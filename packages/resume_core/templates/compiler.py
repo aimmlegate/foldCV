@@ -194,16 +194,19 @@ def compile_definition(definition: TemplateDefinition, version):
     if style.header.divider: require(style.header.divider.color, style.colors, "/style/header/divider")
     if style.focus.icon_catalog: require(style.focus.icon_catalog, assets, "/style/focus/icon_catalog")
     regions = definition.layout.regions
-    if [r.id for r in regions] != ["header", "sidebar", "main"] or definition.layout.reading_order != ["header", "sidebar", "main"]:
-        raise SchemaFailure("/layout", "header/sidebar/main reading order required")
+    region_ids = [r.id for r in regions]
+    # A one-column layout declares no sidebar; documents keep all three regions and its sidebar stays empty.
+    if region_ids not in (["header", "sidebar", "main"], ["header", "main"]) or definition.layout.reading_order != region_ids:
+        raise SchemaFailure("/layout", "header, optional sidebar and main reading order required")
     for region in regions:
         if region.x + region.width > style.page.width:
             raise SchemaFailure("/layout/regions/" + region.id, "region exceeds page width")
         expected = "first_page_header" if region.id == "header" else "independent_column"
         if region.flow != expected: raise SchemaFailure("/layout/regions/" + region.id, "unsupported region flow")
-    sidebar, main = regions[1:]
-    if max(sidebar.x, main.x) < min(sidebar.x + sidebar.width, main.x + main.width):
-        raise SchemaFailure("/layout/regions", "body columns overlap")
+    if len(regions) == 3:
+        sidebar, main = regions[1:]
+        if max(sidebar.x, main.x) < min(sidebar.x + sidebar.width, main.x + main.width):
+            raise SchemaFailure("/layout/regions", "body columns overlap")
     fact_schemas = {}
     for fact in definition.fact_types:
         fact_schemas[fact.id] = reachable_schema(fact.data_schema, definition.content_definitions)
@@ -317,6 +320,8 @@ def compile_definition(definition: TemplateDefinition, version):
                         raise SchemaFailure("/view/" + block.id + pointer, "collection items must be scalar")
                 if node.type == "period" and not {"raw","start","end","ongoing"} <= set(shape.get("properties",{})):
                     raise SchemaFailure("/view/" + block.id + pointer, "period fields must declare raw/start/end/ongoing")
+        if block.placement.region not in region_ids:
+            raise SchemaFailure("/blocks/" + block.id + "/placement", "block region is not in the layout")
         key = (block.placement.region, block.placement.order)
         siblings = placements.setdefault(key, [])
         for sibling in siblings:

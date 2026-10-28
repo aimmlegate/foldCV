@@ -29,7 +29,7 @@ function YearsRow({ entry, paused, submit, drag }: { entry: Entry; paused: boole
     finally { running.current = false; setBusy(false); }
   }
   return <form className="focus-years-row" {...drag.target(entry.recordId)} onSubmit={event => { event.preventDefault(); void save(); }}>
-    <button type="button" className="technology-drag" aria-label={`Порядок в фокусе: ${entry.display}`} title="Перетащите или нажмите Alt+↑ / Alt+↓"
+    <button type="button" className="technology-drag" aria-label={`Порядок в фокусе: ${entry.display}`} title="Перетащите или Alt+↑/↓"
       disabled={paused || busy} {...drag.handle(entry.recordId)}><span aria-hidden="true">⠿</span></button>
     <label htmlFor={`focus-years-${entry.recordId}`}>{entry.display}</label>
     <input id={`focus-years-${entry.recordId}`} aria-label={`Лет опыта: ${entry.display}`} type="number" min={0} max={100} step={1}
@@ -46,6 +46,8 @@ export function FocusYears({ entries, options, paused, submit }: { entries: read
   const running = useRef(false);
   const choice = options.some(option => option.recordId === selected) ? selected : options[0]?.recordId ?? "";
   const drag = useTechnologyDrag(entries.map(entry => entry.recordId), "move_focus", paused || busy, submit);
+  // Nothing to list or add, as for a template without a Focus block: no Focus heading either.
+  if (!entries.length && !options.length) return null;
   async function add() {
     if (paused || running.current || !choice) return;
     running.current = true; setBusy(true);
@@ -53,8 +55,8 @@ export function FocusYears({ entries, options, paused, submit }: { entries: read
     catch { /* The facts panel shows the error. */ }
     finally { running.current = false; setBusy(false); }
   }
-  return <div className="focus-years" aria-label="Фокус в резюме">
-    <p className="technology-label">Фокус в резюме · лет опыта</p>
+  return <div className="focus-years" aria-label="Фокус">
+    <p className="technology-label">Фокус · лет опыта</p>
     {entries.map(entry => <YearsRow key={entry.recordId} entry={entry} paused={paused} submit={submit} drag={drag} />)}
     {drag.dragging && <div className="technology-drop-end" {...drag.target(null)}>В конец списка</div>}
     {options.length > 0 && <form className="focus-add" onSubmit={event => { event.preventDefault(); void add(); }}>

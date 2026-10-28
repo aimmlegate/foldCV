@@ -16,6 +16,7 @@ import { blockAt, copySource, correctionOperation, extractOperations, foldCompos
 import { wireMarks } from "./inline";
 import { employmentPanelCommands, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
+import { changedBy, selectedTextBlocks, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
   type V7Intent, type V7Operation } from "./v7-translation";
 
@@ -322,6 +323,22 @@ export class TemplateEditorSession {
   async linkTarget(target: { blockId: string; occurrenceId: string }, href: string): Promise<void> {
     await this.command([{ operation: { kind: "set_link_target", blockId: target.blockId, occurrenceId: target.occurrenceId, href },
       prior: new Map() }], "panel");
+  }
+
+  /** The text blocks the selection reaches into, with their kinds, as the editor shows them. */
+  textBlocks(): TextBlock[] {
+    return this.editor && !this.closed ? selectedTextBlocks(this.editor._tiptapEditor.state) : [];
+  }
+
+  /** A toolbar block style on the selected blocks: one format_blocks request and one Undo. Blocks that already have
+   * the kind are left out, and nothing is sent when none is left. */
+  async format(style: BlockStyle): Promise<void> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || !this.writable) return;
+    const blocks = this.textBlocks();
+    if (!blocks.length) { this.refuse("block style needs a text block"); return; }
+    const kind = styledKind(style, blocks), blockIds = changedBy(kind, blocks);
+    if (!blockIds.length) return;
+    await this.structure([{ operation: { kind: "format_blocks", blockIds, blockKind: kind } }]);
   }
 
   /** Remove whole selected blocks; their facts stay, as in Python's occurrence removal. */

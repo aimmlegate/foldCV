@@ -6,9 +6,9 @@ export function rewriteCancellable(stage: RewriteStage): boolean {
   return ["saving", "queued", "starting", "running"].includes(stage);
 }
 export const rewriteLabels: Record<RewriteStage, string> = {
-  saving: "Сохраняем ваши изменения", queued: "Правка в очереди", starting: "Начинаем правку",
-  running: "Готовим новый текст", applying: "Применяем и сохраняем правку", cancelling: "Останавливаем запрос",
-  saved: "Текст изменён и сохранён", no_change: "Правка завершена без изменений", cancelled: "Правка отменена",
-  failed: "Не удалось изменить текст", review: "Результат требует проверки",
-  preview: "Новый текст готов к просмотру",
+  saving: "Сохраняем правки", queued: "В очереди", starting: "Начинаем",
+  running: "Готовим новый текст", applying: "Применяем", cancelling: "Останавливаем",
+  saved: "Текст изменён", no_change: "Без изменений", cancelled: "Отменено",
+  failed: "Не удалось изменить текст", review: "Проверьте результат",
+  preview: "Новый текст готов",
 };

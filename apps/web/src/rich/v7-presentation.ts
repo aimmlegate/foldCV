@@ -3,7 +3,6 @@ import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
-import type { BlockNotice } from "./import-notices";
 
 type Presentation = NonNullable<TemplateProjectResponseV1["presentation"]>;
 type Asset = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["templatePackage"]["assets"][number];
@@ -15,11 +14,24 @@ export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url
   presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string> };
 
 /** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
-function assetUrl(asset: Asset): string {
+function assetUrl(asset: Pick<Asset, "sha256">): string {
   return `/v1/rich/template-assets/${asset.sha256}`;
 }
 
 const pt = (value: number): string => `${value}pt`;
+
+/** The sheet's column geometry. A layout without a sidebar is one column: the regions stack in reading order and the
+ * empty sidebar offers no "add text" button. */
+export function sheetColumns(regions: readonly Presentation["recipe"]["layout"]["regions"][number][]): Readonly<Record<string, string>> | null {
+  const byId = new Map(regions.map(region => [region.id, region]));
+  const header = byId.get("header"), sidebar = byId.get("sidebar"), main = byId.get("main");
+  if (!header || !main) return null;
+  const left = sidebar?.x ?? main.x;
+  return { "--fcv-left": pt(left), "--fcv-header-left": pt(header.x - left), "--fcv-header-width": pt(header.width),
+    "--fcv-columns": sidebar ? `${pt(sidebar.width)} ${pt(main.width)}` : pt(main.width),
+    "--fcv-gap": pt(sidebar ? main.x - sidebar.x - sidebar.width : 0),
+    "--fcv-main-column": sidebar ? "2" : "1", "--fcv-main-row": sidebar ? "2" : "3", "--fcv-sidebar-empty": sidebar ? "block" : "none" };
+}
 
 /** Faces, sizes and colors come from the plan; geometry from the compiled recipe. Nothing is read from wording or IDs. */
 export function templateSheet(response: TemplateProjectResponseV1): TemplateSheet | null {
@@ -45,14 +57,17 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
       + ` font-family: var(--fcv-regular), sans-serif; font-size: ${pt(style.size)}; line-height: ${pt(style.lineHeight)};`
       + ` color: ${style.color};${style.alignment ? ` text-align: ${style.alignment};` : ""} }`);
   });
-  const icons = new Map(plan.icons.flatMap(id => { const asset = assets.get(id); return asset ? [[id, assetUrl(asset)] as const] : []; }));
-  const recipe = presentation.recipe, style = recipe.style, [header, sidebar, main] = recipe.layout.regions;
-  if (!header || !sidebar || !main) return null;
+  // A packed icon has no asset entry; the plan names its PNG by hash.
+  const icons = new Map(plan.icons.flatMap(id => {
+    const sha256 = plan.iconFiles?.[id] ?? assets.get(id)?.sha256;
+    return sha256 ? [[id, assetUrl({ sha256 })] as const] : [];
+  }));
+  const recipe = presentation.recipe, style = recipe.style, columns = sheetColumns(recipe.layout.regions);
+  const header = recipe.layout.regions.find(region => region.id === "header");
+  if (!header || !columns) return null;
   const band = style.section_band, focus = style.focus, divider = style.header.divider, logoValue = style.header.logo;
   const variables = {
-    "--fcv-page-width": pt(style.page.width), "--fcv-left": pt(sidebar.x), "--fcv-top": pt(style.header.name_top),
-    "--fcv-sidebar": pt(sidebar.width), "--fcv-main": pt(main.width), "--fcv-gap": pt(main.x - sidebar.x - sidebar.width),
-    "--fcv-header-left": pt(header.x - sidebar.x), "--fcv-header-width": pt(header.width),
+    "--fcv-page-width": pt(style.page.width), "--fcv-top": pt(style.header.name_top), ...columns,
     "--fcv-header-height": pt((divider?.y ?? style.page.first_body_top) - style.header.name_top),
     "--fcv-body-gap": pt(style.page.first_body_top - (divider?.y ?? style.page.first_body_top)),
     "--fcv-divider-left": pt((divider?.x1 ?? header.x) - header.x), "--fcv-divider-width": pt(divider ? divider.x2 - divider.x1 : 0),
@@ -102,33 +117,14 @@ function paintLiterals(content: Node, origin: number, runs: readonly { start: nu
   });
 }
 
-function noteWidget(at: number, notice: BlockNotice): Decoration {
-  return Decoration.widget(at, () => {
-    const note = document.createElement("p");
-    note.className = "fcv-import-note";
-    note.dataset["issueId"] = notice.id;
-    note.textContent = notice.message;
-    return note;
-  }, { side: -1, ignoreSelection: true, key: `import-note-${notice.id}` });
-}
-
 /** Node decorations that apply the plan to canonical block IDs; a block without a plan entry keeps the sheet defaults. */
-export function templatePresentationPlugin(current: () => TemplateSheet | null, notices: () => readonly BlockNotice[] = () => []): Plugin {
+export function templatePresentationPlugin(current: () => TemplateSheet | null): Plugin {
   return new Plugin({ key: new PluginKey(presentationMeta), props: { decorations: state => {
     const sheet = current();
     if (!sheet) return DecorationSet.empty;
     const plan = sheet.presentation.editor, refs = sheet.presentation.blocks, views = sheet.presentation.recipe.views;
-    const notes = new Map<string, BlockNotice>();
-    for (const notice of notices()) if (!notes.has(notice.blockId)) notes.set(notice.blockId, notice);
+    if (!plan) return DecorationSet.empty;
     const decorations: Decoration[] = [];
-    if (!plan) {
-      state.doc.descendants((node, position) => {
-        if (node.type.name !== "blockContainer") return;
-        const id: unknown = node.attrs["id"], notice = typeof id === "string" ? notes.get(id) : undefined;
-        if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
-      });
-      return DecorationSet.create(state.doc, decorations);
-    }
     const rows = new Set(Object.values(plan.blocks).flatMap(entry => entry.focus?.blocks ?? []));
     state.doc.descendants((node, position) => {
       if (node.type.name === "blockGroup" && position === 0) {
@@ -143,11 +139,7 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null, 
         return;
       }
       const entry = typeof id === "string" ? plan.blocks[id] : undefined, ref = typeof id === "string" ? refs[id] : undefined;
-      const notice = typeof id === "string" ? notes.get(id) : undefined;
-      if (!entry || !ref) {
-        if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
-        return;
-      }
+      if (!entry || !ref) return;
       const view = views[ref.viewKey], attributes: Record<string, string> = { "data-fcv-style": sheet.styles.get(entry.style) ?? "" };
       const properties: string[] = [];
       if (entry.band) attributes["data-fcv-band"] = "true";
@@ -167,14 +159,17 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null, 
       }
       if (properties.length) attributes["style"] = properties.join("; ");
       decorations.push(Decoration.node(position, position + node.nodeSize, attributes));
-      if (notice) decorations.push(noteWidget(position + node.nodeSize - 1, notice));
-      // Inline spans that keep another style, and links. A technical link is a BlockNote link, not a bound link.
+      // Inline spans that keep another style, technology chips, and links. A technical link is a BlockNote link, not a bound link.
       const runs = literalRuns(entry.inline);
       content.descendants((child, offset) => {
         const at = position + 2 + offset, name = child.type.name;
         const identity: unknown = name === "templateField" ? child.attrs["bindingId"] : name === "manualScope" ? child.attrs["fragmentId"] : null;
         const key = typeof identity === "string" ? entry.inline?.[identity] : undefined;
-        if (key) decorations.push(Decoration.node(at, at + child.nodeSize, { "data-fcv-style": sheet.styles.get(key) ?? "" }));
+        const chip = typeof identity === "string" ? entry.chips?.[identity] : undefined;
+        const inline: Record<string, string> = {};
+        if (key) inline["data-fcv-style"] = sheet.styles.get(key) ?? "";
+        if (chip) Object.assign(inline, { "data-fcv-chip": "true", style: `--fcv-chip: ${chip}` });
+        if (key || chip) decorations.push(Decoration.node(at, at + child.nodeSize, inline));
         if (name === "link" || (name === "boundLink" && entry.links?.includes(String(child.attrs["occurrenceId"]))))
           decorations.push(Decoration.node(at, at + child.nodeSize, { class: "fcv-link" }));
       });

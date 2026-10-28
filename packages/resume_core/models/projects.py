@@ -99,6 +99,27 @@ class RewriteCancelRequestV1(Wire):
     request_id: Id
 
 
+class ProjectCheckRequestV1(Wire):
+    editor_token: str = Field(min_length=1, max_length=128)
+
+
+class CheckedImportIssueV1(Wire):
+    id: Id
+    block_ids: list[Id]
+
+
+class ProjectCheckResultV1(Wire):
+    """The deterministic resume check over the committed workspace; no model call and no write."""
+    schema_version: Literal[1]
+    project_revision: Revision
+    document_revision: Revision
+    blocks: int = Field(ge=0)
+    facts: int = Field(ge=0)
+    empty_blocks: list[Id] = Field(max_length=50)
+    links_without_target: list[Id] = Field(max_length=50)
+    open_import_issues: list[CheckedImportIssueV1] = Field(max_length=50)
+
+
 class RevisionConflictV1(Wire):
     """The body of a 409 for a stale base: the client drops what was applied and re-issues or reports the rest."""
     error: dict
@@ -129,6 +150,8 @@ PROJECT_CONTRACTS = {
     'delete_request_v1': DeleteRequestV1,
     'rewrite_preview_request_v1': RewritePreviewRequestV1,
     'rewrite_cancel_request_v1': RewriteCancelRequestV1,
+    'project_check_request_v1': ProjectCheckRequestV1,
+    'project_check_result_v1': ProjectCheckResultV1,
 }
 
 

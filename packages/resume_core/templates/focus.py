@@ -2,30 +2,88 @@
 
 import base64
 import binascii
+from dataclasses import dataclass, field
+import hashlib
 import json
 import math
+import re
 
 from ..dates import month_bounds, union_months
 from ..rich_fields import records_by_id, working_field
-from ..technologies import normalize_name, technology_identity
+from ..technologies import BY_ID, normalize_name, resolve_technology, split_version, technology_identity
 from ..technology_experience import whole_years_text
+from .models import CapturedAsset
 from .projection import pointer_tokens
+
+_QUALIFIER = re.compile(r'\s*\([^()]*\)$')
+PACK = 'foldcv-icon-pack-1'
+
+
+@dataclass(frozen=True)
+class IconCatalog:
+    """The template's names for its icons, the same icons by technology catalog ID, and each icon's PNG."""
+    aliases: dict[str, str] = field(default_factory=dict)
+    canonical: dict[str, str] = field(default_factory=dict)
+    files: dict[str, CapturedAsset] = field(default_factory=dict)
+
+    def find(self, text):
+        """The template's own name wins; then the catalog technology the name resolves to (k8s, Python 3.12,
+        GitLab CI/CD); a trailing parenthetical qualifier is dropped last. None shows text only."""
+        name = normalize_name(text)
+        for candidate in dict.fromkeys(value for value in (name, _QUALIFIER.sub('', name)) if value):
+            icon = (self.aliases.get(candidate) or self.aliases.get(split_version(candidate)[0])
+                or self.canonical.get(resolve_technology(candidate).canonical_id))
+            if icon is not None:
+                return icon
+        return None
+
+
+def packed_icons(catalog, icons):
+    """The PNGs an icon pack carries, as icon assets of the catalog asset; each is checked against its stated hash."""
+    if not isinstance(icons, dict):
+        raise ValueError('focus icon catalog is unreadable')
+    files = {}
+    for icon, value in icons.items():
+        if not isinstance(value, dict) or not isinstance(value.get('png'), str) or not isinstance(value.get('sha256'), str):
+            raise ValueError('focus icon catalog is unreadable')
+        try:
+            raw = base64.b64decode(value['png'], validate=True)
+        except binascii.Error:
+            raise ValueError('focus icon catalog is unreadable') from None
+        if hashlib.sha256(raw).hexdigest() != value['sha256']:
+            raise ValueError('focus icon catalog is unreadable')
+        files[icon] = CapturedAsset(id=icon, path=catalog.path + '#' + icon, role='icon', mimeType='image/png',
+            sha256=value['sha256'], size=len(raw), bytesBase64=value['png'])
+    return files
 
 
 def icon_catalog(package):
-    """Normalized alias to captured icon asset; empty when the template declares no catalog."""
+    """The captured alias catalog of the template; empty when the template declares none. A flat catalog names icon
+    assets; an icon pack (one asset, as a portable archive holds at most 47 entries) carries names and PNGs."""
     name = package.recipe.style.focus.icon_catalog
     if name is None:
-        return {}
+        return IconCatalog()
     assets = {asset.id: asset for asset in package.assets}
     try:
         aliases = json.loads(base64.b64decode(assets[name].bytes_base64, validate=True))
     except (KeyError, binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
         raise ValueError('focus icon catalog is unreadable') from None
-    if not isinstance(aliases, dict) or not all(isinstance(alias, str) and isinstance(icon, str)
-            and icon in assets and assets[icon].role == 'icon' for alias, icon in aliases.items()):
+    if isinstance(aliases, dict) and aliases.get('schema') == PACK:
+        files = packed_icons(assets[name], aliases.get('icons'))
+        aliases = aliases.get('names')
+    else:
+        files = {asset.id: asset for asset in package.assets if asset.role == 'icon'}
+    if not isinstance(aliases, dict) or not all(isinstance(alias, str) and isinstance(icon, str) and icon in files
+            for alias, icon in aliases.items()):
         raise ValueError('focus icon catalog names an unknown icon')
-    return {normalize_name(alias): icon for alias, icon in aliases.items()}
+    normalized = {normalize_name(alias): icon for alias, icon in aliases.items()}
+    # A key that is a catalog ID binds it first; older packages name icons by display aliases only (c#, .net).
+    canonical = {alias: icon for alias, icon in normalized.items() if alias in BY_ID}
+    for alias, icon in normalized.items():
+        identifier = resolve_technology(alias).canonical_id
+        if identifier is not None:
+            canonical.setdefault(identifier, icon)
+    return IconCatalog(normalized, canonical, files)
 
 
 def name_keys(definition, view_key, node):
@@ -55,7 +113,7 @@ def focus_icon(package, facts, row, catalog=None):
             for part in span.content if span.type == 'bound_link' else [span]:
                 if part.type == 'fact_field' and part.field_key in keys and part.record_id in records:
                     field = working_field(records[part.record_id], part.field_key)
-                    return catalog.get(normalize_name(field.raw_text)) if field is not None else None
+                    return catalog.find(field.raw_text) if field is not None else None
     return None
 
 

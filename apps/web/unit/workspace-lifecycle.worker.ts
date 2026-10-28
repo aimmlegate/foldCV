@@ -9,10 +9,11 @@ function deferred() {
 }
 const effects: (() => void | (() => void))[] = [], cleanups: (() => void)[] = [], events: string[] = [];
 const scenario = process.argv[2] ?? "", importing = scenario.startsWith("import-");
-// useState call order in useResumeWorkspace: the open template is the 1st state, error the 6th, busy the 8th.
-const TEMPLATE = 0, ERROR = 5, BUSY = 7;
+// useState call order in useResumeWorkspace: the open template is the 1st state, error the 3rd, busy the 5th, the
+// followed imports the 6th.
+const TEMPLATE = 0, ERROR = 2, BUSY = 4, IMPORTS = 5;
 const stateWrites = new Map<number, unknown[]>(), initialStates = new Map<number, unknown>();
-let stateIndex = 0, importReads = 0;
+let stateIndex = 0;
 let mounted = true, staleState = 0;
 Object.defineProperty(globalThis, "location", { value: { search: "?project=A", href: "http://foldcv.test/?project=A", pathname: "/" } });
 Object.defineProperty(globalThis, "history", { value: { replaceState: (_data: unknown, _unused: string, url: string) => events.push(`url:${url}`) } });
@@ -31,28 +32,29 @@ mock.module(file("../src/errors/messages.ts"), { namedExports: { errorMessage: (
 mock.module(file("../src/rich/import-source.ts"), { namedExports: { hasInput: () => importing, importBody: () => ({}) } });
 const pending = deferred();
 let holdDelete = false, holdOpen = false, cleanupStatus = "complete";
-const opened = (id: string) => ({ response: { workspace: { projectId: id, project: {} }, identity: null } });
+// The imported project T opens as a pre-draft (no authored project yet); every other project is authored.
+const opened = (id: string) => ({ response: { workspace: { projectId: id, title: id, project: id === "T" && importing ? null : {} }, identity: null } });
 mock.module(file("../src/workbench/open-editor.ts"), { namedExports: {
   openEditor: async (id: string) => { events.push(`open:${id}`); if (holdOpen) await pending.promise; return opened(id); },
 } });
-const queued = scenario === "import-queued";
-const importState = scenario === "import-timeout" || queued ? "running" : scenario === "import-cancelled" ? "cancelled" : "failed";
+const task = (state: string, error: string | null = null) => ({ id: "task-1", projectId: "T", kind: "import", state, stage: "processing",
+  startedAt: "2026-10-28T00:00:00+00:00", elapsed: 1, detail: { operationId: "operation-1" }, error });
 mock.module(file("../src/projects/api.ts"), { namedExports: {
   listProjects: async () => { events.push("catalog"); return { entries: [], errors: [] }; },
-  createProject: async () => { events.push("create"); return { workspace: { projectId: "T" } }; },
-  startImport: async () => {
+  createProject: async (_body: FormData, templateId: string | null) => { events.push(`create:${templateId}`); return { workspace: { projectId: "T" } }; },
+  startImport: async (_id: string, body: { allowTextRewrite: boolean; effort: string | null }) => {
     if (!importing) throw new Error("unused");
-    events.push("import:start");
-    return { id: "task-1", state: importState, stage: queued ? "waiting" : "processing", detail: {},
-      error: importState === "failed" ? "PROCESS_FAILED" : null };
+    events.push(`import:start:${body.allowTextRewrite}:${body.effort}`);
+    if (scenario === "import-refused") throw new Error("JOB_DISABLED");
+    return scenario === "import-failed" ? task("failed", "IMPORT_EFFORT_UNSUPPORTED") : task("running");
   },
-  projectTasks: async () => {
-    importReads++;
-    // The queued import waits 100 minutes behind another one, then runs.
-    return [{ id: "task-1", state: "running", stage: queued && importReads <= 100 ? "waiting" : "processing", detail: {}, error: null }];
+  projectTasks: async (id: string) => {
+    events.push(`tasks:${id}`);
+    return scenario === "import-background" || scenario === "import-delete" ? [task("running")] : [];
   },
   resumeImport: async () => { throw new Error("unused"); },
-  cancelImport: async () => { events.push("import:cancel"); },
+  lastImportOperation: async () => { throw new Error("unused"); },
+  cancelImport: async () => { events.push("import:cancel"); return task("cancelled"); },
   openFoldcv: async () => {
     if (scenario !== "upload-archive") throw new Error("unused");
     events.push("request:/v2/projects/archive");
@@ -106,19 +108,33 @@ function invoke(): Promise<unknown> {
   }
 }
 if (importing) {
-  let now = Date.now();
-  mock.method(Date, "now", () => now);
-  const schedule = globalThis.setTimeout;
-  mock.method(globalThis, "setTimeout", (callback: () => void) => { now += 60_000; return schedule(callback, 0); });
-  await hook.process();
-  // One read per minute until the default import window plus cleanup (5 s), publication (158 s) and a minute.
-  // A queued import gets the same window once it runs: the 100 minutes in the queue do not count.
-  assert.equal(importReads, scenario === "import-timeout" ? 64 : queued ? 101 + 64 : 0);
-  const expected = scenario === "import-timeout" || queued ? "PROCESS_TIMEOUT" : scenario === "import-cancelled" ? "CANCELLED" : "PROCESS_FAILED";
-  assert.ok(stateWrites.get(ERROR)?.some(value => String(value).includes(expected)), "terminal imports report an error without an optional server error");
-  assert.equal(stateWrites.get(BUSY)?.at(-1), false, "the busy state is released");
-  assert.equal(await hook.action(async () => {}), true, "another action is admitted after failure");
-  mock.restoreAll();
+  type Followed = ReadonlyMap<string, { task: { state: string; error: string | null } }>;
+  const followed = () => stateWrites.get(IMPORTS)?.at(-1) as Followed | undefined;
+  await hook.process(new File(["synthetic"], "cv.txt"), { allowTextRewrite: false, effort: "high" }, "second-one-column");
+  // The upload carries the chosen template and the import start the other choices; the new resume opens as a
+  // pre-draft whose running task is read.
+  const opening = ["open:T", "catalog", "tasks:T", "url:/?project=T"];
+  // A start that already failed is a finished import: the resume list is read again at once.
+  const started = scenario === "import-failed" ? ["import:start:false:high", "catalog"] : ["import:start:false:high"];
+  assert.deepEqual(events, ["create:second-one-column", "catalog", ...started, ...opening]);
+  assert.equal(stateWrites.get(BUSY)?.at(-1), false, "the busy state is released when the import has started");
+  if (scenario === "import-background") {
+    assert.equal(followed()?.get("T")?.task.state, "running", "the import still runs in the background");
+    assert.equal(await hook.action(async () => {}), true, "other actions run while the import runs");
+  } else if (scenario === "import-failed") {
+    // A task that failed at its start is shown on the import screen with Retry and Close, not as a workspace error.
+    assert.equal(followed()?.get("T")?.task.error, "IMPORT_EFFORT_UNSUPPORTED");
+    assert.ok(!stateWrites.get(ERROR)?.some(value => String(value).includes("IMPORT_EFFORT_UNSUPPORTED")));
+  } else if (scenario === "import-refused") {
+    assert.ok(stateWrites.get(ERROR)?.some(value => String(value).includes("JOB_DISABLED")), "a refused start is reported");
+    assert.equal(followed()?.get("T"), undefined);
+  } else if (scenario === "import-delete") {
+    gate.resolve(); events.length = 0;
+    assert.equal(await hook.remove("T"), true);
+    // The service refuses to delete a project whose import runs, so the import stops first.
+    assert.deepEqual(events.slice(0, 2), ["import:cancel", "delete:T"]);
+    assert.equal(followed()?.get("T"), undefined);
+  } else throw new Error(`Unknown scenario ${scenario}`);
 } else if (wait) {
   const result = invoke();
   await Promise.resolve(); unmount();

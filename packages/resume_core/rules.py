@@ -12,12 +12,16 @@ from .storage import StorageFailure, atomic_write, data_root, locked_root, priva
 
 PRESET_HEADINGS = {"shorten": "## Preset: shorten", "clarify": "## Preset: clarify"}
 MAX_RULE_BYTES = 32_768
-EXCLUSION_SENTENCE = (
-    "Omit personal phone, email, messengers, birth date, age and job-board metadata "
-    "from the public resume while retaining their private source evidence."
-)
 HEADER = re.compile(r"<!-- foldcv-rules:v1 revision=([1-9][0-9]*) sha256=([a-f0-9]{64}) -->\n")
 DEFAULT_RULES = Path(__file__).with_name("default_rules.md").read_text(encoding="utf-8")
+FIRST_PRESET = re.compile(r"^## Preset: (?:shorten|clarify)$", re.M)
+# SHA-256 of the editorial text that earlier defaults put before the presets (49b4c406, its NE01 form, 4cc6523e).
+# Nothing reads it since V7; the template holds those rules (D111). Text a user wrote stays.
+LEGACY_EDITORIAL = {
+    "107deec7a56114463d04b764cdbbaee12b4d30baa5ffdf712e4c4fbd6a4c7cd0",
+    "4bde44ff8097b80ada583980e59c73789b1242966c32e00a1565261e493550ca",
+    "db07951b27142a644e15fdd9e7eb79d458ca9aa56c59da6ac8c96e05ee2eb566",
+}
 
 
 class RulesFailure(Exception):
@@ -26,13 +30,11 @@ class RulesFailure(Exception):
         super().__init__(code)
 
 
-def remove_candidate_exclusion(markdown: str) -> str:
-    pattern = r"\s+".join(re.escape(word) for word in EXCLUSION_SENTENCE.split())
-    matches = list(re.finditer(pattern, markdown))
-    if len(matches) != 1:
-        raise RulesFailure("RULES_EXCLUSION_MISMATCH")
-    span = matches[0]
-    return markdown[:span.start()] + markdown[span.end():]
+def without_legacy_editorial(markdown: str) -> str:
+    match = FIRST_PRESET.search(markdown)
+    if match is None or hashlib.sha256(markdown[:match.start()].encode()).hexdigest() not in LEGACY_EDITORIAL:
+        return markdown
+    return markdown[match.start():]
 
 
 def normalize_markdown(markdown: str) -> str:
@@ -105,6 +107,10 @@ class RulesStore:
         result = captured_rules(content[match.end():], int(match.group(1)))
         if result.sha256 != match.group(2):
             raise RulesFailure("RULES_LOAD_FAILED")
+        trimmed = without_legacy_editorial(result.markdown)
+        if trimmed != result.markdown:
+            result = captured_rules(trimmed, result.revision + 1)
+            self._write(result)
         return result
 
     def _write(self, rules: Rules) -> None:

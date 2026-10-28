@@ -7,7 +7,7 @@ Example Institute
 English
 Open source: Queue Tools https://example.org/queue-tools
 Course: Example Academy, Queue Design, 2021
-Old Systems — engineer, 2010–2012; Perl
+Old Systems — engineer, 2006–2008; Perl
 Example Labs — Queue Platform — backend engineer, 03.2020–11.2023
 Product: message queue platform for internal services.
 Python, PostgreSQL, Docker

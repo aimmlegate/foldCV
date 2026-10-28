@@ -47,6 +47,41 @@
 @media (max-width: 1000px) { .progress-screen { padding: 26px; } .import-progress-grid { gap: 24px; grid-template-columns: minmax(170px, .8fr) minmax(0, 1.2fr); } }
 @media (max-width: 700px) { .progress-screen { align-items: flex-start; padding: 24px; } .import-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 22px; } .import-live-message { min-height: 0; margin-top: 14px; } .progress-screen .progress-content h2 { font-size: 29px; } .import-discoveries { padding: 18px; } .import-progress-footer { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 20px; } }
 @media (prefers-reduced-motion: reduce) { .import-activity-dot { animation: none; } }
-.source-form .source-rewrite { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; font-size: 12px; line-height: 1.5; color: var(--ink); cursor: pointer; }
-.source-rewrite input { width: 16px; height: 16px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--accent); }
-.source-rewrite small { display: block; margin-top: 4px; font-size: 11px; font-weight: 400; color: var(--muted); }
+.import-progress-heading .operation-elapsed { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.import-stage-copy { display: grid; gap: 3px; min-width: 0; }
+.import-stage-copy small { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+.import-rotating { color: var(--accent); font-style: italic; white-space: nowrap; }
+.import-signs { margin: 4px 0 0 15px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.import-problem { margin-top: 18px; padding: 14px 16px; border: 1px solid #e7d5cb; border-radius: 8px; background: #f8eee6; color: #8a4f35; }
+.import-problem.neutral { border-color: var(--line); background: var(--wash); color: var(--ink); }
+.import-problem strong { display: block; font-size: 13px; font-weight: 600; }
+.import-problem p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; }
+.import-problem-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 12px; }
+.import-problem-actions .button { font-size: 12px; padding: 7px 12px; }
+.import-activity { margin-top: 18px; }
+.import-activity h4 { margin: 0 0 8px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: .6px; text-transform: uppercase; }
+.import-activity ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.import-activity li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; color: var(--ink); font-size: 11px; line-height: 1.5; }
+.import-activity time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.task-notice p { display: grid; gap: 2px; }
+.task-notice-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+/* Feedback item 14: a smaller form; item 12: model, effort and rewrite sit next to «Обработать».
+   `section.` outranks the later readability.css sizes, which have the same class specificity. */
+.app-shell section.new-screen .source-form { max-width: 600px; padding: 26px; }
+.app-shell section.new-screen .source-form h2 { margin-bottom: 14px; font-size: 24px; }
+.app-shell section.new-screen .source-form label { margin: 12px 0 6px; font-size: 11px; }
+.app-shell section.new-screen .source-form :is(select, button, .source-filename) { font-size: 12px; }
+.app-shell section.new-screen .source-form .model-select { max-width: none; padding: 7px 9px; }
+.app-shell section.new-screen .source-form .dropzone { margin: 14px 0 12px; padding: 14px; }
+.app-shell section.new-screen .source-form .dropzone strong { font-size: 12px; }
+.app-shell section.new-screen .source-form .dropzone small { font-size: 11px; }
+.app-shell section.new-screen .source-form .upload-mark { width: 34px; height: 34px; }
+.app-shell section.new-screen .source-form .import-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 14px; align-items: end; margin-top: 16px; }
+.app-shell section.new-screen .source-form .import-option label { margin-top: 0; }
+.app-shell section.new-screen .source-form .import-rewrite { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--ink); line-height: 1.4; cursor: pointer; }
+.app-shell section.new-screen .source-form .import-rewrite small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 400; }
+.app-shell section.new-screen .source-form .import-process-button { justify-self: end; }
+@media (max-width: 600px) {
+  .app-shell section.new-screen .source-form .import-options { grid-template-columns: minmax(0, 1fr); }
+  .app-shell section.new-screen .source-form .import-process-button { justify-self: stretch; }
+}

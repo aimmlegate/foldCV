@@ -2639,6 +2639,14 @@
           "default": null,
           "title": "Band"
         },
+        "chips": {
+          "additionalProperties": {
+            "pattern": "^#[a-fA-F0-9]{6}$",
+            "type": "string"
+          },
+          "title": "Chips",
+          "type": "object"
+        },
         "focus": {
           "anyOf": [
             {
@@ -2787,6 +2795,14 @@
           },
           "title": "Fonts",
           "type": "array"
+        },
+        "iconFiles": {
+          "additionalProperties": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "title": "Iconfiles",
+          "type": "object"
         },
         "icons": {
           "items": {

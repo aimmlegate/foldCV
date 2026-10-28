@@ -1,13 +1,16 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../../projects/api";
 import { ProjectApiFailure } from "../../../rich/v7-connection";
 
 export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
-export type TemplateConfigState = { package: TemplateSummary; format: "yaml" | "json"; text: string; bundled: boolean };
+/** One template's YAML; `bundled` and `edited` as in its catalog entry. */
+export type TemplateConfigState = { package: TemplateSummary; format: "yaml" | "json"; text: string; bundled: boolean; edited: boolean };
 export type TemplateProblem = { path: string; message: string };
 export type TemplateCheck = { valid: true; package: TemplateSummary } | { valid: false; error: TemplateProblem };
 export type TemplateSave = { saved: true; state: TemplateConfigState } | { saved: false; error: TemplateProblem };
 
 const path = "/v1/rich/template-config";
+const one = (templateId: string) => `${path}/${encodeURIComponent(templateId)}`;
 
 function field(value: unknown, key: string): unknown {
   return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
@@ -21,9 +24,10 @@ function summary(value: unknown): TemplateSummary {
   return { id: text(value, "id"), name: text(value, "name"), revision: text(value, "revision"), packageHash: text(value, "packageHash") };
 }
 export function parseConfigState(value: unknown): TemplateConfigState {
-  const format = field(value, "format"), bundled = field(value, "bundled");
-  if (field(value, "schemaVersion") !== 1 || (format !== "yaml" && format !== "json") || typeof bundled !== "boolean") throw new ProjectApiFailure("INVALID_RESULT");
-  return { package: summary(field(value, "package")), format, text: text(value, "text"), bundled };
+  const format = field(value, "format"), bundled = field(value, "bundled"), edited = field(value, "edited");
+  if (field(value, "schemaVersion") !== 1 || (format !== "yaml" && format !== "json") || typeof bundled !== "boolean" || typeof edited !== "boolean")
+    throw new ProjectApiFailure("INVALID_RESULT");
+  return { package: summary(field(value, "package")), format, text: text(value, "text"), bundled, edited };
 }
 export function parseCheck(value: unknown): TemplateCheck {
   if (field(value, "schemaVersion") !== 1) throw new ProjectApiFailure("INVALID_RESULT");
@@ -32,6 +36,12 @@ export function parseCheck(value: unknown): TemplateCheck {
   if (valid !== false) throw new ProjectApiFailure("INVALID_RESULT");
   const error = field(value, "error");
   return { valid: false, error: { path: text(error, "path"), message: text(error, "message") } };
+}
+
+/** The catalog after a save or reset of one template: its entry follows the new state, the others stay. */
+export function withState(catalog: TemplateCatalog, state: TemplateConfigState): TemplateCatalog {
+  const entry: TemplateEntry = { ...state.package, bundled: state.bundled, edited: state.edited };
+  return { ...catalog, templates: catalog.templates.map(value => value.id === entry.id ? entry : value) };
 }
 
 /** A refused save answers 422 with the same body as a failed check; other failures carry an error code. */
@@ -46,14 +56,17 @@ async function call(url: string, method: string, body?: unknown): Promise<{ stat
   throw new ProjectApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
 }
 
-export async function readTemplateConfig(): Promise<TemplateConfigState> {
-  return parseConfigState((await call(path, "GET")).value);
+export async function readTemplateCatalog(): Promise<TemplateCatalog> {
+  return parseTemplateCatalog((await call(path, "GET")).value);
 }
-export async function checkTemplateConfig(source: string): Promise<TemplateCheck> {
-  return parseCheck((await call(`${path}/check`, "POST", { text: source })).value);
+export async function readTemplateConfig(templateId: string): Promise<TemplateConfigState> {
+  return parseConfigState((await call(one(templateId), "GET")).value);
 }
-export async function saveTemplateConfig(source: string): Promise<TemplateSave> {
-  const { status, value } = await call(path, "PUT", { text: source });
+export async function checkTemplateConfig(templateId: string, source: string): Promise<TemplateCheck> {
+  return parseCheck((await call(`${one(templateId)}/check`, "POST", { text: source })).value);
+}
+export async function saveTemplateConfig(templateId: string, source: string): Promise<TemplateSave> {
+  const { status, value } = await call(one(templateId), "PUT", { text: source });
   if (status === 422) {
     const check = parseCheck(value);
     if (check.valid) throw new ProjectApiFailure("INVALID_RESULT");
@@ -61,8 +74,12 @@ export async function saveTemplateConfig(source: string): Promise<TemplateSave> 
   }
   return { saved: true, state: parseConfigState(value) };
 }
-export async function resetTemplateConfig(): Promise<TemplateConfigState> {
-  return parseConfigState((await call(`${path}/reset`, "POST", {})).value);
+export async function resetTemplateConfig(templateId: string): Promise<TemplateConfigState> {
+  return parseConfigState((await call(`${one(templateId)}/reset`, "POST", {})).value);
+}
+/** Makes the template the default for new imports; its saved YAML stays as it is. */
+export async function setDefaultTemplate(templateId: string): Promise<TemplateCatalog> {
+  return parseTemplateCatalog((await call("/v1/rich/template-default", "PUT", { templateId })).value);
 }
 
 function tokens(pointer: string): string[] {

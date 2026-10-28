@@ -13,7 +13,7 @@ export function originalUrl(projectId: string, sourceId: string): string {
 
 export async function loadOriginal(url: string, hash: string, signal: AbortSignal): Promise<Blob> {
   const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal });
-  if (!response.ok) throw new Error("Не удалось загрузить оригинал. Попробуйте ещё раз.");
+  if (!response.ok) throw new Error("Не удалось загрузить оригинал.");
   const bytes = await response.arrayBuffer();
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");

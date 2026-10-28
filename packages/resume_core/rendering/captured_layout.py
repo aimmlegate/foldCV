@@ -45,8 +45,10 @@ class BodyGeometry:
     @classmethod
     def from_recipe(cls, recipe):
         page = recipe.style.page
-        sidebar, main = recipe.layout.regions[1:]
-        if sidebar.x + sidebar.width > main.x or page.first_body_top < page.continuation_body_top:
+        regions = {region.id: region for region in recipe.layout.regions}
+        # A one-column layout has no sidebar: its body starts at the main column, with no sidebar or gap width.
+        sidebar, main = regions.get('sidebar'), regions['main']
+        if (sidebar is not None and sidebar.x + sidebar.width > main.x) or page.first_body_top < page.continuation_body_top:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         # Page-size native properties use unsigned short values.
         width = native_units(page.width, positive=True, maximum=65535)
@@ -54,8 +56,8 @@ class BodyGeometry:
         first = native_units(page.first_body_top)
         continuation = native_units(page.continuation_body_top)
         bottom = native_units(page.body_bottom, positive=True)
-        left = native_units(sidebar.x)
-        sidebar_width = native_units(sidebar.width, positive=True)
+        left = native_units(sidebar.x if sidebar is not None else main.x)
+        sidebar_width = native_units(sidebar.width, positive=True) if sidebar is not None else 0
         main_x = native_units(main.x)
         main_width = native_units(main.width, positive=True)
         gap, right = main_x - left - sidebar_width, width - main_x - main_width

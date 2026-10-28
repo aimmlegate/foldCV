@@ -10,6 +10,12 @@ export type AssistantHandle = { stop: () => Promise<void> };
 const key = "foldcv.assistant.drawer";
 function storedSize() { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null"); return drawerSize(value); } catch { return drawerSize(null); } }
 
+function blocksText(count: number): string {
+  const last = count % 10, tens = count % 100;
+  const word = last === 1 && tens !== 11 ? "блок" : last >= 2 && last <= 4 && (tens < 12 || tens > 14) ? "блока" : "блоков";
+  return `${String(count)} ${word}`;
+}
+
 /** The assistant drawer of the open V7 editor: runs read a pinned snapshot, proposals change the resume only through
  * the editor's Apply (D093, D109). */
 export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме", onProjectLifecycle }: {
@@ -75,7 +81,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
   const active = controller.current?.active ?? false;
   return view?.settings?.enabled ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500}
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
-    log={log} captured={captured ? `${String(captured.blockIds.length)} ${captured.blockIds.length === 1 ? "блок" : "блоков"}` : null}
+    log={log} captured={captured ? blocksText(captured.blockIds.length) : null}
     applying={view.proposalBusy !== null}
     failure={failure ? errorText(failure) : view.error ? errorText(view.error) : null} fence={null}
     draft={value => controller.current?.draft(value)} flags={(allowEdits, allowWeb) => controller.current?.flags({ allowEdits, allowWeb })}

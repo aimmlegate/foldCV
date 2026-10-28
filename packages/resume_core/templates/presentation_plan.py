@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from ..rendering.captured_styles import authored_spans
 from .compiler import canonical, sha256
 from .focus import focus_icon, icon_catalog
+from .models import remember_asset
 
 
 def hyperlink_target(href):
@@ -28,6 +29,15 @@ def is_band(block, recipe):
     ref = block.presentation
     return (block.type == 'heading' and ref is not None and ref.node_index is None
         and recipe.views[ref.view_key].heading == 'band')
+
+
+def chip_background(block, span, recipe):
+    """The chip color of a fact or edit-scope span that a tags node with a background shows; None for other spans.
+    Separators stay plain text, so each technology reads as its own chip."""
+    if span.type not in {'fact_field', 'manual_scope'} or not span.text:
+        return None
+    node = node_of(recipe, span.presentation or block.presentation)
+    return recipe.style.colors[node.background] if node is not None and node.type == 'tags' and node.background else None
 
 
 def focus_row(block, recipe):
@@ -90,7 +100,7 @@ def style_entry(package, fonts, ref):
 
 
 def editor_plan(project):
-    """Per block: its style, band and Focus icon, and which bound links export as hyperlinks."""
+    """Per block: its style, band, Focus icon and technology chips, and which bound links export as hyperlinks."""
     package = project.template_package
     recipe = package.recipe
     fonts, styles, cached = resolver(package)
@@ -110,12 +120,15 @@ def editor_plan(project):
             if cached[0] is None:
                 cached[0] = icon_catalog(package)
             entry['focus'] = {'blocks': [child.id for child in row], 'icon': focus_icon(package, project.facts, row, cached[0])}
-        inline, links, offset = {}, [], 0
+        inline, links, chips, offset = {}, [], {}, 0
         for span in block.content if isinstance(block.content, list) else []:
             for part in span.content if span.type == 'bound_link' else [span]:
                 identity = getattr(part, 'binding_id', None) or getattr(part, 'fragment_id', None)
                 if identity is not None and part.presentation is not None and style_key(part.presentation) != entry['style']:
                     inline[identity] = keyed(part.presentation)
+            chip = chip_background(block, span, recipe)
+            if chip is not None:
+                chips[getattr(span, 'binding_id', None) or span.fragment_id] = chip
             if span.type == 'bound_link' and hyperlink_target(span.href) is not None:
                 links.append((span.label_binding or span.url_binding).occurrence_id)
         # A literal span has no node id. Record its UTF-16 range when its style is not the block's.
@@ -131,12 +144,22 @@ def editor_plan(project):
             entry['inline'] = inline
         if links:
             entry['links'] = links
+        if chips:
+            entry['chips'] = chips
         blocks[block.id] = entry
     used = {styles[value['style']]['faces'][face] for value in blocks.values() for face in ('regular', 'bold', 'italic', 'boldItalic')}
     used |= {face for key in {key for value in blocks.values() for key in value.get('inline', {}).values()}
         for face in styles[key]['faces'].values()}
-    icons = {value['focus']['icon'] for value in blocks.values() if value.get('focus')}
-    return {'styles': {key: styles[key] for key in sorted({value['style'] for value in blocks.values()}
+    icons = sorted(icon for icon in {value['focus']['icon'] for value in blocks.values() if value.get('focus')} if icon is not None)
+    files = {}
+    for icon in icons:
+        # A packed icon is no asset of its own; its checked bytes join the captured ones the asset route serves by hash.
+        asset = cached[0].files[icon]
+        remember_asset(asset.sha256, asset.bytes_base64, asset.mime_type)
+        files[icon] = asset.sha256
+    plan = {'styles': {key: styles[key] for key in sorted({value['style'] for value in blocks.values()}
             | {key for value in blocks.values() for key in value.get('inline', {}).values()})},
-        'blocks': blocks, 'fonts': sorted(face for face in used if face is not None),
-        'icons': sorted(icon for icon in icons if icon is not None)}
+        'blocks': blocks, 'fonts': sorted(face for face in used if face is not None), 'icons': icons}
+    if files:
+        plan['iconFiles'] = files
+    return plan

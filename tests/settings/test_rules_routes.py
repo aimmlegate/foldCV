@@ -40,7 +40,7 @@ async def test_rule_settings_roundtrip_requires_session_and_stale_save_is_safe(a
         initial = (await client.get("/v1/settings/rules")).json()
         assert set(initial["presets"]) == {"shorten", "clarify"}
         assert "Сократи" in initial["presets"]["shorten"]
-        changed = initial["markdown"].replace("15 years", "20 years")
+        changed = initial["markdown"].replace("лишние слова", "вводные слова")
         saved = await client.put("/v1/settings/rules", headers={"Origin": ORIGIN},
                                  json={"markdown": changed, "baseRevision": initial["revision"]})
         assert saved.status_code == 200 and saved.json()["revision"] == 2

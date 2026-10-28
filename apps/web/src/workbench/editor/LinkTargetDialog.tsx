@@ -6,14 +6,14 @@ import { validLink } from "./link";
 export function LinkTargetDialog({ href, close, apply }: { href: string; close: () => void; apply: (href: string) => void }) {
   const dialog = useRef<HTMLDialogElement>(null), [value, setValue] = useState(href);
   useEffect(() => { const element = dialog.current; if (element && !element.open) element.showModal(); }, []);
-  const note = value === "" ? "Без адреса текст ссылки останется обычным текстом."
-    : validLink(value) ? "" : "Адрес без https:// или mailto: сохранится как текст и не станет ссылкой в DOCX.";
+  const note = value === "" ? "Без адреса это будет обычный текст."
+    : validLink(value) ? "" : "Без https:// или mailto: в DOCX это будет обычный текст.";
   return <dialog ref={dialog} className="modal" aria-labelledby="uir-link-target-title" onClose={close} onCancel={close}>
     <form onSubmit={event => { event.preventDefault(); apply(value); close(); }}>
-      <div className="dialog-heading"><h2 id="uir-link-target-title">Адрес ссылки</h2><button type="button" className="icon" aria-label="Закрыть адрес ссылки" onClick={close}><Icon name="close" /></button></div>
+      <div className="dialog-heading"><h2 id="uir-link-target-title">Адрес ссылки</h2><button type="button" className="icon" aria-label="Закрыть" onClick={close}><Icon name="close" /></button></div>
       <label htmlFor="uir-link-target">Адрес</label><input id="uir-link-target" aria-label="Адрес ссылки" inputMode="url" value={value} onChange={event => setValue(event.currentTarget.value)} />
       {note && <p className="small muted">{note}</p>}
-      <div className="dialog-actions"><button type="button" className="text-button" onClick={close}>Отмена</button><button className="button primary" disabled={value === href}>Сохранить адрес</button></div>
+      <div className="dialog-actions"><button type="button" className="text-button" onClick={close}>Отмена</button><button className="button primary" disabled={value === href}>Сохранить</button></div>
     </form>
   </dialog>;
 }

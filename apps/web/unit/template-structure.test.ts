@@ -575,8 +575,8 @@ test("N04/CT08: the mounted sheet reads the second template's columns, type and 
     const sheet = templateSheet(response);
     assert.ok(sheet);
     const variables = sheet.variables as Record<string, string>;
-    assert.deepEqual([variables["--fcv-sidebar"], variables["--fcv-main"], variables["--fcv-gap"], variables["--fcv-bullet"]],
-      ["130pt", "420pt", "10pt", JSON.stringify("–")]);
+    assert.deepEqual([variables["--fcv-columns"], variables["--fcv-gap"], variables["--fcv-bullet"]],
+      ["130pt 420pt", "10pt", JSON.stringify("–")]);
     const body = sheet.styles.get("body");
     assert.ok(body && sheet.css.includes(`[data-fcv-style="${body}"]`) && /font-size: 11pt/.test(sheet.css));
     assert.equal(sheet.logo, null);

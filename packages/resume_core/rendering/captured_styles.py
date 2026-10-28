@@ -21,6 +21,8 @@ class RunStyle:
     background: str | None
     underline: bool
     strike: bool
+    chip: bool = False
+    gap: float = 0
 
 
 def scaled_line_height(height, size, base_size):

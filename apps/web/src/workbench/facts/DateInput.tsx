@@ -28,6 +28,6 @@ export function DateInput({ name, label, field, disabled }: {
           setRaw(precision === "year" && text ? text.padStart(4, "0") : text); }} />
     </div>
     <input type="hidden" name={name} value={raw} disabled={disabled} />
-    {(raw || needsChoice) && <button type="button" className="text-button date-clear" disabled={disabled} onClick={() => { setValue(""); setRaw(""); setNeedsChoice(false); }}>Очистить дату</button>}
+    {(raw || needsChoice) && <button type="button" className="text-button date-clear" disabled={disabled} onClick={() => { setValue(""); setRaw(""); setNeedsChoice(false); }}>Очистить</button>}
   </div>;
 }

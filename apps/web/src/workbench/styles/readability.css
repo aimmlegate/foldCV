@@ -26,8 +26,6 @@
 .settings-screen .settings-nav button { white-space: normal; line-height: 1.5; text-align: left; }
 .app-shell .settings-layout { grid-template-columns: 210px minmax(0, 1fr); }
 .app-shell .workspace-views button { min-height: 34px; }
-.app-shell .project-select small { line-height: 1.5; }
-.app-shell .project-select strong { line-height: 1.4; }
 .app-shell .notice.error { color: var(--danger); }
 .app-shell .notice.warning { color: var(--warn); }
 @media (max-width: 800px) {

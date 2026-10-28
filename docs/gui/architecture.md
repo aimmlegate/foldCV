@@ -56,7 +56,7 @@ apps/web/src/{workbench,rich,assistant,projects,api,connection,errors,contracts}
 services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
 contracts/{json-schema,examples,error-messages.ru.json}
-templates/{generic,generic-two-column,foldcv-reference}/
+templates/{generic,bundled,foldcv-reference}/   bundled: generic-two-column.yaml, generic-one-column.yaml, shared assets/
 tests/  (layout in testing.md)
 tools/
 ```
@@ -87,7 +87,7 @@ passes another root. Tests and `tools/serve_synthetic.py` always use a temporary
 registry.json                       project list and tombstones (project_store)
 catalog.json                        archive flags (project_catalog)
 preferences.json, rules.md, assistant-settings.json   settings
-template-packages/                  template packages for new imports
+template-packages/                  saved template packages, current version per id, default id
 projects/<projectId>/workspace.json         the WorkspaceV7 file
 projects/<projectId>/history.jsonl          undo journal, local only
 projects/<projectId>/{sources,history,template-assets,renders,images}/   content-addressed files
@@ -229,6 +229,7 @@ Project routes, under `/v2/projects` (`projects/routes.py`):
 | `GET /{id}` | read without a token |
 | `POST /{id}/edits`, `POST /{id}/history` | one edit; undo or redo |
 | `POST /{id}/clipboard` | same-project clipboard capture |
+| `POST /{id}/check` | the assistant's deterministic check over the committed workspace; read-only, no model call |
 | `POST /{id}/rewrite/preview`, `/rewrite/cancel` | rewrite preview of a selection |
 | `POST /{id}/import`, `GET /{id}/tasks` | import start, resume or cancel; task status |
 | `POST /{id}/export`, `/exports/{attemptId}/retry` | DOCX export |
@@ -246,10 +247,12 @@ Assistant routes, under `/v2/projects/{id}/assistant` (`assistant/routes.py`):
 Kept `/v1` routes: `POST /v1/session/exchange`; `/v1/settings/*` (rules, connection,
 preferences, limits, import model, fallback model, rewrite reasoning, assistant);
 `POST /v1/host/*` (CLI discovery, status, models, login, model choice, detach,
-install); `/v1/rich/template-config` with `/check` and `/reset` (Settings template
-editor); `GET /v1/rich/template-assets/{sha}`; `GET /v1/rich/template-import` (import
-availability); `POST /v1/rich/projects/template-input` (the upload that creates a V7
-pre-draft); `GET /v1/template-package`. The template routes are in
+install); `GET /v1/rich/template-config` (templates and the default one),
+`/v1/rich/template-config/{templateId}` (GET, PUT) with `/check` and `/reset`, and
+`PUT /v1/rich/template-default` (Settings template editor); `GET /v1/rich/template-assets/{sha}`;
+`GET /v1/rich/template-import` (import availability, templates, default);
+`POST /v1/rich/projects/template-input` and `/template-input/{templateId}` (the upload that
+creates a V7 pre-draft with the default or the chosen template); `GET /v1/template-package`. The template routes are in
 `templates_routes.py`, the others in `app.py`.
 
 Boundary (`app.py`): loopback Host and Origin checks; a session cookie from the
@@ -263,7 +266,17 @@ Russian text in `contracts/error-messages.ru.json`.
 `packages/resume_core/project_tasks.py` keeps an in-memory `TaskRegistry` of `{id,
 projectId, kind, state, stage, startedAt, elapsed, detail, error}` for import, export
 and rewrite, one running task per project and kind. `GET /tasks` feeds the import
-activity view (stage, elapsed time, saved discoveries). Nothing there is durable.
+activity view (stage, elapsed time, saved discoveries, and `detail.progress` from
+`projects/import_progress.py`: steps, recent model calls, the last event times and the
+stall check). Nothing there is durable.
+
+- Imports of several projects run at once; they share the one inference permit, so a
+  later one waits with stage `queued` and its start reply returns at once. The client
+  (`workbench/import/tracker.ts`) follows each project's task without blocking the
+  workspace. A run is stalled when no event arrives for longer than the longest model
+  call (180 s) plus cleanup and 60 s, or when it outlives its captured time limits.
+- The import start may carry `effort`; the capture checks it against the import model's
+  catalog efforts (`IMPORT_EFFORT_UNSUPPORTED`) and records it.
 
 - Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a

@@ -103,7 +103,7 @@ test("save failures, pending work and import warnings keep distinct meanings", (
   assert.match(errorMessage("DRAFT_STORAGE_FAILED"), /сохранить черновик/u);
   assert.match(errorMessage("DRAFT_STORAGE_FULL"), /объём хранения/u);
   assert.match(errorMessage("OUTCOME_UNKNOWN"), /не подтверждено/u);
-  assert.match(errorMessage("BUSY"), /операция/u);
+  assert.match(errorMessage("BUSY"), /другое действие/u);
   assert.match(errorMessage("busy"), /Codex/u);
   assert.match(errorMessage("IMAGE_INVALID"), /добавить или прочитать/u);
   assert.match(errorMessage("IMAGE"), /не распознано как текст/u);

@@ -1,0 +1,1181 @@
+{
+  "golang": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/go/go-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "2d4558b96d3ec71d0d922a62668cb2ea5a5d83ed7d4caf6b0479b3266f795a2f",
+    "pngSha256": "8713580f53b7df4818df656cff48a46435849fcd7493760bb7dc771d93dca3ca",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "java": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/java/java-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7582e518a9c02425f97155e5a3bd39d1a3a7d421b78caf9c8df7443dad3edc5d",
+    "pngSha256": "daa0fea911d82c7fb6c229ca309da147d78851b99a5d2cffcd46df31c7727c63",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "javascript": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/javascript/javascript-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0656ff65fc8eeacda5c78d7f9ffe91ec1eb919db64f56e0b7dcd460af4bbd36c",
+    "pngSha256": "7d07c10bba2b6b5b57ffe8d0b63c61e1f0ae5c7d29741b0ddda94bd2aba51e9c",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "typescript": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/typescript/typescript-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c9191199f4049920c2fc19035b8a6664f37f4689fcd9e8434e786097e78863f0",
+    "pngSha256": "dc41671e4d6aa46d756e7fa0a44f08292c8f2428b55f55e6c2ecd1d8cf76df1d",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "c": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/c/c-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "8cce48da91084256f15653e02bfd7046ccb34489d030cb1aa34dee766daad6b7",
+    "pngSha256": "939118eb4ead64cbbae94972d891be3b778fa85ad9d0a1e1cd40e261f85da305",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "php": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/php/php-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f22619a19c99a123e4678d71826f65f223721a739631dff46de39827c9ee0633",
+    "pngSha256": "471b3146b3f28465532f49120cf332e9997b3c41efff04d12d57f078f131ad8b",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "ruby": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/ruby/ruby-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "74ead50b8f0f31e1b34618088bc0b0e16c04f1d4539039ef9358717d8505a63c",
+    "pngSha256": "302508e28eb6d03bb63764bc0e20eacf6aa52f80bdce25de2479f4181f61a353",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "kotlin": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/kotlin/kotlin-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5053c2e1288582d1ac2cfc1e807eabb7f6059b1aa2f7d04e5cf00063682a2cbe",
+    "pngSha256": "e717757575b0e67773213ff31caf45287d318a937932ba050f2c59761776d4a0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "swift": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/swift/swift-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "46b6e4abd3ab12c589b8e276295f9439e2869bc4788d918efbc6e76147e8a06e",
+    "pngSha256": "e9a1066643544bf2858bd4545539314f1f900a07fce50d3c030ccccfc34c196a",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "rust": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/rust/rust-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "16c6c6a98e990944fc5e1cc64cc8fc7b8be3a662ec4ee7951b7995d2e52f5e12",
+    "pngSha256": "08eb1e545e9fd55252c475344cf9b950934156bebedd117e5193946f4b55e74b",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "scala": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/scala/scala-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "2565b6286bf30ab28c7d6a988ab7a76c5ce28182b80634e2a2ae21e29b4ad7b9",
+    "pngSha256": "7e2c0d77bc3bd24e1d21565f2fe27c9586f0734e96f25fbf56ad211c9516b2cd",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "bash": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/bash/bash-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "8e9b1f859331c8d11571e77b1371c5d7ac7e380abfcd2f31160ed81dc37de403",
+    "pngSha256": "d8a32ad20540e1b76cd5be6ea97f3c21b6213e7c3213f760c3da4bb65085f659",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "powershell": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/powershell/powershell-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f72bc9843ff04005045b659f1ce960d03ddf7707fe02cb5d3dee373914a6d750",
+    "pngSha256": "fb48aa3a975bb48db726aea91ed009e6a64aa311b6e4458cab9e19b7570de023",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "html": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/html5/html5-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "34826e5b3315daadf4fa15f723a3c1d5ba4a89277bfd94e22ac4d7d3d54338c5",
+    "pngSha256": "d2dc6b1f6428a4aeb072c8f2d6479e48c45dbde6bfdcd22e797495fe26507f82",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "css": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/css3/css3-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "36b7d94b657d571d3f94042acbf6a4c86a5301a222f83f4b4583ad2acf6e297d",
+    "pngSha256": "359fa54a30dffb334bc7a4e814ede397adc6a733c0a50218d2a95c69077bed00",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "dart": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/dart/dart-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "8dec3d6f6d92d5c8db294baf7ea89cbad5c3dd0f7fde5ca972ffc6cebf9b2d40",
+    "pngSha256": "ee6bdfc28d2b62ae0b571ac9c70d08de853fe76b0eb142eecc910b14ef6d19e5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "objectivec": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/objectivec/objectivec-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "8ef92e435763fc39f5b66d09d77267383550a22685ceec5ef2783ebb8f3101b6",
+    "pngSha256": "3925ce9e9ce89d98af0869b63ccd6ea496bb52a88ca4be1cfcacf9062877f599",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "perl": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/perl/perl-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f6cd4249349b4681ba273699aa31cf4df43f8c63dafdc640803b91cf239b8c8b",
+    "pngSha256": "36f47d5537d65b8aa6c2a2526f0429f9133f679cbabd0da7b85649aefb756ad5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "r": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/r/r-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9d135e1a56f58f89203afc9253f1db91901e19522f92dfc10575e3312336e61b",
+    "pngSha256": "045c282284eb369a164fbaf01853fa044653c9e5f71d31c752ae459ea75f6d90",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "django": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/django/django-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c3037ac285dd5f85ee148a151afb85e64b2a03b62c3affc178376d82ebff6a46",
+    "pngSha256": "e5cd006e04512807d3bb2841a392acb19cd18aa8d8dac2bf49a1ba166de2012f",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "flask": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/flask/flask-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7a27bb8cb739a080c285066c16c75828bc2eca4d76fa06eff76d556e0274a9d7",
+    "pngSha256": "d07ffea9c2ed19d2c9be0ff500c2be25b7ecf09228a8bea5663485495b47ccb3",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "spring": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/spring/spring-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4bae92720d27acb7d8cde3bed758a26aed07cd81c353f59ab379b8dd651ff973",
+    "pngSha256": "e60f594938504ccba9a80d7ddcdd454d443b2411d18619b0a010d5ae2d4cefbd",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "react": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/react/react-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5825b649c8c04dec13ecf01d0182401bd0ec71789d2fa06224866d882cd1515f",
+    "pngSha256": "1c328fa90e7b3e35e672a34cd48152b555709b5f9f265b55547a379cb597c980",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "vue": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/vuejs/vuejs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4cc1153600c0845c645ac6c718c11d516d6899079a0dc406e3d62f68b1d02c49",
+    "pngSha256": "96886a2bdd18f63b4c44170001aaae9a2f718af4b3523142510142a17cdc2f47",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "angular": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/angular/angular-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9666f86466e1175ba5e0c685fb423123e93a544732fd7b241e92a192cbb613ab",
+    "pngSha256": "3befb7230b0f97e946bfff48d9febe2fa5bc23c01622c97a848b2d2bd1ced9ca",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nodejs": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nodejs/nodejs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "3218687c5ea24a4d4c0a33dc5c287da38c33a72dcfe9382469d7ce4e0bf661fb",
+    "pngSha256": "2d3b48e7739625822ee971f2a62f42b57e0a048fb11a35b6c9e36740d14f4edf",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "express": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/express/express-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "27ec7e3d21d59102c046a96277877abf78aa9d7ad244277345d9c395486d42d4",
+    "pngSha256": "578125b38711be1365969a6579c065a141fd0c593c71242ab8323ceadd23214b",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nestjs": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nestjs/nestjs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "97ae5e5666850f1f6119871a4197bef2da3472cd2d40a32e9420792a8bfcd360",
+    "pngSha256": "0664a97d08c452a875a67834aeb67acf251d7803cc1ac4cfea65cfe2b2f321d7",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nextjs": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nextjs/nextjs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d9435c4ede7133b376c0173a80226bb3856729366707cd96e9a66e39448d0288",
+    "pngSha256": "d6b1561476fb2d968bde11fe95035d2cc4b03013069549634cf3d4384e72f021",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nuxt": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nuxtjs/nuxtjs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "607ae21caf3008c8fad200d017b4fca95aae42eca4c41d69cdc83cd8a9322800",
+    "pngSha256": "f423813461539e20bb0f35a32918194900b27bb4563fa941588ba037deb3a92d",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "laravel": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/laravel/laravel-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "b293960cd642537d2b19a1442168a396f25bdd31eb10f4f92447623cfc5730df",
+    "pngSha256": "4204759c23aeb88cc0fb8fdaace538a1dad3b0c908c96919759a0f42c1888bf5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "symfony": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/symfony/symfony-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9efe9dd777673188b8ee15afad54c0f097ad73ecaf9510ff2acc17a40ce80004",
+    "pngSha256": "3993924f6100893ac06bfd6352eb69c58570d8db940e08076d96ce515bbadebb",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "rails": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/rails/rails-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4b3c11c91fbe94ebc123089599c6567d73489b855ef6550b0da0356da0c9ceea",
+    "pngSha256": "90fa73633fa877a64db5a50b8057846b493ecb8f9d21dc299b1ba545c876190c",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "yii": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/yii/yii-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "804d4ab25328a6d55f266c16931a82b4a96b03a40eee06420849fecfeb113f31",
+    "pngSha256": "c6871a0de88a0b9f4dbbd2aec90f7aa6e17b1f0853762af6bd7d1cefa802848e",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "pandas": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/pandas/pandas-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0051003a5e5f8739c3304386456843a51be4717dab49c4fea6732ecc6e891b3d",
+    "pngSha256": "9c624d014704faa883360da2964614610999bc26b17102664491ae5026bcc256",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "numpy": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/numpy/numpy-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "efd53b9bf8637500d43ece39fe7ac43c972066f7166e408c5fd13e7cb73d7a05",
+    "pngSha256": "b0703ebe991c163369a56e0cdf601e664774f25e54136c2bdba9ba53a15f6000",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "pytorch": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/pytorch/pytorch-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7fb9c244f59aa3261ed17d6166ef50d0f07e6e5bc4e5211ca53b6e4837e09e75",
+    "pngSha256": "4b46a2df46c51cde13757b897b0c4df85a8ae202f0dcf00a76484eff4ef453ce",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "tensorflow": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/tensorflow/tensorflow-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "44f2bb3db305bc30f50ec0578f7a4a840c82c3544d36e436ab7d8afee3937b71",
+    "pngSha256": "e0579ee3d61372597453d431c6310357e99ea5138348e65c97adc823e0796561",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "sqlalchemy": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/sqlalchemy/sqlalchemy-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f7cd6f77f031d112250e3fff789a616d5fdd9a7be95856cf3adf1c9d7e30882a",
+    "pngSha256": "f974de1fa8c8a323befa21b76e652dc9ba87ca36991ca12f35c1b8996aa467c6",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "qt": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/qt/qt-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "03b72b7d8c57fcedfaaac7052e8b2b0abfb65fe11910a8a14b1d7fbbd69e1332",
+    "pngSha256": "cc50c18b0a29f9980af7bc45fe70081b69c5866e6f7524581392f8810a7686ab",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "unity": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/unity/unity-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "92f5736155fc1d6a4829b6b5798e0821f56ba7b61d2999c0fca6840cc1f7b6af",
+    "pngSha256": "0a68b6ab838f997a9f8b4e4902bef7755727553893b141a17bf7a015109bfd99",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "unreal": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/unrealengine/unrealengine-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "dcbe912c9f76a86ef0185021f6a6387df855cb64716c08015e713798d34942d5",
+    "pngSha256": "5eda0618f56165a5bfcf241cc717690862d8fc31831f2dd6b9ff05cfcf139f7a",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "graphql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/graphql/graphql-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "1fafe03a1f77be5a1c25c20db6e52f292ed8ae5a9b2536f807ee2a3d2e78d3d3",
+    "pngSha256": "a853b9abc9ad967bb309517e299b6cb342a4f534f3e5571a5a54ea055fe3b70e",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "flutter": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/flutter/flutter-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c188249043aecad16b31eaa230474643270a8d8200b897af54a97949cb88e4ae",
+    "pngSha256": "42d36760bdf0026647664d3eb7b88ceeb2599b810f41d60f9b97dbc696c80441",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "jquery": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/jquery/jquery-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "b8224bc5726ce26b18b96df3d9832d7230b60e2390cf87c1342b0822ad66f6f2",
+    "pngSha256": "4471ecf2a66bcdae580eac167ee22716a702eedc73abb418b2ceecd951861b6e",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "redux": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/redux/redux-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "72a56f5d8acc368b77624e1e7b7d8a2acbbc070ac6bf5d1b9979c92072d89962",
+    "pngSha256": "93234b515452c4389efcc8ff0a66716909fde865ba1ccda47bbe38fb03b4cab3",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "svelte": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/svelte/svelte-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "1941fe737cb55f6a88bf919d43131d3e346a1d2a0117bcf319f6638cf21f69f8",
+    "pngSha256": "0003dab515756b3d42445793edf31f16828d46969ddf90479492d99096e33120",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "bootstrap": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/bootstrap/bootstrap-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "016c324b3743e9be8dc2ca3a89bb5bd169d417f4f29fe5e731b16644abeb12cf",
+    "pngSha256": "3ce55de536fa0c724bb4edc47e072285024ce1c38657cc2481bdfafb3477f3e7",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "tailwindcss": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/tailwindcss/tailwindcss-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f8cec54589553807eb603bcaf4e056aa090196211698b056542e3cc62a2f3448",
+    "pngSha256": "9f9020867ae08a5e8d6dc97765d722c3e555b6a6d3494af41a542c35bcdc478e",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "sass": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/sass/sass-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c5cfd1072695faba7d5c23ee4c4e373dad16463cb55980e8118002d445bd764e",
+    "pngSha256": "5f9ba04148a80d7fa3144b916342be0f858f53743949aada55c83e66a8b7a90c",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "postgresql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/postgresql/postgresql-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f220a436258ed014c512ba4f9c0de6b9e5c2c4b55331a0a29f8c7a1a12c36443",
+    "pngSha256": "afca81de059aa1834ad4ed02d4991ead4cc93628e65af5ab8970b4bee12e6970",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "mysql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/mysql/mysql-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f73fa5d6b9da33fbf540ff96f5360c24b6d29d883ecfe6fcaecf89a8d3456067",
+    "pngSha256": "cc2108aea7fd87d350f3dfd812869ff612904fc3dfa61a680d701b630a9a1fb0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "mariadb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/mariadb/mariadb-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "90f14c26b478447171ad800791535f5f5ab0f9abf80387edefb410b6fc85cbdc",
+    "pngSha256": "4fff0b2e12f2d0c02569cfd58368c7cfd012ba0a7c2d4be25782245214f9e1b6",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "mongodb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/mongodb/mongodb-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d9f2bf7041264f4747e9969fb82ede0199c0ac97dfa8632aa0687d702ec05f7b",
+    "pngSha256": "d0e441d2c1aaffd5b133fe2315a49de8bb34d24b3d9e4ab8d52dd4e23deb66ad",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "redis": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/redis/redis-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4707378b190878f36f7e6e1c01fa3ee7e7884c76101809d191dddd943a2e6bdb",
+    "pngSha256": "e7a10e2bbd44ecce13e997f0f3edbbd97cfaa2a9c246f6cdbfe02eff6e208ef8",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "elasticsearch": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/elasticsearch/elasticsearch-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7efc44ea67eac2a877248c0502e498bca8f61de490852c1a5c572db0b5d3f84d",
+    "pngSha256": "7dac3372109dfdc2f48549deb406421cf13574e39b56072808cd8c3ed9ba3fd0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "sqlite": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/sqlite/sqlite-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "2b91c30887d3602479ba845cc012ef6ae577fba71eb96705a05b12e35d2c5e7e",
+    "pngSha256": "702d885b2528ddc1e5c7566771c61e513d613f248000bdbfae3efad79679dffd",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "oracle": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/oracle/oracle-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "6afd3872d2ecb9a619fc10048b6a18bc3b948dfd7c97d1a694af26c6a7153cbf",
+    "pngSha256": "4e5f6ee580968f3fcafd50bb802599bd38402b1ae4088cccedc6b7bf481ffd57",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "mssql": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/microsoftsqlserver/microsoftsqlserver-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "b49115d6dc952690790cea30383a41a7cc8923cd8b7dd070b2e3fb71e1a04d8d",
+    "pngSha256": "9195d4c79d9a327d1d39ecf2e9f328d351460e77e0497cfb149be76f8a9ae457",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "clickhouse": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/clickhouse/clickhouse-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "12cde67e9662314d8934293bc609875d111f761cb4ebb71a946f1a46cd66f841",
+    "pngSha256": "3b64a9de51e4ae42e070ca4d0ff651bf2d49fcf2cb456584d4874a930d1fc8e0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "cassandra": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/cassandra/cassandra-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9b768d3057b8963787ebddf6ecd83ad876956884c8354455b6ac99343df382ae",
+    "pngSha256": "632992fead3d4c2e7cdface9b62f7e73fadd8f2d37bb94555062b75dae0df3ab",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "couchdb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/couchdb/couchdb-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "62c831a339ee6804750c72f740c385d9438d6f9ca154799145fa7f38b3dd6940",
+    "pngSha256": "e94ec88e6e2d90d3ce19333666dcf9bda5f40ec7a53d45e8018b88f401080891",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "neo4j": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/neo4j/neo4j-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5048bfdf1ddf41d9f1d9653ed84092972aa569a7ebac4010483f9a2b203caa7e",
+    "pngSha256": "00a866b5adf964f0546704c212b11c2400c914c374992f45e4b51583ac53a374",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "dynamodb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/dynamodb/dynamodb-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "91f337c176f2d6f2bb26274d1aac7cb5cebcbca84869271261cc18c9f69b3ea4",
+    "pngSha256": "eb99e1753c5ac947384734d5d4268ddfb93ee522fea315ff43f2a78645d1a454",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "influxdb": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/influxdb/influxdb-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "e97943f99426368db009ee2e22408870cc6a3903daba9842a2435b9aa83cdd59",
+    "pngSha256": "3b61a6eac655b9a843be06fa78bed3d506c857775300e81cc4742898479e022c",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "memcached": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/memcached/memcached-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4b8dbfce52441072e0f13f9691971c351333638f71c5e878e7acf78440fb44ff",
+    "pngSha256": "2b329b155ddf986e7fbaba2c347798ac87912d039492a0bd4473903c71cd6265",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "kafka": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/apachekafka/apachekafka-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "2505c5b688c18c8fd5dd8e888561eb7b23a56a75d291ff17e8ee18770193f3e8",
+    "pngSha256": "5d0b4be389c03b8df4028d7d4ee5b1027646302001d64c7a107c32b6cfa42a44",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "rabbitmq": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/rabbitmq/rabbitmq-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "3aad30605375d85bd2fc293880be7e1b07def3f7191c8f063feb775cca5b7006",
+    "pngSha256": "d0ba1b0c911cc9e4578a63aa9fd8b88411ab2dab43ec604465c17c060723cde4",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nats": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nats/nats-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "bc610b84ac6516797bd2bce4a2ae14265197b1adab6110222f70ee6a0ee93fa6",
+    "pngSha256": "e7c00768cb0c641b344d38599cab78338a34e0e84e9b0a8b30bdedf0589b2489",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "aws": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/amazonwebservices/amazonwebservices-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5b4d8371d79a5c0d3a27ea4e929f772e68d47f7d267496bf9211d5f60fcf8084",
+    "pngSha256": "56499adf54326f4c71a0fe1ce4d117df5bff7ec227b449197bd7bf8d91374d17",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "azure": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/azure/azure-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7923db83e3f9755bd412241a683fa996fb7a9d0259b5084de449e6be92f7ca20",
+    "pngSha256": "ec498297aa75fadcf880dc65f7155fee9d0c2bd6904fd2708dd2dd99d06f8d05",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "gcp": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/googlecloud/googlecloud-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "1615b3e53228faa14378f1abb2b78e5f6c3f0ec562bc37db3efde885714e6c2f",
+    "pngSha256": "888af52f17c683fc3dc49a2efdbd9105999304514651fb1ee188ae20d5779e9f",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "digitalocean": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/digitalocean/digitalocean-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "237e683e4a5f982e299d77ad4afc4f77a6245c3905d5344d5de7cdfaaeef95af",
+    "pngSha256": "8c3c53aaf29da212a5b929edaa4c4aa23661bfaa2037cd183a5852602d46881f",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "heroku": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/heroku/heroku-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "3385de8966d218b6a837a6c5f2f07ba52de24a40d1b3b53dc918ede14acb9d13",
+    "pngSha256": "20d3390eb98de4cea68ffe7c72528db9a0bcaf50c3fa3a740846914436a1a7a1",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "cloudflare": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/cloudflare/cloudflare-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "6bb87edf9d3759ab11efb064a4cbe25271d4761539aa4928e68bcaf795839c63",
+    "pngSha256": "6e1d3274006c5f2b4de65090a4dad389594272528f70487aa5ca5d42a05c1bff",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "firebase": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/firebase/firebase-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "6069e979418301117abe2223b62ffb9cedd8c5118fbd805da77170629eaef49c",
+    "pngSha256": "472bb204f29ae83b54e35699245265ab6a77205b0f5e3da6f65ed22748920bf0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "git": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/git/git-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "717a57ea97bf7e86de721dab3e68afac66332a10676d5c9abce4ae6a5a9c9983",
+    "pngSha256": "40d7c6ee6a682b2606d586303905c37fed23df322c5568c38c5e2f653744b638",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "github": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/github/github-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "45262793de6292206a895ed63593cdb1eaed82074173f7f4b5bdb3e427ca805a",
+    "pngSha256": "5c6073fe8937ed48f51f24b4da0947240dd53b4acc372e5573c89c96bca7eaa5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "githubactions": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/githubactions/githubactions-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "3a2524052ccf301d1a239f20cfef98d655e060c51cc29c5e94c867913899a47e",
+    "pngSha256": "30e7757c2c33e68d4ee213d93b7145b45e3d16b813aafc98e7fd5182bc2235bc",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "gitlab": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/gitlab/gitlab-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d057a46d414f4edcb7edf96976ef7b91c2b347a990e99685e48d38de737967b0",
+    "pngSha256": "a6891d8d2174c0fdc742807d8a457c86edca172dbdf93e46ca2b8afd4fb93c47",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "bitbucket": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/bitbucket/bitbucket-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "6d3b83235eea8714cad68a187ff7b0960edb3a70f161dc5b0f273376fe45c04c",
+    "pngSha256": "e7236dffd87485aaa2de541fe7da4c9742651d63bca71a0184b35ef68b6fddab",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "jenkins": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/jenkins/jenkins-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "917c7525a9d6c544f4b5d1d4318778e2dee5ef2d47be075ee494613cb10d2a4e",
+    "pngSha256": "49e36625631553faa5c57ddb36401ef9a40852d108edeabde8bddb7818303ada",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "teamcity": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/teamcity/teamcity-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "be195bba8555141102642736366a050e89be2bbfe5538d871f0aeb9dbb41a1b0",
+    "pngSha256": "cc695efd60a9244b340283187f6ab3402eb574d182edceb29d1240292cca5d11",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "bamboo": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/bamboo/bamboo-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "740a953f358ac31fa2a77d4871ad042df1bb403f755742936c23b2d8b1c25cae",
+    "pngSha256": "a74190e784b3fe982a4cdec0315349d5e5e1b01b27bdec4eaf6908bb316b0c8b",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "circleci": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/circleci/circleci-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "77a7fb145905ac57daa12223b40dcf6527eb4c001120a3a92f5bb065dec93688",
+    "pngSha256": "34e34f6b0982df658c4e35f3679ee269a807c22e41e818585c209b6d9a46e269",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "argocd": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/argocd/argocd-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "946ce9ce2e6a2513846c2ec90095fd1938ee079d8aa0f5ac2039db7cb37532bb",
+    "pngSha256": "f990738d29bbad9f1bb1c16e167b1bb477e85473acff0648e527d99f85cd411a",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "azuredevops": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/azuredevops/azuredevops-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "49122a38457209cda2d22a1e3af1b4ff159b67714d4e7b43899544555ee2823c",
+    "pngSha256": "fc3fd369ef6f4d6e000bd5e98e00f5018ee41361364e44c9e051b3cdbbf408f5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "kubernetes": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/kubernetes/kubernetes-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "fb31e4163238978201cfde0601728ee5168b74e476c32c37739bed626fa281ae",
+    "pngSha256": "3b573974a45e765c21c7842fff69633e66ae3bee7d11e42886d7c66c71b77277",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "helm": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/helm/helm-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "83efc74139c06f09c29cab6592fdad80c8ce9e5090fc1da3ba39d40686fb511b",
+    "pngSha256": "9948e7df574d1afd70baa1068c12a790509c43fd87452c6c3905fed7c4cefd72",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "terraform": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/terraform/terraform-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0be6427291ae47f057b75f9010dffd6f58a40f0c83c43606ff68851cef1621dc",
+    "pngSha256": "0591626a4edfc3e0c78e56e22ba46701a93baa91d6ccac1098f4bf68c3173345",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "ansible": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/ansible/ansible-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "6e318caf2d49685f921a72231816106859e0bf93e440a70d0445a3f7f030fc9f",
+    "pngSha256": "29c2e241cb69b3036b356d82e285a1cc6c193bc6d1bda5b673a7169018aa6dac",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "vagrant": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/vagrant/vagrant-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "daddd8af47a144d7ebda068664b02b1c2f09fcdef261d3d002824634160f7f4f",
+    "pngSha256": "922c98ee1f871906a3d7f0d81b1c17b5f556d1fb2b1bc29989a649eae5572289",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "packer": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/packer/packer-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d2aa34e5d5ff5162f5777b4c3e1d49475d46818cddabb909c920d15c48fe5b79",
+    "pngSha256": "2025b467f001c47a228e4a4426d62f26fe650e58ef1d54b22ba0443da20f5aa0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "vault": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/vault/vault-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "7ba6a343ddad8558691960d4649e337ac30e4182adb91702980c4cc06f0c8ef3",
+    "pngSha256": "7341f750f58d66c135c58546bc972cef202bc9ea6ba21a48919fce226d4e2919",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "consul": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/consul/consul-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5719703e2668ec60d82c4fbdd625102adf0fd9fb0604945f05deac8d50877ea3",
+    "pngSha256": "5fb9ce15dae2c58d08bbf41a9274ffd0e28468337017c34659462ffd0eb5f966",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "podman": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/podman/podman-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d5405e720d60316462b27597ff396bf138286b39cda4fa7095bcc450c96819b7",
+    "pngSha256": "0cbbc7aa2b0c8f5f42806a68d33326ceabfb18b975cdd55b4c710d3b5b93522f",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "openstack": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/openstack/openstack-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "19d8a58082b2601c9e0a7a6e3965f62240a6955c7d83c6a7da6ce97e2b6bca9b",
+    "pngSha256": "4b4d192f99a77f7393ecdbea120579dd2184f711b4e09a3e8272c7c21febf89d",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "nginx": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/nginx/nginx-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "a28c7002fda6748bb018fa5f89ba3d38c622db720d65aa88668208a3cc839900",
+    "pngSha256": "ac79bba903c93a1e59fca5ea25b026864faa5dc7aa07dcf180ab78e08b889b8c",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "apache": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/apache/apache-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "843d8cb7cf9a54eb70e09669d2fadf0b1b59419f92526e94b4359d9366b40ece",
+    "pngSha256": "ddc00eb67b2ee3f0257e568bed93796f6507bf1219ceb07b3feee6641a85effc",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "traefik": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/traefikproxy/traefikproxy-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "df4f9b8d057483e951ed9b74a7adee176225cb340b73b066091a17e1f1f9b70a",
+    "pngSha256": "21664f182f56561a84fdeb1297f4c2c06a1a5dc2687ba9fb0632df4d2bfa8878",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "ubuntu": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/ubuntu/ubuntu-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "af8ddf6c709f61d1b7ac00d5417cf389ad23db2258f0776e0c7854f37105caed",
+    "pngSha256": "e28398a8afe99ebb2512be83693bc5265e8e4847681dfed9add19daf3ffc2718",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "debian": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/debian/debian-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "09b14c9813a322b58b11aa5390fb1a2b4e9bfd02868321482f1a19534a66ec54",
+    "pngSha256": "8751d715d9e1b608c0e6cefac7aa82c734d22b2bf8d7894fffb4ced0d59c09b2",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "centos": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/centos/centos-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "b54c6ad8e100208fd0ade26633abd996c9d979b19c13c1b91caf48b49ed8c8d2",
+    "pngSha256": "3b4596845a20fd09e922a971e1863e289e58ccdf5c7f64c945b0c6dabf7e4b96",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "rhel": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/redhat/redhat-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c7ec409610e7c222191166a5fe7bd52b57e6d057cb8e51ee44d12a2743401e21",
+    "pngSha256": "9342de5b19e1ff73a3af95106b82b30d619b0842300e513fd8bfa88d12a50741",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "windows": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/windows11/windows11-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "11ac9b1e84c8c36c21629d03f26ce699b7d2e56bf702ea2e8eb2637cd2271c56",
+    "pngSha256": "1beba39d94bb14833c2835270b12eef3315b08d3378562f0b10dd3c3d7d9dcc8",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "prometheus": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/prometheus/prometheus-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "cae70cfcf9a8b88de32ab1035819d0c7c9a2b278048112f8c9f99dae42b5b657",
+    "pngSha256": "2b898db9443c977a4e61776903c991e3b11d8af39dfb6e3bd18043c66df59013",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "logstash": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/logstash/logstash-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "01fe7b38a1a5c40c789f6ed15e43049556569be1cc48330d20c11d3d6ff71ae7",
+    "pngSha256": "1a3eaafaca650f8ab7e64de6ee8b87763d1bfb8371c5582b2d53c9bbd4d8b983",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "opentelemetry": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/opentelemetry/opentelemetry-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "4a610f674b648395f6460d3648d995e114cf34ad58004c01b9380c1deb7a19cd",
+    "pngSha256": "5ec963e7843ddeac30b032a8207934f8c65dbbffdc096a5b48165bd8513c7eb8",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "sentry": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/sentry/sentry-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "e7cd143bec12baa7cde9e85280326cb6d24f6a4d2eb37d41f35bc3e9fb5f3e1a",
+    "pngSha256": "23165c1c20638e805e1123fd5d2262fb330571c708bea4ddcf97313baeffc37d",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "datadog": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/datadog/datadog-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "37536bdc59abe690f2f7b8b7913b9d761dfd70d9b8fda19e3faf0b3924b29496",
+    "pngSha256": "99f0ba49b9864a53f726791e2151dfee901e28b4fb08e28d2bd4375d2e0e6533",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "newrelic": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/newrelic/newrelic-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c5aa6bf54be1e98987cde7ca64b96697f4e1c6cb476042e2f4af17a2520b2637",
+    "pngSha256": "c49aff6bd383762b89a34f144d480e1c61c1ef734c0ba5a149ec39ac9212a870",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "jira": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/jira/jira-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "e5010dd0056d130e32fa3d0dc589aa1288370b525b4123658ea6eb90f53ca1db",
+    "pngSha256": "7df19cb1f1213825c69032fdc52fac418cfa32a7191d0e640edd2bb6fe1890c5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "confluence": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/confluence/confluence-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0eb010ed1897a90b29aa1d383e8e4a5c5aaa92bbc4814e1fd7466ea7353756f8",
+    "pngSha256": "6f28fe6155b677e545f91a8655e7976aef236dc2ebaa64b420d3cca629ca204a",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "figma": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/figma/figma-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "d37c2bf1a1d4f10aeffb224e44da672cb8b9510f6e5a2e24b61758262995805e",
+    "pngSha256": "4ac6d362d17107389bdd6b07df54e836e6cbc4368b367d13658ddd2731656384",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "pytest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/pytest/pytest-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "e3073e7f520866f93a40e76b633efc29715539150423178cdb2e33f7077e4be1",
+    "pngSha256": "ab0f38dc79e773c04ca67807073f781ce0d8ccf125bbd3fd3d76cb166a999d1b",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "jest": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/jest/jest-plain.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "56aa3bd209339d2253cdce508143109d20f6d7342db07db7a2d1e8a59ba202f3",
+    "pngSha256": "65b3047bfdd0d6fcd015812e1e8e18042b88285f95921b5ad936cb5b39a99dc1",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "selenium": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/selenium/selenium-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "aa2338673c2880af0489b216512dc14a63a2b1dff4f65ebde0f4c3f61beda693",
+    "pngSha256": "5178daff88810effb9b66540776874637f8707102a5638a95fe085df2f75e264",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "junit": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/junit/junit-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "547001df5fceec5b31bd15c9c9909abcfd42fe9daef9c2dc38d12beb8310a44a",
+    "pngSha256": "65a3eb0ded2f6691eaf3db5e51a6d167800f98afc4a83be75ba32f45f3b57712",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "postman": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/postman/postman-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0b366c7a023328b0d95e8c90d9050519b8c31d206f8b34db17742488f72efccb",
+    "pngSha256": "42c334a1fb36b365d22bf0dec5e1869e62ab87ea3cf818e95269d945deb043d7",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "cypress": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/cypressio/cypressio-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "17cfd19e56397859714a8d4ee6e97b9e9afb0bffd9be87a70240d01e47dfda3b",
+    "pngSha256": "6eebc321994a61df8c364639d8c1ec997aa452a0adc6534565eb572834a73e4f",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "playwright": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/playwright/playwright-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c829ee41780a2c9748b9aeeeec530dc9ceeade68687e252ff7f044c16a8c384b",
+    "pngSha256": "48b053b24b3d6bf276f0e7610cb4c5870a3506efb7f67828e2dcaff4e24d5ee0",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "maven": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/maven/maven-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "eb546e1cfd7c0df769193160d2a03e1ec5243ae68eef48c70934a24ece6bbe31",
+    "pngSha256": "78eeab067b4d50f3099e119cbb1c699fe55297b494e0262638ee48f70895c3f5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "gradle": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/gradle/gradle-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "2caf72625f88b8062f38ee4bed0193f5fe910b6ec73951e239584d55c1bde55a",
+    "pngSha256": "57391a2ffe1a0e1c99c764ff116bf017ba76a16a842df8e2c8f793c6ee9b9977",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "npm": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/npm/npm-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "348709a9c0ed8fc6663413bfb9984360ec12d747183177d1a78eb795f89c5cc3",
+    "pngSha256": "eb3838258499386cd7a3c586e6fcf9f6b91c9c72675f0cd66579dd454cbcfa02",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "yarn": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/yarn/yarn-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "98f289573da1bdde48ed718babc1fb2ca8bbdeef66b56cd60d64dba72b20d7f6",
+    "pngSha256": "d0c988a3c6ea4a821adfb2c8a9fb1b890e7458c3873ec9c0a3619918416dcfc1",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "webpack": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/webpack/webpack-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "5e0a1544a06b2314e780a59ee0e4fcb833101f42ac8ef3cbb3f206d1f3f8e8da",
+    "pngSha256": "00a99952cb980535af0814c7b5e72eb41bcaaf4fcb5236f762090bff425ec0b9",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "vite": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/vitejs/vitejs-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "f84e50febcb3a2a81399c9a1ae76d96dc235428202f91610b6f36bfb5b62051a",
+    "pngSha256": "f5f0a934096dd61bd4ffefd8246336f14475afbc143be6b559f8fd26f6c51509",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "jupyter": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/jupyter/jupyter-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9b246fe756a3b600f68a7af1f17702033a1cdb6417da3a9f695337f584b5d545",
+    "pngSha256": "d0ce4b93d8f7a739c7ad624afd34ef0433aa735ed4259db2ff1b9e9e2a8c135d",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "airflow": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/apacheairflow/apacheairflow-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "0c83b226d54e77eda3336a4a7138a8ba61d82b5a8fee2bc026c135a239ec1814",
+    "pngSha256": "cbc96fbb4ded278301ea1f75b91240ed666bd6b9bf2c757270cd4d774eb73366",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "spark": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/apachespark/apachespark-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "c9eea5d3f0bc25067fa5d2f8ec6c40226854ae85b7658e3d9cf07a15f702cc9a",
+    "pngSha256": "cd55718c5807ab98c9d82ae41cc3c964558ef22b13c97ada114ba55d36074cd5",
+    "rasterizer": "resvg-py 0.5.0"
+  },
+  "hadoop": {
+    "url": "https://raw.githubusercontent.com/devicons/devicon/ff435a0fff0391aefbf70d63a3fe7cfe64f82df0/icons/hadoop/hadoop-original.svg",
+    "revision": "ff435a0fff0391aefbf70d63a3fe7cfe64f82df0",
+    "release": "v2.18.0",
+    "license": "MIT",
+    "sha256": "9a2eca34378dc1c0d7bf7d16a9993ef76ce7e4382075eda1c3ad513bf374afc3",
+    "pngSha256": "7a1d82733cd0513f6805e1db675bf10b9e53c542f83bbb960db8134ad736790e",
+    "rasterizer": "resvg-py 0.5.0"
+  }
+}

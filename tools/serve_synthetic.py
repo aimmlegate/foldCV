@@ -37,7 +37,7 @@ NOW = '2026-10-15T18:00:00+00:00'
 
 
 class ScriptedConnection:
-    """A connected account with two models; every model offers the medium effort as its default."""
+    """A connected account with two models; every model offers low, medium and high, with medium as the default."""
 
     def __init__(self):
         self.calls = []
@@ -46,7 +46,7 @@ class ScriptedConnection:
         self.calls.append('inspect')
         models = ('synthetic-processing', 'synthetic-assistant')
         return Metadata('synthetic-scripted', models, 'plus', Quota('available', 0),
-            reasoning={name: ModelReasoning(supported=['medium'], default='medium') for name in models})
+            reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
 
     def login(self, *_args, **_kwargs):
         self.calls.append('scripted_login')
@@ -59,12 +59,16 @@ class ScriptedContent:
     """Template import tasks and selected-text rewrites with deterministic replies; other requests are refused."""
     template_adapter = 'synthetic-scripted'
 
-    def __init__(self):
+    def __init__(self, delay=0.0):
         self.calls = []
+        self.delay = delay
 
-    def generate(self, request, _files, _cancel):
+    def generate(self, request, _files, cancel):
         if isinstance(request.result_type, DynamicResultSpec):
             from tests.templates.scripted_template_provider import scripted_template_result
+            # --template-delay keeps each call open long enough to watch the import screen; Stop ends the wait.
+            if self.delay and cancel is not None:
+                cancel.wait(self.delay)
             return scripted_template_result(self, request)
         if request.result_type is not PlainTextReply:
             raise ContentFailure('UNSCRIPTED_PROVIDER_PATH')
@@ -113,25 +117,28 @@ async def views_workspace(root):
     return value, originals
 
 
-async def generic_workspace(root, name):
-    """A published scripted import of one synthetic fixture with the bundled Generic template."""
+async def generic_workspace(root, name, template=None):
+    """A published scripted import of one synthetic fixture with a bundled template, the Generic one by default."""
+    from packages.resume_core.templates.compiler import compile_template
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATES
     from tests.templates.generic_fixtures import generic_import
     work = root / 'fixture'
     work.mkdir(mode=0o700)
-    _fixture, _result, value, originals = await generic_import(work, name)
+    package = compile_template(BUNDLED_TEMPLATES[template]) if template else None
+    _fixture, _result, value, originals = await generic_import(work, name, package=package)
     return value, originals
 
 
-async def projects(root, employment_shape='issues'):
+async def projects(root, employment_shape='issues', template=None):
     """A: joined papers; B: plain papers; C: synthetic employment with two import issues, or the views import, or an
-    Generic import. Each keeps its own project identity."""
+    import through a bundled template. Each keeps its own project identity."""
     from tests.templates.storage_fixtures import joined, workspace as papers
     from tests.templates.test_materialize import issue_workspace
     _workspace, sources = papers()
     if employment_shape == 'views':
         employment, employment_sources = await views_workspace(root)
     elif employment_shape.startswith('generic-'):
-        employment, employment_sources = await generic_workspace(root, employment_shape.removeprefix('generic-').upper())
+        employment, employment_sources = await generic_workspace(root, employment_shape.removeprefix('generic-').upper(), template)
     else:
         employment, employment_sources = issue_workspace()
     return [(joined(), sources), (renamed(papers()[0], 'template-project-b', 'Synthetic papers B'), sources),
@@ -231,7 +238,7 @@ async def main(args):
     listener.listen(128)
     origin = 'http://127.0.0.1:' + str(listener.getsockname()[1])
     secret = secrets.token_urlsafe(32)
-    connection, content, web = ScriptedConnection(), ScriptedContent(), StoredWeb()
+    connection, content, web = ScriptedConnection(), ScriptedContent(args.template_delay), StoredWeb()
     runtime = ScriptedAgentRuntime(assistant_script)
     if args.live_assistant:
         # The user's existing Codex sign-in is used in place (allowed 2026-10-27); projects stay in this temp root.
@@ -257,7 +264,9 @@ async def main(args):
         from tests.templates.employment_fixtures import employment_package
         TemplateStore(repository.root).activate(employment_package())
     identifiers = json.loads((root / 'isolation.json').read_text())['projects'] if args.reopen else []
-    for value, sources in [] if args.reopen else await projects(root, args.employment):
+    # A chosen template imports the F10 employment fixture unless another import is named, and opens first.
+    employment = args.employment or ('generic-f10' if args.template else 'issues')
+    for value, sources in [] if args.reopen else await projects(root, employment, args.template):
         repository.create(value, blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])
         identifiers.append(value.project_id)
     info = {'schemaVersion': 1, 'root': str(root), 'dataRoot': str(data), 'operationRoot': str(operations), 'origin': origin,
@@ -283,7 +292,7 @@ async def main(args):
         return diagnostics()
     # Ahead of the static frontend route, which answers every other GET.
     app.app.router.routes.insert(0, app.app.router.routes.pop())
-    url = origin + '/?project=' + identifiers[0]
+    url = origin + '/?project=' + identifiers[-1 if args.template else 0]
     launch = root / 'launch.json'
     write_json(launch, {'origin': origin, 'url': url + '#secret=' + secret, 'pid': os.getpid()})
     launch.chmod(0o600)
@@ -302,9 +311,13 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--dist', type=Path, required=True)
     parser.add_argument('--port', type=int, default=0)
-    parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default='issues')
+    parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default=None)
+    # The bundled template of the generic-* imports; with it the default import is generic-f10.
+    parser.add_argument('--template', choices=['generic-two-column', 'generic-one-column'], default=None)
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
+    # Seconds each scripted template call waits before its reply, to watch a running import in the preview.
+    parser.add_argument('--template-delay', type=float, default=0.0)
     # Native assistant runs on the user's Codex sign-in, charged to the SR08 ledger (at most LIVE_LIMIT starts).
     parser.add_argument('--live-assistant', action='store_true')
     parser.add_argument('--reopen', action='store_true')

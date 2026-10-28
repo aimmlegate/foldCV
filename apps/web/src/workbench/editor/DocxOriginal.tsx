@@ -35,9 +35,9 @@ export function DocxOriginal({ blob }: { blob: Blob }) {
     return () => { active = false; observer.disconnect(); target.removeEventListener("click", preventNavigation); body.remove(); styles.remove(); };
   }, [blob, generation]);
   return <>
-    <p className="source-viewer-note">Предпросмотр DOCX. Шрифты и расположение элементов могут отличаться от Word.</p>
-    {error ? <p className="source-viewer-message" role="alert">Не удалось показать DOCX. Скачайте оригинал и откройте в Word.</p>
-      : !ready && <div className="source-render-status"><OperationStatus label="Отрисовываем DOCX" timed /></div>}
+    <p className="source-viewer-note">В Word вид может отличаться.</p>
+    {error ? <p className="source-viewer-message" role="alert">Не удалось показать DOCX. Скачайте оригинал.</p>
+      : !ready && <div className="source-render-status"><OperationStatus label="Показываем DOCX" timed /></div>}
     <iframe ref={frame} className="source-preview-frame" title="Оригинал DOCX" sandbox="allow-same-origin" srcDoc={frameHtml}
       hidden={error} onLoad={() => setGeneration(value => value + 1)} />
   </>;

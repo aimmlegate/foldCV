@@ -187,8 +187,8 @@ async def test_an_unowned_claim_stays_exact_source_text_under_no_employer(tmp_pa
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('rewrite', [True, False])
-async def test_the_ten_year_window_compacts_only_wholly_old_jobs_and_keeps_every_fact(tmp_path_factory, rewrite):
-    # B04/B05: the cutoff is 2016-10-21; year-only 2016 and month-only 2016-10 may end after it.
+async def test_the_fifteen_year_window_compacts_only_wholly_old_jobs_and_keeps_every_fact(tmp_path_factory, rewrite):
+    # B04/B05: the cutoff is 2011-10-21; year-only 2011 and month-only 2011-10 may end after it.
     _fixture, _result, workspace, _originals = await shared(tmp_path_factory, 'F04-on' if rewrite else 'F04-off')
     shown = views(workspace)
     companies = ['Early Systems', 'Year Boundary', 'Month Boundary', 'Current Systems']
@@ -303,7 +303,7 @@ async def test_a_long_document_keeps_every_marker_once_and_in_order_and_exports(
 @pytest.mark.asyncio
 async def test_a_focus_entry_without_a_stated_length_shows_the_time_its_jobs_span(tmp_path_factory):
     # D104: the user chose durations counted from projects. PostgreSQL and Docker are listed in 03.2020–11.2023 (45
-    # months, 4 years); Perl in 2010–2012, year precision (between 14 and 36 months, the middle rounds to 2 years).
+    # months, 4 years); Perl in 2006–2008, year precision (between 14 and 36 months, the middle rounds to 2 years).
     _fixture, _result, workspace, _originals = await shared(tmp_path_factory, 'F10-durations')
     assert views(workspace)['focus'] == ['ФОКУС', 'Python', '3 years', 'PostgreSQL', '4 года', 'Perl', '2 года', 'Docker', '4 года']
     # The computed text is shown, not stored as stated experience.
