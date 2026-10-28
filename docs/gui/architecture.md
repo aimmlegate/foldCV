@@ -87,7 +87,7 @@ passes another root. Tests and `tools/serve_synthetic.py` always use a temporary
 registry.json                       project list and tombstones (project_store)
 catalog.json                        archive flags (project_catalog)
 preferences.json, rules.md, assistant-settings.json   settings
-template-packages/                  template packages for new imports
+template-packages/                  saved template packages, current version per id, default id
 projects/<projectId>/workspace.json         the WorkspaceV7 file
 projects/<projectId>/history.jsonl          undo journal, local only
 projects/<projectId>/{sources,history,template-assets,renders,images}/   content-addressed files
@@ -221,10 +221,12 @@ Assistant routes, under `/v2/projects/{id}/assistant` (`assistant/routes.py`):
 Kept `/v1` routes: `POST /v1/session/exchange`; `/v1/settings/*` (rules, connection,
 preferences, limits, import model, fallback model, rewrite reasoning, assistant);
 `POST /v1/host/*` (CLI discovery, status, models, login, model choice, detach,
-install); `/v1/rich/template-config` with `/check` and `/reset` (Settings template
-editor); `GET /v1/rich/template-assets/{sha}`; `GET /v1/rich/template-import` (import
-availability); `POST /v1/rich/projects/template-input` (the upload that creates a V7
-pre-draft); `GET /v1/template-package`. The template routes are in
+install); `GET /v1/rich/template-config` (templates and the default one),
+`/v1/rich/template-config/{templateId}` (GET, PUT) with `/check` and `/reset`, and
+`PUT /v1/rich/template-default` (Settings template editor); `GET /v1/rich/template-assets/{sha}`;
+`GET /v1/rich/template-import` (import availability, templates, default);
+`POST /v1/rich/projects/template-input` and `/template-input/{templateId}` (the upload that
+creates a V7 pre-draft with the default or the chosen template); `GET /v1/template-package`. The template routes are in
 `templates_routes.py`, the others in `app.py`.
 
 Boundary (`app.py`): loopback Host and Origin checks; a session cookie from the

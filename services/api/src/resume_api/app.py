@@ -137,7 +137,8 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                    or path.startswith("/v1/rich/projects/template-input/"))
                 body_limit = (ARCHIVE_BYTES + 4096 if path == "/v2/projects/archive" else MAX_EXTRACT_BODY if project_upload
                     else MAX_BODY)
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):

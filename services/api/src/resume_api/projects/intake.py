@@ -1,5 +1,5 @@
-"""Template import intake: an upload becomes a V7 pre-draft with the store's active package, and the import start
-captures its package, sources, models and limits.
+"""Template import intake: an upload becomes a V7 pre-draft with the current package of the chosen (else the default)
+template, and the import start captures its package, sources, models and limits.
 
 The runtime call cap has no default: without an explicit configured value the import is unavailable.
 """
@@ -18,11 +18,12 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_limits import finalization_seconds, import_seconds
 from packages.resume_core.sources import canonical_source
 from packages.resume_core.template_import import TemplateImportFailure, digest, identity
-from packages.resume_core.templates.store import TemplateStore
+from packages.resume_core.templates.store import TemplateStore, UnknownTemplate
 
 from ..extracting import UploadFailure, run_extract
 from ..inference_admission import AdmissionCancelled
 from ..lifecycle import OperationFiles, SpikeError
+from ..template_config import TemplateConfig
 from .errors import ProjectFailure
 
 CANCEL_SECONDS = 65
@@ -52,22 +53,27 @@ class TemplateIntake:
             raise ValueError('template import concurrency must be an integer from 1 to ' + str(MAX_IMPORT_CONCURRENCY))
         self.call_cap, self.model, self.fallback, self.concurrency = call_cap, model, fallback, concurrency
 
-    def package(self):
-        return TemplateStore(self.repository.root).active()
+    @property
+    def available(self):
+        return self.call_cap is not None and self.model is not None and self.ready
+
+    def package(self, template_id=None):
+        """The current version of the chosen template, else of the default one."""
+        store = TemplateStore(self.repository.root)
+        try:
+            return store.active() if template_id is None else store.current(template_id)
+        except UnknownTemplate:
+            raise ProjectFailure('TEMPLATE_NOT_FOUND', 404) from None
 
     def status(self):
-        available = self.call_cap is not None and self.model is not None and self.ready
-        package = self.package() if available else None
-        return {'schemaVersion': 1, 'available': available, 'package': None if package is None else {
-            'id': package.id, 'name': package.definition.template.name, 'revision': package.revision,
-            'packageHash': package.package_hash}}
+        return {'schemaVersion': 1, 'available': self.available, **TemplateConfig(self.repository.root).catalog()}
 
-    async def create(self, data, name, pasted):
+    async def create(self, data, name, pasted, template_id=None):
         """Extract the upload, then store one pre-draft with its source; a failed extraction keeps the bytes and
         names the failure in the pre-draft warnings."""
-        if not self.status()['available']:
+        if not self.available:
             raise ProjectFailure('JOB_DISABLED', 409)
-        package = self.package()
+        package = await asyncio.to_thread(self.package, template_id)
         project_id, source_id = identity('project'), identity('source')
         source = Source.model_validate({'id': source_id, 'revision': 1, 'originalName': name,
             'mimeType': 'text/plain' if pasted else 'application/octet-stream',

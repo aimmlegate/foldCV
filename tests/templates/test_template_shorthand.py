@@ -170,6 +170,6 @@ def test_settings_show_the_bundled_text_for_a_package_captured_from_the_old_long
     old = compile_bytes(yaml.safe_dump(document, allow_unicode=True, sort_keys=False).encode(), BUNDLED_TEMPLATE.parent)
     assert old.package_hash == compile_template(BUNDLED_TEMPLATE).package_hash
     TemplateStore(tmp_path / 'template-packages').activate(old)
-    state = TemplateConfig(tmp_path / 'template-packages').read()
+    state = TemplateConfig(tmp_path / 'template-packages').read(old.id)
     assert base64.b64decode(old.original_base64).decode() != BUNDLED_TEMPLATE.read_text(encoding='utf-8')
-    assert state['text'] == BUNDLED_TEMPLATE.read_text(encoding='utf-8') and state['bundled'] is True
+    assert state['text'] == BUNDLED_TEMPLATE.read_text(encoding='utf-8') and state['edited'] is False
