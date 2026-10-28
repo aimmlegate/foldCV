@@ -2350,6 +2350,13 @@
           },
           "title": "Styles",
           "type": "object"
+        },
+        "technologyTargets": {
+          "items": {
+            "$ref": "#/$defs/EditorTechnologyTarget"
+          },
+          "title": "Technologytargets",
+          "type": "array"
         }
       },
       "required": [
@@ -2408,6 +2415,40 @@
         "alignment"
       ],
       "title": "EditorStyle",
+      "type": "object"
+    },
+    "EditorTechnologyTarget": {
+      "additionalProperties": false,
+      "description": "A tags line of one scope, or a job section that has none yet, where the facts panel adds a technology.",
+      "properties": {
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Jobid"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "blockId",
+        "jobId",
+        "label"
+      ],
+      "title": "EditorTechnologyTarget",
       "type": "object"
     },
     "EducationRecord": {
@@ -3651,7 +3692,10 @@
           "type": "number"
         },
         "missing_icon": {
-          "const": "text_only",
+          "enum": [
+            "text_only",
+            "initial"
+          ],
           "title": "Missing Icon",
           "type": "string"
         },

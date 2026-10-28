@@ -1,7 +1,7 @@
 import type { OrderDocument } from "../../rich/technology-order";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { PanelCommand } from "../../rich/v7-panel";
+import type { PanelCommand, TechnologyTarget } from "../../rich/v7-panel";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
@@ -10,15 +10,18 @@ import { Spinner } from "../ui/OperationStatus";
 import { documentTechnologies } from "../../rich/technology-order";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
-export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId }: {
+export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId, targets }: {
   facts: WorkingFacts; document: OrderDocument; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
   focusRecordId?: string | undefined;
+  /** The lines Python can add to; with several, the user picks the group. */
+  targets: readonly TechnologyTarget[];
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false), [group, setGroup] = useState("");
+  const line = targets.some(target => target.blockId === group) ? group : targets[0]?.blockId;
   const records = documentTechnologies(facts, resumeDocument, jobId);
   const focused = records.some(record => record.id === focusRecordId);
   useEffect(() => { if (focused) setExpanded(true); }, [focused]);
@@ -45,8 +48,8 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
   }, []);
   const apply = (command: PanelCommand) => { void submit(command).catch(() => {}); };
   function choose(name: string) {
-    if (paused) return;
-    apply({ operation: "add", recordKind: "technology", jobId, values: { display: name } });
+    if (paused || !line) return;
+    apply({ operation: "add", recordKind: "technology", jobId, values: { display: name }, lineBlockId: line });
     setQuery(""); setActive(0); setExpanded(true); setOpen(true); input.current?.focus();
   }
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
@@ -70,7 +73,12 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
     {drag.dragging && <div className="technology-drop-end" {...drag.target(null)}>В конец списка</div>}
     {records.length > 8 && <button type="button" className="technology-expand" aria-expanded={expanded} aria-controls={`${id}-values`}
       onClick={() => { setExpanded(value => !value); }}>{expanded ? "Свернуть" : `Ещё ${records.length - 8}`}</button>}
-    <div className="technology-field" onClick={() => input.current?.focus()}>
+    {!targets.length && <small className="technology-note">Новую технологию здесь не добавить: в документе нет строки для этого списка.</small>}
+    {targets.length > 1 && <label className="technology-group">Группа
+      <select aria-label={`Группа для новой технологии: ${label}`} value={line} disabled={paused} onChange={event => setGroup(event.target.value)}>
+        {targets.map(target => <option key={target.blockId} value={target.blockId}>{target.label || "Без названия"}</option>)}
+      </select></label>}
+    {targets.length > 0 && <><div className="technology-field" onClick={() => input.current?.focus()}>
         <input ref={input} id={id} className="technology-search" role="combobox" aria-label={`Технологии: ${label}`} aria-autocomplete="list"
           aria-expanded={open} aria-controls={`${id}-options`} aria-activedescendant={open && choices.length ? `${id}-option-${activeIndex}` : undefined}
           autoComplete="off" maxLength={80} placeholder="Добавить технологию…" value={query} disabled={paused}
@@ -93,7 +101,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         onMouseDown={event => event.preventDefault()} onClick={() => choose(choice.name)}>{choice.custom ? `Добавить «${choice.name}»` : choice.name}</button>)
         : <span className="technology-no-results">Ничего не найдено</span>}
       {available.length > 60 && <span className="technology-no-results">Показаны не все. Уточните запрос.</span>}
-    </div>
+    </div></>}
     {open && (records.length > 0 || adding.length > 0) && <button type="button" className="text-button" aria-label={`Убрать все технологии: ${label}`} disabled={paused}
       onClick={() => { apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}>Убрать все технологии</button>}
     {editedRecord && <FactDialog target={{ kind: "technology", record: editedRecord }} close={() => { setEditing(null); }} submit={submit} />}

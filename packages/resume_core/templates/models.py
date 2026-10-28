@@ -105,7 +105,8 @@ class Focus(Definition):
     text_x: Points
     minimum_row_height: Positive
     icon_fit: Literal["contain"]
-    missing_icon: Literal["text_only"]
+    # initial: a grey square with the first letter of the name (D113); text_only keeps earlier packages as they were.
+    missing_icon: Literal["text_only", "initial"]
 
 
 class Footer(Definition):

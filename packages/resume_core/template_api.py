@@ -44,6 +44,14 @@ class EditorBlock(Wire):
         exclude_if=lambda value: not value)
 
 
+class EditorTechnologyTarget(Wire):
+    """A tags line of one scope, or a job section that has none yet, where the facts panel adds a technology."""
+    block_id: Id
+    job_id: Id | None
+    # The view title the panel names when one scope has several lines.
+    label: str
+
+
 class EditorPlanV1(Wire):
     """Python's presentation decisions for the mounted editor; the editor only applies them."""
     styles: dict[str, EditorStyle]
@@ -52,6 +60,8 @@ class EditorPlanV1(Wire):
     icons: list[Id]
     # Each used icon's PNG by hash; a packed icon has no asset entry of its own.
     icon_files: dict[str, Sha256] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    # The only places a new technology can be shown; a scope without one offers no adding.
+    technology_targets: list[EditorTechnologyTarget] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

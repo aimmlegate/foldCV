@@ -5,7 +5,8 @@ import { Spinner } from "../ui/OperationStatus";
 import { Button } from "../ui/Button";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
-export type FocusEntry = { recordId: string; display: string; years: number | null };
+/** One Focus row: whole years when its line states them, else the line as shown (10 месяцев) for the placeholder. */
+export type FocusEntry = { recordId: string; display: string; years: number | null; detail: string };
 type Entry = FocusEntry;
 
 function YearsRow({ entry, paused, submit, drag }: { entry: Entry; paused: boolean; submit: (command: PanelCommand) => Promise<void>;
@@ -33,7 +34,7 @@ function YearsRow({ entry, paused, submit, drag }: { entry: Entry; paused: boole
       disabled={paused || busy} {...drag.handle(entry.recordId)}><span aria-hidden="true">⠿</span></button>
     <label htmlFor={`focus-years-${entry.recordId}`}>{entry.display}</label>
     <input id={`focus-years-${entry.recordId}`} aria-label={`Лет опыта: ${entry.display}`} type="number" min={0} max={100} step={1}
-      inputMode="numeric" placeholder="Лет" value={value} disabled={paused || busy}
+      inputMode="numeric" placeholder={entry.years === null && entry.detail ? entry.detail : "Лет"} value={value} disabled={paused || busy}
       onChange={event => setValue(event.target.value)} onBlur={() => { void save(); }} />
     <button type="submit" className="text-button" aria-label={`Сохранить срок: ${entry.display}`} aria-busy={busy} disabled={paused || busy || value === saved}>{busy ? <Spinner /> : "✓"}</button>
     <button type="button" className="icon" aria-label={`Убрать из фокуса: ${entry.display}`} disabled={paused || busy}

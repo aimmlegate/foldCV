@@ -14,7 +14,7 @@ import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
   itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
-import { employmentPanelCommands, type PanelCommand } from "./v7-panel";
+import { blockPlacement, panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { changedBy, selectedTextBlocks, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
@@ -202,9 +202,14 @@ export class TemplateEditorSession {
   async panel(command: PanelCommand): Promise<void> {
     await this.navigation;
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
-    const commands = employmentPanelCommands(command, this.recordKinds());
-    if (!commands) { this.refuse(`panel ${command.operation} is not a V7 employment command`); throw new Error("V7_INPUT_UNSUPPORTED"); }
-    await this.command(commands.map(value => ({ operation: { kind: "builtin_panel", command: value }, prior: new Map() })), "panel");
+    const commands = panelCommandsV7(command, this.recordKinds());
+    // The panel offers only what Python saves, so this is a stale or foreign command; the panel shows the refusal.
+    if (!commands) { console.warn(`V7 panel ${command.operation} refused`); throw new Error("PANEL_ACTION_UNSUPPORTED"); }
+    const document = this.queue.template.durable.workspace.project?.document;
+    const placement = command.lineBlockId && document ? blockPlacement(document, command.lineBlockId) : null;
+    if (command.lineBlockId && !placement) throw new Error("TECHNOLOGY_LINE_MISSING");
+    const context = command.lineBlockId && placement ? { placementContext: { contextBlockId: command.lineBlockId, placement } } : {};
+    await this.command(commands.map(value => ({ operation: { kind: "builtin_panel", command: value, ...context }, prior: new Map() })), "panel");
   }
 
   /** One server-first action: typing drains, input locks, and Python's verified result is shown before input continues. */

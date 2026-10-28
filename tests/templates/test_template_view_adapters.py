@@ -31,6 +31,8 @@ URL = 'https://example.org/portfolio'
 def view_package():
     config = employment_package().definition.model_dump(mode='json', by_alias=True)
     config['template'].update(id='synthetic-view-adapters', name='Links and Focus')
+    # Catalog icons only: rows without one stay text, as packages before 2.7.0 show them.
+    config['style']['focus']['missing_icon'] = 'text_only'
     config['fact_types'] += [
         {'id': 'portfolio', 'schema_version': '1', 'schema': object_schema({'name': TEXT, 'url': TEXT}),
             'builtin_kind': None, 'relations': []},

@@ -99,9 +99,8 @@ def name_keys(definition, view_key, node):
     return keys
 
 
-def focus_icon(package, facts, row, catalog=None):
-    """The icon of one Focus row from the current text of its first bound name field; None shows text only."""
-    catalog = icon_catalog(package) if catalog is None else catalog
+def row_name(package, facts, row):
+    """The current text of the first bound name field of one Focus row; None when it shows no bound name."""
     records = records_by_id(facts)
     for block in row:
         ref = block.presentation
@@ -113,8 +112,65 @@ def focus_icon(package, facts, row, catalog=None):
             for part in span.content if span.type == 'bound_link' else [span]:
                 if part.type == 'fact_field' and part.field_key in keys and part.record_id in records:
                     field = working_field(records[part.record_id], part.field_key)
-                    return catalog.find(field.raw_text) if field is not None else None
+                    return field.raw_text if field is not None else None
     return None
+
+
+def focus_icon(package, facts, row, catalog=None):
+    """The catalog icon of one Focus row from the current text of its first bound name field; None shows text only."""
+    catalog = icon_catalog(package) if catalog is None else catalog
+    name = row_name(package, facts, row)
+    return catalog.find(name) if name is not None else None
+
+
+_INITIALS = {}
+INITIAL_SIDE = 160
+INITIAL_BACKGROUND = (0xEF, 0xEF, 0xEF, 0xFF)
+INITIAL_INK = (0x80, 0x80, 0x80, 0xFF)
+
+
+def initial_icon(package, row, name):
+    """The placeholder of a row without an icon: a grey rounded square with the first letter or digit of the name, in
+    the row's own captured font (D113). None for a template that keeps such rows text-only, or a name without one."""
+    if package.recipe.style.focus.missing_icon != 'initial' or not name:
+        return None
+    letter = next((character.upper() for character in name if character.isalnum()), None)
+    ref = row[0].presentation if row else None
+    if letter is None or ref is None:
+        return None
+    token = package.recipe.style.text[ref.style_token].font
+    key = (package.package_hash, token, letter)
+    if key not in _INITIALS:
+        from io import BytesIO
+        from PIL import Image, ImageDraw, ImageFont
+        fonts = {asset.id: asset for asset in package.assets}
+        font = ImageFont.truetype(BytesIO(base64.b64decode(fonts[package.recipe.style.fonts[token]].bytes_base64)),
+            round(INITIAL_SIDE * .6))
+        image = Image.new('RGBA', (INITIAL_SIDE, INITIAL_SIDE), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        draw.rounded_rectangle((0, 0, INITIAL_SIDE - 1, INITIAL_SIDE - 1), radius=INITIAL_SIDE // 6, fill=INITIAL_BACKGROUND)
+        # Centered by the drawn glyph, not the font's line box, so Q and k sit as high as H.
+        left, top, right, bottom = draw.textbbox((0, 0), letter, font=font)
+        draw.text(((INITIAL_SIDE - right - left) / 2, (INITIAL_SIDE - bottom - top) / 2), letter, font=font, fill=INITIAL_INK)
+        output = BytesIO()
+        image.save(output, format='PNG')
+        raw = output.getvalue()
+        digest = hashlib.sha256(raw).hexdigest()
+        _INITIALS[key] = CapturedAsset(id='initial-' + digest[:24], path='generated#' + digest, role='icon',
+            mimeType='image/png', sha256=digest, size=len(raw), bytesBase64=base64.b64encode(raw).decode('ascii'))
+    return _INITIALS[key]
+
+
+def row_icon(package, facts, row, catalog=None):
+    """The icon a Focus row shows as (key, PNG asset): the catalog's, else the template's placeholder; None shows text
+    only. Editor and DOCX use this one decision."""
+    catalog = icon_catalog(package) if catalog is None else catalog
+    name = row_name(package, facts, row)
+    found = catalog.find(name) if name is not None else None
+    if found is not None:
+        return found, catalog.files[found]
+    placeholder = initial_icon(package, row, name)
+    return (placeholder.id, placeholder) if placeholder is not None else None
 
 
 def duration_text(months, locale):

@@ -1,4 +1,4 @@
-"""Employment panel changes keep authored wording outside selected canonical fields."""
+"""Facts panel changes keep authored wording outside selected canonical fields."""
 
 from .models.rich_document import FactFieldSpan
 from .models.template_authoring import BuiltinPanel, DeleteEntity
@@ -44,8 +44,8 @@ def _delete_entity(workspace, record_id, revision, action_id):
 
 def _patch_displays(before, candidate, original, updated, selected, removed_periods, allocator):
     switches = {}
-    previous = {period.id: period for period in original.periods}
-    for period in updated.periods:
+    previous = {period.id: period for period in getattr(original, 'periods', [])}
+    for period in getattr(updated, 'periods', []):
         old = previous[period.id]
         active = period_endpoint(period)
         inactive = 'end' if active == 'present' else 'present'
@@ -162,14 +162,16 @@ def _separator_nodes(nodes):
     return bool(nodes) and all(isinstance(node, PresentedText) for node in nodes)
 
 
-def _join_technology_line(prefix, entries, trailing):
+def _join_technology_line(prefix, entries, trailing, separator=None):
     sample = next((node for _record, leading, _spans in entries for node in leading if isinstance(node, PresentedText)), None)
+    if sample is None:
+        sample = separator or PresentedText(type='text', text=', ', styles={})
     content = list(prefix)
     for index, (_record, leading, spans) in enumerate(entries):
         if index == 0 and _separator_nodes(leading):
             leading = []
         elif index and not leading:
-            leading = [PresentedText(type='text', text=', ', styles={})] if sample is None else [sample.model_copy(deep=True)]
+            leading = [sample.model_copy(deep=True)]
         content.extend(leading)
         content.extend(spans)
     content.extend(trailing)
@@ -227,7 +229,28 @@ def prepare_panel_edit(response, request, *, occupied=None):
         if ((command.facts_revision, command.document_revision) != (workspace.project.facts.revision, workspace.document_revision)
                 or command.capture != request.capture):
             raise ValueError('stale or incompatible employment panel command')
-        if command.operation == 'move_technology':
+        from .template_panel_focus import FOCUS_OPERATIONS, prepare_focus
+        from .template_panel_records import add_technology, edit_record, remove_records
+        records = {value.id: value.kind for value in workspace.project.facts.records}
+        kind = records.get(command.record_id) if command.record_id is not None else command.record_kind
+        if command.operation in FOCUS_OPERATIONS:
+            if operation.placement_context is not None:
+                raise ValueError('FOCUS_SCOPE_INVALID')
+            prepared = prepare_focus(workspace, command, allocator)
+            if prepared is None:
+                return prepared_response(response, request, allocator, None, response.model_copy(deep=True))
+            candidate, steps = prepared
+        elif command.operation == 'add' and command.record_kind == 'technology':
+            candidate, steps = add_technology(workspace.project, operation, allocator)
+        elif command.operation in {'edit', 'remove', 'clear_technologies'} and kind not in {None, 'employment'}:
+            if operation.placement_context is not None:
+                raise ValueError('PANEL_ACTION_UNSUPPORTED')
+            prepared = (edit_record(workspace.project, command, allocator) if command.operation == 'edit'
+                else remove_records(workspace.project, command, request.capture.action_id))
+            if prepared is None:
+                return prepared_response(response, request, allocator, None, response.model_copy(deep=True))
+            candidate, steps = prepared
+        elif command.operation == 'move_technology':
             if operation.placement_context is not None:
                 raise ValueError('TECHNOLOGY_MOVE_INVALID')
             candidate = _reorder_technology_displays(workspace.project, command)
@@ -235,7 +258,8 @@ def prepare_panel_edit(response, request, *, occupied=None):
                 return prepared_response(response, request, allocator, None, response.model_copy(deep=True))
             steps = []
         elif command.job_id is not None or command.record_kind not in {None, 'employment'}:
-            raise ValueError('stale or incompatible employment panel command')
+            # Adding a candidate, an education or language item or a claim has no adapter; the panel does not offer it.
+            raise ValueError('PANEL_ACTION_UNSUPPORTED')
         elif command.operation in {'add', 'add_period'}:
             from .template_panel_creation import create_employment, create_period
             create = create_employment if command.operation == 'add' else create_period

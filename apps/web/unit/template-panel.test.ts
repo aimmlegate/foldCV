@@ -4,7 +4,8 @@ import { BlockNoteEditor } from "@blocknote/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
-import { employmentPanelCommands } from "../src/rich/v7-panel";
+import { blockPlacement, panelCommandsV7 } from "../src/rich/v7-panel";
+import { shownYears } from "../src/rich/v7-focus";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
 import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
@@ -17,25 +18,70 @@ function storage(): Storage {
 }
 Object.assign(globalThis, { sessionStorage: storage(), localStorage: storage() });
 
-const kinds = new Map([["job", "employment"], ["tech", "technology"]]);
+const kinds = new Map([["job", "employment"], ["tech", "technology"], ["person", "candidate"], ["school", "education"], ["note", "claim"]]);
+test("Focus rows and technology edits are forwarded", () => {
+  assert.deepEqual(panelCommandsV7({ operation: "move_focus", recordId: "tech", beforeRecordId: "other" }, kinds),
+    [{ operation: "move_focus", recordId: "tech", beforeRecordId: "other" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "move_focus", recordId: "tech", beforeRecordId: null }, kinds),
+    [{ operation: "move_focus", recordId: "tech" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "add_to_focus", recordId: "tech" }, kinds), [{ operation: "add_to_focus", recordId: "tech" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "remove_from_focus", recordId: "tech" }, kinds),
+    [{ operation: "remove_from_focus", recordId: "tech" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "tech", values: { experience: "" } }, kinds),
+    [{ operation: "edit", recordId: "tech", values: { experience: "" } }]);
+  assert.equal(panelCommandsV7({ operation: "add_to_focus", recordId: "job" }, kinds), null);
+  assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "tech", values: { experience: "3", display: "Go" } }, kinds),
+    [{ operation: "edit", recordId: "tech", values: { experience: "3", display: "Go" } }]);
+});
+
+test("only what Python saves is forwarded: technology add, removal and clearing, other records' fields, item removal", () => {
+  assert.deepEqual(panelCommandsV7({ operation: "add", recordKind: "technology", jobId: "job", values: { display: "Go" }, lineBlockId: "line" }, kinds),
+    [{ operation: "add", recordKind: "technology", jobId: "job", values: { display: "Go" } }]);
+  assert.deepEqual(panelCommandsV7({ operation: "remove", recordId: "tech" }, kinds), [{ operation: "remove", recordId: "tech" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "clear_technologies", recordKind: "technology", jobId: null, recordId: null, periodId: null, values: {} }, kinds),
+    [{ operation: "clear_technologies", recordKind: "technology", jobId: null, recordId: null, periodId: null, values: {} }]);
+  assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "person", values: { name: "Alex" } }, kinds),
+    [{ operation: "edit", recordId: "person", values: { name: "Alex" } }]);
+  assert.deepEqual(panelCommandsV7({ operation: "remove", recordId: "school" }, kinds), [{ operation: "remove", recordId: "school" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "note", values: { value: "Led a team" } }, kinds),
+    [{ operation: "edit", recordId: "note", values: { value: "Led a team" } }]);
+  // No adapter: a candidate or claim removal, adding an education item, a claim or a technology with other values.
+  for (const command of [{ operation: "remove", recordId: "person" }, { operation: "remove", recordId: "note" },
+    { operation: "add", recordKind: "education", values: { institution: "School" } }, { operation: "add", recordKind: "claim", values: { value: "x" } },
+    { operation: "add", recordKind: "technology", values: { display: "Go", experience: "3" } }, { operation: "edit", recordId: "person", values: {} },
+    { operation: "edit", recordId: "school", jobId: "job", values: { institution: "School" } }] as const)
+    assert.equal(panelCommandsV7(command, kinds), null, JSON.stringify(command));
+});
+
+test("a block's placement is its parent block or region and the sibling before it", () => {
+  const document = { regions: [{ id: "main", blocks: [{ id: "a", children: [] }, { id: "b", children: [{ id: "c", children: [] }, { id: "d", children: [] }] }] }] };
+  assert.deepEqual(blockPlacement(document, "a"), { parentId: "main", afterId: null });
+  assert.deepEqual(blockPlacement(document, "b"), { parentId: "main", afterId: "a" });
+  assert.deepEqual(blockPlacement(document, "d"), { parentId: "b", afterId: "c" });
+  assert.equal(blockPlacement(document, "missing"), null);
+});
+
+test("a Focus line gives whole years only when it states them", () => {
+  assert.deepEqual(["3 года", "1 год", "11 лет", "2 years", " 1 year ", "10 месяцев", "1,5 года", "около 3 лет", ""].map(shownYears),
+    [3, 1, 11, 2, 1, null, null, null, null]);
+});
+
 test("panel commands adapt to Python's V7 employment form; a technology reorder is forwarded", () => {
-  assert.deepEqual(employmentPanelCommands({ operation: "edit", recordId: "job", values: { role: "Lead", "period:p1:start": "01.2021" } }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "job", values: { role: "Lead", "period:p1:start": "01.2021" } }, kinds),
     [{ operation: "edit", recordId: "job", values: { role: "Lead", "period:p1:start": "01.2021" } }]);
-  assert.deepEqual(employmentPanelCommands({ operation: "remove_period", recordId: "job", periodId: "p1", values: { role: "Lead" } }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "remove_period", recordId: "job", periodId: "p1", values: { role: "Lead" } }, kinds),
     [{ operation: "edit", recordId: "job", values: { role: "Lead" } }, { operation: "remove_period", recordId: "job", periodId: "p1" }]);
-  assert.deepEqual(employmentPanelCommands({ operation: "add_period", recordId: "job", values: {} }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "add_period", recordId: "job", values: {} }, kinds),
     [{ operation: "add_period", recordId: "job", values: {} }]);
-  assert.deepEqual(employmentPanelCommands({ operation: "add", recordKind: "employment", values: { employer: "Acme", start: "01.2024" } }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "add", recordKind: "employment", values: { employer: "Acme", start: "01.2024" } }, kinds),
     [{ operation: "add", recordKind: "employment", values: { employer: "Acme", start: "01.2024" } }]);
-  assert.deepEqual(employmentPanelCommands({ operation: "move_technology", recordId: "tech", beforeRecordId: "other" }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "move_technology", recordId: "tech", beforeRecordId: "other" }, kinds),
     [{ operation: "move_technology", recordId: "tech", beforeRecordId: "other" }]);
-  assert.deepEqual(employmentPanelCommands({ operation: "move_technology", recordId: "tech", beforeRecordId: null }, kinds),
+  assert.deepEqual(panelCommandsV7({ operation: "move_technology", recordId: "tech", beforeRecordId: null }, kinds),
     [{ operation: "move_technology", recordId: "tech" }]);
-  assert.equal(employmentPanelCommands({ operation: "edit", recordId: "tech", values: { display: "Go" } }, kinds), null);
-  assert.equal(employmentPanelCommands({ operation: "move_technology", recordId: "job", beforeRecordId: "tech" }, kinds), null);
-  assert.equal(employmentPanelCommands({ operation: "move_focus", recordId: "tech", beforeRecordId: "other" }, kinds), null);
-  assert.equal(employmentPanelCommands({ operation: "edit", recordId: "job", values: {} }, kinds), null);
-  assert.equal(employmentPanelCommands({ operation: "remove", recordId: "job", jobId: "job" }, kinds), null);
+  assert.equal(panelCommandsV7({ operation: "move_technology", recordId: "job", beforeRecordId: "tech" }, kinds), null);
+  assert.equal(panelCommandsV7({ operation: "edit", recordId: "job", values: {} }, kinds), null);
+  assert.equal(panelCommandsV7({ operation: "remove", recordId: "job", jobId: "job" }, kinds), null);
 });
 
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[] };
@@ -120,15 +166,20 @@ test("E03: editing A retires only A; Undo restores it, Redo retires it, retyping
   } finally { session.close(); await value.close(); }
 });
 
-test("a panel command for a non-employment record is refused without touching the queue", async () => {
+test("a technology rename saves through Python; an action without an adapter is refused without touching the queue", async () => {
   const value = await harness("issues");
   const { session, warnings } = await opened(value);
   try {
-    const technology = session.queue.template.durable.workspace.project?.facts.records.find(item => item.kind === "technology");
+    const records = () => session.queue.template.durable.workspace.project?.facts.records ?? [];
+    const technology = records().find(item => item.kind === "technology");
     assert.ok(technology);
-    await assert.rejects(session.panel({ operation: "edit", recordId: technology.id, values: { display: "Go" } }),
-      /V7_INPUT_UNSUPPORTED/);
+    await session.panel({ operation: "edit", recordId: technology.id, values: { display: "Go" } });
+    const renamed = records().find(item => item.id === technology.id);
+    assert.ok(renamed?.kind === "technology");
+    assert.equal(renamed.display.rawText, "Go");
+    await assert.rejects(session.panel({ operation: "add", recordKind: "language", values: { language: "French" } }), /PANEL_ACTION_UNSUPPORTED/);
     assert.equal(session.queue.template.pending.length, 0);
-    assert.equal(warnings.length, 1);
+    // The facts panel shows the refusal; the editor's notices stay clear.
+    assert.equal(warnings.length, 0);
   } finally { session.close(); await value.close(); }
 });

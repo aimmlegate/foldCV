@@ -21,6 +21,7 @@ import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
 import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
+import { focusFacts } from "./v7-focus";
 import { checkCount, checkRemarks, importRemarks, placeRemarks } from "./remarks";
 import type { ProjectCheckResultV1 } from "../contracts/generated/project_check_result_v1";
 import type { CheckState } from "../workbench/facts/RemarkSections";
@@ -198,7 +199,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   async function submitPanel(value: PanelCommand) {
     setPanelPending([value]);
     try { await session.panel(value); }
-    catch (error) { if (!(error instanceof Error && error.message === "V7_INPUT_UNSUPPORTED")) setWarning(errorMessage(error)); throw error; }
+    // The facts panel shows its own refusal; other errors also reach the editor notices.
+    catch (error) { if (!(error instanceof Error && error.message === "PANEL_ACTION_UNSUPPORTED")) setWarning(errorMessage(error)); throw error; }
     finally { setPanelPending([]); }
   }
   const facts = shown.workspace.project?.facts ?? project.facts, documentShown = shown.workspace.project?.document ?? project.document;
@@ -211,6 +213,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const state = session.queue.template.state, styles = editor.getActiveStyles(), textBlocks = session.textBlocks();
   const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
   // Selection changes re-render the editor; the outline is read again only when the shown state or the check changes.
+  const focus = useMemo(() => shown.workspace.project ? focusFacts(shown.workspace.project, shown.presentation)
+    : { entries: [], options: [] }, [shown]);
   const remarks = useMemo(() => placeRemarks(documentShown, [...importRemarks(shown.workspace.project?.importIssues ?? []),
     ...checked ? checkRemarks(checked) : []]), [documentShown, shown, checked]);
   const check: CheckState = checkState.kind !== "idle" ? checkState : checked ? { kind: "done", count: checkCount(checked),
@@ -249,6 +253,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
+            focusEntries={focus.entries} focusOptions={focus.options} technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
             hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
             remarks={remarks} showBlock={blockId => { showBlock(blockId); }} check={{ state: check, run: () => void runCheck() }} />
         </fieldset>

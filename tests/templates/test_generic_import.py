@@ -264,8 +264,11 @@ async def test_a_manual_focus_duration_and_order_stay_exact_through_transfer_and
     ordered = edit(typed, {'kind': 'move_block', 'blockId': moved.id, 'beforeRevision': moved.revision,
         'placement': {'parentId': region.id, 'afterId': heading.id}}, 'order')
     plan = editor_plan(ordered.project)
-    assert [(text(block.children[0]), plan['blocks'][block.id]['focus']['icon']) for block in ordered.project.document.blocks()
-        if block.id in plan['blocks'] and 'focus' in plan['blocks'][block.id]] == [('SQL', None), ('Python', 'python'), ('UnknownTool', None)]
+    icons = [(text(block.children[0]), plan['blocks'][block.id]['focus']['icon']) for block in ordered.project.document.blocks()
+        if block.id in plan['blocks'] and 'focus' in plan['blocks'][block.id]]
+    # A row without a catalog icon shows the template's first-letter placeholder (D113).
+    assert [name for name, _icon in icons] == ['SQL', 'Python', 'UnknownTool'] and icons[1][1] == 'python'
+    assert icons[0][1].startswith('initial-') and icons[2][1].startswith('initial-') and icons[0][1] != icons[2][1]
     copy = transferred(ordered, originals)
     assert views(copy)['focus'] == ['ФОКУС', 'SQL', 'about 3 years', 'Python', '10 months', 'UnknownTool', '7 weeks']
     shown = emitted(xml(render(copy, tmp_path)))

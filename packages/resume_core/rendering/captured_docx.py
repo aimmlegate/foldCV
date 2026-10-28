@@ -17,7 +17,7 @@ from ..models.template_document import PresentedText, TemplateParagraphBlock
 from ..models.template_render import TemplateRendererIdentity, TemplateRenderRequestV1
 from ..rich_limits import DOCX_BYTES
 from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES, canonical
-from ..templates.focus import focus_icon, icon_catalog
+from ..templates.focus import icon_catalog, row_icon
 from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target
 from ..templates.materialize_nodes import reference
 from .captured_assets import CapturedAssets, decode_logo, decode_png
@@ -187,9 +187,10 @@ class CapturedWriter:
                 catalog = icon_catalog(request.package) if catalog is None else catalog
             except ValueError:
                 raise RenderFailure('ASSET_MISMATCH') from None
-            icon = focus_icon(request.package, request.facts, row, catalog)
-            if icon is not None and icon not in self.icons:
-                self.icons[icon] = decode_png(catalog.files[icon], 'icon')
+            found = row_icon(request.package, request.facts, row, catalog)
+            icon = found[0] if found else None
+            if found and icon not in self.icons:
+                self.icons[icon] = decode_png(found[1], 'icon')
             self.rows[block.id] = (row, icon)
         self.configure_page()
 

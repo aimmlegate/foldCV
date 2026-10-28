@@ -2,7 +2,7 @@ import type { OrderDocument } from "../../rich/technology-order";
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import type { PanelCommand } from "../../rich/v7-panel";
+import { panelSupport, type PanelCommand, type TechnologyTarget } from "../../rich/v7-panel";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
@@ -23,11 +23,13 @@ function summary(record: RecordValue): [string, string] {
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
-export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], submit, pending, paused, hidden, close,
+export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], technologyTargets = [], submit, pending, paused, hidden, close,
   focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
+  /** Where Python can show a new technology; a list without one offers no adding. */
+  technologyTargets?: readonly TechnologyTarget[];
   hidden: boolean; close: () => void;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
   /** Remarks by resume section, with the place each one names in the document. */
@@ -73,16 +75,18 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
       {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={paused || pending.length > 0} submit={apply} />
-        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={paused} submit={apply} focusRecordId={focusRequest?.recordId} /></>
+        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={paused} submit={apply} focusRecordId={focusRequest?.recordId}
+          targets={technologyTargets.filter(target => target.jobId === null)} /></>
         : facts.records.filter(record => record.kind === kind).map(record => {
           const [name, sub] = summary(record);
           return <div key={record.id}><div className="fact-row" data-fact-id={record.id}>
             <button className="fact-edit" disabled={paused} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
               {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
-            <button className="icon" aria-label={`Удалить: ${name}`} disabled={paused} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>
-          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={paused} submit={apply} focusRecordId={focusRequest?.recordId} />}</div>;
+            {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={paused} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
+          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={paused} submit={apply} focusRecordId={focusRequest?.recordId}
+            targets={technologyTargets.filter(target => target.jobId === record.id)} />}</div>;
         })}
-      {kind !== "technology" && (kind !== "candidate" || !facts.records.some(record => record.kind === "candidate")) && <button className="text-button fact-add" disabled={paused}
+      {panelSupport.add.has(kind) && <button className="text-button fact-add" disabled={paused}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
     </details>)}
     {remarks && <RemarkSections remarks={remarks} show={showBlock} />}

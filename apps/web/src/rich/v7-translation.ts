@@ -6,6 +6,8 @@ import { contentText, leafTarget, responseBlocks, responseLeaves, type ResponseL
 type Operation = TemplateEditPreparationV1["operations"][0];
 type ReplaceText = Extract<Operation, { kind: "replace_text" }>;
 type PanelRequest = Extract<Operation, { kind: "builtin_panel" }>["command"];
+/** The line a panel technology add goes to, as Python offered it. */
+export type PanelPlacement = NonNullable<Extract<Operation, { kind: "builtin_panel" }>["placementContext"]>;
 type PasteInline = Extract<Operation, { kind: "paste_inline" }>;
 type Capture = TemplateEditPreparationV1["capture"];
 /** A panel command before its revisions and capture are bound at issue time. */
@@ -23,7 +25,7 @@ export type V7Operation =
   | { kind: "set_marks"; container: LocalContainer; start: number; end: number; styles: Styles }
   | { kind: "split_block"; container: LocalContainer; offset: number; created: string }
   | { kind: "merge_blocks"; leading: LocalContainer; trailing: LocalContainer }
-  | { kind: "builtin_panel"; command: PanelCommandV7 }
+  | { kind: "builtin_panel"; command: PanelCommandV7; placementContext?: PanelPlacement }
   | { kind: "delete_entity"; recordId: string }
   // Structure commands are not optimistic: they name editor blocks and run after typing drains.
   | { kind: "move_block"; blockId: string; placement: Placement }
@@ -175,7 +177,8 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       if (!capture) return conflict("panel command needs its request capture");
       const current = revisions(basis);
       return { kind: "operation", operation: { kind: "builtin_panel", opId, command: { ...structuredClone(value.command),
-        factsRevision: current.facts, documentRevision: current.document, capture: structuredClone(capture) } } };
+        factsRevision: current.facts, documentRevision: current.document, capture: structuredClone(capture) },
+        ...(value.placementContext ? { placementContext: structuredClone(value.placementContext) } : {}) } };
     }
     if (value.kind === "delete_entity") {
       const revision = revisions(basis).records.get(value.recordId);

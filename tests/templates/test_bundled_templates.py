@@ -21,7 +21,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-GENERIC_HASH = '8fe57e27b83525604a16f42ff1a4b7bdeb77c330c1193a3303aab81160cf0665'
+GENERIC_HASH = '29cc211fa5f0f6663844286c5af99310317def70cdc6fce322000151aadd8e4e'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 
 

@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.6.0
+  revision: 2.7.0
   name: Две колонки
   default_locale: ru
 model:
@@ -696,7 +696,7 @@ style:
     text_x: 36.75
     minimum_row_height: 38
     icon_fit: contain
-    missing_icon: text_only
+    missing_icon: initial
   footer:
     text: mail@example.com
     center_x: 275.65
