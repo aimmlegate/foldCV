@@ -2,6 +2,7 @@
 running steps in the operation sidecar (S7e, D109)."""
 
 import asyncio
+from collections import OrderedDict
 from dataclasses import dataclass, replace
 import hashlib
 import json
@@ -18,9 +19,9 @@ from packages.resume_core.template_capture import item_identities, prepare_built
 from packages.resume_core.template_identity import (capture_span, empty_value, evidence_options, line_spans,
     offered_evidence, source_slice)
 from packages.resume_core.template_import import (ProcessingDeadline, TemplateImportFailure, admit_operation, attempt_in,
-    cancel_operation, capture_finalization, capture_task_input, checked, digest, dispatch_attempt, identity, observe_time,
-    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
-    task_in)
+    authorization, cancel_operation, capture_finalization, capture_task_input, checked, digest, dispatch_attempt, identity,
+    observe_time, record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls,
+    start_operation, task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
@@ -100,6 +101,8 @@ def reply_feedback(task_id, errors):
 # Normal calls take 3-35 s and the CLI streams nothing before the reply, so a stalled call (LIVE-04: 180 s) is
 # only seen at its limit; a first call that runs out gets one retry with the full provider limit.
 CALL_SECONDS, RETRY_SECONDS = 90, MAX_GENERATION_SECONDS
+# Import reads kept, one per project; a running import hits its own between sidecar steps.
+CACHED_READS = 4
 
 
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
@@ -263,21 +266,25 @@ class TemplatePipeline:
         self.repository, self.transport = repository, transport
         self.authority, self.assemble, self.derive = authority, assemble, derive
         self.wall, self.elapsed, self.id_factory = wall, elapsed, id_factory
-        self.locks, self.cancels, self.read_cache = {}, {}, {}
+        self.locks, self.cancels = {}, {}
+        self.read_cache, self.cache_lock = OrderedDict(), threading.Lock()
 
     def read(self, project):
         session = self.repository.open(project)
         with session.lock:
-            workspace = session.workspace
+            committed = workspace = session.workspace
             data = owner(workspace)
             if workspace.project is not None and not data.history_loaded:
                 workspace = decode_project(session.directory, rich_snapshot_bytes(workspace), history=True)
                 data = owner(workspace)
             sidecar = OperationSidecar(session.directory)
-            key = (id(session.workspace), sidecar.keys(project, workspace))
+            keys = sidecar.keys(project, workspace)
+            # The entry holds the committed object and compares it by identity: an id() key matched a later
+            # workspace that CPython had placed at the address of a freed one.
             cached = self.read_cache.get(project)
-            if cached is not None and cached[0] == key and not verifying():
-                return cached[1]
+            hit = cached is not None and cached[0] is committed and cached[1] == keys
+            if hit and not verifying():
+                return cached[2]
             overlays = [sidecar.overlay(project, session.revision, value) for value in data.template_operations]
             facts = [value for _operation, value in overlays if value is not None]
             if len(facts) > 1:
@@ -287,12 +294,23 @@ class TemplatePipeline:
             holder.template_operations = [operation for operation, _facts in overlays]
             if facts:
                 holder.facts = facts[0]
-            if cached is not None and cached[0] == key:
-                if cached[1] != view:
+            if hit:
+                if cached[2] != view:
                     raise RuntimeError('Import read cache changed')
-                return cached[1]
-            self.read_cache[project] = (key, view)
+                return cached[2]
+            with self.cache_lock:
+                self.read_cache.pop(project, None)
+                self.read_cache[project] = (committed, keys, view)
+                while len(self.read_cache) > CACHED_READS:
+                    self.read_cache.popitem(last=False)
             return view
+
+    async def view(self, project):
+        """read() in a worker thread: it waits for the project lock and may copy the whole workspace."""
+        return await asyncio.to_thread(self.read, project)
+
+    def recheck(self, project, operation_id):
+        self.guard(project, operation_in(self.read(project), operation_id))
 
     def checkpoint(self, project, transition, **_options):
         session = self.repository.open(project)
@@ -373,7 +391,7 @@ class TemplatePipeline:
         return operation
 
     async def recover(self, project, identifier):
-        workspace = self.read(project)
+        workspace = await self.view(project)
         operation = operation_in(workspace, identifier)
         if workspace.project is not None and operation.finalization is not None:
             return await asyncio.to_thread(self.record_publication, project, identifier)
@@ -404,7 +422,7 @@ class TemplatePipeline:
         async with self.locks.setdefault(project, asyncio.Lock()):
             if command.kind == 'start_new_import':
                 operation = await self.start(project, command)
-                if operation.finalization is not None and self.read(project).project is not None:
+                if operation.finalization is not None and (await self.view(project)).project is not None:
                     return await self.recover(project, operation.id)
                 if operation.attempts or operation.state in {'published', 'cancelled', 'failed', 'fenced'}:
                     return operation
@@ -417,7 +435,6 @@ class TemplatePipeline:
                 operation = operation_in(workspace, operation.id)
             cancel = self.cancels[(project, operation.id)] = cancel_event if cancel_event is not None else threading.Event()
             await asyncio.to_thread(self.authorize, project, operation)
-            self.guard(project, operation)
             await admitted()
             workspace = await asyncio.to_thread(self.update, project, operation.id,
                 lambda value, _data, _workspace: admit_operation(value, self.wall()))
@@ -425,11 +442,10 @@ class TemplatePipeline:
             deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
             await self.run_tasks(project, operation, deadline, cancel,
                 implicit=implicit_dependencies(owner(workspace).template_package, operation))
-            workspace = self.read(project)
-            operation = operation_in(workspace, operation.id)
+            operation = operation_in(await self.view(project), operation.id)
             if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
                 return operation
-            return await self.finalize(project, operation.id) if finalize else operation
+            return await self.finalize(project, operation.id, cancel) if finalize else operation
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
@@ -524,7 +540,7 @@ class TemplatePipeline:
         return value, sorted(handles)
 
     async def execute_task(self, project, operation_id, task_id, deadline, cancel):
-        workspace = self.read(project)
+        workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
         task = task_in(operation, task_id)
         if any(result.task_id == task_id for result in operation.task_results):
@@ -553,7 +569,7 @@ class TemplatePipeline:
             return
         feedback, unresolved, previous = (), [], None
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
-            workspace = self.read(project)
+            workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
                 and attempt.slot == slot and attempt.state != 'released'), None)
@@ -602,12 +618,12 @@ class TemplatePipeline:
                     break
             else:
                 attempt_id = existing.id
-            workspace = self.read(project)
+            workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             attempt = attempt_in(operation, attempt_id)
             if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
                 return
-            self.guard(project, operation)
+            await asyncio.to_thread(self.guard, project, operation)
             if attempt.outcome != 'completed' and attempt.proposal_record_id is None:
                 unresolved.append(attempt.error_code or attempt.outcome or 'IMPORT_RETURN_UNKNOWN')
                 refusal = transport_refusal(attempt, data.template_package, task.block_id) if (slot != 'fallback_repair'
@@ -664,7 +680,7 @@ class TemplatePipeline:
                         review_schema(review), deadline, cancel, review=review)
                 else:
                     review_id = review_attempt.id
-                self.guard(project, operation_in(self.read(project), operation_id))
+                await asyncio.to_thread(self.recheck, project, operation_id)
                 kept_first = [False]
                 def accept(value, current, _workspace):
                     self.facts_current(value, current.facts)
@@ -698,7 +714,7 @@ class TemplatePipeline:
         await self.fallback(project, operation_id, task_id, unresolved)
 
     async def finish_admitted(self, project, operation_id, task_id, proposal):
-        workspace = self.read(project)
+        workspace = await self.view(project)
         operation, effective = operation_in(workspace, operation_id), owner(workspace).facts
         active_handles = {record.item_handle for record in effective.extensions if record.active}
         active_handles.update(allocation.item_handle for allocation in item_identities(operation)
@@ -711,9 +727,9 @@ class TemplatePipeline:
 
     async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None,
             seconds=CALL_SECONDS):
-        workspace = self.read(project)
+        workspace = await self.view(project)
         operation = operation_in(workspace, operation_id)
-        self.guard(project, operation)
+        await asyncio.to_thread(self.guard, project, operation)
         remaining = deadline.remaining(operation, self.wall(), self.elapsed())
         policy = review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair' else operation.capture.primary
         if review is None:
@@ -744,7 +760,7 @@ class TemplatePipeline:
         if not reserved:
             raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
         attempt_id = reserved[0]
-        self.guard(project, operation_in(self.read(project), operation_id))
+        await asyncio.to_thread(self.recheck, project, operation_id)
         def dispatch(result, _data, _workspace):
             now = self.wall()
             remaining = deadline.remaining(result, now, self.elapsed())
@@ -787,21 +803,23 @@ class TemplatePipeline:
         try:
             response = await asyncio.to_thread(launch)
         except ContentFailure as error:
-            operation = operation_in(self.read(project), operation_id)
+            operation = operation_in(await self.view(project), operation_id)
             attempt = attempt_in(operation, attempt_id)
             if attempt.state == 'dispatch_started':
-                returned(ContentTransportReturn(error.raw_return, outcome_state(error.code), error.code,
-                    error.logical_attempts, error.usage, error.cleanup_verified, error.dispatch_witness, policy.effort))
+                await asyncio.to_thread(returned, ContentTransportReturn(error.raw_return, outcome_state(error.code),
+                    error.code, error.logical_attempts, error.usage, error.cleanup_verified, error.dispatch_witness,
+                    policy.effort))
             else:
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     record_return(result, attempt_id, error.raw_return,
                         attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,
                         attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code))
         else:
-            if attempt_in(operation_in(self.read(project), operation_id), attempt_id).state == 'dispatch_started':
-                returned(ContentTransportReturn(response.raw_return, 'completed', None, response.logical_attempts,
-                    response.usage, response.cleanup_verified, response.dispatch_witness, response.reasoning_effort))
-        current = operation_in(self.read(project), operation_id)
+            if attempt_in(operation_in(await self.view(project), operation_id), attempt_id).state == 'dispatch_started':
+                await asyncio.to_thread(returned, ContentTransportReturn(response.raw_return, 'completed', None,
+                    response.logical_attempts, response.usage, response.cleanup_verified, response.dispatch_witness,
+                    response.reasoning_effort))
+        current = operation_in(await self.view(project), operation_id)
         if stops_import(current, attempt_in(current, attempt_id)):
             raise AccountStop(attempt_in(current, attempt_id).error_code)
         return attempt_id
@@ -833,7 +851,7 @@ class TemplatePipeline:
         await asyncio.to_thread(self.update_operation, project, operation_id, finish)
 
     async def fallback(self, project, operation_id, task_id, errors):
-        current = self.read(project)
+        current = await self.view(project)
         operation = operation_in(current, operation_id)
         if operation.state in {'cancelled', 'fenced'}:
             return
@@ -912,18 +930,23 @@ class TemplatePipeline:
                 'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {})}, spans,
             task.allowed_handles, 'source_fallback', issues, accepted=kept)
 
-    async def finalize(self, project, identifier):
-        workspace = self.read(project)
+    async def finalize(self, project, identifier, cancel=None):
+        """Publish the import. The publication commit is the point of no return: a cancel seen before it leaves the
+        import unpublished and resumable."""
+        stopped = cancel if cancel is not None else threading.Event()
+        workspace = await self.view(project)
         operation = operation_in(workspace, identifier)
         if workspace.project is not None and operation.finalization is not None:
             return await asyncio.to_thread(self.record_publication, project, identifier)
-        self.guard(project, operation)
+        await asyncio.to_thread(self.guard, project, operation)
         if any(attempt.cleanup.state != 'verified' for attempt in operation.attempts):
             return operation
         authored = await asyncio.to_thread(self.assemble, workspace, operation)
         authored.document_revision = workspace.document_revision + 1
         authored.project.document.revision = authored.document_revision
-        candidate = capture_finalization(operation, authored.project, self.wall(), id_factory=self.id_factory)
+        candidate = self.candidate(operation, authored.project)
+        if stopped.is_set():
+            return operation
 
         def prepare(value, _data, current):
             if current.project_revision != workspace.project_revision:
@@ -940,12 +963,24 @@ class TemplatePipeline:
         authored.updated_at = self.wall()
 
         def publish():
+            if stopped.is_set():
+                return operation_in(self.read(project), identifier)
             mutation_id = 'template_publication_' + candidate.id
             self.repository.replace(project, base_revision=before.project_revision, workspace=authored,
                 reason='publication', client_mutation_id=mutation_id, request_sha256=hashlib.sha256(mutation_id.encode()).hexdigest())
             return self.record_publication(project, identifier)
 
         return await asyncio.to_thread(publish)
+
+    def candidate(self, operation, project):
+        """The finalization to publish. A resume renews the one an earlier authorization saved before its publication
+        failed or was cancelled. finalize() comes here only while the project is unpublished, so nothing was published
+        with that candidate and the renewal takes the current content."""
+        previous = operation.finalization
+        if previous is None or previous.authorization_id == authorization(operation).id:
+            return capture_finalization(operation, project, self.wall(), id_factory=self.id_factory)
+        return capture_finalization(operation.model_copy(update={'finalization': None}), project, self.wall(),
+            id_factory=self.id_factory)
 
     def record_publication(self, project, identifier):
         session = self.repository.open(project)
@@ -966,8 +1001,8 @@ class TemplatePipeline:
             return operation_in(self.update(project, identifier, recorded), identifier)
 
     async def finish_fallbacks(self, project, operation_id):
-        for task_id in [task.id for task in operation_in(self.read(project), operation_id).tasks]:
-            workspace = self.read(project)
+        for task_id in [task.id for task in operation_in(await self.view(project), operation_id).tasks]:
+            workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             if operation.state in {'cancelled', 'fenced', 'published'}:
                 return operation
@@ -979,4 +1014,4 @@ class TemplatePipeline:
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory))
             await self.fallback(project, operation_id, task_id, ['IMPORT_PROCESSING_STOPPED'])
-        return operation_in(self.read(project), operation_id)
+        return operation_in(await self.view(project), operation_id)

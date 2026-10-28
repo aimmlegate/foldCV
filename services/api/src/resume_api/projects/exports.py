@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import hashlib
 import threading
 from dataclasses import dataclass
@@ -55,15 +56,13 @@ class ExportService:
     async def export(self, project_id, snapshot, editor_token, *, retry_attempt_id=None, trusted=False):
         """`trusted` is the assistant's server-side export: it has no page, so no editor token."""
         task = self.projects.tasks.start(project_id, 'export', stage='rendering')
-        session = self.projects.repository.open(project_id)
-        with session.lock:
-            session.pins += 1
         try:
-            prepared = await asyncio.to_thread(self._prepare, project_id, snapshot, editor_token, retry_attempt_id, trusted)
-            artifact = await self.render(prepared.request)
-            if not isinstance(artifact, bytes) or not 0 < len(artifact) <= DOCX_BYTES:
-                raise ProjectFailure('IMPORT_EXPORT_INVALID_ARTIFACT', 422)
-            result = await asyncio.to_thread(self._record, project_id, prepared, artifact)
+            async with pinned(self.projects.repository, project_id) as session:
+                prepared = await asyncio.to_thread(self._prepare, session, snapshot, editor_token, retry_attempt_id, trusted)
+                artifact = await self.render(prepared.request)
+                if not isinstance(artifact, bytes) or not 0 < len(artifact) <= DOCX_BYTES:
+                    raise ProjectFailure('IMPORT_EXPORT_INVALID_ARTIFACT', 422)
+                result = await asyncio.to_thread(self._record, session, prepared, artifact)
             self.projects.tasks.finish(task.id, 'succeeded', detail={'attemptId': result.attempt.id})
             return result
         except ProjectFailure as error:
@@ -75,12 +74,8 @@ class ExportService:
         except BaseException as error:
             self.projects.tasks.finish(task.id, 'failed', error=getattr(error, 'code', 'PROCESS_FAILED'))
             raise
-        finally:
-            with session.lock:
-                session.pins -= 1
 
-    def _prepare(self, project_id, snapshot, editor_token, retry_attempt_id, trusted=False):
-        session = self.projects.repository.open(project_id)
+    def _prepare(self, session, snapshot, editor_token, retry_attempt_id, trusted):
         with session.lock:
             if not trusted:
                 session.require_editor(editor_token)
@@ -99,40 +94,54 @@ class ExportService:
                 raise ProjectFailure(error.code, 409) from None
             request = TemplateRenderRequestV1.model_validate({**captured.request.model_dump(by_alias=True),
                 'package': project.template_package})
-            return _Prepared(workspace.project_revision, attempt, captured, request)
+            return _Prepared(attempt, captured, request)
 
-    def _record(self, project_id, prepared, artifact):
+    def _record(self, session, prepared, artifact):
         digest = sha256(artifact)
-        session = self.projects.repository.open(project_id)
+        attempt = prepared.attempt.model_copy(update={'state': 'completed', 'artifact_hash': digest, 'error_code': None})
+        render = RichRenderSnapshot(id=attempt.id, documentRevision=prepared.captured.snapshot.document_revision,
+            factsRevision=prepared.captured.request.facts.revision, templateSha256=prepared.captured.request.package_hash,
+            rendererVersion=prepared.captured.request.renderer.version, rendererSha256=prepared.captured.request.renderer.sha256,
+            docxSha256=digest, docxSize=len(artifact), docxPath='renders/' + attempt.id + '.docx')
         with session.lock:
-            if session.revision != prepared.revision:
-                raise ProjectFailure('REVISION_CONFLICT', 409)
-            updated = session.workspace.model_copy(deep=True)
-            attempt = prepared.attempt.model_copy(update={'state': 'completed', 'artifact_hash': digest, 'error_code': None})
-            render = RichRenderSnapshot(id=attempt.id, documentRevision=prepared.captured.snapshot.document_revision,
-                factsRevision=prepared.captured.request.facts.revision, templateSha256=prepared.captured.request.package_hash,
-                rendererVersion=prepared.captured.request.renderer.version, rendererSha256=prepared.captured.request.renderer.sha256,
-                docxSha256=digest, docxSize=len(artifact), docxPath='renders/' + attempt.id + '.docx')
+            # The record changes no undoable key, so it goes on the current workspace: commits made during the render
+            # stay, and the attempt keeps the snapshot it rendered.
+            current = session.workspace
+            updated = current.model_copy(deep=True)
             updated.project.exports.append(attempt)
             updated.project.export_inputs.append(prepared.captured)
             updated.project.renders.append(render)
-            if attempt.publication_intent_id is not None:
-                operation = next((value for value in updated.project.template_operations
-                    if value.publication.intent_id == attempt.publication_intent_id), None)
-                if operation is not None:
-                    operation.export_attempts.append(attempt.model_copy(deep=True))
-            self.projects.repository.replace(project_id, base_revision=prepared.revision, workspace=updated, reason='export',
-                blobs=[('renders', attempt.id, artifact, digest)], client_mutation_id='export-' + attempt.id,
+            self.projects.repository.replace(session.project_id, base_revision=current.project_revision, workspace=updated,
+                reason='export', blobs=[('renders', attempt.id, artifact, digest)], client_mutation_id='export-' + attempt.id,
                 request_sha256=hashlib.sha256(attempt.id.encode()).hexdigest())
         return ExportResult(attempt, prepared.captured.snapshot, artifact)
 
 
 @dataclass
 class _Prepared:
-    revision: int
     attempt: object
     captured: object
     request: object
+
+
+@asynccontextmanager
+async def pinned(repository, project_id):
+    """`repository.pinned` across awaits. Taking it waits for the project lock, which another holder may keep during
+    slow I/O, so it is taken and left in worker threads; both are shielded, so a cancelled export leaves no pin."""
+    loop, pin = asyncio.get_running_loop(), repository.pinned(project_id)
+    taking = loop.run_in_executor(None, pin.__enter__)
+    try:
+        session = await asyncio.shield(taking)
+    except asyncio.CancelledError:
+        def leave(done):
+            if not done.cancelled() and done.exception() is None:
+                loop.run_in_executor(None, pin.__exit__, None, None, None)
+        taking.add_done_callback(leave)
+        raise
+    try:
+        yield session
+    finally:
+        await asyncio.shield(loop.run_in_executor(None, pin.__exit__, None, None, None))
 
 
 async def production_render(request, *, temp_root, worker_slot, renderer, cleanup_error=lambda _error: None):

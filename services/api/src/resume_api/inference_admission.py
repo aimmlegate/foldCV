@@ -81,6 +81,11 @@ class InferenceAdmission:
         with self.condition:
             return self.owned
 
+    def busy(self):
+        """Held or with a queue: a new reservation would wait."""
+        with self.condition:
+            return self.owned or bool(self.waiting)
+
     def acquire(self, blocking=True, timeout=-1):
         deadline = None if timeout == -1 else time.monotonic() + timeout
         with self.condition:

@@ -222,8 +222,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         yield
         intake.request_shutdown()
         rewrite.request_shutdown()
+        projects.imports.stop_all()
         await assistant.shutdown()
-        for stopping in (intake.shutdown, rewrite.shutdown):
+        # An import left running would keep its model process and block the default executor's shutdown.
+        for stopping in (intake.shutdown, rewrite.shutdown, projects.imports.shutdown):
             try:
                 await stopping()
             except ProjectFailure:
@@ -710,6 +712,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 connection_epoch += 1
                 epoch = connection_epoch
                 assistant.stop_all()
+                # A running import holds the permit and makes this BUSY; one not yet admitted would call the model
+                # under the new sign-in or CLI.
+                projects.imports.stop_all()
                 if kind == "install":
                     install_task = task
                 else:
@@ -864,12 +869,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             current = list(connection_work.items())
             intake.request_shutdown()
             rewrite.request_shutdown()
+            projects.imports.stop_all()
             assistant.stop_all()
         codes = await asyncio.gather(*(stop_connection(task, files, cancel)
                                        for task, (files, cancel) in current))
         try:
             await intake.shutdown()
             await rewrite.shutdown()
+            # No import keeps calling the model under the account that signed out.
+            await projects.imports.shutdown()
         except ProjectFailure:
             unsafe_code = SpikeError("PROCESS_CLEANUP_FAILED")
             lifecycle_code(unsafe_code)

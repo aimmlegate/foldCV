@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import json
 import threading
 from typing import Literal
@@ -29,6 +30,13 @@ from .skills import read_skill
 
 TOOL_NAMES = ('read_resume', 'find_text', 'read_facts', 'read_original', 'read_skill', 'check_resume',
     'read_public_page', 'export_document', 'propose_changes', 'publish_findings')
+
+
+@dataclass(frozen=True)
+class Stored:
+    """A reply whose `save` (the store write and its event) runs only after the reply passed every limit."""
+    value: dict
+    save: object
 
 
 class ToolSession(PrivateMcp):
@@ -103,7 +111,7 @@ class ToolSession(PrivateMcp):
         @tool
         async def export_document(format: Literal['docx', 'foldcv']) -> CallToolResult:  # noqa: A002
             """Export the saved resume (not an unapplied proposal) as DOCX or a .foldcv project file; returns a link."""
-            return await self.call('export_document', lambda: self.service.export(self.control.project_id, format, self.control))
+            return await self.call('export_document', lambda: self.export(format))
 
         @tool
         async def propose_changes(request: ProposeChangesV1) -> CallToolResult:
@@ -162,10 +170,14 @@ class ToolSession(PrivateMcp):
                 if asyncio.iscoroutine(value):
                     value = await value
                 self.guard()
+                value, save = (value.value, value.save) if isinstance(value, Stored) else (value, None)
                 text = context.json_text(value)
                 size = len(text.encode())
                 if size > limits.TOOL_BYTES or self.result_bytes + size > limits.TOOL_TOTAL_BYTES:
                     raise AgentFailure('AGENT_TOOL_LIMIT')
+                if save is not None:
+                    # A stored draft, finding or source must reach the model as a success, so it is stored last.
+                    await save()
                 self.result_bytes += size
                 return CallToolResult(content=[TextContent(type='text', text=text)], isError=False)
             except AgentFailure as error:
@@ -187,29 +199,43 @@ class ToolSession(PrivateMcp):
         self.fetches += 1
         source = await self.service.fetcher.fetch(AgentFetchRequest(url=url), self.fetch_cancel)
         source.run_id = self.control.run_id
-        self.service.record_source(self.control, source)
         excerpt, clipped = context.clip(source.text, 12000)
         value = source.model_dump(mode='json', by_alias=True)
         value.pop('text')
-        return {'source': value, 'excerpt': excerpt, 'excerptTruncated': clipped}
+        return Stored({'source': value, 'excerpt': excerpt, 'excerptTruncated': clipped},
+            lambda: self.service.write(self.service.record_source, self.control, source))
 
-    def propose(self, request):
+    async def export(self, fmt):
+        # The export records itself in the project before its link reply exists; that reply stays under 1 KiB.
+        if self.result_bytes + 1024 > limits.TOOL_TOTAL_BYTES:
+            raise AgentFailure('AGENT_TOOL_LIMIT')
+        return await self.service.export(self.control.project_id, fmt, self.control)
+
+    async def propose(self, request):
         from .proposals import propose
-        proposal = propose(self.service, self.control.run, self.pinned, request)
-        self.service.emit(self.control, 'proposal.ready', {'id': proposal.id})
-        return {'proposalId': proposal.id, 'kind': proposal.kind, 'preview': proposal.preview,
-            'note': 'Stored as a preview; the user applies or discards it in the panel.'}
+        # Compiling may load the project or wait for its lock: off the event loop.
+        proposal = await asyncio.to_thread(propose, self.service, self.control.run, self.pinned, request)
 
-    def findings(self, request):
-        known = self.service.source_ids(self.control)
+        def save():
+            if getattr(self.control, 'deleted', False):
+                return
+            self.service.store.save_proposal(proposal)
+            self.service.emit(self.control, 'proposal.ready', {'id': proposal.id})
+        # The panel shows the preview; a reply carrying it could pass the reply limits for a large proposal.
+        return Stored({'proposalId': proposal.id, 'kind': proposal.kind, 'changes': len(proposal.preview),
+            'note': 'Stored as a preview; the user applies or discards it in the panel.'},
+            lambda: self.service.write(save))
+
+    async def findings(self, request):
+        known = await asyncio.to_thread(self.service.source_ids, self.control)
         stored = []
         for item in request.findings:
             if not set(item.source_ids) <= known:
                 raise AgentFailure('AGENT_EVIDENCE_INVALID')
             stored.append(AgentFinding(id=identity('finding'), runId=self.control.run_id, severity=item.severity,
                 message=item.message, anchors=[self.anchor(target) for target in item.targets], sourceIds=item.source_ids))
-        self.service.record_findings(self.control, stored)
-        return {'findingIds': [finding.id for finding in stored]}
+        return Stored({'findingIds': [finding.id for finding in stored]},
+            lambda: self.service.write(self.service.record_findings, self.control, stored))
 
     def anchor(self, target):
         project = self.pinned.project

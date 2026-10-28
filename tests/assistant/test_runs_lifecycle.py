@@ -5,6 +5,7 @@ import asyncio
 import threading
 import time
 
+from packages.resume_core.models.template_render import TemplateRendererIdentity
 from tests.assistant.support import MODEL, PROJECT, assistant_app, base, conversation, finish, start
 
 
@@ -64,9 +65,10 @@ def test_deleting_the_project_stops_its_run_and_the_ending_run_writes_no_assista
         run = start(client, conversation(client))
         wait(started)
         store = application.state.assistant.store
+        # Taken before the delete: a run that ended drops its control.
+        control = application.state.assistant.controls[run['id']]
         deleted = client.request('DELETE', '/v2/projects/' + PROJECT, json={'confirmed': True})
         assert deleted.status_code == 200, deleted.text[:300]
-        control = next(control for control in application.state.assistant.controls.values() if control.run.id == run['id'])
         deadline = time.monotonic() + 5
         while control.task is not None and not control.task.done():
             assert time.monotonic() < deadline, 'the run did not stop'
@@ -74,3 +76,23 @@ def test_deleting_the_project_stops_its_run_and_the_ending_run_writes_no_assista
         assert control.cancel.is_set() and control.deleted
         assert client.get(base() + '/conversations').status_code == 404
         assert not store.directory(PROJECT).exists()
+
+
+def test_deleting_the_project_drops_its_export_links(tmp_path):
+    links = []
+
+    async def render(_request):
+        return b'PK\x03\x04synthetic-assistant-export'
+
+    async def steps(tools, _value, _cancel, _emit):
+        links.append(await tools.call('export_document', {'format': 'docx'}))
+        return 'Файл готов.'
+    with assistant_app(tmp_path, steps) as (client, application, _runtime):
+        exports = application.state.projects.exports
+        exports._renderer = TemplateRendererIdentity(id='captured-docx', version='test', sha256='a' * 64)
+        exports.render = render
+        finish(client, start(client, conversation(client)))
+        assert client.get(links[0]['url']).status_code == 200
+        deleted = client.request('DELETE', '/v2/projects/' + PROJECT, json={'confirmed': True})
+        assert deleted.status_code == 200, deleted.text[:300]
+        assert client.get(links[0]['url']).status_code == 404 and not application.state.assistant.files

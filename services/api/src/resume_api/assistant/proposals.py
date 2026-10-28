@@ -56,7 +56,8 @@ def action_preview(workspace, op):
 
 
 def propose(service, run, pinned, request):
-    """A stored draft proposal from the pinned read; edits off still allows a draft (G8)."""
+    """A draft proposal from the pinned read; edits off still allows a draft (G8). The tool stores it once the run's
+    reply limits admit its reply. Blocking: it may wait for the project lock."""
     project_id, first = run.project_id, request.ops[0]
     proposal_id = identity('proposal')
     expected = None
@@ -81,21 +82,20 @@ def propose(service, run, pinned, request):
             raise CompileFailure('ASSISTANT_PROPOSAL_EMPTY')
         shown = preview(pinned, after, request.ops)
     now = timestamp()
-    proposal = AssistantChangeProposalV1(schemaVersion=1, id=proposal_id, projectId=project_id,
+    return AssistantChangeProposalV1(schemaVersion=1, id=proposal_id, projectId=project_id,
         conversationId=run.conversation_id, runId=run.id, kind=kind, summary=request.summary,
         baseRevision=pinned.project_revision, touched=hashes, expectedActionId=expected, ops=request.ops,
         preview=shown, state='draft', appliedRevision=None, createdAt=now, updatedAt=now)
-    service.store.save_proposal(proposal)
-    return proposal
 
 
 def apply(service, project_id, proposal_id, request):
     projects, store = service.projects, service.store
-    proposal = store.proposal(project_id, proposal_id)
     repository = projects.repository
     session = repository.open(project_id)
-    request_sha256 = digest({'proposal': proposal.id, 'kind': proposal.kind})
     with session.lock:
+        # The state is read and settled under the project lock: a second Apply or a Discard waits for this one.
+        proposal = store.proposal(project_id, proposal_id)
+        request_sha256 = digest({'proposal': proposal.id, 'kind': proposal.kind})
         session.require_editor(request.editor_token)
         if request.client_mutation_id in session.replays:
             # A retried Apply: the repository returns its stored outcome and applies nothing. A crash after the commit
@@ -144,23 +144,25 @@ def apply(service, project_id, proposal_id, request):
                     raise ProjectFailure('ASSISTANT_PROPOSAL_STALE', 409, targets=[proposal.expected_action_id]) from None
                 raise
             edit = editing.result(projects, session, outcome, request.client_mutation_id)
-        else:
+        elif proposal.ops[0].action != 'delete':
             action = run_action(service, project_id, proposal.ops[0], request)
-        if proposal.kind != 'action' or not action.deleted:
+        if proposal.kind != 'action' or action is not None:
             proposal = proposal.model_copy(update={'state': 'applied', 'applied_revision': session.revision,
                 'updated_at': timestamp()})
             store.save_proposal(proposal)
+    if proposal.kind == 'action' and action is None:
+        # A deletion waits for the project's running work to stop, and that work needs the project lock to finish.
+        action = run_action(service, project_id, proposal.ops[0], request)
     return AssistantApplyResultV1(proposal=proposal, edit=edit, action=action)
 
 
 def run_action(service, project_id, op, request):
     """The same service calls the project buttons use; one action per proposal."""
     projects = service.projects
-    session = projects.repository.open(project_id)
     try:
         if op.action == 'rename':
             response = projects.rename(project_id, RenameRequestV1(editorToken=request.editor_token,
-                baseRevision=session.revision, title=(op.value or '').strip()))
+                baseRevision=projects.repository.read(project_id).project_revision, title=(op.value or '').strip()))
             return AssistantActionResultV1(action='rename', title=response.workspace.title, archived=None, deleted=False)
         if op.action == 'formatting_date':
             projects.set_formatting_date(project_id, formatting_date(op.value))
@@ -186,10 +188,12 @@ def store_cleanup(service, project_id):
 
 
 def discard(service, project_id, proposal_id):
-    proposal = service.store.proposal(project_id, proposal_id)
-    if proposal.state == 'applied':
-        raise ProjectFailure('ASSISTANT_PROPOSAL_CLOSED', 409)
-    if proposal.state == 'draft':
-        proposal = proposal.model_copy(update={'state': 'discarded', 'updated_at': timestamp()})
-        service.store.save_proposal(proposal)
+    session = service.projects.repository.open(project_id)
+    with session.lock:
+        proposal = service.store.proposal(project_id, proposal_id)
+        if proposal.state == 'applied':
+            raise ProjectFailure('ASSISTANT_PROPOSAL_CLOSED', 409)
+        if proposal.state == 'draft':
+            proposal = proposal.model_copy(update={'state': 'discarded', 'updated_at': timestamp()})
+            service.store.save_proposal(proposal)
     return proposal

@@ -40,9 +40,15 @@ type Pending = { conversationId: string; request: AssistantRunRequestV2 };
 // The combined reply types each message as an open object (see above); the server validated it as an AgentMessage.
 const messagesOf = (value: AssistantMessagesV1): AgentMessage[] => value.messages as unknown as AgentMessage[];
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
+// A failed poll is retried after a doubling pause of at most 20 × the base (5 s, below Stop's 6 s wait): about two
+// minutes at the default base before the panel reports the run as unreachable.
+const FOLLOW_RETRIES = 30;
 function code(error: unknown): string {
   return error instanceof AgentApiFailure ? error.code : error instanceof Error && /^[A-Z][A-Z0-9_]+$/u.test(error.message) ? error.message : "REQUEST_FAILED";
 }
+// A missing run or a refused request stays so; a network or service failure may pass.
+const lasting = (error: unknown): boolean => error instanceof AgentApiFailure && error.status >= 400 && error.status < 500
+  && ![408, 409, 429].includes(error.status);
 
 export class AssistantController {
   view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: true }, conversations: [],
@@ -68,10 +74,16 @@ export class AssistantController {
     this.view = { ...this.view, ...update }; this.changed(this.view);
   }
   private readonly waiting = new Map<symbol, string>();
+  // The follow loop's line in the loading state: reconnecting, or lost until the run is followed again.
+  private readonly link = Symbol();
+  private label(key: symbol, text: string | null): void {
+    if (text === null) this.waiting.delete(key); else this.waiting.set(key, text);
+    this.publish({ loading: [...this.waiting.values()].at(-1) ?? null });
+  }
   private async wait<T>(label: string, work: () => Promise<T>): Promise<T> {
-    const key = Symbol(); this.waiting.set(key, label); this.publish({ loading: label });
+    const key = Symbol(); this.label(key, label);
     try { return await work(); }
-    finally { this.waiting.delete(key); this.publish({ loading: [...this.waiting.values()].at(-1) ?? null }); }
+    finally { this.label(key, null); }
   }
   draft(value: string): void { this.publish({ draft: value }); }
   /** The panel's two flags; they go with each run, and Apply sends the edits flag again. */
@@ -145,7 +157,10 @@ export class AssistantController {
     // A run of this conversation that is still going (for example after a reload) is followed again.
     if (latest && !terminal(latest)) this.follow(latest);
   }
-  private leaveConversation(): number { this.stream?.abort(); this.stream = null; this.following = null; return ++this.epoch; }
+  private leaveConversation(): number {
+    this.stream?.abort(); this.stream = null; this.following = null; this.label(this.link, null);
+    return ++this.epoch;
+  }
 
   /** Show a stored source or finding of this conversation in the transcript. */
   async resource(kind: "sources" | "findings", id: string): Promise<void> {
@@ -213,19 +228,21 @@ export class AssistantController {
     return conversation.id;
   }
 
-  /** One long-poll loop per run; it ends when the run ends, the conversation changes or the drawer closes. */
+  /** One long-poll loop per run; it ends when the run ends, the conversation changes or the drawer closes. Failed
+   * polls are retried with backoff while the panel shows the reconnect; past FOLLOW_RETRIES it reports the lost run. */
   private follow(run: Run): void {
     this.stream?.abort();
     const stream = new AbortController(), epoch = this.epoch;
     this.stream = stream;
-    const work = (async () => {
+    this.label(this.link, null);
+    const work: Promise<void> = (async () => {
       let after = 0, failures = 0;
       while (!this.closed && !stream.signal.aborted && epoch === this.epoch) {
         try {
           const reply = await this.api.events(run.id, after, stream.signal);
           if (this.closed || stream.signal.aborted || epoch !== this.epoch) return;
           if (reply.run.id !== run.id || reply.events.some(event => event.runId !== run.id)) throw new AgentApiFailure("INVALID_RESULT");
-          failures = 0;
+          if (failures > 0) { failures = 0; this.label(this.link, null); }
           for (const event of reply.events) if (event.sequence > after) this.accept(event);
           after = Math.max(after, reply.next);
           this.publish({ run: reply.run });
@@ -236,11 +253,18 @@ export class AssistantController {
           }
         } catch (error) {
           if (this.closed || stream.signal.aborted || epoch !== this.epoch) return;
-          if (++failures >= 3) { this.publish({ error: code(error) }); return; }
-          await pause(this.retryMs * failures);
+          if (lasting(error)) { this.label(this.link, null); this.publish({ error: code(error) }); return; }
+          if (++failures > FOLLOW_RETRIES) {
+            this.label(this.link, "Нет связи с помощником");
+            this.publish({ error: error instanceof AgentApiFailure ? error.code : "SERVICE_UNAVAILABLE" });
+            return;
+          }
+          this.label(this.link, "Восстанавливаем связь с помощником");
+          await pause(Math.min(this.retryMs * 2 ** (failures - 1), this.retryMs * 20));
         }
       }
-    })().catch(error => { this.publish({ error: code(error) }); });
+    })().catch(error => { this.publish({ error: code(error) }); })
+      .finally(() => { if (this.following === work) this.following = null; });
     this.following = work;
   }
   private accept(event: AssistantEvent): void {
@@ -295,6 +319,8 @@ export class AssistantController {
     const run = this.view.run;
     if (run && !terminal(run)) {
       this.publish({ run: await this.api.cancel(run.id) });
+      // A loop that lost the run follows it again from the start, so the partial answer is read again too.
+      if (!this.following && !terminal(this.view.run)) { this.publish({ partial: "", partialTruncated: false, activity: [] }); this.follow(run); }
       // The loop sees the run end; a run that does not end in time is reported, not hidden.
       const following = this.following;
       if (following) await Promise.race([following, pause(6000)]);

@@ -1,8 +1,14 @@
-"""An export is one completed attempt, a retry, and no undo barrier (plan SR04)."""
+"""An export is one completed attempt, a retry, and no undo barrier (plan SR04); edits made during the render stay,
+and the export waits for the project lock off the event loop."""
 
+import asyncio
 import hashlib
+import json
+import threading
 
-from packages.resume_core.models.template_render import TemplateRendererIdentity
+import pytest
+
+from packages.resume_core.models.template_render import TemplateRendererIdentity, TemplateSnapshotIdentity
 from packages.resume_core.template_import import digest
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
@@ -47,7 +53,7 @@ def test_export_records_one_completed_attempt_and_retry_returns_the_same_bytes(t
         assert b'barrier' not in (journal.read_bytes() if journal.is_file() else b'')
 
 
-def test_an_edit_during_render_refuses_the_export_record(tmp_path):
+def test_an_edit_during_render_stays_and_the_export_is_recorded_with_its_own_snapshot(tmp_path):
     from tests.projects.test_edit_routes import typing
     with v2_app(tmp_path, [papers()]) as (client, application):
         service = application.state.projects
@@ -65,8 +71,51 @@ def test_an_edit_during_render_refuses_the_export_record(tmp_path):
         service.exports.render = render_after_edit
         reply = client.post('/v2/projects/' + PROJECT + '/export', json={'schemaVersion': 1,
             'editorToken': editor.token, 'snapshot': editor.response['snapshot']})
-        assert reply.status_code == 409 and reply.json()['error']['code'] == 'REVISION_CONFLICT'
+        assert reply.status_code == 200, reply.text[:400]
+        assert reply.content == DOCX and json.loads(reply.headers['X-FoldCV-Snapshot']) == editor.response['snapshot']
         saved = service.repository.read(PROJECT)
-        assert saved.project.exports == [] and saved.project.renders == []
+        assert [item.id for item in saved.project.exports] == [reply.headers['X-FoldCV-Export-Attempt']]
+        assert saved.project.export_inputs[0].snapshot.model_dump(mode='json', by_alias=True) == editor.response['snapshot']
         assert ''.join(span.text for span in saved.project.document.regions[2].blocks[0].content) == 'Human title'
-        assert service.tasks.list(PROJECT)[0]['state'] == 'failed'
+        assert saved.project_revision == editor.revision + 2
+        assert service.tasks.list(PROJECT)[0]['state'] == 'succeeded'
+        assert Editor(client, PROJECT).history['undo']['actionId'] == 'action-concurrent-edit'
+
+
+def test_an_export_waits_for_the_project_lock_off_the_event_loop_and_a_cancelled_one_leaves_no_pin(tmp_path):
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        service = application.state.projects
+        service.exports._renderer, service.exports.render = RENDERER, render
+        editor = Editor(client, PROJECT)
+        snapshot = TemplateSnapshotIdentity.model_validate(editor.response['snapshot'])
+        session = service.repository.open(PROJECT)
+        held, release, freed = threading.Event(), threading.Event(), []
+
+        def hold():
+            # Another holder doing slow I/O under the project lock, as a large commit does.
+            with session.lock:
+                held.set()
+                freed.append(release.wait(5))
+
+        async def scenario():
+            holder = threading.Thread(target=hold)
+            holder.start()
+            held.wait(5)
+            waiting = asyncio.create_task(service.exports.export(PROJECT, snapshot, editor.token))
+            for _tick in range(5):
+                await asyncio.sleep(0.01)
+            waiting.cancel()
+            release.set()
+            await asyncio.to_thread(holder.join)
+            with pytest.raises(asyncio.CancelledError):
+                await waiting
+            for _tick in range(200):
+                if not session.pins:
+                    break
+                await asyncio.sleep(0.01)
+            pins = session.pins
+            return pins, await service.exports.export(PROJECT, snapshot, editor.token)
+
+        pins, result = asyncio.run(scenario())
+        assert freed == [True] and pins == 0 and result.artifact == DOCX
+        assert [task['state'] for task in service.tasks.list(PROJECT)] == ['failed', 'succeeded']

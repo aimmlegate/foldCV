@@ -80,7 +80,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const presentation = useMemo(() => templatePresentationPlugin(() => presented.current, () => noticeRef.current), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
     status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
-    warning: text => setWarning(text),
+    // A repeated text still re-renders: the undo buttons follow the history a refused step brought back.
+    warning: text => { setWarning(text); refresh(value => value + 1); },
     mode: value => setMode(value),
     shown: response => { setShown(response); callbacks.current.onShown(response); refresh(value => value + 1); },
   }), [connection]);
@@ -201,13 +202,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     <div className="editor-body uir-editor-body">
       <aside className="editor-notifications" aria-label="Уведомления редактора">
         {mode === "recovering" && <div className="notice warning" role="alert">
-          <p>{recovering ? "Восстанавливаем введённый текст…" : errorMessage("WRITER_RECOVERY_REQUIRED")}</p>
+          <p>{recovering ? "Восстанавливаем введённый текст…" : "Введённый текст ещё не восстановлен."}</p>
           {!recovering && <button type="button" onClick={() => void recover()}>Продолжить</button>}
         </div>}
         {mode === "read_only" && <div className="notice warning" role="alert"><p>{errorMessage("EDITOR_REPLACED")}</p></div>}
         <EditorNotices warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}} />
         {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
-          <p>{errorMessage(state.kind === "conflict" ? "V7_INPUT_CONFLICT" : "V7_INPUT_REJECTED")}</p>
+          <p>{state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}</p>
           <button type="button" onClick={() => session.retry()}>Сохранить текст из редактора</button>
         </div>}
       </aside>

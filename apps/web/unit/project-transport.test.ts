@@ -70,14 +70,14 @@ test("listing, creation, catalog flags and deletion use the kept routes", async 
     calls.push({ path, method: init.method ?? "GET", body: init.body instanceof FormData ? [...init.body.keys()] : init.body ? JSON.parse(String(init.body)) as unknown : null });
     if (path === "/v2/projects") return Promise.resolve(Response.json(listing));
     if (path.endsWith("/template-input")) return Promise.resolve(Response.json(base, { status: 201 }));
-    if (init.method === "DELETE") return Promise.resolve(Response.json({ projectId: "p", cleanupStatus: "cleanup_incomplete" }));
+    if (init.method === "DELETE") return Promise.resolve(Response.json({ projectId: "p", cleanupStatus: "failed" }));
     return Promise.resolve(Response.json({ projectId: "p", archived: true }));
   };
   assert.deepEqual(await listProjects(fetcher), listing);
   const body = new FormData(); body.append("paste", new Blob(["text"]), "pasted.txt");
   assert.equal((await createProject(body, fetcher)).workspace.projectId, base.workspace.projectId);
   await catalogFlag("p", true, fetcher);
-  assert.equal((await deleteProject("p", fetcher)).cleanupStatus, "cleanup_incomplete");
+  assert.equal((await deleteProject("p", fetcher)).cleanupStatus, "failed");
   assert.deepEqual(calls, [
     { path: "/v2/projects", method: "GET", body: null },
     { path: "/v1/rich/projects/template-input", method: "POST", body: ["paste"] },

@@ -88,7 +88,9 @@ def fold_sidecar(session, after):
     target = copied.project or copied.pre_draft
     committed_owner = session.workspace.project or session.workspace.pre_draft
     if target.facts != committed_owner.facts and facts != committed_owner.facts and target.facts != facts:
-        raise RepositoryFailure('REVISION_CONFLICT', revision=session.revision)
+        # The same details as the repository's own conflict (RevisionConflictV1).
+        raise RepositoryFailure('REVISION_CONFLICT', revision=session.revision,
+            appliedClientMutationIds=list(session.replays))
     base_ops = after_ops or committed_ops
     if any(item.id == operation.id for item in base_ops):
         target.template_operations = [operation if item.id == operation.id else item for item in base_ops]

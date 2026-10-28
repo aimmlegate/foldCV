@@ -16,7 +16,7 @@ def snapshot_identity(workspace):
         presentationHash=digest(presentation_value(project.document, project.template_package)))
 
 
-def capture_export(workspace, expected, renderer, *, publication_intent_id=None, retry_capture=None, id_factory=identity):
+def capture_export(workspace, expected, renderer, *, retry_capture=None, id_factory=identity):
     if retry_capture is None:
         snapshot = snapshot_identity(workspace)
         if snapshot != expected:
@@ -34,6 +34,6 @@ def capture_export(workspace, expected, renderer, *, publication_intent_id=None,
     attempt = ExportAttempt(id=id_factory('export'), state='pending', documentHash=request.document_hash,
         factsHash=request.facts_hash, presentationHash=request.presentation_hash, packageHash=request.package_hash,
         assetsHash=digest(request.assets), rendererHash=digest(request.renderer), artifactHash=None, errorCode=None,
-        publicationIntentId=publication_intent_id)
+        publicationIntentId=None)
     retained = CapturedTemplateRenderInputV1.model_validate(request.model_dump(by_alias=True, exclude={'package'}))
     return attempt, TemplateExportCapture(attemptId=attempt.id, snapshot=snapshot, request=retained)

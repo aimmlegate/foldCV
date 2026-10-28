@@ -46,12 +46,12 @@ def mount_assistant(app, service):
 
     @app.get('/v1/settings/assistant')
     async def settings():
-        return settings_reply(service.settings.load())
+        return settings_reply(await worker(service.settings.load))
 
     @app.put('/v1/settings/assistant')
     async def save_settings(payload: AgentSettingsRequest):
-        prior = service.settings.load()
-        saved = service.settings.save(payload, service.connection().models or None)
+        prior = await worker(service.settings.load)
+        saved = await worker(service.settings.save, payload, service.connection().models or None)
         if prior.enabled and not saved.enabled:
             service.stop_all()
         return settings_reply(saved)
@@ -75,7 +75,7 @@ def mount_assistant(app, service):
     @app.post(PREFIX + '/conversations/{conversation_id}/runs')
     async def submit(project_id: str, conversation_id: str, payload: AssistantRunRequestV2):
         try:
-            return model_reply(service.submit(project_id, conversation_id, payload), 201)
+            return model_reply(await service.submit(project_id, conversation_id, payload), 201)
         except AgentFailure as error:
             raise translated(error) from None
 
@@ -90,7 +90,7 @@ def mount_assistant(app, service):
     @app.post(PREFIX + '/runs/{run_id}/cancel')
     async def cancel(project_id: str, run_id: str):
         try:
-            return model_reply(service.cancel(project_id, run_id))
+            return model_reply(await service.cancel(project_id, run_id))
         except AgentFailure as error:
             raise translated(error) from None
 

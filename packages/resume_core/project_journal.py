@@ -3,6 +3,9 @@
 Each line keeps full before and after payloads of the undoable keys an edit changed: the `values()` keys of
 `template_local_history` plus the order of the fact, issue and tombstone lists, which those keys do not encode. Undo
 applies an action's `before`, redo its `after`; both go through the repository commit like any edit.
+
+Every commit leaves a line with its resulting revision (a `mark` when no undoable key changed), so a journal that ends
+below the workspace revision lost a line and restarts the history instead of undoing around the missing edit.
 """
 
 from __future__ import annotations
@@ -198,18 +201,27 @@ class ProjectJournal:
     open_seq: int | None = None
     lines: int = 0
     gap: bool = False
+    # The revision after the last line; None when no line names it (an empty or older journal).
+    revision: int | None = None
 
     @classmethod
-    def load(cls, path, *, compact=True):
+    def load(cls, path, *, revision=None, compact=True):
+        """The journal of a project whose workspace file is at `revision`; a journal behind or ahead of it restarts."""
         journal = cls(Path(path))
         try:
             journal._load()
         except (OSError, StorageFailure) as error:
             LOG.warning('journal unreadable, history starts empty: %s', type(error).__name__)
             journal.undo, journal.redo, journal.open_seq = [], [], None
-        if compact and (journal.lines > 2 * ACTIONS or journal._file_bytes() > 2 * BYTES):
-            journal.compact()
+        if revision is not None and journal.revision is not None and journal.revision != revision:
+            LOG.warning('journal ends at revision %s, the project file at %s; history restarts', journal.revision, revision)
+            journal.barrier(revision_after=revision, reason='journal_behind')
+        if compact and journal.oversized():
+            journal.compact(revision=revision)
         return journal
+
+    def oversized(self, factor=2):
+        return self.lines > factor * ACTIONS or self._file_bytes() > 2 * BYTES
 
     def _file_bytes(self):
         try:
@@ -248,9 +260,11 @@ class ProjectJournal:
             self.open_seq = None
         elif kind == 'barrier':
             self.undo, self.redo, self.open_seq = [], [], None
-        else:
+        elif kind != 'mark':
             raise ValueError('unknown journal line')
         self.seq = max(self.seq, line.get('seq', 0))
+        if line.get('revisionAfter') is not None:
+            self.revision = line['revisionAfter']
 
     def _edit(self, action_id, seq, before, after):
         top = self.undo[-1] if self.undo else None
@@ -298,38 +312,50 @@ class ProjectJournal:
 
     def _append(self, line):
         """Write one line and fsync; a failure is a logged gap and the history restarts at the next line."""
+        lines = [line]
+        if self.gap and line['kind'] != 'barrier':
+            # The cleared history is written down first; otherwise a reload would bring the older actions back.
+            lines.insert(0, {'kind': 'barrier', 'seq': self.seq, 'revisionAfter': line.get('revisionBefore'),
+                'at': self._now(), 'reason': 'gap'})
         try:
             private_directory(self.path.parent)
             descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0), 0o600)
             try:
-                os.write(descriptor, json.dumps(line, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n')
+                os.write(descriptor, b''.join(json.dumps(item, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+                    + b'\n' for item in lines))
                 os.fsync(descriptor)
             finally:
                 os.close(descriptor)
-            self.lines += 1
-            return True
         except (OSError, StorageFailure) as error:
             LOG.warning('journal gap: %s', type(error).__name__)
-            self.gap = True
-            self.undo, self.redo, self.open_seq = [], [], None
+            self.lost()
             return False
+        self.lines += len(lines)
+        self.gap = False
+        if line.get('revisionAfter') is not None:
+            self.revision = line['revisionAfter']
+        return True
+
+    def lost(self):
+        """A line could not be written: the history restarts, and the next line is preceded by a barrier."""
+        self.gap = True
+        self.undo, self.redo, self.open_seq = [], [], None
 
     @staticmethod
     def _now():
         return datetime.now(timezone.utc).isoformat()
 
     def record_edit(self, *, action_id, client_mutation_id, revision_before, revision_after, before, after):
-        """Journal an edit from full snapshots; nothing is written when no undoable key changed."""
+        """Journal an edit from full snapshots; an edit that changed no undoable key leaves only a mark."""
         old, new = changes(before, after)
         if all(same(old[key], new[key]) for key in old):
+            self.mark(revision_before=revision_before, revision_after=revision_after)
             return False
         top = self.undo[-1] if self.undo else None
         seq = top.seq if top is not None and self.open_seq == top.seq and top.action_id == action_id else self.seq + 1
         line = {'kind': 'edit', 'seq': seq, 'actionId': action_id, 'clientMutationId': client_mutation_id,
             'revisionBefore': revision_before, 'revisionAfter': revision_after, 'at': self._now(),
             'before': _encode(old), 'after': _encode(new)}
-        if self.gap:
-            self.gap = False
         if not self._append(line):
             return False
         self.seq = max(self.seq, seq)
@@ -350,8 +376,17 @@ class ProjectJournal:
         self._append({'kind': 'barrier', 'seq': self.seq, 'revisionAfter': revision_after, 'at': self._now(), 'reason': reason})
         self.undo, self.redo, self.open_seq = [], [], None
 
-    def compact(self):
-        """Rewrite the file as the retained actions: undo stack as edits, then the redo list as edits and undos."""
+    def mark(self, *, revision_before=None, revision_after):
+        """A commit without undoable changes (an export record, a rename): only its revision is written, and only
+        while there is history a missing line could misplace."""
+        if not self.undo and not self.redo and not self.gap:
+            return True
+        return self._append({'kind': 'mark', 'seq': self.seq, 'revisionBefore': revision_before,
+            'revisionAfter': revision_after, 'at': self._now()})
+
+    def compact(self, revision=None):
+        """Rewrite the file as the retained actions: undo stack as edits, then the redo list as edits and undos.
+        The last line names `revision`, the workspace revision the retained actions end at."""
         lines = []
         def edit(action):
             return {'kind': 'edit', 'seq': action.seq, 'actionId': action.action_id, 'clientMutationId': None,
@@ -366,10 +401,19 @@ class ProjectJournal:
                 'revisionBefore': None, 'revisionAfter': None, 'at': self._now(), 'before': [], 'after': []})
         if not lines and not self.path.exists():
             return
+        if revision is not None:
+            if lines:
+                lines[-1]['revisionAfter'] = revision
+            else:
+                lines.append({'kind': 'mark', 'seq': self.seq, 'revisionBefore': None, 'revisionAfter': revision,
+                    'at': self._now()})
         try:
             atomic_write(self.path, b''.join(json.dumps(line, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
                 for line in lines))
             self.lines = len(lines)
+            self.gap = False
+            if revision is not None:
+                self.revision = revision
             # A redo action's edit line must not merge into the undo stack top on the next load.
             self.open_seq = None
         except (OSError, StorageFailure) as error:

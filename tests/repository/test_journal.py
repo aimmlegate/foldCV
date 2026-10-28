@@ -147,3 +147,37 @@ def test_undo_restores_fact_order_issues_and_sync_rows_exactly(tmp_path):
         old, new = changes(snapshot(before), snapshot(after))
         assert comparable(apply(after, old)) == comparable(before), name
         assert comparable(apply(apply(after, old), new)) == comparable(after), name
+
+
+def test_a_payload_that_no_longer_validates_is_stale_history(tmp_path, monkeypatch):
+    from packages.resume_core import project_repository
+    from packages.resume_core.models.template_workspace import WorkspaceV7
+    repo = repository(tmp_path)
+    edit(repo, 'One', identifier='edit-1', action='one')
+    monkeypatch.setattr(project_repository, 'apply_payloads', lambda *_args: WorkspaceV7.model_validate({}))
+    with pytest.raises(RepositoryFailure) as refused:
+        history(repo, 'undo', identifier='undo-1')
+    assert refused.value.code == 'HISTORY_STALE' and refused.value.details['history'] == {'undo': None, 'redo': None}
+    assert text_of(repo.read(PROJECT)) == 'One'
+
+
+def test_a_commit_without_undoable_changes_keeps_the_history_after_a_restart(tmp_path):
+    repo = repository(tmp_path)
+    edit(repo, 'One', identifier='edit-1', action='one')
+    titled = repo.read(PROJECT).model_copy(deep=True)
+    titled.title = 'Renamed'
+    repo.replace(PROJECT, base_revision=2, workspace=titled, reason='rename')
+    # No close: the journal is read as a crash would leave it, and its last line still names revision 3.
+    reopened = ProjectRepository(tmp_path / 'data')
+    assert reopened.open(PROJECT).journal.state()['undo']['actionId'] == 'one'
+
+
+def test_a_long_session_compacts_its_journal_without_a_close(tmp_path, monkeypatch):
+    monkeypatch.setattr(project_journal, 'ACTIONS', 2)
+    repo = repository(tmp_path)
+    for index in range(12):
+        edit(repo, 'Text %d' % index, identifier='edit-%d' % index, action='action-%d' % index)
+    path = repo.open(PROJECT).directory / 'history.jsonl'
+    assert len(path.read_bytes().splitlines()) <= 4 * 2
+    reopened = ProjectRepository(tmp_path / 'data')
+    assert [action.action_id for action in reopened.open(PROJECT).journal.undo] == ['action-10', 'action-11']

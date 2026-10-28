@@ -18,6 +18,7 @@ export function TaskProgress({ task, cancel }: { task: ProjectTask; cancel: () =
       <Elapsed startedAt={task.startedAt} /></div>
     <h2>Обработка резюме</h2>
     <p role="status">{task.stage === "publication" ? "Применяем макет и сохраняем документ."
+      : task.stage === "waiting" ? "Ждём очереди: модель занята другой задачей."
       : quiet ? "Ждём следующую часть результата." : "Извлекаем и проверяем данные исходника."}</p>
     {found && <section className="import-discoveries" aria-label="Промежуточный результат">
       {(found.name || found.title) && <div className="import-found-candidate"><h3>{found.name}</h3><p>{found.title}</p></div>}

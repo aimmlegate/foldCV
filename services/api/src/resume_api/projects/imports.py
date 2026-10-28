@@ -16,9 +16,12 @@ from packages.resume_core.template_import import TemplateImportFailure
 from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
+from .exports import pinned
 from .fold import sidecar_store
 
 LOG = logging.getLogger(__name__)
+# A cancelled model call ends within seconds (its process group is stopped); the wait at shutdown and sign-out.
+STOP_SECONDS = 15
 
 
 class ImportCommand(BaseModel):
@@ -44,6 +47,19 @@ class _Stop:
             await asyncio.sleep(0.05)
 
 
+def outcome(task, result):
+    """The task's final state. The publication commit is the point of no return: a saved import succeeded even when a
+    cancel came after it; before it, a cancel leaves the import unpublished."""
+    state, publication = getattr(result, 'state', None), getattr(result, 'publication', None)
+    if publication is not None and publication.state == 'saved':
+        return 'succeeded', None
+    if task.cancel.is_set() or state == 'cancelled':
+        return 'cancelled', None
+    if state in {'failed', 'fenced'} or publication is not None:
+        return 'failed', getattr(publication, 'error_code', None) or 'PROCESS_FAILED'
+    return 'succeeded', None
+
+
 class ImportService:
     def __init__(self, projects, pipeline=None, *, commands=None, admission=INFERENCE):
         self.projects = projects
@@ -61,84 +77,80 @@ class ImportService:
 
     async def start(self, project_id, request, started):
         self._require_pipeline()
-        self.projects.require_writable(project_id)
+        await asyncio.to_thread(self.projects.require_writable, project_id)
         task = self.projects.tasks.start(project_id, 'import', stage='starting',
             detail={'clientRequestId': request.client_request_id})
         self.runners[task.id] = asyncio.create_task(self.drive(task, request, started))
         return task.id
 
     async def drive(self, task, request, started):
-        project_id = task.project_id
-        session, held = None, {}
+        """Only the runner finishes its task, as its last step: a finished import holds no pin, lock or permit."""
+        project_id, held = task.project_id, {}
+        state, error, detail = 'failed', 'PROCESS_FAILED', None
         try:
-            session = self.projects.repository.open(project_id)
-            with session.lock:
-                session.pins += 1
-            command = request
-            if self.commands is not None and request.kind == 'start':
-                command = await asyncio.to_thread(self.commands, project_id, request.client_request_id,
-                    request.allow_text_rewrite)
-
-            async def admitted():
-                operation_id = request.operation_id or request.client_request_id
-                reader = getattr(self.pipeline, 'read', None)
-                if reader is not None:
-                    try:
-                        workspace = await asyncio.to_thread(reader, project_id)
-                        owner = workspace.project or workspace.pre_draft
-                        match = next((item for item in owner.template_operations
-                            if item.client_request_id == request.client_request_id), None)
-                        if match is not None:
-                            operation_id = match.id
-                    except Exception:
-                        pass
-                # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
-                # assistant turn waits instead of turning a block into a source fallback.
-                held['permit'], held['operation'] = await self._permit(project_id, operation_id, task.cancel), operation_id
-                held['token'] = JOB_PERMIT.set(held['permit'])
-                self.projects.tasks.update(task.id, stage='processing', detail={'operationId': operation_id})
-                started.set()
-
-            if request.kind == 'resume':
-                if not request.operation_id:
-                    raise ProjectFailure('INVALID_REQUEST', 422)
-                await asyncio.to_thread(self.resume_saved, project_id, request.operation_id)
-                workspace = await asyncio.to_thread(self.pipeline.read, project_id)
-                operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations
-                    if item.id == request.operation_id), None)
-                if operation is None:
-                    raise ProjectFailure('IMPORT_OPERATION_UNKNOWN', 404)
-                command = ResumeTemplateImportV1(kind='resume_import', protocol='template_import_v1',
-                    operationId=operation.id, authorizationId='resume-' + request.client_request_id,
-                    authorityHash=operation.capture.authority_hash)
-            result = await self.pipeline.run(project_id, command, admitted=admitted, cancel_event=task.cancel)
-            state = 'cancelled' if task.cancel.is_set() or getattr(result, 'state', None) == 'cancelled' else None
-            if state is None and getattr(result, 'state', None) in {'failed', 'fenced'}:
-                state = 'failed'
-            publication = getattr(result, 'publication', None)
-            if state is None and publication is not None and publication.state != 'saved':
-                state = 'failed'
-            error = None if state != 'failed' else getattr(publication, 'error_code', None) or 'PROCESS_FAILED'
-            self.projects.tasks.finish(task.id, state or 'succeeded', error=error,
-                detail={'operationId': getattr(result, 'id', request.client_request_id)})
-        except (ProjectFailure, RepositoryFailure, TemplateImportFailure) as error:
-            self._fail(task.id, getattr(error, 'code', 'PROCESS_FAILED'))
+            async with pinned(self.projects.repository, project_id):
+                try:
+                    result = await self.run(task, request, started, held)
+                finally:
+                    if 'token' in held:
+                        JOB_PERMIT.reset(held['token'])
+                    if 'permit' in held:
+                        await asyncio.to_thread(self._settle, project_id, held['operation'], held['permit'])
+            state, error = outcome(task, result)
+            detail = {'operationId': getattr(result, 'id', request.client_request_id)}
+        except (ProjectFailure, RepositoryFailure, TemplateImportFailure) as failure:
+            code = getattr(failure, 'code', 'PROCESS_FAILED')
+            state, error = ('cancelled', None) if code == 'CANCELLED' else ('failed', code)
         except Exception:
             LOG.exception('import task failed')
-            self._fail(task.id, 'PROCESS_FAILED')
         finally:
-            if 'token' in held:
-                JOB_PERMIT.reset(held['token'])
-            if 'permit' in held:
-                await asyncio.to_thread(self._settle, project_id, held['operation'], held['permit'])
-            if session is not None:
-                with session.lock:
-                    session.pins -= 1
             self.runners.pop(task.id, None)
-            if not started.is_set():
-                started.set()
+            self.projects.tasks.finish(task.id, state, error=error, detail=detail)
+            started.set()
 
-    async def _permit(self, project_id, operation_id, cancel):
+    async def run(self, task, request, started, held):
+        project_id = task.project_id
+        command = request
+        if self.commands is not None and request.kind == 'start':
+            command = await asyncio.to_thread(self.commands, project_id, request.client_request_id,
+                request.allow_text_rewrite)
+
+        async def admitted():
+            operation_id = request.operation_id or request.client_request_id
+            reader = getattr(self.pipeline, 'read', None)
+            if reader is not None:
+                try:
+                    workspace = await asyncio.to_thread(reader, project_id)
+                    owner = workspace.project or workspace.pre_draft
+                    match = next((item for item in owner.template_operations
+                        if item.client_request_id == request.client_request_id), None)
+                    if match is not None:
+                        operation_id = match.id
+                except Exception:
+                    pass
+            # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
+            # assistant turn waits instead of turning a block into a source fallback.
+            held['permit'], held['operation'] = await self._permit(task, operation_id, started), operation_id
+            held['token'] = JOB_PERMIT.set(held['permit'])
+            self.projects.tasks.update(task.id, stage='processing', detail={'operationId': operation_id})
+            started.set()
+
+        if request.kind == 'resume':
+            if not request.operation_id:
+                raise ProjectFailure('INVALID_REQUEST', 422)
+            await asyncio.to_thread(self.resume_saved, project_id, request.operation_id)
+            workspace = await asyncio.to_thread(self.pipeline.read, project_id)
+            operation = next((item for item in (workspace.project or workspace.pre_draft).template_operations
+                if item.id == request.operation_id), None)
+            if operation is None:
+                raise ProjectFailure('IMPORT_OPERATION_UNKNOWN', 404)
+            command = ResumeTemplateImportV1(kind='resume_import', protocol='template_import_v1',
+                operationId=operation.id, authorizationId='resume-' + request.client_request_id,
+                authorityHash=operation.capture.authority_hash)
+        return await self.pipeline.run(project_id, command, admitted=admitted, cancel_event=task.cancel)
+
+    async def _permit(self, task, operation_id, started):
+        project_id = task.project_id
         retained = self.retained.pop(project_id, None)
         if retained is not None:
             permit, owner = retained
@@ -146,8 +158,12 @@ class ImportService:
                 # The same import continues, or an earlier one may still own a process: nothing else may start.
                 return permit
             permit.release()
+        if self.admission.busy():
+            # Another import or an assistant turn has the permit: the start reply shows this import waiting.
+            self.projects.tasks.update(task.id, stage='waiting')
+            started.set()
         try:
-            return await self.admission.reserve(_Stop(cancel))
+            return await self.admission.reserve(_Stop(task.cancel))
         except (AdmissionBlocked, AdmissionCancelled):
             raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN' if self.admission.blocked else 'CANCELLED') from None
 
@@ -170,26 +186,38 @@ class ImportService:
         else:
             self.retained[project_id] = (permit, operation_id)
 
-    def _fail(self, task_id, code):
-        try:
-            self.projects.tasks.finish(task_id, 'failed', error=code)
-        except Exception:
-            pass
+    def release(self, project_id):
+        """Free the permit a stopped import of this project kept. The project is being deleted, so no later run of it
+        can prove that cleanup, and every other import and assistant turn would wait for it forever."""
+        retained = self.retained.pop(project_id, None)
+        if retained is not None:
+            retained[0].release()
 
     async def cancel(self, project_id, request):
+        """Ask the import to stop; its runner finishes the task. The reply is the status after a short wait."""
         if not request.task_id:
             raise ProjectFailure('INVALID_REQUEST', 422)
-        _status(self.projects, project_id, request.task_id)
-        task = self.projects.tasks.cancel(request.task_id)
+        if _status(self.projects, project_id, request.task_id)['kind'] != 'import':
+            raise ProjectFailure('JOB_NOT_FOUND', 404)
+        self.projects.tasks.cancel(request.task_id)
         runner = self.runners.get(request.task_id)
         if runner is not None:
-            try:
-                await asyncio.wait_for(asyncio.shield(runner), 2)
-            except asyncio.TimeoutError:
-                pass
-        if task.state == 'running':
-            self.projects.tasks.finish(task.id, 'cancelled')
-        return _status(self.projects, project_id, task.id)
+            await asyncio.wait({runner}, timeout=2)
+        return _status(self.projects, project_id, request.task_id)
+
+    def stop_all(self):
+        """Ask every running import to stop (shutdown, sign-in change); each runner finishes its own task."""
+        for identifier in list(self.runners):
+            self.projects.tasks.cancel(identifier)
+
+    async def shutdown(self, timeout=STOP_SECONDS):
+        """Stop every import and wait for its runner; one still running after `timeout` may own a model process."""
+        self.stop_all()
+        runners = [runner for runner in self.runners.values() if not runner.done()]
+        if runners:
+            _done, pending = await asyncio.wait(runners, timeout=timeout)
+            if pending:
+                raise ProjectFailure('PROCESS_CLEANUP_FAILED', 503)
 
     def statuses(self, project_id):
         for task in self.projects.tasks.running(project_id, 'import'):
@@ -214,7 +242,8 @@ class ImportService:
                     'facts': len(records) + sum(record.active for record in facts.extensions),
                     'jobs': jobs[:3], 'jobCount': len(jobs), 'technologies': technologies[:8],
                     'technologyCount': len(technologies)}}
-            stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+            # The runner sets the starting, waiting and processing stages; a poll adds only the publication.
+            stage = 'publication' if operation is not None and operation.state == 'finalizing' else None
             self.projects.tasks.update(task.id, stage=stage, detail=details)
         return self.projects.tasks.list(project_id)
 
@@ -222,34 +251,25 @@ class ImportService:
         """Read the sidecar and commit it at the revision it names. Nothing is written before that commit."""
         repository = self.projects.repository
         session = repository.open(project_id)
-        stored = sidecar_store(session.directory).read(project_id, operation_id)
-        if stored is None:
-            return session.workspace
-        base, operation, facts = stored
-        raw = (session.directory / 'workspace.json').read_bytes()
-        workspace = decode_project(session.directory, raw, history=True)
-        if base != workspace.project_revision:
-            raise RepositoryFailure('OUTCOME_UNKNOWN')
-        copied = workspace.model_copy(deep=True)
-        owner = copied.project or copied.pre_draft
-        if owner is None or not any(item.id == operation.id for item in owner.template_operations):
-            raise RepositoryFailure('OUTCOME_UNKNOWN')
-        owner.template_operations = [operation if item.id == operation.id else item for item in owner.template_operations]
-        owner.facts = facts
-        return repository.replace(project_id, base_revision=base, workspace=copied, reason='import-resume',
-            client_mutation_id='resume-' + operation.id,
-            request_sha256=hashlib.sha256(operation.id.encode()).hexdigest())
-
-    def publish_at(self, project_id, task_id, workspace, base_revision):
-        """One publication commit. A moved revision fails the import task and reports the conflict."""
-        try:
-            return self.projects.repository.replace(project_id, base_revision=base_revision, workspace=workspace,
-                reason='publication', client_mutation_id='publication-' + task_id,
-                request_sha256=hashlib.sha256(task_id.encode()).hexdigest())
-        except RepositoryFailure as error:
-            if error.code == 'REVISION_CONFLICT':
-                self._fail(task_id, 'REVISION_CONFLICT')
-            raise
+        with session.lock:
+            stored = sidecar_store(session.directory).read(project_id, operation_id)
+            if stored is None:
+                return None
+            base, operation, facts = stored
+            raw = (session.directory / 'workspace.json').read_bytes()
+            workspace = decode_project(session.directory, raw, history=True)
+            if base != workspace.project_revision:
+                raise RepositoryFailure('OUTCOME_UNKNOWN')
+            copied = workspace.model_copy(deep=True)
+            owner = copied.project or copied.pre_draft
+            if owner is None or not any(item.id == operation.id for item in owner.template_operations):
+                raise RepositoryFailure('OUTCOME_UNKNOWN')
+            owner.template_operations = [operation if item.id == operation.id else item
+                for item in owner.template_operations]
+            owner.facts = facts
+            return repository.replace(project_id, base_revision=base, workspace=copied, reason='import-resume',
+                client_mutation_id='resume-' + operation.id,
+                request_sha256=hashlib.sha256(operation.id.encode()).hexdigest())
 
 
 def _status(projects, project_id, task_id):

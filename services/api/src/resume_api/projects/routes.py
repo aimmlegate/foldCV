@@ -94,7 +94,8 @@ def mount_projects_v2(app, service):
         try:
             await asyncio.wait_for(started.wait(), 30)
         except asyncio.TimeoutError:
-            raise ProjectFailure('REQUEST_TIMEOUT', 408) from None
+            # The task is registered and still running: the client follows it through /tasks, as it does a waiting one.
+            pass
         found = next(item for item in service.tasks.list(project_id) if item['id'] == task_id)
         return json_reply(found, 202)
 

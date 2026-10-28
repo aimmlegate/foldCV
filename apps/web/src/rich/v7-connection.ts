@@ -42,6 +42,7 @@ export async function v2Request<T>(path: string, method = "GET", body?: unknown,
 
 export class ProjectEditorConnection {
   private replacedToken = false;
+  private reopening: Promise<void> | null = null;
 
   constructor(readonly project: string, private token: string, public response: TemplateProjectResponseV1, public history: HistoryState,
     private readonly fetcher: Fetcher = (input, init) => fetch(input, init)) {}
@@ -59,22 +60,33 @@ export class ProjectEditorConnection {
   /** Every editing request: a replaced token blocks the page; an unknown one (service restart) re-opens once and retries. */
   private async editing<T>(send: (token: string) => Promise<T>, mutation = false): Promise<T> {
     if (this.replacedToken) throw new ProjectApiFailure("EDITOR_REPLACED", 409);
-    try { return await send(this.token); }
+    const token = this.token;
+    try { return await send(token); }
     catch (error) {
       if (!(error instanceof ProjectApiFailure)) throw error;
-      if (error.code === "EDITOR_REPLACED") { this.replacedToken = true; throw error; }
-      if (error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
-      await this.reopen();
-      if (mutation) throw error;
+      if (error.code === "EDITOR_REPLACED") {
+        // This page's own re-open replaces the token a request carried; only a replaced current token means another page.
+        await this.reopening;
+        if (token === this.token) { this.replacedToken = true; throw error; }
+      } else if (error.code === "EDITOR_TOKEN_UNKNOWN") {
+        // Requests that lost one token share one re-open; a token the page has already re-opened past is only sent again.
+        await (token === this.token ? this.reopen() : this.reopening);
+        if (mutation) throw error;
+      } else throw error;
       return await send(this.token);
     }
   }
 
-  async reopen(): Promise<void> {
-    const opened = await v2Request<OpenResult>(this.path("/open"), "POST", {}, this.fetcher);
-    this.token = opened.editorToken;
-    this.response = opened.response;
-    this.history = opened.history;
+  /** One open at a time: a second open would replace the token the first one gave this page. A replaced page never opens
+   * again, so it cannot take the project back from the page that has it. */
+  reopen(): Promise<void> {
+    if (this.replacedToken) return Promise.reject(new ProjectApiFailure("EDITOR_REPLACED", 409));
+    this.reopening ??= v2Request<OpenResult>(this.path("/open"), "POST", {}, this.fetcher).then(opened => {
+      this.token = opened.editorToken;
+      this.response = opened.response;
+      this.history = opened.history;
+    }).finally(() => { this.reopening = null; });
+    return this.reopening;
   }
 
   async read(): Promise<TemplateProjectResponseV1> {
@@ -94,8 +106,15 @@ export class ProjectEditorConnection {
   }
 
   async step(direction: "undo" | "redo", clientMutationId: string, expectedActionId: string | null, baseRevision: number): Promise<EditResult> {
-    return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/history"), "POST",
-      { editorToken: token, baseRevision, direction, clientMutationId, expectedActionId }, this.fetcher), true));
+    try {
+      return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/history"), "POST",
+        { editorToken: token, baseRevision, direction, clientMutationId, expectedActionId }, this.fetcher), true));
+    } catch (error) {
+      // A refused step carries the server's history; the buttons follow it instead of repeating the refusal.
+      const history = error instanceof ProjectApiFailure && error.code === "HISTORY_STALE" ? error.body["history"] : null;
+      if (typeof history === "object" && history !== null && "undo" in history && "redo" in history) this.history = history as HistoryState;
+      throw error;
+    }
   }
 
   /** Apply an assistant proposal with this page's token; an edit result becomes the shown state and undo history. */

@@ -8,7 +8,8 @@ const scenarios = [
   ...["open", "upload", "fresh", "remove", "archive", "lifecycle"].flatMap(action =>
     ["navigate", "assistant", "remount"].map(wait => `${action}:${wait}`)),
   "failed-leave", "pending-delete", "pending-open", "new-action-lock", "fresh-reopen", "switch-open", "upload-archive",
-  "import-cancelled", "import-failed", "import-interrupted", "import-timeout",
+  "delete-cleanup-failed", "export-refresh-failed",
+  "import-cancelled", "import-failed", "import-interrupted", "import-queued", "import-timeout",
 ];
 for (const scenario of scenarios) test(`workspace hook lifecycle: ${scenario}`, () => {
   const result = spawnSync(process.execPath, ["--experimental-test-module-mocks", "--import", "tsx", worker, scenario],

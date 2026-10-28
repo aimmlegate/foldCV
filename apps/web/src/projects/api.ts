@@ -77,6 +77,6 @@ export function catalogFlag(projectId: string, archived: boolean, fetcher?: Fetc
   return v2Request(projectPath(projectId, `/catalog/${archived ? "archive" : "restore"}`), "POST", {}, fetcher);
 }
 
-export function deleteProject(projectId: string, fetcher?: Fetcher): Promise<{ cleanupStatus: string }> {
+export function deleteProject(projectId: string, fetcher?: Fetcher): Promise<{ cleanupStatus: RegistryEntry["cleanupStatus"] }> {
   return v2Request(projectPath(projectId), "DELETE", { confirmed: true }, fetcher);
 }

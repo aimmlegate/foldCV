@@ -58,6 +58,25 @@ def test_delete_needs_the_project_id_and_removes_the_project_and_its_assistant_f
         assert not folder.exists()
 
 
+def test_delete_waits_for_running_work_that_needs_the_project_lock(tmp_path):
+    import functools
+    import threading
+    with assistant_app(tmp_path) as (client, application, runtime):
+        projects = application.state.projects
+        projects.delete = functools.partial(type(projects).delete, projects, wait=3)
+        run_once(client, proposing(action('delete', target=PROJECT)), runtime)
+        proposal, editor = proposals(client)[0], Editor(client, PROJECT)
+        task = projects.tasks.start(PROJECT, 'export', stage='rendering')
+        def record():
+            # Running work ends by taking the project lock, as an export record or an import checkpoint does.
+            task.cancel.wait(5)
+            with projects.repository.open(PROJECT).lock:
+                projects.tasks.finish(task.id, 'cancelled')
+        threading.Thread(target=record, daemon=True).start()
+        assert apply(client, editor, proposal['id'])['action']['deleted'] is True
+        assert client.get('/v2/projects/' + PROJECT).status_code in {404, 410}
+
+
 def test_apply_without_a_stored_proposal_is_refused(tmp_path):
     with assistant_app(tmp_path) as (client, _application, _runtime):
         editor = Editor(client, PROJECT)

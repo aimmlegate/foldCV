@@ -127,7 +127,8 @@ export function useResumeWorkspace() {
     return action(async current => {
       if (activeProject.current === id) await leave(current);
       if (!current()) return;
-      const incomplete = (await deleteProject(id)).cleanupStatus === "cleanup_incomplete";
+      // The project is gone from the list either way; "failed" means its files could not all be removed.
+      const incomplete = (await deleteProject(id)).cleanupStatus === "failed";
       if (!current()) return;
       if (template?.response.workspace.projectId === id) clear();
       const catalog = await listProjects();
@@ -178,6 +179,8 @@ export function useResumeWorkspace() {
   async function finishTemplateImport(id: string, first: ProjectTask, current: () => boolean, startedAt = Date.now()) {
     let task = first;
     let operationId: string | null = null, stopped = false;
+    // Time queued behind another import or an assistant turn does not count against this import's own limit.
+    let since: number | null = first.stage === "waiting" ? null : startedAt;
     const stop = async () => {
       try { await cancelImport(id, task.id); stopped = true; }
       catch (error) { if (current()) setError(label(error)); }
@@ -186,12 +189,14 @@ export function useResumeWorkspace() {
     setImportTask(task);
     while (task.state === "running") {
       if (!current() || stopped) return;
+      if (task.stage !== "waiting") since ??= Date.now();
       const policySeconds = task.detail["processingSeconds"];
       const wait = typeof policySeconds === "number" ? policySeconds * 1000 + 223000 : IMPORT_WAIT_MS;
-      if (Date.now() - startedAt > wait) throw new ProjectApiFailure("PROCESS_TIMEOUT");
+      if (since !== null && Date.now() - since > wait) throw new ProjectApiFailure("PROCESS_TIMEOUT");
       const named = task.detail["operationId"];
       if (typeof named === "string" && named) operationId = named;
-      stage(task.stage === "processing" ? "Импортируем по шаблону" : "Запускаем импорт", stop);
+      stage(task.stage === "processing" ? "Импортируем по шаблону"
+        : task.stage === "waiting" ? "Импорт ждёт очереди: модель занята другой задачей" : "Запускаем импорт", stop);
       await new Promise(resolve => setTimeout(resolve, 1000));
       if (!current() || stopped) return;
       const tasks = await projectTasks(id);
@@ -280,11 +285,13 @@ export function useResumeWorkspace() {
       if (!current || !connection) throw new Error("Откройте резюме перед сохранением файла.");
       if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
       stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
-      let blob: Blob;
-      // The editor token and the flushed revision go with the file. Refresh adopts the commit.
-      try { blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv(); }
-      finally { if (reads.current.current(kind, capture)) await templateEditor.current?.refresh(); }
-      if (reads.current.current(kind, capture)) deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
+      // The editor token and the flushed revision go with the file.
+      const blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv();
+      if (!reads.current.current(kind, capture)) return;
+      deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
+      // Refresh adopts the export record. The file is already delivered, so a failed refresh is not this action's error:
+      // the editor reports its own save problems, and queued input meets the new revision itself.
+      await templateEditor.current?.refresh().catch(() => {});
     }, "Сохраняем изменения перед скачиванием");
   }
   async function renameTemplate(title: string) {
