@@ -203,6 +203,7 @@ Project routes, under `/v2/projects` (`projects/routes.py`):
 | `GET /{id}` | read without a token |
 | `POST /{id}/edits`, `POST /{id}/history` | one edit; undo or redo |
 | `POST /{id}/clipboard` | same-project clipboard capture |
+| `POST /{id}/check` | the assistant's deterministic check over the committed workspace; read-only, no model call |
 | `POST /{id}/rewrite/preview`, `/rewrite/cancel` | rewrite preview of a selection |
 | `POST /{id}/import`, `GET /{id}/tasks` | import start, resume or cancel; task status |
 | `POST /{id}/export`, `/exports/{attemptId}/retry` | DOCX export |
