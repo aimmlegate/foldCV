@@ -1,9 +1,13 @@
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { rulesRequest } from "../../api/client";
 import { Icon } from "../ui/Icon";
 import { rewriteCancellable, rewriteLabels, type RewriteActivity } from "../../rich/rewrite-progress";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
+
+// Used until the saved presets from Settings are read, and when that read fails.
+const builtInPresets = { shorten: "Сократи текст, сохрани факты и смысл.", clarify: "Сделай текст яснее, сохрани факты и смысл." };
 
 export function RewritePanel({ open, close, instruction, change, submit, apply, preview, editPreview, busy, source, error, activity, cancel, anchor, focusInstruction }: {
   open: boolean; close: () => void; instruction: string; change: (value: string) => void;
@@ -13,6 +17,14 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
   anchor: { left: number; top: number; bottom: number } | null; focusInstruction: boolean;
 }) {
   const dialog = useRef<HTMLElement>(null), returnFocus = useRef<HTMLElement | null>(null);
+  const [presets, setPresets] = useState(builtInPresets);
+  // Read on every opening: Settings may have saved new presets while this editor stayed mounted.
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void rulesRequest().then(rules => { if (live) setPresets(rules.presets); }, () => {});
+    return () => { live = false; };
+  }, [open]);
   useLayoutEffect(() => {
     const element = dialog.current;
     if (!element || !open) return;
@@ -32,7 +44,7 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     document.addEventListener("pointerdown", outside); return () => document.removeEventListener("pointerdown", outside);
   }, [open, close]);
   const fields = <><label htmlFor="uir-rewrite-instruction">Что изменить?</label><textarea id="uir-rewrite-instruction" rows={2} aria-label="Инструкция для фрагмента" disabled={busy} value={instruction} onChange={event => change(event.currentTarget.value)} />
-    <div className="rewrite-chips"><button disabled={busy} onClick={() => change("Сократи текст, сохрани факты и смысл.")}>Сократить</button><button disabled={busy} onClick={() => change("Сделай текст яснее, сохрани факты и смысл.")}>Сделать яснее</button></div></>;
+    <div className="rewrite-chips"><button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button><button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></div></>;
   return <section ref={dialog} hidden={!open} role="dialog" aria-modal="false" className="rewrite-panel uir-rewrite" aria-labelledby="uir-rewrite-title"
     onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); returnFocus.current?.focus(); }

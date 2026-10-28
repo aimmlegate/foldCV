@@ -18,13 +18,23 @@ def test_private_preferences_keep_defaults_model_and_unrelated_fields_on_restart
     RulesStore(root).load()
     store = PreferencesStore(root)
     initial = store.load()
-    assert initial.automatic_analysis and initial.theme == 'system' and initial.selected_model is None
+    assert not initial.automatic_analysis and initial.theme == 'system' and initial.selected_model is None
     selected = store.select_model('reported-model-a')
     assert selected.selected_model == 'reported-model-a'
     assert PreferencesStore(root).load() == selected and selected.automatic_analysis == initial.automatic_analysis
     assert stat.S_IMODE(root.stat().st_mode) == 0o700 and stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert set(json.loads(store.path.read_text())) == {'schemaVersion', 'automaticAnalysis', 'theme', 'selectedModel',
         'selectedImportModel', 'selectedFallbackModel', 'rewriteReasoningEffort', 'importMinutes', 'projectMegabytes'}
+
+
+def test_an_older_stored_automatic_check_choice_stays_readable_and_unchanged(tmp_path):
+    root = tmp_path / 'FoldCV'
+    RulesStore(root).load()
+    store = PreferencesStore(root)
+    older = b'{"schemaVersion":1,"automaticAnalysis":true,"theme":"light","selectedModel":"model-a"}'
+    atomic_write(store.path, older)
+    assert store.load().automatic_analysis is True and store.path.read_bytes() == older
+    assert store.select_model('model-b').automatic_analysis is True
 
 
 def test_preferences_invalid_model_corrupt_json_and_symlink_fail_without_reset_or_leak(tmp_path, capsys):
@@ -72,7 +82,7 @@ async def test_settings_open_reads_connection_and_preferences_without_probe_logi
         connection = await client.get('/v1/settings/connection')
         preferences = await client.get('/v1/settings/preferences')
         assert connection.status_code == preferences.status_code == 200 and connection.json()['state'] == 'unchecked'
-        assert preferences.json()['automaticAnalysis'] is True
+        assert preferences.json()['automaticAnalysis'] is False
     assert adapter.inspections == adapter.logins == 0 and provider.calls == []
 
 

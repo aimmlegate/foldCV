@@ -49,7 +49,7 @@ export default function TemplateSettings({ dirtyChange }: { dirtyChange: (dirty:
   const busy = work !== null;
   return <>
     <h3>Шаблон резюме</h3>
-    <p>Шаблон описывает блоки, их оформление, извлечение данных и правила переписывания. Сохранённый шаблон действует для новых импортов; уже созданные резюме сохраняют свою версию.</p>
+    <p className="small muted">Действует при импорте резюме. Шаблон описывает блоки, их оформление, извлечение данных (<code>extract</code>) и правила переписывания (<code>rewrite</code>). Сохранённый шаблон действует для новых импортов; уже созданные резюме сохраняют свою версию.</p>
     {state && <p className="template-active small">Сейчас используется: <strong>{state.package.name} · {state.package.revision}</strong>
       <span className="muted">{state.bundled ? "встроенный шаблон" : "изменённый шаблон"}</span></p>}
     {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}

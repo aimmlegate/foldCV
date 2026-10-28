@@ -24,7 +24,8 @@ class PreferencesStore:
 
     def _read(self):
         if not self.path.exists() and not self.path.is_symlink():
-            value = Preferences(schemaVersion=1, automaticAnalysis=True, theme='system', selectedModel=None)
+            # No edit check runs automatically on V7; the flag stays only so older stores remain readable.
+            value = Preferences(schemaVersion=1, automaticAnalysis=False, theme='system', selectedModel=None)
             self._write(value)
             return value
         private_file(self.path)
