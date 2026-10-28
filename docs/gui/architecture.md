@@ -237,7 +237,17 @@ Russian text in `contracts/error-messages.ru.json`.
 `packages/resume_core/project_tasks.py` keeps an in-memory `TaskRegistry` of `{id,
 projectId, kind, state, stage, startedAt, elapsed, detail, error}` for import, export
 and rewrite, one running task per project and kind. `GET /tasks` feeds the import
-activity view (stage, elapsed time, saved discoveries). Nothing there is durable.
+activity view (stage, elapsed time, saved discoveries, and `detail.progress` from
+`projects/import_progress.py`: steps, recent model calls, the last event times and the
+stall check). Nothing there is durable.
+
+- Imports of several projects run at once; they share the one inference permit, so a
+  later one waits with stage `queued` and its start reply returns at once. The client
+  (`workbench/import/tracker.ts`) follows each project's task without blocking the
+  workspace. A run is stalled when no event arrives for longer than the longest model
+  call (180 s) plus cleanup and 60 s, or when it outlives its captured time limits.
+- The import start may carry `effort`; the capture checks it against the import model's
+  catalog efforts (`IMPORT_EFFORT_UNSUPPORTED`) and records it.
 
 - Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a

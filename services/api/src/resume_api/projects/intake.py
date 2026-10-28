@@ -42,7 +42,8 @@ class TemplateIntake:
         self.extractions = {}
 
     def configure(self, *, call_cap, model, fallback=None, concurrency=1):
-        """`model` returns the ModelCapture for the selected import model or raises ProjectFailure; `fallback`, given
+        """`model(effort=None)` returns the ModelCapture for the selected import model with that effort, else its
+        catalog default, or raises ProjectFailure (also for an effort the catalog does not offer). `fallback`, given
         that capture, returns the configured fallback model's capture, None when there is none, or raises.
         `concurrency` is how many independent blocks one import runs at once (CT10); 1 is sequential."""
         if call_cap is not None and (not isinstance(call_cap, int) or call_cap < 1):
@@ -132,23 +133,23 @@ class TemplateIntake:
             except Exception:
                 pass
 
-    def command(self, project_id, client_request_id, allow_text_rewrite, *, workspace):
+    def command(self, project_id, client_request_id, allow_text_rewrite, effort=None, *, workspace):
         pre = workspace.pre_draft
         if workspace.schema_version != 7 or workspace.project is not None or pre is None or pre.template_package is None:
             raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         if not pre.sources or not any(unit.text.strip() for source in pre.sources for unit in source.units):
             raise ProjectFailure('NO_USABLE_TEXT', 409)
-        capture = self.capture(workspace, allow_text_rewrite)
+        capture = self.capture(workspace, allow_text_rewrite, effort=effort)
         return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
             capture=capture)
 
-    def capture(self, workspace, allow_text_rewrite, models=None):
+    def capture(self, workspace, allow_text_rewrite, models=None, *, effort=None):
         data = workspace.project or workspace.pre_draft
         package, sources = data.template_package, {source.id: source.byte_sha256 for source in data.sources}
         if models is not None:
             primary, fallback = models
         else:
-            primary = self.model()
+            primary = self.model(effort=effort)
             fallback = self.fallback(primary) if self.fallback else None
         models = {'model': primary.model_dump(mode='json', by_alias=True)}
         if fallback is not None:
@@ -174,8 +175,10 @@ class TemplateIntake:
         stored = any(value.id == operation.id for value in data.template_operations) or any(
             ref.operation_id == operation.id for ref in getattr(data, 'import_history', []))
         try:
+            # A new operation carries the effort its start chose; the catalog must still offer it.
             expected = self.capture(workspace, operation.capture.allow_text_rewrite,
-                models=(operation.capture.primary, operation.capture.fallback) if stored else None)
+                models=(operation.capture.primary, operation.capture.fallback) if stored else None,
+                effort=None if stored else operation.capture.primary.effort)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
         ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds', 'concurrency'}} if stored else {})}

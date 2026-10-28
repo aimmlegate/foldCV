@@ -37,7 +37,7 @@ NOW = '2026-10-15T18:00:00+00:00'
 
 
 class ScriptedConnection:
-    """A connected account with two models; every model offers the medium effort as its default."""
+    """A connected account with two models; every model offers low, medium and high, with medium as the default."""
 
     def __init__(self):
         self.calls = []
@@ -46,7 +46,7 @@ class ScriptedConnection:
         self.calls.append('inspect')
         models = ('synthetic-processing', 'synthetic-assistant')
         return Metadata('synthetic-scripted', models, 'plus', Quota('available', 0),
-            reasoning={name: ModelReasoning(supported=['medium'], default='medium') for name in models})
+            reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
 
     def login(self, *_args, **_kwargs):
         self.calls.append('scripted_login')
@@ -59,12 +59,16 @@ class ScriptedContent:
     """Template import tasks and selected-text rewrites with deterministic replies; other requests are refused."""
     template_adapter = 'synthetic-scripted'
 
-    def __init__(self):
+    def __init__(self, delay=0.0):
         self.calls = []
+        self.delay = delay
 
-    def generate(self, request, _files, _cancel):
+    def generate(self, request, _files, cancel):
         if isinstance(request.result_type, DynamicResultSpec):
             from tests.templates.scripted_template_provider import scripted_template_result
+            # --template-delay keeps each call open long enough to watch the import screen; Stop ends the wait.
+            if self.delay and cancel is not None:
+                cancel.wait(self.delay)
             return scripted_template_result(self, request)
         if request.result_type is not PlainTextReply:
             raise ContentFailure('UNSCRIPTED_PROVIDER_PATH')
@@ -231,7 +235,7 @@ async def main(args):
     listener.listen(128)
     origin = 'http://127.0.0.1:' + str(listener.getsockname()[1])
     secret = secrets.token_urlsafe(32)
-    connection, content, web = ScriptedConnection(), ScriptedContent(), StoredWeb()
+    connection, content, web = ScriptedConnection(), ScriptedContent(args.template_delay), StoredWeb()
     runtime = ScriptedAgentRuntime(assistant_script)
     if args.live_assistant:
         # The user's existing Codex sign-in is used in place (allowed 2026-10-27); projects stay in this temp root.
@@ -305,6 +309,8 @@ if __name__ == '__main__':
     parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default='issues')
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
+    # Seconds each scripted template call waits before its reply, to watch a running import in the preview.
+    parser.add_argument('--template-delay', type=float, default=0.0)
     # Native assistant runs on the user's Codex sign-in, charged to the SR08 ledger (at most LIVE_LIMIT starts).
     parser.add_argument('--live-assistant', action='store_true')
     parser.add_argument('--reopen', action='store_true')

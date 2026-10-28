@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import hashlib
 import logging
 from typing import Literal
@@ -11,12 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.models.template_import import ResumeTemplateImportV1
 from packages.resume_core.project_repository import RepositoryFailure, decode_project
+from packages.resume_core.reasoning import ReasoningEffort
 from packages.resume_core.template_import import TemplateImportFailure
 
 from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
 from .fold import sidecar_store
+from .import_progress import import_progress
 
 LOG = logging.getLogger(__name__)
 
@@ -28,6 +31,8 @@ class ImportCommand(BaseModel):
     kind: Literal['start', 'resume', 'cancel']
     operation_id: str | None = Field(default=None, alias='operationId')
     task_id: str | None = Field(default=None, alias='taskId')
+    # The import model's effort for this start; None keeps its catalog default. The capture checks it in the catalog.
+    effort: ReasoningEffort | None = None
 
 
 class _Stop:
@@ -45,12 +50,16 @@ class _Stop:
 
 
 class ImportService:
-    def __init__(self, projects, pipeline=None, *, commands=None, admission=INFERENCE):
+    def __init__(self, projects, pipeline=None, *, commands=None, admission=INFERENCE,
+                 wall=lambda: datetime.now(timezone.utc)):
         self.projects = projects
         self.pipeline = pipeline
         self.commands = commands
         self.admission = admission
+        self.wall = wall
         self.runners = {}
+        # When an import last took or returned the inference permit: a queued import is quiet only while this stays.
+        self.queue_moved = None
         # project -> (permit, operation id): a permit whose import may still own a model process stays held until
         # every attempt of that operation has verified cleanup.
         self.retained = {}
@@ -77,7 +86,7 @@ class ImportService:
             command = request
             if self.commands is not None and request.kind == 'start':
                 command = await asyncio.to_thread(self.commands, project_id, request.client_request_id,
-                    request.allow_text_rewrite)
+                    request.allow_text_rewrite, request.effort)
 
             async def admitted():
                 operation_id = request.operation_id or request.client_request_id
@@ -92,11 +101,19 @@ class ImportService:
                             operation_id = match.id
                     except Exception:
                         pass
+                if self.admission.locked() and project_id not in self.retained:
+                    # Another import or an assistant turn holds the permit: the start reply returns now and this task
+                    # waits in the queue, instead of the reply timing out while the task keeps waiting.
+                    self.projects.tasks.update(task.id, stage='queued', detail={'operationId': operation_id,
+                        'queuedAt': self.wall().isoformat()})
+                    started.set()
                 # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
                 # assistant turn waits instead of turning a block into a source fallback.
                 held['permit'], held['operation'] = await self._permit(project_id, operation_id, task.cancel), operation_id
                 held['token'] = JOB_PERMIT.set(held['permit'])
-                self.projects.tasks.update(task.id, stage='processing', detail={'operationId': operation_id})
+                self.queue_moved = self.wall()
+                self.projects.tasks.update(task.id, stage='processing', detail={'operationId': operation_id,
+                    'admittedAt': self.queue_moved.isoformat()})
                 started.set()
 
             if request.kind == 'resume':
@@ -131,6 +148,7 @@ class ImportService:
                 JOB_PERMIT.reset(held['token'])
             if 'permit' in held:
                 await asyncio.to_thread(self._settle, project_id, held['operation'], held['permit'])
+                self.queue_moved = self.wall()
             if session is not None:
                 with session.lock:
                     session.pins -= 1
@@ -198,7 +216,8 @@ class ImportService:
             workspace = self.pipeline.read(project_id)
             data = workspace.project or workspace.pre_draft
             operations = data.template_operations
-            operation = operations[-1] if operations else None
+            named = task.detail.get('operationId')
+            operation = next((item for item in operations if item.id == named), operations[-1] if operations else None)
             facts = data.facts
             def text(record, field):
                 value = getattr(record, field, None)
@@ -213,8 +232,14 @@ class ImportService:
                 'discoveries': {'name': text(candidate, 'name'), 'title': text(candidate, 'title'),
                     'facts': len(records) + sum(record.active for record in facts.extensions),
                     'jobs': jobs[:3], 'jobCount': len(jobs), 'technologies': technologies[:8],
-                    'technologyCount': len(technologies)}}
-            stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+                    'technologyCount': len(technologies)},
+                'progress': import_progress(operation, data.template_package, stage=task.stage, now=self.wall(),
+                    started_at=task.started_at, queued_at=task.detail.get('queuedAt'),
+                    admitted_at=task.detail.get('admittedAt'), queue_moved_at=self.queue_moved)}
+            # Only an admitted task moves between processing and publication; the runner owns the earlier stages.
+            stage = None
+            if task.stage in {'processing', 'publication'}:
+                stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
             self.projects.tasks.update(task.id, stage=stage, detail=details)
         return self.projects.tasks.list(project_id)
 
