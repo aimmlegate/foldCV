@@ -64,7 +64,8 @@ class ProjectService:
             raise RepositoryFailure('PROJECT_READ_ONLY')
 
     def listing(self):
-        """Registry entries with catalog flags and the resume identity; unopened projects are read once for it."""
+        """Registry entries with catalog flags and the resume identity, newest added first; unopened projects are read
+        once for the identity."""
         entries, errors = [], []
         catalog = self.catalog.entries()
         for entry in self.repository.listing():
@@ -80,7 +81,8 @@ class ProjectService:
             if identity is not None:
                 value.update(title=identity[0], subtitle=identity[1])
             entries.append(value)
-        entries.sort(key=lambda entry: (entry['lastOpenedAt'] or entry['updatedAt'], entry['projectId']), reverse=True)
+        # The registry appends a project when it is added and never reorders it, so its order is the date added.
+        entries.reverse()
         return {'entries': entries, 'errors': errors}
 
     def _identity(self, project_id):

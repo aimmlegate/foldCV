@@ -7,6 +7,7 @@ export type ProjectTask = TaskStatusV1;
 
 /** One row of GET /v2/projects: the registry entry with catalog flags and the resume identity. */
 export type ProjectListEntry = RegistryEntry & { lastOpenedAt?: string | null; archived?: boolean; subtitle?: string | null };
+/** The server sends the entries newest added first; the sidebar keeps that order. */
 export type ProjectList = { entries: ProjectListEntry[]; errors: { projectId: string; errorCode: string }[] };
 
 export type ImportDiscoveries = {

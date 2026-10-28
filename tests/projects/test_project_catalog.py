@@ -1,22 +1,26 @@
-"""The project catalog (project_catalog) through the v2 routes: recency, archive flags and deletion keep project files
-as they are and never decode or follow what they should not."""
+"""The project catalog (project_catalog) through the v2 routes: listing order, recency, archive flags and deletion keep
+project files as they are and never decode or follow what they should not."""
 
 import json
 
 import pytest
 
 from packages.resume_core.project_store import ProjectStoreFailure
-from tests.projects.support import v2_app
+from tests.projects.support import Editor, source_blobs, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 
 FIRST, OTHER = 'template-project', 'other-project'
 
 
-def projects():
+def copy(identifier):
     first, sources = papers()
     data = first.model_dump(by_alias=True)
-    data['projectId'] = data['project']['projectId'] = OTHER
-    return [(first, sources), (type(first).model_validate(data), sources)]
+    data['projectId'] = data['project']['projectId'] = identifier
+    return type(first).model_validate(data), sources
+
+
+def projects():
+    return [papers(), copy(OTHER)]
 
 
 def entries(client):
@@ -40,7 +44,6 @@ def test_only_an_explicit_open_updates_recency_and_the_archive_flag_survives_res
         application.state.projects.repository.close(FIRST)
         assert entries(client)[FIRST]['lastOpenedAt'] == initial
         assert client.post('/v2/projects/' + OTHER + '/open', json={}).status_code == 200
-        assert client.get('/v2/projects').json()['entries'][0]['projectId'] == OTHER
         assert client.post('/v2/projects/' + FIRST + '/catalog/archive', json={}).status_code == 200
         path = application.state.projects.repository.open(FIRST).directory / 'workspace.json'
     before = path.read_bytes()
@@ -50,6 +53,23 @@ def test_only_an_explicit_open_updates_recency_and_the_archive_flag_survives_res
         assert client.post('/v2/projects/' + FIRST + '/catalog/restore', json={}).status_code == 200
         assert not entries(client)[FIRST]['archived'] and entries(client)[FIRST]['lastOpenedAt'] == initial
     assert path.read_bytes() == before
+
+
+def test_the_listing_is_newest_added_first_whatever_was_opened_renamed_or_archived_since(tmp_path):
+    def order(client):
+        return [entry['projectId'] for entry in client.get('/v2/projects').json()['entries']]
+    with v2_app(tmp_path, [*projects(), copy('third-project')]) as (client, application):
+        assert order(client) == ['third-project', OTHER, FIRST]
+        editor = Editor(client, FIRST)
+        editor.call('post', '/rename', {'editorToken': editor.token, 'baseRevision': editor.revision, 'title': 'Renamed'})
+        archived = client.post('/v2/projects/' + OTHER + '/catalog/archive', json={}).json()['entries']
+        assert [entry['projectId'] for entry in archived] == ['third-project', OTHER, FIRST]
+        assert order(client) == ['third-project', OTHER, FIRST]
+        added, sources = copy('added-project')
+        application.state.projects.repository.create(added, blobs=source_blobs(sources))
+        assert order(client) == ['added-project', 'third-project', OTHER, FIRST]
+    with v2_app(tmp_path) as (client, _application):
+        assert order(client) == ['added-project', 'third-project', OTHER, FIRST]
 
 
 @pytest.mark.parametrize('version', [5, 99, 'unreadable'])
