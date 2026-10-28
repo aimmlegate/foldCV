@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline Claude Code stand-in that replays the envelopes observed in MP00. All input is synthetic."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -125,6 +126,9 @@ if case == "denied":
     sys.exit(0)
 
 value = config["value"]
+if case == "relay":
+    # The test leaves each request's answer under its prompt's hash, so concurrent processes answer independently.
+    value = json.loads((base / "answers" / (hashlib.sha256(prompt.encode()).hexdigest() + ".json")).read_text())
 if case == "repair" and count == 1:
     value = config["invalid"]
 if structured:
