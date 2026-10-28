@@ -119,6 +119,13 @@ export function parseTemplateCatalog(value: unknown): TemplateCatalog {
   return { defaultId, templates: entries };
 }
 
+/** The template the import form shows after it reads the list: the user's own pick while it still exists, else the
+ * default one. */
+export function shownTemplate(catalog: TemplateCatalog, current: string | null, picked: boolean): string {
+  const kept = picked ? catalog.templates.find(entry => entry.id === current) : undefined;
+  return kept?.id ?? catalog.defaultId;
+}
+
 /** Whether imports run, and the templates a new resume can use. */
 export async function templateImportStatus(fetcher?: Fetcher): Promise<TemplateImportStatus> {
   const value = await v2Request<unknown>("/v1/rich/template-import", "GET", undefined, fetcher);

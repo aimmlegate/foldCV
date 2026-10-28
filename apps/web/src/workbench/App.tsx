@@ -101,7 +101,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
             settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
             title={projectTitle} settings={openSettings} />} />}
-        {view === "source" && !workspace.loading && <SourceForm busy={busy} connection={connection?.snapshot ?? null}
+        {view === "source" && !workspace.loading && <SourceForm active={!settings} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
       {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}

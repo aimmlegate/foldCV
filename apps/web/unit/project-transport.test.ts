@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, templateImportStatus } from "../src/projects/api";
+import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, shownTemplate, templateImportStatus } from "../src/projects/api";
 import { ProjectApiFailure, ProjectEditorConnection, type Fetcher } from "../src/rich/v7-connection";
 
 const base = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;
@@ -98,4 +98,13 @@ test("the template list is checked before the import form offers it", async () =
     { ...status, templates: [{ ...entry, edited: "no" }] }, { ...status, schemaVersion: 2 }])
     await assert.rejects(templateImportStatus(reply(broken)), /INVALID_RESULT/);
   assert.deepEqual(parseTemplateCatalog({ schemaVersion: 1, defaultId: "generic", templates: [entry] }), { defaultId: "generic", templates: [entry] });
+});
+
+test("the import form follows a new default after Settings but keeps the user's own pick while it exists", () => {
+  const entry = (id: string) => ({ id, name: id, revision: "1", packageHash: "a".repeat(64), bundled: true, edited: false });
+  const catalog = { defaultId: "second", templates: [entry("first"), entry("second")] };
+  assert.equal(shownTemplate(catalog, "first", false), "second");
+  assert.equal(shownTemplate(catalog, "first", true), "first");
+  assert.equal(shownTemplate(catalog, "removed", true), "second");
+  assert.equal(shownTemplate(catalog, null, false), "second");
 });

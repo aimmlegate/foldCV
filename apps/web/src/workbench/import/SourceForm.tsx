@@ -3,15 +3,16 @@ import { preferencesRequest, saveImportModelRequest } from "../../api/client";
 import type { ConnectionSnapshot } from "../../connection/workflow";
 import { isReasoningEffort, type ReasoningEffort } from "../../connection/reasoning";
 import { errorMessage } from "../../errors/messages";
-import { templateImportStatus, type ImportOptions, type TemplateEntry } from "../../projects/api";
+import { shownTemplate, templateImportStatus, type ImportOptions, type TemplateEntry } from "../../projects/api";
 import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSelect";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
 /** A new resume from one file (PDF, DOCX, TXT, Markdown) with a template, the import model, its effort and the rewrite
- * choice. Without the template list the upload uses the default template. */
-export function SourceForm({ busy, process, connection }: {
-  busy: boolean; process: (file: File, options: ImportOptions, templateId: string | null) => void; connection: ConnectionSnapshot | null;
+ * choice. Without the template list the upload uses the default template. `active`: shown, not behind Settings. */
+export function SourceForm({ active, busy, process, connection }: {
+  active: boolean; busy: boolean; process: (file: File, options: ImportOptions, templateId: string | null) => void;
+  connection: ConnectionSnapshot | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null), [rewrite, setRewrite] = useState(true);
@@ -19,13 +20,19 @@ export function SourceForm({ busy, process, connection }: {
   const [effort, setEffort] = useState<ReasoningEffort | null>(null);
   const [templates, setTemplates] = useState<TemplateEntry[]>([]), [templateId, setTemplateId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false), [modelError, setModelError] = useState("");
+  const picked = useRef(false);
+  // The form stays mounted behind Settings, which can change the default template, its versions and the import model.
   useEffect(() => {
+    if (!active) return;
     let alive = true;
     void preferencesRequest().then(value => { if (alive) setImportModel(value.selectedImportModel ?? null); })
       .catch((error: unknown) => { if (alive) setModelError(errorMessage(error)); }).finally(() => { if (alive) setLoaded(true); });
-    void templateImportStatus().then(value => { if (alive) { setTemplates(value.templates); setTemplateId(value.defaultId); } }).catch(() => {});
+    void templateImportStatus().then(value => {
+      if (!alive) return;
+      setTemplates(value.templates); setTemplateId(current => shownTemplate(value, current, picked.current));
+    }).catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [active]);
   const models = connection?.models ?? [];
   const model = importModel ?? connection?.selectedModel ?? null;
   const reasoning = model ? connection?.modelReasoning?.[model] : undefined;
@@ -40,7 +47,7 @@ export function SourceForm({ busy, process, connection }: {
     <h2>Добавить исходник</h2>
     <label htmlFor="import-template">Шаблон</label>
     <select className="model-select" id="import-template" aria-label="Шаблон" disabled={busy || templates.length === 0}
-      value={templateId ?? ""} onChange={event => setTemplateId(event.currentTarget.value)}>
+      value={templateId ?? ""} onChange={event => { picked.current = true; setTemplateId(event.currentTarget.value); }}>
       {templates.length === 0 && <option value="">Шаблон по умолчанию</option>}
       {templates.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select>
