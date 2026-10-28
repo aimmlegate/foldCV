@@ -121,6 +121,13 @@ def test_a_one_column_layout_has_no_sidebar_and_refuses_a_block_placed_there(mut
     assert error.value.path == path
 
 
+@pytest.mark.parametrize("template_id", ["a/b", "../generic", ".hidden", "with space", "шаблон", "x" * 201])
+def test_a_new_template_id_is_one_url_path_segment(config, template_id):
+    config['template']['id'] = template_id
+    with pytest.raises(SchemaFailure) as error: compile_config(config)
+    assert error.value.path == "/template/id"
+
+
 def test_provider_envelope_uses_only_reachable_definitions_and_keeps_server_constraints(config):
     config['content_definitions']['unused_incompatible'] = {'type':'string','not':{'const':'bad'}}
     package = compile_config(config)

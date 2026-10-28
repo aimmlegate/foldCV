@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 from pydantic import ValidationError
@@ -25,6 +26,8 @@ ASSET_BYTES = 20 * 1024 * 1024
 PACKAGE_BYTES = 40 * 1024 * 1024
 CAPABILITIES = ["text", "join_fields", "join_items", "bullets", "tags", "period", "link", "focus_entry"]
 ADDED_CAPABILITIES = ['object_items', 'builtin_mapping', 'explicit_item_roots', 'fallback_style', 'header_slots', 'date_text']
+# Settings and the import form name the template in one URL path segment, and the router decodes %2F before matching.
+TEMPLATE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}")
 
 
 def is_date(shape):
@@ -138,6 +141,8 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml", assets=None
     compiled, recipe, manifest = compile_definition(definition, version)
     # New packages only: stored packages re-verify without it and keep opening; their runtime refuses such replies.
     check_item_roots(definition)
+    if not TEMPLATE_ID.fullmatch(definition.template.id):
+        raise SchemaFailure("/template/id", "template id must use letters, digits, '.', '_' or '-' and start with a letter or digit")
     captured = []
     total = 0
     for asset in definition.assets:
