@@ -17,7 +17,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 DEVICON = ROOT / 'skills/format-resume/assets/devicon'
-TEMPLATE = ROOT / 'templates/generic-two-column/assets'
+TEMPLATE = ROOT / 'templates/bundled/assets'
 REPOSITORY = 'https://github.com/devicons/devicon'
 RELEASE = 'v2.18.0'
 REVISION = 'ff435a0fff0391aefbf70d63a3fe7cfe64f82df0'

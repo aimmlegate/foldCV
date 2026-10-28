@@ -19,9 +19,12 @@ from .loading import load_declared_definition,load_definition
 from .models import TemplateDefinition, TemplatePackage
 from .projection import SchemaFailure, validate_schema
 
-BUNDLED_TEMPLATE = Path(__file__).resolve().parents[3] / "templates/generic-two-column/template.yaml"
-# Templates shipped with the app by id; the first one is the default until the user picks another.
-BUNDLED_TEMPLATES = {"generic-two-column": BUNDLED_TEMPLATE}
+BUNDLED_DIR = Path(__file__).resolve().parents[3] / "templates/bundled"
+# Templates shipped with the app by id, sharing one asset folder; the first one is the default until the user picks
+# another.
+BUNDLED_TEMPLATES = {"generic-two-column": BUNDLED_DIR / "generic-two-column.yaml",
+    "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml"}
+BUNDLED_TEMPLATE = BUNDLED_TEMPLATES["generic-two-column"]
 _VERIFIED_PACKAGES = OrderedDict()
 _VERIFIED_LOCK = threading.Lock()
 
