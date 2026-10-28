@@ -44,12 +44,27 @@ class EditorBlock(Wire):
         exclude_if=lambda value: not value)
 
 
+class EditorPlacement(Wire):
+    """A block's parent block or region and the sibling before it, as a panel placement context names them."""
+    parent_id: Id
+    after_id: Id | None
+
+
 class EditorTechnologyTarget(Wire):
-    """A tags line of one scope, or a job section that has none yet, where the facts panel adds a technology."""
+    """Where the facts panel adds a technology: a line of one scope, a job section that has none yet, or a group view
+    the document no longer shows (block id view:<view id>)."""
     block_id: Id
     job_id: Id | None
     # The view title the panel names when one scope has several lines.
     label: str
+    # The block's place, or where the view's line goes; the panel sends it back and Python refuses an older one.
+    placement: EditorPlacement
+
+
+class EditorFocusPanel(Wire):
+    """The facts panel can add, remove and move Focus rows and set their years."""
+    # Records only Focus rows show; the panel's technology lists leave them out.
+    records: list[Id]
 
 
 class EditorPlanV1(Wire):
@@ -62,6 +77,8 @@ class EditorPlanV1(Wire):
     icon_files: dict[str, Sha256] = Field(default_factory=dict, exclude_if=lambda value: not value)
     # The only places a new technology can be shown; a scope without one offers no adding.
     technology_targets: list[EditorTechnologyTarget] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # Absent when the template's Focus is not one view the panel can change.
+    focus_panel: EditorFocusPanel | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class TemplatePresentationV1(Wire):

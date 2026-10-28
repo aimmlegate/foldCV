@@ -116,13 +116,6 @@ def row_name(package, facts, row):
     return None
 
 
-def focus_icon(package, facts, row, catalog=None):
-    """The catalog icon of one Focus row from the current text of its first bound name field; None shows text only."""
-    catalog = icon_catalog(package) if catalog is None else catalog
-    name = row_name(package, facts, row)
-    return catalog.find(name) if name is not None else None
-
-
 _INITIALS = {}
 INITIAL_SIDE = 160
 INITIAL_BACKGROUND = (0xEF, 0xEF, 0xEF, 0xFF)
@@ -130,8 +123,8 @@ INITIAL_INK = (0x80, 0x80, 0x80, 0xFF)
 
 
 def initial_icon(package, row, name):
-    """The placeholder of a row without an icon: a grey rounded square with the first letter or digit of the name, in
-    the row's own captured font (D113). None for a template that keeps such rows text-only, or a name without one."""
+    """The placeholder of a row without an icon: a grey square with the name's first letter or digit in the row's font
+    (D113). None keeps the row text-only: for a text_only template, a name without one, or an unreadable font."""
     if package.recipe.style.focus.missing_icon != 'initial' or not name:
         return None
     letter = next((character.upper() for character in name if character.isalnum()), None)
@@ -141,24 +134,30 @@ def initial_icon(package, row, name):
     token = package.recipe.style.text[ref.style_token].font
     key = (package.package_hash, token, letter)
     if key not in _INITIALS:
-        from io import BytesIO
-        from PIL import Image, ImageDraw, ImageFont
         fonts = {asset.id: asset for asset in package.assets}
-        font = ImageFont.truetype(BytesIO(base64.b64decode(fonts[package.recipe.style.fonts[token]].bytes_base64)),
-            round(INITIAL_SIDE * .6))
-        image = Image.new('RGBA', (INITIAL_SIDE, INITIAL_SIDE), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((0, 0, INITIAL_SIDE - 1, INITIAL_SIDE - 1), radius=INITIAL_SIDE // 6, fill=INITIAL_BACKGROUND)
-        # Centered by the drawn glyph, not the font's line box, so Q and k sit as high as H.
-        left, top, right, bottom = draw.textbbox((0, 0), letter, font=font)
-        draw.text(((INITIAL_SIDE - right - left) / 2, (INITIAL_SIDE - bottom - top) / 2), letter, font=font, fill=INITIAL_INK)
-        output = BytesIO()
-        image.save(output, format='PNG')
-        raw = output.getvalue()
-        digest = hashlib.sha256(raw).hexdigest()
-        _INITIALS[key] = CapturedAsset(id='initial-' + digest[:24], path='generated#' + digest, role='icon',
-            mimeType='image/png', sha256=digest, size=len(raw), bytesBase64=base64.b64encode(raw).decode('ascii'))
+        try:
+            raw = _initial_png(base64.b64decode(fonts[package.recipe.style.fonts[token]].bytes_base64), letter)
+        except (KeyError, OSError, ValueError):
+            raw = None
+        digest = hashlib.sha256(raw).hexdigest() if raw is not None else None
+        _INITIALS[key] = None if raw is None else CapturedAsset(id='initial-' + digest[:24], path='generated#' + digest,
+            role='icon', mimeType='image/png', sha256=digest, size=len(raw), bytesBase64=base64.b64encode(raw).decode('ascii'))
     return _INITIALS[key]
+
+
+def _initial_png(font_bytes, letter):
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageFont
+    font = ImageFont.truetype(BytesIO(font_bytes), round(INITIAL_SIDE * .6))
+    image = Image.new('RGBA', (INITIAL_SIDE, INITIAL_SIDE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((0, 0, INITIAL_SIDE - 1, INITIAL_SIDE - 1), radius=INITIAL_SIDE // 6, fill=INITIAL_BACKGROUND)
+    # Centered by the drawn glyph, not the font's line box, so Q and k sit as high as H.
+    left, top, right, bottom = draw.textbbox((0, 0), letter, font=font)
+    draw.text(((INITIAL_SIDE - right - left) / 2, (INITIAL_SIDE - bottom - top) / 2), letter, font=font, fill=INITIAL_INK)
+    output = BytesIO()
+    image.save(output, format='PNG')
+    return output.getvalue()
 
 
 def row_icon(package, facts, row, catalog=None):

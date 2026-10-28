@@ -4,8 +4,9 @@ import { BlockNoteEditor } from "@blocknote/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
-import { blockPlacement, panelCommandsV7 } from "../src/rich/v7-panel";
-import { shownYears } from "../src/rich/v7-focus";
+import { panelCommandsV7 } from "../src/rich/v7-panel";
+import { focusOptions, wholeYears, yearsValue } from "../src/rich/v7-focus";
+import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
 import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
@@ -53,17 +54,24 @@ test("only what Python saves is forwarded: technology add, removal and clearing,
     assert.equal(panelCommandsV7(command, kinds), null, JSON.stringify(command));
 });
 
-test("a block's placement is its parent block or region and the sibling before it", () => {
-  const document = { regions: [{ id: "main", blocks: [{ id: "a", children: [] }, { id: "b", children: [{ id: "c", children: [] }, { id: "d", children: [] }] }] }] };
-  assert.deepEqual(blockPlacement(document, "a"), { parentId: "main", afterId: null });
-  assert.deepEqual(blockPlacement(document, "b"), { parentId: "main", afterId: "a" });
-  assert.deepEqual(blockPlacement(document, "d"), { parentId: "b", afterId: "c" });
-  assert.equal(blockPlacement(document, "missing"), null);
+test("stated experience gives whole years only when it states them", () => {
+  assert.deepEqual(["3 года", "1 год", "11 лет", "2 years", " 1 year ", "10 месяцев", "1,5 года", "около 3 лет", ""].map(wholeYears),
+    [3, 1, 11, 2, 1, null, null, null, null]);
 });
 
-test("a Focus line gives whole years only when it states them", () => {
-  assert.deepEqual(["3 года", "1 год", "11 лет", "2 years", " 1 year ", "10 месяцев", "1,5 года", "около 3 лет", ""].map(shownYears),
-    [3, 1, 11, 2, 1, null, null, null, null]);
+test("the years field sends whole years as digits and nothing for other input", () => {
+  assert.deepEqual(["3", "3.0", "1e1", "-0", "0", "100", ""].map(value => yearsValue(value, false)), ["3", "3", "10", "0", "0", "100", ""]);
+  assert.deepEqual(["3.5", "-1", "101", "x"].map(value => yearsValue(value, false)), [null, null, null, null]);
+  // A half-typed value (3-) reads as "" in the browser; it must not clear the stated years.
+  assert.equal(yearsValue("", true), null);
+});
+
+test("a Focus option binds a general record no line shows before another general one, and a job's last", () => {
+  const record = (id: string, name: string, jobId: string | null = null) => ({ id, jobId, display: { rawText: name } });
+  const options = focusOptions([record("group-python", "Python"), record("focus-python", "Python"), record("job-kafka", "Kafka", "job"),
+    record("group-go", "Go"), record("job-go", "go", "job"), record("job-rust", "Rust", "job"), record("shown-sql", "SQL")],
+    new Set(["group-python", "group-go", "job-rust"]), new Set(["sql"]));
+  assert.deepEqual(options.map(value => value.recordId), ["group-go", "job-kafka", "focus-python", "job-rust"]);
 });
 
 test("panel commands adapt to Python's V7 employment form; a technology reorder is forwarded", () => {
@@ -178,8 +186,13 @@ test("a technology rename saves through Python; an action without an adapter is 
     assert.ok(renamed?.kind === "technology");
     assert.equal(renamed.display.rawText, "Go");
     await assert.rejects(session.panel({ operation: "add", recordKind: "language", values: { language: "French" } }), /PANEL_ACTION_UNSUPPORTED/);
+    // Python's refusal keeps its code for the panel's text, and the editor takes the next command.
+    await assert.rejects(session.panel({ operation: "edit", recordId: technology.id, values: { display: "  " } }),
+      (error: unknown) => error instanceof ProjectApiFailure && error.code === "TECHNOLOGY_NAME_REQUIRED" && error.status === 422);
+    assert.equal(session.queue.template.state.kind, "ready");
+    await session.panel({ operation: "edit", recordId: technology.id, values: { display: "Rust" } });
     assert.equal(session.queue.template.pending.length, 0);
-    // The facts panel shows the refusal; the editor's notices stay clear.
+    // The facts panel shows the refusals; the editor's notices stay clear.
     assert.equal(warnings.length, 0);
   } finally { session.close(); await value.close(); }
 });

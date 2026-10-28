@@ -111,6 +111,12 @@ def move_owned(facts: WorkingFactsV2,record_id,new_owner,*,supported_owner_ids):
 
 def delete_subject(facts: WorkingFactsV2,record_id,action_id,*,order=None):
     result=facts.model_copy(deep=True)
+    delete_subject_in_place(result,record_id,action_id,order=order)
+    return WorkingFactsV2.model_validate(result.model_dump(by_alias=True))
+
+
+def delete_subject_in_place(result,record_id,action_id,*,order=None):
+    """delete_subject on facts the caller copied and validates once after all its removals; the ids it removed."""
     current={r.id for r in result.records}|{r.id for r in result.extensions if r.active}
     if record_id not in current: raise ValueError('fact deletion target missing')
     removed={record_id}
@@ -138,4 +144,4 @@ def delete_subject(facts: WorkingFactsV2,record_id,action_id,*,order=None):
             updated=relation.model_copy(deep=True);updated.active=False;updated.revision+=1
             replace_effective_relation(result,updated)
     result.revision+=1
-    return WorkingFactsV2.model_validate(result.model_dump(by_alias=True))
+    return removed

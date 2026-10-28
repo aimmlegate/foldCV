@@ -9,7 +9,7 @@ from .models.template_mutations import (PutExtension, RemoveExtension, PutRelati
     PutManualScope, SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors, RestoreAuthoredBlockPatch,
     SetManualScopeDisplays, TemplateMutationV1, PutTemplateSync, RemoveTemplateSync)
 from .rich_fact_mutations import apply_record_mutations
-from .template_facts import delete_subject
+from .template_facts import delete_subject_in_place
 
 
 FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope)
@@ -191,7 +191,8 @@ def apply_fact_steps(original, request, replay=False):
     order = {record.id: index for index, record in enumerate([*original.records, *original.extensions])}
     for step in steps:
         if isinstance(step, (RemoveRecord, RemoveExtension)):
-            result = delete_subject(result, step.record_id, request.action_id, order=order)
+            # One copy and one validation below for all removals; clearing a list sends one step per record.
+            delete_subject_in_place(result, step.record_id, request.action_id, order=order)
     builtin_steps = [step for step in steps if isinstance(step, PutRecord)]
     if builtin_steps:
         base = WorkingFacts(revision=result.revision, records=result.records, tombstones=result.tombstones,

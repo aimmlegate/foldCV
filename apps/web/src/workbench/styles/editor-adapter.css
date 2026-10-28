@@ -49,7 +49,8 @@
 .uir-prototype .bn-block-content.cv-focus { display: flex; }
 .focus-years { margin-bottom: 12px; }
 .focus-years-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 24px 24px; align-items: center; gap: 8px; padding: 5px 0; }
-.focus-years-row label { overflow-wrap: anywhere; }
+.focus-years-row > button.focus-name { justify-content: flex-start; width: auto; height: auto; min-height: 24px; padding: 2px 4px;
+  color: var(--ink); text-align: left; overflow-wrap: anywhere; }
 .focus-years-row input { width: 100%; min-width: 0; padding: 5px; }
 .focus-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .focus-add select { min-width: 0; flex: 1; padding: 6px; }

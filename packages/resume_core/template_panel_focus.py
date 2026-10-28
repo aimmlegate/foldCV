@@ -1,12 +1,12 @@
-"""Focus rows from the facts panel: add, remove and move a technology's row, and show its stated experience (D113).
+"""Focus rows from the facts panel (D113): membership and order change only the document; years are the technology's
+stated experience, edited with the record, and its Focus line."""
 
-Facts stay as they are: membership and order change only the document; the stated experience is the technology's own
-field, edited with the record, and its Focus line."""
-
-from .models.template_document import FieldOccurrence, TemplateHeadingBlock, TemplateParagraphBlock, TemplateSectionBlock
+from .models.rich_document import FactFieldSpan
+from .models.template_document import BoundLink, TemplateParagraphBlock, TemplateSectionBlock
 from .rich_dependencies import placements
-from .rich_fields import field_key, working_field
+from .rich_fields import inline_groups, working_field
 from .template_panel_creation import _mapping
+from .template_preparation_panel import drop_empty_titles, field_occurrence, restore_view, sibling_lists, view_title
 from .templates.focus import focus_durations
 from .templates.materialize_nodes import fallback_style, literal, locale_text, reference
 from .templates.projection import pointer_tokens
@@ -34,20 +34,11 @@ def focus_view(package):
     return found[0]
 
 
-def _parent_lists(document):
-    def visit(items):
-        yield items
-        for block in items:
-            yield from visit(block.children)
-    for region in document.regions:
-        yield from visit(region.blocks)
-
-
 def focus_rows(document, view_id, records):
     """(sibling list, section) of each Focus row in document order; a row is an item section of the view whose record
     is a technology."""
     rows = []
-    for items in _parent_lists(document):
+    for items in sibling_lists(document):
         for block in items:
             if (isinstance(block, TemplateSectionBlock) and block.presentation is not None
                     and block.presentation.view_key == view_id and block.props.record_id in records):
@@ -55,21 +46,29 @@ def focus_rows(document, view_id, records):
     return rows
 
 
-def _heading(document, view_id):
-    for items in _parent_lists(document):
-        for block in items:
-            if block.type == 'heading' and block.presentation is not None and block.presentation.view_key == view_id \
-                    and block.presentation.node_index is None:
-                return items, block
-    return None
-
-
-def _occurrence(allocator, record, key, ref, slot):
-    value = working_field(record, key)
-    root = allocator.allocate('occurrence', ['panel-focus-occurrence', record.id, key, slot])
-    return FieldOccurrence(type='fact_field', bindingId=allocator.allocate('fragment', ['panel-focus-fragment', root]),
-        bindingRootId=root, recordId=record.id, fieldKey=key, cellId=field_key(record.id, key), occurrenceId=root,
-        complete=True, presentation=ref, text=value.raw_text, styles={}, syncedFactRevision=value.revision)
+def focus_only(project):
+    """Records only Focus rows show: Focus manages them and the panel's technology lists leave them out. None when the
+    panel cannot change Focus rows."""
+    try:
+        view = focus_view(project.template_package)[0]
+    except ValueError:
+        return None
+    technologies = {record.id for record in project.facts.records if record.kind == 'technology'}
+    rows = focus_rows(project.document, view.id, technologies)
+    skipped, shown = {section.id for _items, section in rows}, set()
+    def visit(blocks):
+        for block in blocks:
+            if block.id in skipped:
+                continue
+            for _container, content in inline_groups(block):
+                for span in content:
+                    for part in span.content if isinstance(span, BoundLink) else [span]:
+                        if isinstance(part, FactFieldSpan) and part.field_key == 'display':
+                            shown.add(part.record_id)
+            visit(block.children)
+    for region in project.document.regions:
+        visit(region.blocks)
+    return frozenset(section.props.record_id for _items, section in rows) - shown
 
 
 def _detail_content(package, view, index, instance, record, experience_key, computed, allocator, slot):
@@ -78,7 +77,7 @@ def _detail_content(package, view, index, instance, record, experience_key, comp
     ref = reference(package, view.id, node.detail_style or node.style, instance, node_index=index)
     stated = working_field(record, experience_key) if experience_key else None
     if stated is not None and stated.raw_text.strip():
-        return ref, [_occurrence(allocator, record, experience_key, ref, slot)]
+        return ref, [field_occurrence(allocator, 'focus', record, experience_key, ref, experience_key, slot)]
     return (ref, [literal(computed, ref)]) if computed else (ref, None)
 
 
@@ -97,18 +96,22 @@ def _add(workspace, candidate, command, allocator, technologies):
     if any(section.props.record_id == record.id for _items, section in rows):
         raise ValueError('FOCUS_DUPLICATE')
     node = view.view.nodes[index]
+    locale = package.definition.template.default_locale
     instance = allocator.allocate('template-instance', ['panel-focus-instance', record.id])
     name_ref = reference(package, view.id, node.style, instance, node_index=index)
-    children = [TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', ['panel-focus-name', record.id]),
-        revision=1, props={}, children=[], provenance=[], presentation=name_ref,
-        content=[_occurrence(allocator, record, name_key, name_ref, 'name')])]
+    def paragraph(slot, ref, content):
+        return TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', [slot, record.id]), revision=1,
+            props={}, children=[], provenance=[], presentation=ref, content=content)
+    # As the import writes a row: an optional label, the name with its prefix, then the experience line.
+    label, prefix = locale_text(node.label, locale), locale_text(node.prefix, locale)
+    children = [paragraph('panel-focus-label', name_ref, [literal(label, name_ref)])] if label else []
+    children.append(paragraph('panel-focus-name', name_ref, [*([literal(prefix, name_ref)] if prefix else []),
+        field_occurrence(allocator, 'focus', record, name_key, name_ref, name_key, 'name')]))
     as_of = workspace.formatting_as_of
-    computed = focus_durations(candidate.facts, as_of, package.definition.template.default_locale).get(record.id) \
-        if as_of is not None else None
+    computed = focus_durations(candidate.facts, as_of, locale).get(record.id) if as_of is not None else None
     detail_ref, detail = _detail_content(package, view, index, instance, record, experience_key, computed, allocator, 'detail')
     if detail:
-        children.append(TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', ['panel-focus-detail', record.id]),
-            revision=1, props={}, children=[], provenance=[], presentation=detail_ref, content=detail))
+        children.append(paragraph('panel-focus-detail', detail_ref, detail))
     section = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-focus-section', record.id]),
         revision=1, props={'recordId': record.id}, content=[], children=children, provenance=[],
         presentation=reference(package, view.id, fallback_style(view), instance))
@@ -116,69 +119,52 @@ def _add(workspace, candidate, command, allocator, technologies):
         items, last = rows[-1]
         items.insert(items.index(last) + 1, section)
         return
-    heading = _heading(candidate.document, view.id)
-    if heading is None:
-        # The last row's removal took the heading along; it comes back with the first row.
-        title = locale_text(view.view.title, package.definition.template.default_locale)
-        regions = [region for region in candidate.document.regions if region.role == view.placement.region]
-        if len(regions) != 1:
-            raise ValueError('FOCUS_VIEW_MISSING')
-        items = regions[0].blocks
-        blocks = [section]
-        if view.view.heading != 'none' and title:
-            ref = reference(package, view.id, package.recipe.style.section_band.heading_style,
-                allocator.allocate('template-instance', ['panel-focus-heading-instance', view.id]))
-            blocks.insert(0, TemplateHeadingBlock(type='heading', id=allocator.allocate('block', ['panel-focus-heading', view.id]),
-                revision=1, props={'level': 1}, content=[literal(title, ref)], children=[], provenance=[], presentation=ref))
-        # Placed before the first block of a later view in the same region, as the import orders views.
-        later = {value.id for value in package.definition.blocks if value.placement.region == view.placement.region
-            and value.placement.order > view.placement.order}
-        position = next((at for at, block in enumerate(items)
-            if block.presentation is not None and block.presentation.view_key in later), len(items))
-        items[position:position] = blocks
-        return
-    items, block = heading
-    items.insert(items.index(block) + 1, section)
+    title = next(((items, block) for items in sibling_lists(candidate.document) for block in items if view_title(block, view.id)), None)
+    if title is not None:
+        items, block = title
+        items.insert(items.index(block) + 1, section)
+    # The last row's removal took the title along; it comes back with the first row.
+    elif not restore_view(candidate.document, package, view, [section], allocator, 'focus'):
+        raise ValueError('FOCUS_VIEW_MISSING')
 
 
 def _remove(candidate, command, technologies):
     view = focus_view(candidate.template_package)[0]
-    rows = focus_rows(candidate.document, view.id, technologies)
-    removed = [(items, section) for items, section in rows if section.props.record_id == command.record_id]
+    removed = [(items, section) for items, section in focus_rows(candidate.document, view.id, technologies)
+        if section.props.record_id == command.record_id]
     if not removed:
         raise ValueError('FOCUS_SCOPE_INVALID')
     for items, section in removed:
         items.remove(section)
-    if len(removed) == len(rows):
-        heading = _heading(candidate.document, view.id)
-        if heading is not None:
-            heading[0].remove(heading[1])
+    # The title goes with the last row unless the view still shows other lines, such as source text.
+    drop_empty_titles(candidate.document, {view.id})
 
 
 def _move(candidate, command, technologies):
+    """The moved row; None when the order stays as it is."""
     view = focus_view(candidate.template_package)[0]
     rows = focus_rows(candidate.document, view.id, technologies)
     moving = next(((items, section) for items, section in rows if section.props.record_id == command.record_id), None)
     target = next(((items, section) for items, section in rows if section.props.record_id == command.before_record_id), None)
     if moving is None or command.before_record_id is not None and target is None:
         raise ValueError('TECHNOLOGY_MOVE_INVALID')
-    if command.before_record_id == command.record_id:
-        return False
     items, section = moving
+    others = [value for _items, value in rows if value is not section]
+    if command.before_record_id == command.record_id or not others:
+        return None
     if (target[0] if target is not None else rows[-1][0]) is not items:
         raise ValueError('TECHNOLOGY_MOVE_INVALID')
     before = [value.id for value in items]
-    others = [value for _items, value in rows if value is not section]
     items.remove(section)
-    at = items.index(target[1]) if target is not None else items.index(others[-1]) + 1 if others else len(items)
-    items.insert(at, section)
-    return [value.id for value in items] != before
+    items.insert(items.index(target[1]) if target is not None else items.index(others[-1]) + 1, section)
+    return section if [value.id for value in items] != before else None
 
 
 def experience_text(package, text):
     """The panel's years field: a bare number is whole years, written as the template's language writes them."""
     text = text.strip()
-    return whole_years_text(int(text), package.definition.template.default_locale == 'ru') if text.isdigit() else text
+    return whole_years_text(int(text), package.definition.template.default_locale == 'ru') \
+        if text.isascii() and text.isdigit() else text
 
 
 def show_experience(candidate, updated, allocator):
@@ -195,13 +181,15 @@ def show_experience(candidate, updated, allocator):
     for _items, section in focus_rows(candidate.document, view.id, technologies):
         if section.props.record_id != updated.id:
             continue
-        names = [block for block in section.children if _is_name(block, updated.id, name_key)]
-        details = [block for block in section.children if block not in names]
-        instance = (names[0] if names else section).presentation.template_instance_id
+        # The name and a label before it stay; the experience line follows the name.
+        name = next((at for at, block in enumerate(section.children) if _is_name(block, updated.id, name_key)), None)
+        lead = section.children[:name + 1] if name is not None else []
+        details = section.children[len(lead):]
+        instance = (lead[-1] if lead else section).presentation.template_instance_id
         ref, content = _detail_content(package, view, index, instance, updated, experience_key, None, allocator,
             ['detail', section.id])
         kept = details[0] if details else None
-        section.children = names
+        section.children = lead
         if content:
             if kept is None:
                 kept = TemplateParagraphBlock(type='paragraph',
@@ -223,11 +211,10 @@ def prepare_focus(workspace, command, allocator):
     elif command.operation == 'remove_from_focus':
         _remove(candidate, command, technologies)
     elif command.operation == 'move_focus':
-        if not _move(candidate, command, technologies):
+        section = _move(candidate, command, technologies)
+        if section is None:
             return None
         # A changed order is no block change: the move is its own step.
-        section = next(block for block in candidate.document.blocks() if block.type == 'section'
-            and block.props.record_id == command.record_id)
         parent, previous, _owner = placements(candidate.document)[section.id]
         steps.append({'kind': 'move_block', 'blockId': section.id, 'beforeRevision': section.revision,
             'parentId': parent, 'afterId': previous})

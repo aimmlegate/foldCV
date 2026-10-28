@@ -91,6 +91,17 @@ def test_a_stale_dependency_stamp_or_snapshot_is_refused_without_a_change(app):
     assert editor.call('get', '')['workspace']['projectRevision'] == 1
 
 
+def test_a_panel_refusal_keeps_its_code_and_changes_nothing(app):
+    client, _application = app
+    editor = Editor(client, PROJECT)
+    value, workspace = typing(editor, 'x', 'panel-1'), editor.workspace()
+    value['operations'] = [{'opId': 'panel', 'kind': 'builtin_panel', 'command': {'operation': 'add', 'recordKind': 'language',
+        'recordId': None, 'jobId': None, 'periodId': None, 'values': {'language': 'French'}, 'capture': value['capture'],
+        'factsRevision': workspace.project.facts.revision, 'documentRevision': workspace.document_revision}}]
+    assert editor.edit(value, status=422)['error']['code'] == 'PANEL_ACTION_UNSUPPORTED'
+    assert editor.call('get', '')['workspace']['projectRevision'] == 1
+
+
 def test_a_split_reports_its_created_block(app):
     client, _application = app
     editor = Editor(client, PROJECT)

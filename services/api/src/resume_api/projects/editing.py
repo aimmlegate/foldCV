@@ -6,6 +6,7 @@ from packages.resume_core.models.projects import EditResultV1, digest_request
 from packages.resume_core.models.template_authoring import PasteBlocks, PasteInline
 from packages.resume_core.rich_mutations import RichMutationFailure
 from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.template_preparation_panel import PANEL_REFUSALS
 
 from .clipboard import for_paste
 from .errors import ProjectFailure
@@ -51,8 +52,10 @@ def _edit_locked(service, project_id, request, session):
             clipboard = for_paste(session, committed, operation.source.clipboard_capture_id)
         try:
             prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids)
-        except (ValueError, RichMutationFailure):
-            raise ProjectFailure('V7_INPUT_REJECTED', 422) from None
+        except (ValueError, RichMutationFailure) as error:
+            # A panel refusal keeps its code, so the panel can say why; other input is rejected as a whole.
+            code = str(error) if isinstance(error, ValueError) and str(error) in PANEL_REFUSALS else 'V7_INPUT_REJECTED'
+            raise ProjectFailure(code, 422) from None
         if prepared.mutation is None:
             return None
         after = prepared.preview.workspace

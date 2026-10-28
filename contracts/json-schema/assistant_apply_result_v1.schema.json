@@ -2777,6 +2777,54 @@
       "title": "EditorFocus",
       "type": "object"
     },
+    "EditorFocusPanel": {
+      "additionalProperties": false,
+      "description": "The facts panel can add, remove and move Focus rows and set their years.",
+      "properties": {
+        "records": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Records",
+          "type": "array"
+        }
+      },
+      "required": [
+        "records"
+      ],
+      "title": "EditorFocusPanel",
+      "type": "object"
+    },
+    "EditorPlacement": {
+      "additionalProperties": false,
+      "description": "A block's parent block or region and the sibling before it, as a panel placement context names them.",
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parentId",
+        "afterId"
+      ],
+      "title": "EditorPlacement",
+      "type": "object"
+    },
     "EditorPlanV1": {
       "additionalProperties": false,
       "description": "Python's presentation decisions for the mounted editor; the editor only applies them.",
@@ -2787,6 +2835,17 @@
           },
           "title": "Blocks",
           "type": "object"
+        },
+        "focusPanel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EditorFocusPanel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "fonts": {
           "items": {
@@ -2887,7 +2946,7 @@
     },
     "EditorTechnologyTarget": {
       "additionalProperties": false,
-      "description": "A tags line of one scope, or a job section that has none yet, where the facts panel adds a technology.",
+      "description": "Where the facts panel adds a technology: a line of one scope, a job section that has none yet, or a group view\nthe document no longer shows (block id view:<view id>).",
       "properties": {
         "blockId": {
           "minLength": 1,
@@ -2909,12 +2968,16 @@
         "label": {
           "title": "Label",
           "type": "string"
+        },
+        "placement": {
+          "$ref": "#/$defs/EditorPlacement"
         }
       },
       "required": [
         "blockId",
         "jobId",
-        "label"
+        "label",
+        "placement"
       ],
       "title": "EditorTechnologyTarget",
       "type": "object"

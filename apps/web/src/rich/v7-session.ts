@@ -14,7 +14,7 @@ import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
   itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
-import { blockPlacement, panelCommandsV7, type PanelCommand } from "./v7-panel";
+import { panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { changedBy, selectedTextBlocks, shownSelection, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
@@ -35,6 +35,7 @@ const projectionMeta = "foldcv.v7.projection";
 // Marks a copy from this editor; the token finds the session's own server capture, never wording.
 export const clipboardType = "application/x-foldcv-v7-copy";
 type Captured = { id: string; kind: ClipboardSource["kind"] };
+type CommandItem = { operation: V7Operation; prior: ReadonlyMap<string, string> };
 type Copied = { token: string; text: string; capture: Promise<Captured | null> };
 /** A generated replacement for one selected range, shown before anything changes. */
 export type TemplateRewrite = { requestId: string; instruction: string; container: LocalContainer; start: number; end: number;
@@ -70,6 +71,8 @@ export class TemplateEditorSession {
   // Settles when the undo or redo in flight has been adopted or given up.
   private navigation: Promise<void> = Promise.resolve();
   private panelBusy = false;
+  // A refusal of a facts-panel command is shown by the panel, not as an editor notice.
+  private factsCommand = false;
   // A block style waits for Python's result; a second one before it would be expressed on a stale revision.
   private formatting = false;
   private closed = false;
@@ -210,20 +213,27 @@ export class TemplateEditorSession {
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     const commands = panelCommandsV7(command, this.recordKinds());
     // The panel offers only what Python saves, so this is a stale or foreign command; the panel shows the refusal.
-    if (!commands) { console.warn(`V7 panel ${command.operation} refused`); throw new Error("PANEL_ACTION_UNSUPPORTED"); }
-    const document = this.queue.template.durable.workspace.project?.document;
-    const placement = command.lineBlockId && document ? blockPlacement(document, command.lineBlockId) : null;
-    if (command.lineBlockId && !placement) throw new Error("TECHNOLOGY_LINE_MISSING");
-    const context = command.lineBlockId && placement ? { placementContext: { contextBlockId: command.lineBlockId, placement } } : {};
-    await this.command(commands.map(value => ({ operation: { kind: "builtin_panel", command: value, ...context }, prior: new Map() })), "panel");
+    if (!commands) { console.warn(`V7 panel ${command.operation} refused`); throw new ProjectApiFailure("PANEL_ACTION_UNSUPPORTED", 422); }
+    this.factsCommand = true;
+    try {
+      // The line is read from the plan of the state the command is issued against, after typing drained.
+      await this.command(() => {
+        const target = command.lineBlockId === undefined ? undefined
+          : this.queue.template.durable.presentation?.editor?.technologyTargets?.find(value => value.blockId === command.lineBlockId);
+        if (command.lineBlockId !== undefined && !target) throw new ProjectApiFailure("TECHNOLOGY_LINE_MISSING", 422);
+        const context = target ? { placementContext: { contextBlockId: target.blockId, placement: target.placement } } : {};
+        return commands.map(value => ({ operation: { kind: "builtin_panel", command: value, ...context }, prior: new Map() }));
+      }, "panel");
+    } finally { this.factsCommand = false; }
   }
 
   /** One server-first action: typing drains, input locks, and Python's verified result is shown before input continues. */
-  private async command(items: { operation: V7Operation; prior: ReadonlyMap<string, string> }[], kind: HistoryKind): Promise<void> {
+  private async command(items: CommandItem[] | (() => CommandItem[]), kind: HistoryKind): Promise<void> {
     // An undo or redo in flight moves the revision; the command is expressed on the state it leaves.
     await this.navigation;
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();
+    const operations = typeof items === "function" ? items() : items;
     // Locking turns the contenteditable read-only and drops its focus; an editor command gives it back.
     const focused = this.editor.isFocused();
     this.panelBusy = true;
@@ -234,7 +244,7 @@ export class TemplateEditorSession {
       if (!id) throw new Error("WRITER_INPUT_BLOCKED");
       const token = this.history.capture(id, [])?.actionToken ?? 0;
       this.tokens.set(id, token);
-      for (const item of items) {
+      for (const item of operations) {
         const localId = `intent-${crypto.randomUUID()}`;
         this.serverFirst.add(localId);
         this.queue.template.enqueue({ localId, operation: item.operation, prior: item.prior }, id, token);
@@ -244,9 +254,11 @@ export class TemplateEditorSession {
       try { await this.queue.flush(); this.port.status("Сохранено"); }
       catch (error) {
         // Typing drained first, so only this command is pending; a definitive answer drops it and input continues.
-        const state = this.queue.template.state.kind;
-        if (state === "rejected" || state === "conflict") this.queue.template.discardUnsaved();
+        const state = this.queue.template.state;
+        if (state.kind === "rejected" || state.kind === "conflict") this.queue.template.discardUnsaved();
         this.retryLater();
+        // A refusal keeps its public code, so the caller can say why.
+        if (state.kind === "rejected" && knownErrorMessage(state.reason)) throw new ProjectApiFailure(state.reason, 422);
         throw error;
       }
       await this.reproject();
@@ -623,7 +635,7 @@ export class TemplateEditorSession {
 
   private queueChanged(state: TemplateQueueState): void {
     if (state.kind === "conflict") this.port.warning(errorMessage("V7_INPUT_CONFLICT"));
-    else if (state.kind === "rejected") this.port.warning(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
+    else if (state.kind === "rejected" && !this.factsCommand) this.port.warning(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
     else if (state.kind === "replaced") { this.setMode("read_only"); this.port.warning(errorMessage("EDITOR_REPLACED")); }
   }
 

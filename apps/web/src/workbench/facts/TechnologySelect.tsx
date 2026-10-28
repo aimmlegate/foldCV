@@ -10,19 +10,21 @@ import { Spinner } from "../ui/OperationStatus";
 import { documentTechnologies } from "../../rich/technology-order";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
-export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId, targets }: {
+export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId, targets, excluded }: {
   facts: WorkingFacts; document: OrderDocument; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
   focusRecordId?: string | undefined;
   /** The lines Python can add to; with several, the user picks the group. */
   targets: readonly TechnologyTarget[];
+  /** Records only Focus rows show; Focus manages them, so the list leaves them out. */
+  excluded?: ReadonlySet<string> | undefined;
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false), [group, setGroup] = useState("");
+  const [expanded, setExpanded] = useState(false), [group, setGroup] = useState(""), [refocus, setRefocus] = useState(false);
   const line = targets.some(target => target.blockId === group) ? group : targets[0]?.blockId;
-  const records = documentTechnologies(facts, resumeDocument, jobId);
+  const records = documentTechnologies(facts, resumeDocument, jobId).filter(record => !excluded?.has(record.id));
   const focused = records.some(record => record.id === focusRecordId);
   useEffect(() => { if (focused) setExpanded(true); }, [focused]);
   const editedRecord = records.find(record => record.id === editing);
@@ -46,11 +48,13 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false); };
     document.addEventListener("pointerdown", outside); return () => document.removeEventListener("pointerdown", outside);
   }, []);
+  // The field is disabled while a command saves; the next technology is typed into it again afterwards.
+  useEffect(() => { if (refocus && !paused) { setRefocus(false); input.current?.focus(); } }, [refocus, paused]);
   const apply = (command: PanelCommand) => { void submit(command).catch(() => {}); };
   function choose(name: string) {
     if (paused || !line) return;
     apply({ operation: "add", recordKind: "technology", jobId, values: { display: name }, lineBlockId: line });
-    setQuery(""); setActive(0); setExpanded(true); setOpen(true); input.current?.focus();
+    setQuery(""); setActive(0); setExpanded(true); setOpen(true); setRefocus(true);
   }
   return <div className="technology-select" data-technology-scope={jobId ?? ""} ref={root}>
     <span className="technology-label">{jobId ? "Технологии" : "Все технологии"}</span>
@@ -102,7 +106,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         : <span className="technology-no-results">Ничего не найдено</span>}
       {available.length > 60 && <span className="technology-no-results">Показаны не все. Уточните запрос.</span>}
     </div></>}
-    {open && (records.length > 0 || adding.length > 0) && <button type="button" className="text-button" aria-label={`Убрать все технологии: ${label}`} disabled={paused}
+    {(open || !targets.length) && (records.length > 0 || adding.length > 0) && <button type="button" className="text-button" aria-label={`Убрать все технологии: ${label}`} disabled={paused}
       onClick={() => { apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}>Убрать все технологии</button>}
     {editedRecord && <FactDialog target={{ kind: "technology", record: editedRecord }} close={() => { setEditing(null); }} submit={submit} />}
   </div>;

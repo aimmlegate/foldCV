@@ -32,6 +32,7 @@ export type Blocks2 = [string, ...string[]];
 export type Icon = string | null;
 export type Links = string[];
 export type Style = string;
+export type Records = string[];
 export type Fonts = string[];
 export type Icons = string[];
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
@@ -45,6 +46,8 @@ export type Size1 = number;
 export type Blockid = string;
 export type Jobid = string | null;
 export type Label = string;
+export type Afterid = string | null;
+export type Parentid = string;
 export type Technologytargets = EditorTechnologyTarget[];
 export type Capabilities = string[];
 export type AllowMorePages = true;
@@ -356,7 +359,7 @@ export type Origin12 = "source" | "user";
 export type Revision20 = number;
 export type Status7 = "unresolved" | "pending" | "conflict";
 export type Usercorrected17 = boolean;
-export type Records = (
+export type Records1 = (
   | CandidateRecord
   | DetailRecord
   | EmploymentRecord
@@ -1416,7 +1419,7 @@ export type Relationid2 = string | null;
  * @maxItems 1000
  */
 export type Remainingoccurrenceids = [string, ...string[]];
-export type Afterid = string | null;
+export type Afterid1 = string | null;
 export type Beforerevision = number | null;
 export type Block1 =
   | TemplateParagraphBlock
@@ -1433,15 +1436,15 @@ export type Block1 =
   | TemplateSectionBlock;
 export type Keepchildren = boolean;
 export type Kind46 = "put_block";
-export type Parentid = string;
+export type Parentid1 = string;
 export type Beforerevision1 = number;
 export type Blockid2 = string;
 export type Kind47 = "remove_block";
-export type Afterid1 = string | null;
+export type Afterid2 = string | null;
 export type Beforerevision2 = number;
 export type Blockid3 = string;
 export type Kind48 = "move_block";
-export type Parentid1 = string;
+export type Parentid2 = string;
 export type Beforerevision3 = number;
 export type Blockid4 = string;
 export type Cellid3 = string | null;
@@ -1635,7 +1638,7 @@ export type Fieldkeys2 = string[];
 export type Id78 = string;
 export type Instruction1 = string | null;
 export type Kind73 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
-export type Afterid2 = string | null;
+export type Afterid3 = string | null;
 export type Beforerevision11 = number | null;
 export type Block2 =
   | ParagraphBlock
@@ -1916,7 +1919,7 @@ export type Revision58 = number;
 export type Type32 = "paragraph";
 export type Keepchildren1 = boolean;
 export type Kind74 = "put_block";
-export type Parentid2 = string;
+export type Parentid3 = string;
 export type Beforerevision12 = number;
 export type Blockid9 = string;
 export type Cellid8 = string | null;
@@ -2043,6 +2046,7 @@ export interface StyleOverrides {
  */
 export interface EditorPlanV1 {
   blocks: Blocks1;
+  focusPanel?: EditorFocusPanel | null;
   fonts: Fonts;
   iconFiles?: Iconfiles;
   icons: Icons;
@@ -2070,6 +2074,12 @@ export interface EditorFocus {
 export interface Inline {
   [k: string]: string;
 }
+/**
+ * The facts panel can add, remove and move Focus rows and set their years.
+ */
+export interface EditorFocusPanel {
+  records: Records;
+}
 export interface Iconfiles {
   [k: string]: string;
 }
@@ -2090,12 +2100,21 @@ export interface EditorFaces {
   regular: Regular;
 }
 /**
- * A tags line of one scope, or a job section that has none yet, where the facts panel adds a technology.
+ * Where the facts panel adds a technology: a line of one scope, a job section that has none yet, or a group view
+ * the document no longer shows (block id view:<view id>).
  */
 export interface EditorTechnologyTarget {
   blockId: Blockid;
   jobId: Jobid;
   label: Label;
+  placement: EditorPlacement;
+}
+/**
+ * A block's parent block or region and the sibling before it, as a panel placement context names them.
+ */
+export interface EditorPlacement {
+  afterId: Afterid;
+  parentId: Parentid;
 }
 export interface CompiledRecipe {
   capabilities: Capabilities;
@@ -2309,7 +2328,7 @@ export interface WorkingFactsV2 {
   manualScopes: Manualscopes;
   mode?: Mode1;
   observations: Observations;
-  records: Records;
+  records: Records1;
   relations: Relations1;
   revision: Revision21;
   schemaVersion: Schemaversion4;
@@ -3866,12 +3885,12 @@ export interface TemplateOwnershipConflict {
   remainingOccurrenceIds: Remainingoccurrenceids;
 }
 export interface TemplatePutBlock {
-  afterId: Afterid;
+  afterId: Afterid1;
   beforeRevision: Beforerevision;
   block: Block1;
   keepChildren?: Keepchildren;
   kind: Kind46;
-  parentId: Parentid;
+  parentId: Parentid1;
 }
 export interface RemoveBlock {
   beforeRevision: Beforerevision1;
@@ -3879,11 +3898,11 @@ export interface RemoveBlock {
   kind: Kind47;
 }
 export interface MoveBlock {
-  afterId: Afterid1;
+  afterId: Afterid2;
   beforeRevision: Beforerevision2;
   blockId: Blockid3;
   kind: Kind48;
-  parentId: Parentid1;
+  parentId: Parentid2;
 }
 export interface TemplateReplaceInlineRange {
   beforeRevision: Beforerevision3;
@@ -4085,12 +4104,12 @@ export interface RichSyncRecord {
   status: Status10;
 }
 export interface PutBlock {
-  afterId: Afterid2;
+  afterId: Afterid3;
   beforeRevision: Beforerevision11;
   block: Block2;
   keepChildren?: Keepchildren1;
   kind: Kind74;
-  parentId: Parentid2;
+  parentId: Parentid3;
 }
 export interface ParagraphBlock {
   children: Children14;

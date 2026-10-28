@@ -3,7 +3,7 @@ import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import type { ProjectEditorConnection } from "./v7-connection";
+import { ProjectApiFailure, type ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
 import type { AssistantFinding, AssistantSelection } from "../assistant/controller";
@@ -199,11 +199,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     catch (error) { setWarning(errorMessage(error)); }
   }
   async function submitPanel(value: PanelCommand) {
-    setPanelPending([value]);
+    setPanelPending(list => [...list, value]);
     try { await session.panel(value); }
-    // The facts panel shows its own refusal; other errors also reach the editor notices.
-    catch (error) { if (!(error instanceof Error && error.message === "PANEL_ACTION_UNSUPPORTED")) setWarning(errorMessage(error)); throw error; }
-    finally { setPanelPending([]); }
+    // The facts panel shows a refusal itself; other errors also reach the editor notices.
+    catch (error) { if (!(error instanceof ProjectApiFailure && error.status === 422)) setWarning(errorMessage(error)); throw error; }
+    finally { setPanelPending(list => list.filter(item => item !== value)); }
   }
   const facts = shown.workspace.project?.facts ?? project.facts, documentShown = shown.workspace.project?.document ?? project.document;
   const sources = (shown.workspace.project?.sources ?? project.sources).map(source => ({
@@ -216,7 +216,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
   // Selection changes re-render the editor; the outline is read again only when the shown state or the check changes.
   const focus = useMemo(() => shown.workspace.project ? focusFacts(shown.workspace.project, shown.presentation)
-    : { entries: [], options: [] }, [shown]);
+    : { entries: [], options: [], only: new Set<string>() }, [shown]);
   const remarks = useMemo(() => placeRemarks(documentShown, [...importRemarks(shown.workspace.project?.importIssues ?? []),
     ...checked ? checkRemarks(checked) : []]), [documentShown, shown, checked]);
   const check: CheckState = checkState.kind !== "idle" ? checkState : checked ? { kind: "done", count: checkCount(checked),
@@ -256,7 +256,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-            focusEntries={focus.entries} focusOptions={focus.options} technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
+            focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only}
+            technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
             hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
             remarks={remarks} showBlock={blockId => { showBlock(blockId); }} check={{ state: check, run: () => void runCheck() }} />
         </fieldset>

@@ -100,8 +100,8 @@ def style_entry(package, fonts, ref):
 
 
 def editor_plan(project):
-    """Per block: its style, band, Focus icon and technology chips, and which bound links export as hyperlinks; and the
-    places the facts panel can add a technology."""
+    """Per block: its style, band, Focus icon and technology chips, and which bound links export as hyperlinks; the
+    places the facts panel can add a technology and whether it can change Focus rows."""
     package = project.template_package
     recipe = package.recipe
     fonts, styles, cached = resolver(package)
@@ -165,8 +165,12 @@ def editor_plan(project):
         'blocks': blocks, 'fonts': sorted(face for face in used if face is not None), 'icons': icons}
     if files:
         plan['iconFiles'] = files
+    from ..template_panel_focus import focus_only
     from ..template_panel_records import technology_targets
-    targets = [{'blockId': value.block_id, 'jobId': value.job_id, 'label': value.label} for value in technology_targets(project)]
+    targets = [value.model_dump(mode='json', by_alias=True) for value in technology_targets(project)]
     if targets:
         plan['technologyTargets'] = targets
+    only = focus_only(project)
+    if only is not None:
+        plan['focusPanel'] = {'records': sorted(only)}
     return plan

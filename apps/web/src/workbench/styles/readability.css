@@ -8,7 +8,7 @@
 .modal :is(label, .dialog-copy, .dialog-subtitle, .export-summary, .export-format small) { color: var(--muted); font-size: var(--ui-small); }
 .app-shell .source-form .source-note { font-size: var(--ui-small) !important; }
 .app-shell :is(.tool, .toolbar-select, .text-button, .new-button, .history-open, .history-footer button, .fact-add, .fact-group summary, .technology-option, .technology-search, .technology-expand, .settings-nav button, .workspace-views button, .source-viewer-file, .source-pdf-controls) { color: var(--ink); font-size: var(--ui-body); }
-.app-shell :is(.technology-chip, .technology-chip .technology-edit, .focus-years-row label, .uir-timeline, .uir-timeline small, .uir-timeline button, .notice-trigger, .rewrite-status-trigger),
+.app-shell :is(.technology-chip, .technology-chip .technology-edit, .focus-years-row .focus-name, .uir-timeline, .uir-timeline small, .uir-timeline button, .notice-trigger, .rewrite-status-trigger),
 .notice-panel :is(p, h3, strong, button), .uir-rewrite :is(label, summary, button, textarea), [data-uir-engine-ui] .uir-selection-action { font-size: var(--ui-small); }
 .app-shell :is(.source-text, .rules-text), .uir-rewrite textarea, .source-text-preview .bn-editor { color: var(--ink); font-size: var(--ui-body); line-height: 1.65; }
 .app-shell :is(.dropzone strong, .fact-edit strong, .technology-chip, .technology-option, .technology-no-results, .settings-nav button.active, .settings-content h3),

@@ -1,15 +1,22 @@
 """Focus rows from the facts panel (D113): add, remove, move and stated years change only the document and the
 technology's experience; Undo restores both. Rows without an icon get the first-letter placeholder."""
 
+import base64
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
+from packages.resume_core.models.template_document import TemplateParagraphBlock
+from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation, semantic
+from packages.resume_core.template_panel_focus import experience_text
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import compile_bytes
+from packages.resume_core.templates.focus import initial_icon
+from packages.resume_core.templates.materialize_nodes import literal, reference
 from packages.resume_core.templates.presentation_plan import editor_plan
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import TEXT, employment_source, object_schema
@@ -21,19 +28,22 @@ from tests.templates.test_transactions import authorization
 FOCUS = [('Python', '10 months'), ('SQL', None), ('UnknownTool', '7 weeks')]
 
 
-def technology_package(missing_icon='initial'):
-    """The synthetic Focus view bound to the technology builtin, as the Generic template binds it."""
+def technology_package(missing_icon='initial', label=None):
+    """The synthetic Focus view bound to the technology builtin, as the Generic template binds it; a label shows before
+    each row's name."""
     config = view_package().definition.model_dump(mode='json', by_alias=True)
     focus = next(value for value in config['fact_types'] if value['id'] == 'focus')
     focus.update(builtin_kind='technology', schema=object_schema({'technology': TEXT, 'experience': TEXT}),
         builtin_fields={'technology': {'field': 'display', 'period': None}, 'experience': {'field': 'experience', 'period': None}})
     config['style']['focus']['missing_icon'] = missing_icon
+    if label is not None:
+        next(value for value in config['blocks'] if value['id'] == 'focus')['view']['nodes'][0]['label'] = label
     return compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
 
 
-async def imported(tmp_path, focus=FOCUS, missing_icon='initial'):
+async def imported(tmp_path, focus=FOCUS, missing_icon='initial', label=None):
     src, raw = employment_source('F06')
-    fixture = EmploymentFixture(tmp_path, captured=technology_package(missing_icon), src=src, original_bytes=raw,
+    fixture = EmploymentFixture(tmp_path, captured=technology_package(missing_icon, label), src=src, original_bytes=raw,
         scripted=scripted(src, focus, [{'name': 'Portfolio', 'url': 'https://example.org'}]), cap=8, fallback=False)
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.publication.state == 'saved'
@@ -172,3 +182,70 @@ async def test_a_text_only_package_keeps_rows_without_an_icon_as_text(tmp_path):
     before = await imported(tmp_path, missing_icon='text_only')
     icons = [entry['focus']['icon'] for entry in editor_plan(before.project)['blocks'].values() if entry.get('focus')]
     assert icons == ['python', None, None]
+
+
+def with_source_line(workspace):
+    """A Focus value the review sent to the source text: a plain line of the view after its rows, as an import shows it."""
+    package, region = workspace.project.template_package, workspace.project.document.regions[1]
+    ref = reference(package, 'focus', 'body', 'focus-fallback-instance')
+    region.blocks.append(TemplateParagraphBlock(type='paragraph', id='focus-fallback', revision=1, props={}, children=[],
+        provenance=[], presentation=ref, content=[literal('Python, PostgreSQL', ref)]))
+    return WorkspaceV7.model_validate(workspace.model_dump(by_alias=True))
+
+
+@pytest.mark.asyncio
+async def test_the_only_row_moved_to_the_end_stays_where_it_is(tmp_path):
+    before = with_source_line(await imported(tmp_path, focus=[('Python', '10 months')]))
+    assert prepare_edit(response(before), panel(before, 'move_focus', technology(before, 'Python').id)).mutation is None
+
+
+@pytest.mark.asyncio
+async def test_the_title_stays_while_focus_shows_a_source_line_and_a_new_row_goes_before_it(tmp_path):
+    before = with_source_line(await imported(tmp_path, focus=[('Python', '10 months')]))
+    python = technology(before, 'Python')
+    after, result = applied(before, panel(before, 'remove_from_focus', python.id))
+    assert rows(after) == [] and len(headings(after)) == 1
+    undone(before, after, result)
+    again, _ = applied(after, panel(after, 'add_to_focus', python.id, identifier='focus-add'))
+    shown = [block.type for block in again.project.document.regions[1].blocks]
+    assert shown == ['heading', 'section', 'paragraph'] and rows(again) == [('Python', ['10 months'])]
+
+
+@pytest.mark.asyncio
+async def test_deleting_the_record_of_the_last_row_takes_the_title(tmp_path):
+    before = await imported(tmp_path, focus=[('Python', '10 months')])
+    python = technology(before, 'Python')
+    capture = {'sessionId': 'session', 'actionId': 'focus-delete', 'actionToken': 1, 'dependencies': []}
+    after, result = applied(before, TemplateEditPreparationV1(schemaVersion=1, clientMutationId='focus-delete',
+        snapshot=response(before).snapshot, capture=capture, operations=[{'kind': 'delete_entity', 'opId': 'delete',
+            'recordId': python.id, 'beforeRevision': python.revision}]))
+    assert rows(after) == [] and headings(after) == []
+    undone(before, after, result)
+
+
+@pytest.mark.asyncio
+async def test_a_row_label_stays_through_a_years_edit_and_comes_with_an_added_row(tmp_path):
+    before = await imported(tmp_path, focus=[('Python', '10 months')], label={'en': 'Main:'})
+    python = technology(before, 'Python')
+    assert rows(before) == [('Main:', ['Python', '10 months'])]
+    after, result = applied(before, panel(before, 'edit', python.id, values={'experience': '3'}))
+    assert rows(after) == [('Main:', ['Python', '3 years'])]
+    undone(before, after, result)
+    removed, _ = applied(before, panel(before, 'remove_from_focus', python.id))
+    again, _ = applied(removed, panel(removed, 'add_to_focus', python.id, identifier='focus-add'))
+    assert rows(again) == [('Main:', ['Python', '10 months'])]
+
+
+def test_only_ascii_digits_become_whole_years():
+    package = technology_package()
+    assert [experience_text(package, value) for value in (' 3 ', '²', '3.0', '')] == ['3 years', '²', '3.0', '']
+
+
+def test_an_unreadable_font_leaves_a_row_without_a_placeholder():
+    package = technology_package()
+    row = [SimpleNamespace(presentation=reference(package, 'focus', 'emphasis', 'row', node_index=0))]
+    assert initial_icon(package, row, 'Zig') is not None
+    font = package.recipe.style.fonts[package.recipe.style.text['emphasis'].font]
+    broken = package.model_copy(update={'package_hash': 'f' * 64, 'assets': [asset.model_copy(update={'bytes_base64':
+        base64.b64encode(b'not a font').decode()}) if asset.id == font else asset for asset in package.assets]})
+    assert initial_icon(broken, row, 'Zig') is None

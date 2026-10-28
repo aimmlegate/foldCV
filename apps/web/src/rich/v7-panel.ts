@@ -1,11 +1,12 @@
 import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
+import type { EditorTechnologyTarget } from "../contracts/generated/template_project_response_v1";
 import type { PanelCommandV7 } from "./v7-translation";
 
 /** The facts panel's command; the V7 session translates it below. A technology add names the line Python offered. */
 export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | "documentRevision"> & { lineBlockId?: string };
 
-/** A place Python's editor plan offers for a new technology: a tags line, or a job section without one yet. */
-export type TechnologyTarget = { blockId: string; jobId: string | null; label: string };
+/** A place Python's editor plan offers for a new technology, with the placement Python checks. */
+export type TechnologyTarget = EditorTechnologyTarget;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { add: ReadonlySet<string>; remove: ReadonlySet<string> } = {
@@ -17,9 +18,8 @@ const focusOperations: ReadonlySet<PanelCommand["operation"]> = new Set(["add_to
 // Records whose fields Python edits outside the employment form.
 const editedKinds: ReadonlySet<string> = new Set(["candidate", "technology", "education", "language", "claim"]);
 
-/** The facts panel speaks the generic panel command. Python's V7 panel path accepts employment commands, Focus rows,
- * a technology reorder, add and removal, field edits of the other records and their removal where `panelSupport` says
- * so; it refuses values on period creation/removal, so changed values the dialog attaches there become a preceding edit. */
+/** The generic panel command as Python's V7 panel path takes it, or null for what it does not save. Changed values the
+ * dialog attaches to a period's creation or removal become a preceding edit. */
 export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string, string>): PanelCommandV7[] | null {
   const kind = command.recordId ? kinds.get(command.recordId) : command.recordKind;
   const values = command.values && Object.keys(command.values).length ? structuredClone(command.values) : null;
@@ -61,26 +61,4 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
     case "add_period": return recordId ? [...edit, { operation: "add_period", recordId, values: {} }] : null;
     default: return null;
   }
-}
-
-type PlacedBlock = { id: string; children: readonly PlacedBlock[] };
-
-/** A block's own place as Python reads it: its parent block or region and the sibling before it. */
-export function blockPlacement(document: { regions: readonly { id: string; blocks: readonly PlacedBlock[] }[] }, blockId: string):
-  { parentId: string; afterId: string | null } | null {
-  function visit(items: readonly PlacedBlock[], parentId: string): { parentId: string; afterId: string | null } | null {
-    let afterId: string | null = null;
-    for (const block of items) {
-      if (block.id === blockId) return { parentId, afterId };
-      const found = visit(block.children, block.id);
-      if (found) return found;
-      afterId = block.id;
-    }
-    return null;
-  }
-  for (const region of document.regions) {
-    const found = visit(region.blocks, region.id);
-    if (found) return found;
-  }
-  return null;
 }
