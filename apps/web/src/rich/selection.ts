@@ -1,4 +1,5 @@
-import type { EditorState, Transaction } from "@tiptap/pm/state";
+import { Selection, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
+import type { ResolvedPos } from "@tiptap/pm/model";
 import type { BlockKind } from "./v7-translation";
 
 export function selectionLocation(tr: Transaction): string | null {
@@ -10,6 +11,33 @@ export function selectionLocation(tr: Transaction): string | null {
     if (node.type.name === "blockContainer" && typeof id === "string") return JSON.stringify([id, cell]);
   }
   return null;
+}
+
+// An item section's own line is hidden in the editor (`.cv-section-title`): text there would not show.
+const hidden = ($pos: ResolvedPos) => $pos.parent.type.name === "section";
+
+function shownFrom(state: EditorState, $pos: ResolvedPos, direction: -1 | 1): ResolvedPos | null {
+  let at = $pos;
+  for (let step = 0; step < 1000; step++) {
+    if (at.parent.isTextblock && !hidden(at)) return at;
+    // Inside a hidden line the search starts past it; a gap position searches from itself.
+    const from = at.parent.isTextblock ? state.doc.resolve(direction > 0 ? at.after() : at.before()) : at;
+    const found = Selection.findFrom(from, direction, true);
+    if (!found || found.$head.pos === at.pos) return null;
+    at = found.$head;
+  }
+  return null;
+}
+
+/** A caret in a hidden section line or in a gap between blocks, moved on to shown text the way it went; a click (no
+ * previous selection) goes into the item. Ranges stay: one from an item's line to the next names whole items. Null when
+ * nothing moves. */
+export function shownSelection(previous: Selection | null, state: EditorState): Selection | null {
+  const selection = state.selection;
+  if (!selection.empty || selection instanceof TextSelection && !hidden(selection.$head)) return null;
+  const direction = previous && selection.head < previous.head ? -1 : 1;
+  const head = shownFrom(state, selection.$head, direction) ?? shownFrom(state, selection.$head, direction > 0 ? -1 : 1);
+  return head ? TextSelection.between(head, head) : null;
 }
 
 /** Editor content node names of the block kinds `format_blocks` changes. */

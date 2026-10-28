@@ -18,6 +18,7 @@ import type { RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
+import { markable } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
@@ -51,7 +52,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
   const [mode, setMode] = useState<EditorMode | null>(null);
-  const [recovering, setRecovering] = useState(false);
+  const [recovering, setRecovering] = useState(false), [formatting, setFormatting] = useState(false);
   const recoveryRunning = useRef(false);
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
@@ -153,7 +154,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }
   function formatBlocks(style: BlockStyle) {
     // The style select keeps focus after a choice; the caret goes back to the document once Python's result is shown.
-    void session.format(style).then(() => { if (editor.isEditable) editor.focus(); });
+    setFormatting(true);
+    void session.format(style).then(() => { if (editor.isEditable) editor.focus(); }).finally(() => setFormatting(false));
   }
   function openRewrite() {
     const source = session.rewriteSource();
@@ -248,6 +250,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={session.rewriteSource() !== null}
             style={blockStyle(textBlocks[0])} canUndo={session.canUndo} canRedo={session.canRedo}
+            blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)}
             active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,
               list: listed("bullet_list"), numbered: listed("numbered_list") }} />
         </fieldset>

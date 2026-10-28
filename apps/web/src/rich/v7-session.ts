@@ -16,7 +16,7 @@ import { blockAt, copySource, correctionOperation, extractOperations, foldCompos
 import { wireMarks } from "./inline";
 import { blockPlacement, panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
-import { changedBy, selectedTextBlocks, styledKind, type BlockStyle, type TextBlock } from "./selection";
+import { changedBy, selectedTextBlocks, shownSelection, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
   type V7Intent, type V7Operation } from "./v7-translation";
 
@@ -70,6 +70,8 @@ export class TemplateEditorSession {
   // Settles when the undo or redo in flight has been adopted or given up.
   private navigation: Promise<void> = Promise.resolve();
   private panelBusy = false;
+  // A block style waits for Python's result; a second one before it would be expressed on a stale revision.
+  private formatting = false;
   private closed = false;
   private retries = 0;
 
@@ -104,9 +106,13 @@ export class TemplateEditorSession {
     queueMicrotask(() => { if (!this.closed) this.setMode("recovering"); });
     this.plugin = new Plugin({ key: new PluginKey("foldcv-v7-session"),
       filterTransaction: transaction => this.filter(transaction),
-      appendTransaction: transactions => {
+      appendTransaction: (transactions, previous, state) => {
         for (const transaction of transactions) { const operations = this.stash.get(transaction); if (operations) this.accept(operations); }
-        return null;
+        if (this.composing || this.projecting) return null;
+        // A caret in an item's hidden section line moves on to shown text, so nothing is typed or styled out of sight.
+        const pointer = transactions.some(transaction => transaction.getMeta("pointer") === true);
+        const shown = shownSelection(pointer ? null : previous.selection, state);
+        return shown ? state.tr.setSelection(shown) : null;
       },
       props: {
         handleKeyDown: (_view, event) => this.key(event),
@@ -338,12 +344,14 @@ export class TemplateEditorSession {
   /** A toolbar block style on the selected blocks: one format_blocks request and one Undo. Blocks that already have
    * the kind are left out, and nothing is sent when none is left. */
   async format(style: BlockStyle): Promise<void> {
-    if (!this.editor || this.closed || this.composing || this.panelBusy || !this.writable) return;
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.formatting || !this.writable) return;
     const blocks = this.textBlocks();
     if (!blocks.length) { this.refuse("block style needs a text block"); return; }
     const kind = styledKind(style, blocks), blockIds = changedBy(kind, blocks);
     if (!blockIds.length) return;
-    await this.structure([{ operation: { kind: "format_blocks", blockIds, blockKind: kind } }]);
+    this.formatting = true;
+    try { await this.structure([{ operation: { kind: "format_blocks", blockIds, blockKind: kind } }]); }
+    finally { this.formatting = false; }
   }
 
   /** Remove whole selected blocks; their facts stay, as in Python's occurrence removal. */

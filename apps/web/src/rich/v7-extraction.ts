@@ -155,6 +155,20 @@ function marked(transaction: Transaction): ExtractedOperation[] {
   return operations;
 }
 
+/** Whether inline styles on the selection can be saved: Python addresses every text container it touches. */
+export function markable(state: EditorState): boolean {
+  try {
+    const selection = state.selection, bold = state.schema.marks["bold"];
+    if (selection.empty) { locate(selection.$from); return true; }
+    if (!bold) return false;
+    marked(state.tr.addMark(selection.from, selection.to, bold.create()));
+    return true;
+  } catch (error) {
+    if (error instanceof Unsupported) return false;
+    throw error;
+  }
+}
+
 /** Turn one editor transaction into V7 operations, or refuse input the server cannot express. */
 export function extractOperations(transaction: Transaction): Extraction {
   try {
