@@ -20,6 +20,19 @@ function assetUrl(asset: Pick<Asset, "sha256">): string {
 
 const pt = (value: number): string => `${value}pt`;
 
+/** The sheet's column geometry. A layout without a sidebar is one column: the regions stack in reading order and the
+ * empty sidebar offers no "add text" button. */
+export function sheetColumns(regions: readonly Presentation["recipe"]["layout"]["regions"][number][]): Readonly<Record<string, string>> | null {
+  const byId = new Map(regions.map(region => [region.id, region]));
+  const header = byId.get("header"), sidebar = byId.get("sidebar"), main = byId.get("main");
+  if (!header || !main) return null;
+  const left = sidebar?.x ?? main.x;
+  return { "--fcv-left": pt(left), "--fcv-header-left": pt(header.x - left), "--fcv-header-width": pt(header.width),
+    "--fcv-columns": sidebar ? `${pt(sidebar.width)} ${pt(main.width)}` : pt(main.width),
+    "--fcv-gap": pt(sidebar ? main.x - sidebar.x - sidebar.width : 0),
+    "--fcv-main-column": sidebar ? "2" : "1", "--fcv-main-row": sidebar ? "2" : "3", "--fcv-sidebar-empty": sidebar ? "block" : "none" };
+}
+
 /** Faces, sizes and colors come from the plan; geometry from the compiled recipe. Nothing is read from wording or IDs. */
 export function templateSheet(response: TemplateProjectResponseV1): TemplateSheet | null {
   const presentation = response.presentation, project = response.workspace.project, plan = presentation?.editor;
@@ -49,13 +62,12 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
     const sha256 = plan.iconFiles?.[id] ?? assets.get(id)?.sha256;
     return sha256 ? [[id, assetUrl({ sha256 })] as const] : [];
   }));
-  const recipe = presentation.recipe, style = recipe.style, [header, sidebar, main] = recipe.layout.regions;
-  if (!header || !sidebar || !main) return null;
+  const recipe = presentation.recipe, style = recipe.style, columns = sheetColumns(recipe.layout.regions);
+  const header = recipe.layout.regions.find(region => region.id === "header");
+  if (!header || !columns) return null;
   const band = style.section_band, focus = style.focus, divider = style.header.divider, logoValue = style.header.logo;
   const variables = {
-    "--fcv-page-width": pt(style.page.width), "--fcv-left": pt(sidebar.x), "--fcv-top": pt(style.header.name_top),
-    "--fcv-sidebar": pt(sidebar.width), "--fcv-main": pt(main.width), "--fcv-gap": pt(main.x - sidebar.x - sidebar.width),
-    "--fcv-header-left": pt(header.x - sidebar.x), "--fcv-header-width": pt(header.width),
+    "--fcv-page-width": pt(style.page.width), "--fcv-top": pt(style.header.name_top), ...columns,
     "--fcv-header-height": pt((divider?.y ?? style.page.first_body_top) - style.header.name_top),
     "--fcv-body-gap": pt(style.page.first_body_top - (divider?.y ?? style.page.first_body_top)),
     "--fcv-divider-left": pt((divider?.x1 ?? header.x) - header.x), "--fcv-divider-width": pt(divider ? divider.x2 - divider.x1 : 0),

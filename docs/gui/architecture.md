@@ -56,7 +56,7 @@ apps/web/src/{workbench,rich,assistant,projects,api,connection,errors,contracts}
 services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
 contracts/{json-schema,examples,error-messages.ru.json}
-templates/{generic,generic-two-column,foldcv-reference}/
+templates/{generic,bundled,foldcv-reference}/   bundled: generic-two-column.yaml, generic-one-column.yaml, shared assets/
 tests/  (layout in testing.md)
 tools/
 ```

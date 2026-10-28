@@ -46,6 +46,8 @@ export function FocusYears({ entries, options, paused, submit }: { entries: read
   const running = useRef(false);
   const choice = options.some(option => option.recordId === selected) ? selected : options[0]?.recordId ?? "";
   const drag = useTechnologyDrag(entries.map(entry => entry.recordId), "move_focus", paused || busy, submit);
+  // Nothing to list or add, as for a template without a Focus block: no Focus heading either.
+  if (!entries.length && !options.length) return null;
   async function add() {
     if (paused || running.current || !choice) return;
     running.current = true; setBusy(true);

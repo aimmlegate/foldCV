@@ -131,8 +131,10 @@ class CapturedWriter:
                 self.widths[block.id] = native_units(width, positive=True)
                 self.regions[block.id] = region
                 assign_width(block.children, width, region)
-        for region, captured in zip(request.document.regions, self.recipe.layout.regions, strict=True):
-            assign_width(region.blocks, captured.width, region.role)
+        layout = {region.id: region for region in self.recipe.layout.regions}
+        for region in request.document.regions:
+            # Without a sidebar column, blocks moved into the sidebar flow at the main width before the main ones.
+            assign_width(region.blocks, layout.get(region.role, layout['main']).width, region.role)
         self.runs = {}
         self.links = {}
         self.paragraphs = {}
@@ -496,10 +498,8 @@ class CapturedWriter:
         if after:
             self.spacer(self.document, after)
 
-    def render(self, workspace):
-        growth = self.header()
-        self.footer()
-        self.first_page_spacer(growth)
+    def columns(self):
+        """The sidebar and main columns as one borderless table row."""
         widths = [self.geometry.sidebar_width, self.geometry.main_width]
         if self.geometry.gap:
             widths.insert(1, self.geometry.gap)
@@ -528,6 +528,17 @@ class CapturedWriter:
                     keep.set(qn('w:val'), '0')
             if not cell.paragraphs:
                 self.spacer(cell, 1)
+
+    def render(self, workspace):
+        growth = self.header()
+        self.footer()
+        self.first_page_spacer(growth)
+        if self.geometry.sidebar_width:
+            self.columns()
+        else:
+            # One column: the body itself is the main column, in reading order, with no layout table.
+            for region in self.request.document.regions[1:]:
+                self.blocks(self.document, region.blocks)
         logo = self.recipe.style.header.logo
         if logo is not None:
             asset = next(asset for asset in self.request.package.assets if asset.id == logo.asset)

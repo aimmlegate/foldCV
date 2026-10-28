@@ -78,3 +78,10 @@ test("check findings are placed like import remarks and counted with the open im
   const projects = placeRemarks(document, remarks).sections.find(section => section.id === "projects");
   assert.deepEqual(projects?.items.map(entry => entry.blockId), ["labs"], "a link inside an item marks that item");
 });
+
+test("an empty region adds no section, so a one-column resume lists only its header and main sections", () => {
+  const [header, , main] = document.regions;
+  assert.ok(header && main);
+  const placed = placeRemarks({ regions: [header, { id: "sidebar", role: "sidebar", blocks: [] }, main] }, [remark("labs", ["labs-role"])]);
+  assert.deepEqual(placed.sections.map(section => section.title), ["Шапка", "ПРОЕКТЫ", "О СЕБЕ"]);
+});
