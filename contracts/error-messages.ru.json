@@ -1168,6 +1168,7 @@
     "CLAUDE_CODE_OAUTH_TOKEN": "Credential environment variable kept from the CLI",
     "CLAUDE_CONFIG_DIR": "CLI profile environment setting",
     "CLAUDE_CODE_TMPDIR": "CLI profile environment setting",
+    "MCP_TIMEOUT": "CLI environment setting",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "CLI profile environment setting",
     "DISABLE_AUTOUPDATER": "CLI profile environment setting",
     "DISABLE_TELEMETRY": "CLI profile environment setting",

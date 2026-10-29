@@ -41,6 +41,8 @@ MODEL, EFFORT = "claude-sonnet-5-5", "high"
 # CV-B of the D097 live imports (LIVE-02, LIVE-11, LIVE-14, LIVE-15 on Codex).
 CV_B = "3a2cb324ec603c053c820afd1731024a97b0fd1b16fb2dda30380296cb4b90d9"
 EXPECTED = {"answer": "ready", "count": 3, "items": ["alpha", "beta", "gamma"]}
+# MP06a-1: a read-only request; the evidence keeps no answer text.
+ASSISTANT_PROMPT = ("Проверь резюме по текущему шаблону и назови до трёх самых важных замечаний. Ничего не меняй.")
 
 
 class Synthetic(BaseModel):
@@ -217,7 +219,7 @@ async def run_import(args) -> None:
     dist.mkdir()
     (dist / "index.html").write_text("MP05")
     origin, secret = "http://127.0.0.1:39305", secrets.token_urlsafe(32)
-    slot, refused = claude_slot(DATA), Refused()
+    slot, refused = claude_slot(DATA, root / "operations"), Refused()
     wrapped = create_app(origin=origin, secret=secret, temp_root=root / "operations", dist=dist, data_root=root / "data",
                          template_import_call_cap=60, provider_registry=ProviderRegistry(frozenset({"claude_cli"})),
                          provider_slots={"claude_cli": slot})
@@ -240,10 +242,12 @@ async def run_import(args) -> None:
             project, warnings = workspace["projectId"], workspace["preDraft"]["warnings"]
             if "NO_USABLE_TEXT" in warnings:
                 raise SystemExit("no usable text; nothing dispatched")
-            charge({"id": "MP05-2", "slice": "MP05", "model": MODEL, "effort": EFFORT, "allowRepair": False,
+            run_id = "MP05-2b" if args.retry else "MP05-2"
+            retry = {"retryOf": "MP05-2", "instruction": args.retry} if args.retry else {}
+            charge({"id": run_id, "slice": "MP05", "model": MODEL, "effort": EFFORT, "allowRepair": False,
                     "path": "app routes: template-input upload, /v2 import task, Claude active",
                     "source": "CV-B", "sourceSha256": CV_B, "template": "bundled Generic", "rewrite": True,
-                    "root": root.name, "status": "dispatched", "startedAt": now()}, after="MP05-1")
+                    "root": root.name, **retry, "status": "dispatched", "startedAt": now()}, after="MP05-1")
             began = time.monotonic()
             started = await client.post("/v2/projects/" + project + "/import",
                                         json={"kind": "start", "clientRequestId": "mp05-import", "allowTextRewrite": True})
@@ -259,6 +263,10 @@ async def run_import(args) -> None:
             saved = decode_project(directory, (directory / "workspace.json").read_bytes(), history=True)
             owner = saved.project or saved.pre_draft
             [operation] = owner.template_operations
+            published = operation.state == "published" and saved.project is not None
+            codes = Counter(attempt.error_code for attempt in operation.attempts if attempt.error_code)
+            # Source fallbacks also publish; the proof needs every model reply accepted.
+            passed = published and not codes
             if saved.project is not None:
                 began = time.monotonic()
                 opened = (await client.post("/v2/projects/" + project + "/open", json={})).json()
@@ -268,10 +276,11 @@ async def run_import(args) -> None:
                 steps["exportStatus"] = exported.status_code
                 if exported.status_code == 200:
                     (root / "CV-B.docx").write_bytes(exported.content)
-    published = operation.state == "published" and saved.project is not None
-    codes = Counter(attempt.error_code for attempt in operation.attempts if attempt.error_code)
-    # Source fallbacks also publish; the proof needs every model reply accepted.
-    passed = published and not codes
+            settle(run_id, status="completed" if passed else "failed", finishedAt=now(),
+                   elapsedSeconds=steps["importSeconds"], calls=spent_calls(operation),
+                   **({"code": codes.most_common(1)[0][0]} if codes else {}))
+            if passed and args.assistant:
+                await run_assistant(client, project, refused)
     seconds = []
     for attempt in operation.attempts:
         if attempt.dispatched_at and attempt.returned_at:
@@ -281,10 +290,7 @@ async def run_import(args) -> None:
     for attempt in operation.attempts:
         for key in ("input_tokens", "cached_input_tokens", "output_tokens"):
             usage[key] += getattr(attempt.usage, key) or 0
-    settle("MP05-2", status="completed" if passed else "failed", finishedAt=now(),
-           elapsedSeconds=steps["importSeconds"], calls=spent_calls(operation),
-           **({"code": codes.most_common(1)[0][0]} if codes else {}))
-    write("live-2.json", {
+    write("live-2b.json" if args.retry else "live-2.json", {
         "at": now(), "passed": passed, "published": published, "task": {key: final.get(key) for key in ("state", "stage", "error")},
         "operationState": operation.state, **steps, "calls": spent_calls(operation),
         "cleanupVerified": cleanup_verified(operation),
@@ -301,6 +307,51 @@ async def run_import(args) -> None:
     slot.profile.wipe()
 
 
+async def run_assistant(client, project, refused) -> None:
+    """MP06a-1: one read-only assistant run on the imported project through the app's routes, Claude active."""
+    from packages.resume_core.models.assistant import TERMINAL
+    base = "/v2/projects/" + project + "/assistant"
+    current = (await client.get("/v1/settings/assistant")).json()
+    saved = await client.put("/v1/settings/assistant", json={"expectedRevision": current["revision"], "enabled": True,
+                                                             "selectedAgentModel": MODEL, "reasoningEffort": None})
+    assert saved.status_code == 200, saved.text[:300]
+    capabilities = (await client.get(base + "/capabilities")).json()
+    if not capabilities["ready"]:
+        raise SystemExit("assistant not ready: " + json.dumps(capabilities.get("unavailable")))
+    conversation = (await client.post(base + "/conversations")).json()["id"]
+    charge({"id": "MP06a-1", "slice": "MP06a", "model": MODEL, "effort": EFFORT, "allowRepair": False,
+            "path": "assistant run through the app routes on the MP05 import, Claude active, read-only",
+            "status": "dispatched", "startedAt": now()}, after="MP05-2")
+    began, after, kinds, tools = time.monotonic(), 0, Counter(), Counter()
+    started = await client.post(base + "/conversations/" + conversation + "/runs", json={
+        "clientRequestId": "mp06a-1", "message": ASSISTANT_PROMPT, "allowEdits": False, "allowWeb": False})
+    assert started.status_code == 201, started.text[:300]
+    run = started.json()
+    while True:
+        reply = (await client.get(base + "/runs/" + run["id"] + "/events/" + str(after))).json()
+        for event in reply["events"]:
+            kinds[event["type"]] += 1
+            if event["type"] == "tool.started":
+                tools[event["payload"]["name"]] += 1
+        after, run = reply["next"], reply["run"]
+        if run["state"] in TERMINAL:
+            break
+    seconds = round(time.monotonic() - began, 1)
+    messages = (await client.get(base + "/conversations/" + conversation + "/messages")).json()["messages"]
+    answer = next((item for item in reversed(messages) if item["role"] == "assistant"), None)
+    error = (run.get("error") or {}).get("code")
+    passed = run["state"] == "completed" and bool(tools) and bool(answer and answer["text"].strip())
+    settle("MP06a-1", status="completed" if passed else "failed", finishedAt=now(), elapsedSeconds=seconds,
+           **({"code": error} if error else {}))
+    directory = EVIDENCE.parent / "mp06a"
+    directory.mkdir(exist_ok=True)
+    value = {"at": now(), "passed": passed, "state": run["state"], "error": error, "seconds": seconds,
+             "events": dict(kinds), "tools": dict(tools), "usage": run.get("usage"),
+             "answerChars": len(answer["text"]) if answer else 0, "refusedEvents": dict(refused.kinds)}
+    (directory / "live-1.json").write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(json.dumps(value, indent=2, ensure_ascii=False))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -309,6 +360,8 @@ def main() -> None:
     canary_run.add_argument("--retry", metavar="INSTRUCTION", help="the user's instruction to repeat the failed MP05-1")
     importing = commands.add_parser("import")
     importing.add_argument("source")
+    importing.add_argument("--retry", metavar="INSTRUCTION", help="the user's instruction to repeat the failed MP05-2")
+    importing.add_argument("--assistant", action="store_true", help="then MP06a-1 on the imported project")
     args = parser.parse_args()
     if args.command == "import":
         asyncio.run(run_import(args))
