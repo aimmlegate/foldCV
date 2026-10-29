@@ -12,8 +12,8 @@ from tests.templates.storage_fixtures import package, source
 NOW = '2026-10-21T00:00:00+00:00'
 
 
-def model(name='synthetic-primary'):
-    return ModelCapture(adapter='controlled', model=name, effort='medium', capabilityProfile='closed-json-v1',
+def model(name='synthetic-primary', effort='medium'):
+    return ModelCapture(adapter='controlled', model=name, effort=effort, capabilityProfile='closed-json-v1',
         capabilityVersion='1', configurationHash=digest({'model': name, 'test': True}))
 
 
@@ -23,13 +23,14 @@ def owner(index):
         transportTurnId=None, pid=None)
 
 
-def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text_rewrite=True, concurrency=1):
+def setup_operation(*, cap=8, fallback=True, captured=None, src=None, allow_text_rewrite=True, concurrency=1, review=None):
     captured, src = captured or package(), src or source()[0]
     facts = WorkingFactsV2(schemaVersion=2, revision=1, records=[], tombstones=[],
         extensions=[], observations=[], relations=[], manualScopes=[])
     capture = ImportCapture(packageHash=captured.package_hash, sourceHashes={src.id: src.byte_sha256}, factRevisions={},
         authorityHash=digest('synthetic-account-and-permissions'), dependencyHash=digest('synthetic-dependencies'),
         allowTextRewrite=allow_text_rewrite, primary=model(), fallback=model('synthetic-fallback') if fallback else None,
+        review=review,
         formattingAsOf={'precision': 'day', 'year': 2026, 'month': 10, 'day': 21},
         policy=RuntimePolicy(callCap=cap, concurrency=concurrency, processingSeconds=300, cleanupSeconds=5,
             finalizationSeconds=30, primaryRepairs=1, fallbackRepairs=1))

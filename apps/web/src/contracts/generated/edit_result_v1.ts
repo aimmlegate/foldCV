@@ -606,7 +606,8 @@ export type Returnhash = string | null;
 export type Returnedat = string | null;
 export type Reviewinputrecordid = string | null;
 export type Reviewreceiptid = string | null;
-export type Slot = "initial" | "review" | "primary_repair" | "fallback_repair" | "replacement_review";
+export type Slot =
+  "initial" | "review" | "primary_repair" | "fallback_repair" | "replacement_review" | "outline" | "outline_review";
 export type State2 = "reserved" | "dispatch_started" | "returned" | "outcome_unknown" | "reconciled" | "released";
 export type Taskid1 = string;
 export type Cachedinputtokens = number | null;
@@ -806,6 +807,14 @@ export type Instructions = string[];
 export type Version1 = 1;
 export type Rules = Check[];
 export type Schemaversion6 = 1 | 2;
+export type Actionable1 = boolean;
+export type Disposition2 = "satisfied" | "violation" | "uncertain";
+export type Evidence20 = SourceSpan[];
+export type Origin14 = "verbatim" | "reused";
+export type Reason2 = string;
+export type Ruleid3 = string;
+export type Targetid4 = string;
+export type Settled = SettledCheck[];
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -817,7 +826,7 @@ export type Id37 = string;
 export type Inputhash3 = string;
 export type Taskid4 = string;
 export type Taskinputs = TaskInputRecord[];
-export type Disposition2 = "admitted" | "derived" | "source_fallback" | "empty";
+export type Disposition3 = "admitted" | "derived" | "source_fallback" | "empty";
 export type Id38 = string;
 export type Inputhash4 = string;
 export type Issueids = string[];
@@ -829,12 +838,23 @@ export type Allowedhandles = string[];
 export type Attemptids = string[];
 export type Blockid1 = string;
 export type Dependencies1 = string[];
+export type Index1 = number;
+export type Origin15 = "outline" | "review";
+/**
+ * @minItems 1
+ */
+export type Parts = [EntryPart, ...EntryPart[]];
+export type Spans = SourceSpan[];
+export type Title4 = string;
+export type Spans1 = SourceSpan[];
+export type Title5 = string;
 export type Expectedchecks1 = CheckTarget[];
 export type Id39 = string;
 export type Inputhash5 = string;
 export type Issueids1 = string[];
-export type Kind32 = "extract" | "rewrite" | "derive" | "source_copy";
+export type Kind32 = "extract" | "rewrite" | "derive" | "source_copy" | "outline_review";
 export type Operationid4 = string;
+export type Parenttaskid = string | null;
 export type Proposalhash3 = string | null;
 export type Receiptids1 = string[];
 export type State9 =
@@ -884,6 +904,10 @@ export type Extract = string[];
 export type Id43 = string;
 export type Mode2 = "model" | "derived" | "source_copy";
 export type Operation = string | null;
+/**
+ * Outline the list first, then extract its entries in parallel groups. A model list without item limits only.
+ */
+export type PerEntry = boolean;
 export type Fields3 = string[];
 export type Instructions1 = string[];
 export type Id44 = string;
@@ -1052,7 +1076,7 @@ export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid6 = string | null;
 export type Textcolor1 = string;
-export type Evidence20 = EvidenceSpan[];
+export type Evidence21 = EvidenceSpan[];
 export type Fieldkeys = string[];
 export type Id55 = string;
 export type Kind41 = "citation";
@@ -1067,7 +1091,7 @@ export type Recordid9 = string;
 /**
  * @minItems 1
  */
-export type Evidence21 = [EvidenceSpan, ...EvidenceSpan[]];
+export type Evidence22 = [EvidenceSpan, ...EvidenceSpan[]];
 export type Id58 = string;
 export type Kind44 = "source";
 export type Provenance1 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
@@ -1339,7 +1363,7 @@ export type Revision42 = number;
 export type Role3 = "header" | "sidebar" | "main";
 export type Revision43 = number;
 export type Schemaversion9 = 2;
-export type Evidence22 = EvidenceSpan[];
+export type Evidence23 = EvidenceSpan[];
 export type Id73 = string;
 export type Rawtext5 = string;
 export type Evidencerecords = ImmutableFactEvidence[];
@@ -1361,9 +1385,9 @@ export type Schemaversion10 = 1;
 export type Exportinputs = TemplateExportCapture[];
 export type Exports = ExportAttempt[];
 export type Blockids2 = string[];
-export type Disposition3 = "accepted" | "fallback" | "source_only" | "multiple_views";
+export type Disposition4 = "accepted" | "fallback" | "source_only" | "multiple_views";
 export type Itemhandle8 = string | null;
-export type Reason2 = string | null;
+export type Reason3 = string | null;
 export type Importcoverage = SpanCoverage[];
 export type Operationid5 = string;
 export type Sha2564 = string;
@@ -1943,7 +1967,7 @@ export type Rewriteresult1 = string | null;
 export type Rewritesource1 = string | null;
 export type Status10 = "pending" | "failed" | "conflict" | "applied" | "stale";
 export type Syncrecords = (TemplateSyncRecord | RichSyncRecord)[];
-export type Title4 = string;
+export type Title6 = string;
 export type Titlemanuallyset = boolean;
 export type Updatedat = string;
 export type Blockids6 = string[];
@@ -1953,7 +1977,7 @@ export type Sourceid3 = string;
 export type Sourcerevision2 = number;
 export type Unitid4 = string;
 export type Unitrevision2 = number;
-export type Evidence23 = Evidence24[];
+export type Evidence24 = Evidence25[];
 export type Id93 = string;
 export type Page3 = number | null;
 export type Sourceid4 = string;
@@ -2293,7 +2317,7 @@ export interface WorkspaceV7 {
   schemaVersion: Schemaversion12;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
-  title: Title4;
+  title: Title6;
   titleManuallySet: Titlemanuallyset;
   updatedAt: Updatedat;
   warnings: Warnings2;
@@ -2943,6 +2967,7 @@ export interface ImportCapture {
   packageHash: Packagehash2;
   policy: RuntimePolicy;
   primary: ModelCapture;
+  review?: ModelCapture | null;
   sourceHashes: Sourcehashes;
 }
 export interface Factrevisions {
@@ -3189,6 +3214,7 @@ export interface ReviewInput {
   rules: Rules;
   schemaVersion: Schemaversion6;
   semanticContext: Semanticcontext;
+  settled?: Settled;
   sourceSpans: Sourcespans;
   sourceTexts: Sourcetexts;
   targets: Targets;
@@ -3211,6 +3237,19 @@ export interface CheckParameters {
 export interface Semanticcontext {
   [k: string]: JsonValue;
 }
+/**
+ * A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's
+ * result for a value the repair left as it was.
+ */
+export interface SettledCheck {
+  actionable: Actionable1;
+  disposition: Disposition2;
+  evidence: Evidence20;
+  origin: Origin14;
+  reason: Reason2;
+  ruleId: Ruleid3;
+  targetId: Targetid4;
+}
 export interface Sourcetexts {
   [k: string]: string;
 }
@@ -3225,7 +3264,7 @@ export interface Value2 {
   [k: string]: JsonValue;
 }
 export interface TaskResultRecord {
-  disposition: Disposition2;
+  disposition: Disposition3;
   id: Id38;
   inputHash: Inputhash4;
   issueIds: Issueids;
@@ -3239,15 +3278,36 @@ export interface ImportTask {
   attemptIds: Attemptids;
   blockId: Blockid1;
   dependencies: Dependencies1;
+  entry?: EntryScope | null;
   expectedChecks: Expectedchecks1;
   id: Id39;
   inputHash: Inputhash5;
   issueIds: Issueids1;
   kind: Kind32;
   operationId: Operationid4;
+  parentTaskId?: Parenttaskid;
   proposalHash: Proposalhash3;
   receiptIds: Receiptids1;
   state: State9;
+}
+/**
+ * The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
+ * the outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)
+ * and whether the outline or its review named them.
+ */
+export interface EntryScope {
+  index: Index1;
+  origin: Origin15;
+  parts: Parts;
+  spans: Spans1;
+  title: Title5;
+}
+/**
+ * One entry the outline named (D117): its title and its source lines.
+ */
+export interface EntryPart {
+  spans: Spans;
+  title: Title4;
 }
 export interface StoredTemplatePackage {
   assets: Assets;
@@ -3324,6 +3384,7 @@ export interface Block {
   id: Id43;
   mode: Mode2;
   operation: Operation;
+  per_entry?: PerEntry;
   placement: Placement;
   rewrite: Rewrite;
   selectors: Selectors;
@@ -3708,7 +3769,7 @@ export interface SectionProps {
   textColor?: Textcolor1;
 }
 export interface NarrativeCitation {
-  evidence: Evidence20;
+  evidence: Evidence21;
   fieldKeys: Fieldkeys;
   id: Id55;
   kind: Kind41;
@@ -3726,7 +3787,7 @@ export interface WorkingOwnership {
   recordId: Recordid9;
 }
 export interface SourceWitness {
-  evidence: Evidence21;
+  evidence: Evidence22;
   id: Id58;
   kind: Kind44;
 }
@@ -3786,7 +3847,7 @@ export interface HeadingProps {
   textColor?: Textcolor5;
 }
 export interface ImmutableFactEvidence {
-  evidence: Evidence22;
+  evidence: Evidence23;
   id: Id73;
   rawText: Rawtext5;
 }
@@ -3820,9 +3881,9 @@ export interface TemplateRendererIdentity {
 }
 export interface SpanCoverage {
   blockIds: Blockids2;
-  disposition: Disposition3;
+  disposition: Disposition4;
   itemHandle: Itemhandle8;
-  reason: Reason2;
+  reason: Reason3;
   span: SourceSpan;
 }
 /**
@@ -4280,12 +4341,12 @@ export interface RichWarning {
   blockIds: Blockids6;
   code: Code4;
   count?: Count;
-  evidence: Evidence23;
+  evidence: Evidence24;
   id: Id93;
   locations?: Locations;
   recordIds: Recordids;
 }
-export interface Evidence24 {
+export interface Evidence25 {
   sourceId: Sourceid3;
   sourceRevision: Sourcerevision2;
   unitId: Unitid4;

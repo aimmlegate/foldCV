@@ -3,6 +3,9 @@
 USER_CHARS = 8000
 CONTEXT_BYTES = 64 * 1024
 TOOL_BYTES = 64 * 1024
+CALL_BYTES = 64 * 1024
+# A larger tool call is still read up to this size, only to answer it with AGENT_CALL_TOO_LARGE.
+CALL_READ_BYTES = 1024 * 1024
 TOOL_TOTAL_BYTES = 1024 * 1024
 PAGE_BYTES = 16 * 1024
 MESSAGE_BYTES = 128 * 1024

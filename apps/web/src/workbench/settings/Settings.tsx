@@ -2,7 +2,7 @@ import { errorMessage } from "../../errors/messages";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
 import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteReasoningRequest } from "../../api/client";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
 import { Connection } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
@@ -14,8 +14,8 @@ import { Dialog } from "../ui/Dialog";
 
 // Loaded on first visit: the YAML parser and Monaco stay out of the startup bundle.
 const TemplateSettings = lazy(() => import("./template/TemplateSettings"));
-const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
-export function Settings({ close, connectionChanged, paneOrder, changePaneOrder }: { close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
+const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
+export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder }: { open: boolean; close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "limits" | "interface">("model");
   // The template editor stays mounted after its first visit so switching sections keeps unsaved YAML.
   const [templateOpened, setTemplateOpened] = useState(false), [templateDirty, setTemplateDirty] = useState(false);
@@ -28,7 +28,7 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
   const [controller] = useState(() => {
     return new SettingsDrafts({ preferences: preferencesRequest, rules: rulesRequest, assistant: () => assistantSettings(),
       saveRules: saveRulesRequest, saveAssistant: value => saveAssistantSettings(value),
-      selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
+      selectRewrite: saveRewriteModelRequest, selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         await workflow.select(model);
@@ -37,6 +37,8 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
       } }, setState);
   });
   useEffect(() => { void controller.load(); void workflow.peek(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
+  // Settings stays mounted behind the editor, whose rewrite popover saves the same rewrite choices.
+  useEffect(() => { if (open) void controller.refreshPreferences(); }, [open, controller]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
   const draftActions = <>{!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
     <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить</Button>
@@ -60,8 +62,11 @@ export function Settings({ close, connectionChanged, paneOrder, changePaneOrder 
       </div>
       {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences}
           switchDisabled={busy || dirty} providerChanged={() => void controller.reloadChoices()} />
-        <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.model ?? ""]}
-          disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !current.draft.model}
+        <ModelSelect id="rewrite-model-select" label="Модель правки текста" value={current.draft.rewriteModel} models={view.snapshot.models}
+          defaultLabel="Как модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
+          change={value => controller.change("rewriteModel", value)} />
+        <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.rewriteModel ?? current.draft.model ?? ""]}
+          disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !(current.draft.rewriteModel ?? current.draft.model)}
           change={value => controller.change("reasoning", value)} />
         <div className="uir-assistant-options"><h3>Импорт резюме</h3>
           <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}

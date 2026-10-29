@@ -24,8 +24,8 @@ def test_private_preferences_keep_defaults_model_and_unrelated_fields_on_restart
     assert PreferencesStore(root).load() == selected and selected.automatic_analysis == initial.automatic_analysis
     assert stat.S_IMODE(root.stat().st_mode) == 0o700 and stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert set(json.loads(store.path.read_text())) == {'schemaVersion', 'automaticAnalysis', 'theme', 'selectedModel',
-        'selectedImportModel', 'selectedFallbackModel', 'rewriteReasoningEffort', 'importMinutes', 'projectMegabytes',
-        'selectedProvider', 'providerSelections'}
+        'selectedImportModel', 'selectedFallbackModel', 'selectedRewriteModel', 'rewriteReasoningEffort', 'importMinutes',
+        'projectMegabytes', 'selectedProvider', 'providerSelections'}
 
 
 def test_preferences_from_before_providers_load_as_codex(tmp_path):
@@ -47,16 +47,17 @@ def test_provider_switch_keeps_and_restores_each_providers_choices(tmp_path):
     store.select_model('model-a')
     store.select_import_model('model-b')
     store.select_fallback_model('model-c')
-    store.select_rewrite_reasoning('model-a', 'high')
+    store.select_rewrite_model('model-d', {'high'})
+    store.select_rewrite_reasoning('model-d', 'high')
     value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
     assert value.selected_provider == 'claude_cli' and agent == (None, None)
     assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
-            value.rewrite_reasoning_effort) == (None, None, None, None)
+            value.selected_rewrite_model, value.rewrite_reasoning_effort) == (None, None, None, None, None)
     store.select_model('claude-model')
     value, agent = store.select_provider('codex_cli', 'agent-b', 'max')
     assert agent == ('agent-a', 'low') and value.selected_provider == 'codex_cli'
     assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
-            value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'model-c', 'high')
+            value.selected_rewrite_model, value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'model-c', 'model-d', 'high')
     assert set(value.provider_selections) == {'claude_cli'}
     value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
     assert value.selected_model == 'claude-model' and agent == ('agent-b', 'max')
@@ -68,6 +69,7 @@ def test_provider_switch_keeps_and_restores_each_providers_choices(tmp_path):
     {'providerSelections': {'codex_cli': {'selectedModel': 'model-a'}}},
     {'selectedProvider': 'claude_cli', 'providerSelections': {'claude_cli': {}}},
     {'providerSelections': {'claude_cli': {'selectedAgentModel': 'email@example.invalid'}}},
+    {'providerSelections': {'claude_cli': {'selectedRewriteModel': 'email@example.invalid'}}},
 ])
 def test_invalid_provider_preferences_are_corrupt_without_reset(tmp_path, change):
     root = tmp_path / 'FoldCV'

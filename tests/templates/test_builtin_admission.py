@@ -192,7 +192,10 @@ def test_rejected_individual_metric_and_its_classification_do_not_survive_as_eff
 def test_rejected_owner_withholds_its_entire_nested_dependency_chain():
     package = employment_package()
     src, _raw = employment_source()
-    operation, facts, proposed, _package, _src = proposed_from(package, src, employment_proposal(src))
+    reply = employment_proposal(src)
+    # Reworded employer and role: the model's to reject; verbatim ones would be settled by the coordinator (D115).
+    reply['payload'][0].update(company='Example Labs Ltd', role='senior backend engineer')
+    operation, facts, proposed, _package, _src = proposed_from(package, src, reply)
     job = next(value for value in operation.allocations if value.key == 'job')
     _admitted, after = accept(operation, facts, proposed, package, src, set(job.cell_ids.values()))
     assert not after.records and not after.extensions and not after.relations

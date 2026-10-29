@@ -4,13 +4,15 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from .models.template_import import (AttemptCleanupRecord, CleanupOutcome, FinalizationCandidate, ImportAttempt,
+from .models.template_import import (AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope, FinalizationCandidate, ImportAttempt,
     ImportAuthorization, ImportOperation, ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
 from .templates.compiler import canonical, dependency_order, sha256
 
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
 GENERATION_SLOTS = frozenset({'initial', 'primary_repair', 'fallback_repair'})
+# D117: the outline of a block that extracts its entries on their own, and the review of that outline.
+OUTLINE_SLOTS = frozenset({'outline', 'outline_review'})
 IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
 
 
@@ -33,8 +35,8 @@ def identity(prefix):
 
 
 def same_captured_model(model, expected):
-    """The captured model whatever effort a block asked for (D101: a block may declare its own extraction effort)."""
-    return expected is not None and model.model_copy(update={'effort': expected.effort}) == expected
+    """The captured model, effort included: every call runs the effort chosen for the import (D114)."""
+    return expected is not None and model == expected
 
 
 def digest(value):
@@ -90,6 +92,15 @@ def attempt_in(operation, identifier):
     if attempt is None:
         raise TemplateImportFailure('IMPORT_ATTEMPT_UNKNOWN')
     return attempt
+
+
+def children_of(operation, parent_id):
+    """The tasks a block task added while running (D117): its entries and its outline review, in the order added."""
+    return [task for task in operation.tasks if task.parent_task_id == parent_id]
+
+
+def entries_of(operation, parent_id):
+    return [task for task in children_of(operation, parent_id) if task.entry is not None]
 
 
 def authorization(operation):
@@ -222,6 +233,45 @@ def capture_task_input(operation, task_id, value, handles, now, *, id_factory=id
     return checked(result)
 
 
+ENTRY_TITLE = 120
+
+
+def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity):
+    """The entry tasks of a block task (D117), one per group of consecutive outline entries ((title, spans) each),
+    after the entries it has, in this order. An entry task extracts as its block does, under the same dependencies,
+    and reads the block's captured input."""
+    result = fork(operation, lists=('tasks',))
+    parent = task_in(result, parent_id)
+    if (parent.parent_task_id is not None or parent.kind not in {'extract', 'rewrite'} or parent.state in TERMINAL_TASKS
+            or not any(record.task_id == parent_id for record in result.task_inputs) or not all(groups)):
+        raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
+    taken = max([task.entry.index for task in entries_of(result, parent_id)], default=0)
+    for offset, group in enumerate(groups, 1):
+        title = ', '.join(title for title, _spans in group)
+        title = title if len(title) <= ENTRY_TITLE else title[:ENTRY_TITLE - 1].rstrip() + '…'
+        scope = EntryScope(index=taken + offset, title=title, spans=[span for _title, spans in group for span in spans],
+            parts=[EntryPart(title=part, spans=list(spans)) for part, spans in group], origin=origin)
+        result.tasks.append(ImportTask(id=id_factory('task'), operationId=result.id, blockId=parent.block_id, kind=parent.kind,
+            dependencies=list(parent.dependencies), inputHash=digest({'parent': parent.input_hash, 'entry': scope}),
+            allowedHandles=[], expectedChecks=[], state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[],
+            parentTaskId=parent_id, entry=scope))
+    return checked(result)
+
+
+def add_outline_review(operation, parent_id, *, id_factory=identity):
+    """The one review of a block's outline (D117), added with the block's entries."""
+    result = fork(operation, lists=('tasks',))
+    parent = task_in(result, parent_id)
+    if (parent.parent_task_id is not None or parent.kind not in {'extract', 'rewrite'} or parent.state in TERMINAL_TASKS
+            or any(task.kind == 'outline_review' for task in children_of(result, parent_id))):
+        raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
+    result.tasks.append(ImportTask(id=id_factory('task'), operationId=result.id, blockId=parent.block_id, kind='outline_review',
+        dependencies=list(parent.dependencies), inputHash=digest({'parent': parent.input_hash, 'outline': 'review'}),
+        allowedHandles=[], expectedChecks=[], state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[],
+        parentTaskId=parent_id))
+    return checked(result)
+
+
 def spent_calls(operation):
     return sum(attempt.state != 'released' for attempt in operation.attempts)
 
@@ -261,9 +311,25 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
         if not any(attempt.slot in GENERATION_SLOTS and attempt.state in {'returned', 'reconciled'}
                 and attempt.outcome == 'completed' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REVIEW_WITHOUT_PROPOSAL')
-        if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.fallback]) or any(
+        if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.fallback,
+                result.capture.review]) or any(
                 attempt.slot in {'review', 'replacement_review'} and attempt.input_hash == input_hash for attempt in prior):
             raise TemplateImportFailure('IMPORT_REVIEW_ALREADY_SPENT')
+    elif slot == 'outline':
+        # D117: a block task outlines its entries once, with the import model, before any extraction of its own.
+        if task.parent_task_id is not None or task.kind not in {'extract', 'rewrite'}:
+            raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
+        if any(attempt.slot in GENERATION_SLOTS or attempt.slot == 'outline' for attempt in prior):
+            raise TemplateImportFailure('IMPORT_SLOT_SPENT')
+        if not same_captured_model(model, result.capture.primary):
+            raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
+    elif slot == 'outline_review':
+        if task.kind != 'outline_review':
+            raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
+        if any(attempt.slot == 'outline_review' for attempt in prior):
+            raise TemplateImportFailure('IMPORT_SLOT_SPENT')
+        if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.review]):
+            raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
     else:
         raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
     if any(attempt.owner.reservation_id == owner.reservation_id for attempt in result.attempts):
@@ -278,7 +344,8 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
         authorizationId=authority.id)
     result.attempts.append(attempt)
     task.attempt_ids.append(attempt.id)
-    task.state = 'checking' if slot in {'review', 'replacement_review'} else 'repairing' if slot != 'initial' else 'running'
+    task.state = ('checking' if slot in {'review', 'replacement_review'}
+        else 'running' if slot == 'initial' or slot in OUTLINE_SLOTS else 'repairing')
     return checked(result), attempt.id
 
 
@@ -441,11 +508,16 @@ def retain_operation(before, after):
     for old, new in zip(before.authorizations, after.authorizations):
         if old.state == 'cancelled' and new.state != 'cancelled':
             _refuse()
-    if [value.id for value in before.tasks] != [value.id for value in after.tasks]:
+    if [value.id for value in after.tasks[:len(before.tasks)]] != [value.id for value in before.tasks]:
+        _refuse()
+    # D117: a running block task adds its entry tasks and outline review after the captured tasks; nothing else is added.
+    added = after.tasks[len(before.tasks):]
+    if added and (before.state not in {'processing', 'cleanup_pending'} or any(value.parent_task_id is None for value in added)):
         _refuse()
     captured = {value.task_id for value in before.task_inputs}
     for old, new in zip(before.tasks, after.tasks):
-        if any(getattr(old, name) != getattr(new, name) for name in ('operation_id', 'block_id', 'kind', 'dependencies')):
+        if any(getattr(old, name) != getattr(new, name) for name in ('operation_id', 'block_id', 'kind', 'dependencies',
+                'parent_task_id', 'entry')):
             _refuse()
         if old.id in captured and old.input_hash != new.input_hash:
             _refuse()

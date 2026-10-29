@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
+import { Spinner } from "./Spinner";
 
-export function Spinner({ className = "" }: { className?: string }) {
-  return <span className={`operation-spinner ${className}`} aria-hidden="true" />;
-}
+export { Spinner };
 
 export function elapsedText(milliseconds: number): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));

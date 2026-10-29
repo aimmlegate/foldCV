@@ -13,10 +13,12 @@ from .dynamic_result import DynamicResultSpec
 
 from packages.resume_core.reasoning import EFFORTS, ReasoningEffort
 from resume_api.lifecycle import OperationFiles
+from packages.resume_core.project_limits import IMPORT_CEILING_SECONDS
 
 
 ResultT = TypeVar("ResultT", bound=BaseModel)
-MAX_GENERATION_SECONDS = 180
+# One call may run as long as the longest import limit Settings allow (D114: no call limit of its own).
+MAX_GENERATION_SECONDS = IMPORT_CEILING_SECONDS
 CONTENT_INPUT_BYTES = 256 * 1024
 
 

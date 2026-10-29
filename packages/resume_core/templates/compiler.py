@@ -99,6 +99,18 @@ def asset_path(root: Path, relative: str) -> Path:
     return candidate
 
 
+# Limits of a whole list: entries extracted on their own each see a part of it, so none could keep them.
+ITEM_LIMITS = ("minItems", "maxItems", "uniqueItems", "contains", "minContains", "maxContains")
+
+
+def splits_entries(block) -> bool:
+    """Whether a block extracts its entries on their own (D117): per_entry on a model block whose content is a list
+    without item limits."""
+    schema = block.content_schema
+    return (bool(block.per_entry) and block.mode == "model" and schema.get("type") == "array"
+        and not any(key in schema for key in ITEM_LIMITS))
+
+
 def dependency_order(definition: TemplateDefinition) -> dict[str, int]:
     blocks = {item.id: item for item in definition.blocks}
     operations = {item.id: item for item in definition.operations}
@@ -296,6 +308,9 @@ def compile_definition(definition: TemplateDefinition, version):
                 raise SchemaFailure("/blocks/" + block.id + "/when", "incompatible operation condition output")
         if block.view.mode == "object" and block.content_schema.get("type") == "array":
             raise SchemaFailure("/blocks/" + block.id + "/view", "array content requires items mode")
+        if block.per_entry and not splits_entries(block):
+            raise SchemaFailure("/blocks/" + block.id + "/per_entry",
+                "per_entry needs a model block whose content is a list without item limits")
         for node in block.view.nodes:
             if node.header_slot is not None:
                 if block.placement.region != 'header' or node.header_slot in header_slots:

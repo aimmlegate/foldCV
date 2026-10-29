@@ -13,7 +13,7 @@ from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.template_review import make_review_input, record_review, reusable_receipt, validate_review_reply
 from packages.resume_core.templates.compiler import sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
-from packages.resume_core.templates.replies import check_references, proposal_schema, review_schema
+from packages.resume_core.templates.replies import check_references, proposal_schema, review_schema, model_targets
 from resume_api.providers.dynamic_result import dynamic_result
 from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, setup_operation, usage
@@ -181,8 +181,11 @@ def test_review_selects_checks_and_evidence_by_reference_and_its_receipt_keeps_i
     assert value.schema_version == 2 and not value.source_spans and not value.source_texts
     assert value.evidence[:2] == options
     checks = per_check(value)
+    # D115: the verbatim title, journal and url are settled by the coordinator; the model is asked about the rest.
+    asked = model_targets(value)
+    assert value.settled and len(asked) + len(value.settled) == len(value.targets)
     assert sorted(checks, key=lambda ref: int(ref[1:])) == list(check_references(value)) == [
-        'C' + str(index) for index in range(1, len(value.targets) + 1)]
+        'C' + str(index) for index in range(1, len(asked) + 1)]
     assert all(checks[ref]['ruleId'] == target.rule_id for ref, target in check_references(value).items())
     # Stored checks state each target once; rules and targets are restored by ref from the captured targets.
     assert len(value.semantic_context['checks']) <= len(checks) and 'targetId' not in json.dumps(value.semantic_context['checks'])
@@ -216,13 +219,15 @@ def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_hol
             'actionable': True}]
     operation, attempt, value, raw = review_returned(operation, proposal, captured, src, results)
     refs = list(check_references(value))
-    assert value.semantic_context['replyProtocol']['version'] == 'template-review-protocol-3' and len(refs) > 2
+    assert value.semantic_context['replyProtocol']['version'] == 'template-review-protocol-5' and len(refs) > 2
     assert review_schema(value)['required'] == ['results']
     reply = validate_review_reply({'results': results(value)}, value, [src])
     by_target = {(result.rule_id, result.target_id): result for result in reply.results}
     assert [(result.rule_id, result.target_id) for result in reply.results] == [
         (target.rule_id, target.target_id) for target in value.targets]
-    first = by_target.pop((value.targets[0].rule_id, value.targets[0].target_id))
+    # C1 is the first check the model is asked about; the verbatim cells before it are settled (D115).
+    asked = model_targets(value)[0]
+    first = by_target.pop((asked.rule_id, asked.target_id))
     assert first.disposition == 'violation' and first.evidence and first.reason
     assert all(result.disposition == 'satisfied' and result.evidence == [] and result.reason == '' for result in by_target.values())
     assert all(result.disposition == 'satisfied' for result in validate_review_reply({'results': []}, value, [src]).results)
@@ -231,7 +236,7 @@ def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_hol
     doubled = validate_review_reply({'results': [*results(value), {'check': 'C1', 'disposition': 'uncertain',
         'reason': 'Период не подтверждён', 'evidence': ['S2'], 'actionable': False}]}, value, [src])
     merged = next(result for result in doubled.results if result.disposition != 'satisfied')
-    assert [result.disposition for result in doubled.results].count('satisfied') == len(refs) - 1
+    assert [result.disposition for result in doubled.results].count('satisfied') == len(value.targets) - 1
     assert merged.disposition == 'violation' and merged.reason == 'Год не указан в источнике Период не подтверждён'
     assert len(merged.evidence) == 2 and merged.actionable
     same_twice = validate_review_reply({'results': [*results(value), *results(value)]}, value, [src])
@@ -248,7 +253,7 @@ def test_a_review_sent_with_protocol_2_still_decodes_its_one_entry_per_check_rep
         'replyProtocol': {'version': 'template-review-protocol-2', 'rules': []}}})
     entries = [{'check': ref, 'disposition': 'satisfied', 'reason': '', 'evidence': [], 'actionable': False}
         for ref in check_references(value)]
-    assert len(validate_review_reply({'results': entries}, value, [src]).results) == len(entries)
+    assert len(validate_review_reply({'results': entries}, value, [src]).results) == len(value.targets)
     # Protocol 2 needs every check answered: a reply that leaves one out is incomplete.
     with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_INCOMPLETE'):
         validate_review_reply({'results': entries[1:]}, value, [src])
@@ -346,6 +351,12 @@ def test_prompts_of_two_blocks_share_everything_up_to_the_offered_evidence():
     common = model_prompt(shared)[:-1]
     assert first.startswith(common) and second.startswith(common)
     assert first.index('"declaration"') > first.index('"evidence"')
+    # D116: a review of the same import, which has no reply protocol or instructions of its own at the top, still
+    # shares the protocol and the offered evidence as the opening of its text.
+    review = model_prompt({'protocol': 'template_import_v1', 'evidence': shared['evidence'], 'allowTextRewrite': True,
+        'targets': [], 'semanticContext': {'checks': []}})
+    opening = model_prompt({'protocol': 'template_import_v1', 'evidence': shared['evidence']})[:-1]
+    assert first.startswith(opening) and review.startswith(opening) and len(opening) > len('{"protocol":"template_import_v1",')
 
 
 def test_review_prompts_carry_only_cells_their_proposal_reads_and_no_cell_spans():

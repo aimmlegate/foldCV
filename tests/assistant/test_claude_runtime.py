@@ -23,7 +23,7 @@ class Dispatcher:
     def __init__(self):
         self.calls = 0
 
-    def preflight(self, _params):
+    def preflight(self, _params, _size):
         return None
 
     def revoke(self):

@@ -104,8 +104,9 @@ def test_admitted_success_preserves_usage_and_does_not_double_count(tmp_path, re
 
 @pytest.mark.parametrize("repair", [True, False])
 def test_repair_setting_does_not_remove_runtime_timeout_ceiling(repair):
-    assert GenerationPolicy("fixture", timeout_seconds=180, allow_repair=repair).timeout_seconds == 180
-    for seconds in [180.01, 0, float("inf"), float("nan")]:
+    # D114: the ceiling is the longest import limit Settings allow (240 min), not a call limit.
+    assert GenerationPolicy("fixture", timeout_seconds=14400, allow_repair=repair).timeout_seconds == 14400
+    for seconds in [14400.01, 0, float("inf"), float("nan")]:
         with pytest.raises(ValueError, match="generation limits"):
             GenerationPolicy("fixture", timeout_seconds=seconds, allow_repair=repair)
 

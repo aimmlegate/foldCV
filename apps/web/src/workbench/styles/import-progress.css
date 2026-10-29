@@ -78,6 +78,7 @@
 .app-shell section.new-screen .source-form .upload-mark { width: 34px; height: 34px; }
 .app-shell section.new-screen .source-form .import-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 14px; align-items: end; margin-top: 16px; }
 .app-shell section.new-screen .source-form .import-option label { margin-top: 0; }
+.app-shell section.new-screen .source-form .import-option small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.4; }
 .app-shell section.new-screen .source-form .import-rewrite { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--ink); line-height: 1.4; cursor: pointer; }
 .app-shell section.new-screen .source-form .import-rewrite small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 400; }
 .app-shell section.new-screen .source-form .import-process-button { justify-self: end; }

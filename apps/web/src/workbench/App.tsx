@@ -97,14 +97,14 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" timed /></div>}
         {view === "editor" && template?.response.workspace.project && <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`}
           initial={template.response} connection={template.connection}
-          onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost}
+          onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} paneOrder={paneOrder}
           assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
             settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
             title={projectTitle} settings={openSettings} />} />}
         {view === "source" && !workspace.loading && <SourceForm active={!settings} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings open={settings} close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}

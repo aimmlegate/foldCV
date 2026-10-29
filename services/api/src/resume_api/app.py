@@ -347,11 +347,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         apply_limits(preferences_store.load() if preferences_store.path.exists() else None)
     except PreferencesFailure:
         apply_limits(None)
-    def import_selected_provider():
-        try:
-            model = preferences_store.load().selected_import_model
-        except PreferencesFailure as error:
-            raise ProjectFailure(error.code, 409) from None
+    def chosen_provider(model):
+        """The provider for a model chosen in preferences; None follows the processing model."""
         if model is None:
             return selected_provider()
         if not connection_state.metadataReady or model not in connection_state.models:
@@ -361,6 +358,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         if experimental_ready(model) and provider is not None:
             return provider, model
         return None
+
+    def preferred_provider(field):
+        try:
+            model = getattr(preferences_store.load(), field)
+        except PreferencesFailure as error:
+            raise ProjectFailure(error.code, 409) from None
+        return chosen_provider(model)
+
+    def import_selected_provider():
+        return preferred_provider("selected_import_model")
 
     from packages.resume_core.project_repository import ProjectRepository
     from .projects.exports import ExportService, production_render
@@ -379,8 +386,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     intake = TemplateIntake(project_repository, temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
         **({"clock": clock} if clock is not None else {}))
     app.state.intake = intake
-    rewrite = TemplateRewrite(selected_provider, preferences=preferences_store, temp_root=temp_root, worker_slot=worker_slot,
-        cleanup_error=lifecycle_code)
+    rewrite = TemplateRewrite(lambda: preferred_provider("selected_rewrite_model"), preferences=preferences_store,
+        temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
+        reasoning=lambda model: connection_state.modelReasoning.get(model))
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
     mount_projects_v2(app, projects)
 
@@ -738,11 +746,25 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             except (PreferencesFailure, RulesFailure) as error:
                 return problem(error.code, 409, "settings")
 
+    @app.put("/v1/settings/rewrite-model")
+    async def save_rewrite_model(payload: SaveImportModelPreference):
+        async with gate:
+            if not connection_state.metadataReady or payload.model is not None and payload.model not in connection_state.models:
+                return problem("MODEL_DENIED", 409, "settings")
+            metadata = connection_state.modelReasoning.get(payload.model or connection_state.selectedModel or "")
+            try:
+                rules_store.load()
+                value = preferences_store.select_rewrite_model(payload.model, set(metadata.supported if metadata else ()))
+                return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+            except (PreferencesFailure, RulesFailure) as error:
+                return problem(error.code, 409, "settings")
+
     @app.put("/v1/settings/rewrite-reasoning")
     async def save_rewrite_reasoning(payload: SelectReasoningRequest):
         async with gate:
             metadata = connection_state.modelReasoning.get(payload.model)
-            if (not connection_state.metadataReady or payload.model != connection_state.selectedModel
+            # The store checks the model against the rewrite model, which follows the processing model when unset.
+            if (not connection_state.metadataReady or payload.model not in connection_state.models
                     or payload.effort is not None and (metadata is None or payload.effort not in metadata.supported)):
                 return problem("MODEL_DENIED", 409, "settings")
             try:

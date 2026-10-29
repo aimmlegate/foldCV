@@ -65,6 +65,12 @@ class ExperimentalCliProfile:
     def codex_home(self) -> Path:
         return self.root / "codex"
 
+    @property
+    def workdir(self) -> Path:
+        """One empty working directory for every CLI call: the CLI names its cwd in the model's context, and a
+        per-call directory made every prompt prefix unique (D116: no prompt cache hits across calls)."""
+        return self.root / "cwd"
+
     def prepare(self) -> None:
         self.prepare_directories()
         self.check_binary()
@@ -87,6 +93,7 @@ class ExperimentalCliProfile:
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
         _safe_directory(self.home, create=True)
         _safe_directory(self.codex_home, create=True)
+        _safe_directory(self.workdir, create=True)
         sandbox = Path("/usr/bin/sandbox-exec")
         if not sandbox.is_file() or not os.access(sandbox, os.X_OK):
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")

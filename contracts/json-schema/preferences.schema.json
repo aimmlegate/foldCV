@@ -95,6 +95,18 @@
           ],
           "default": null,
           "title": "Selectedmodel"
+        },
+        "selectedRewriteModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedrewritemodel"
         }
       },
       "title": "ProviderSelection",
@@ -204,6 +216,18 @@
       ],
       "title": "Selectedprovider",
       "type": "string"
+    },
+    "selectedRewriteModel": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Selectedrewritemodel"
     },
     "theme": {
       "enum": [

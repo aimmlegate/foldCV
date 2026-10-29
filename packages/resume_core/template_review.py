@@ -2,15 +2,17 @@
 
 from dataclasses import dataclass
 import json
+import re
 
-from .models.template_import import CheckTarget, ReferencedReviewReply, ReviewInput, ReviewReceipt, ReviewReply
+from .models.template_import import (CheckTarget, ReferencedReviewReply, ReviewDisposition, ReviewInput, ReviewReceipt,
+    ReviewReply, SettledCheck)
 from .project_store import strict_json
 from .template_identity import capture_span, empty_value, evidence_options, offered_evidence, payload_value, restore_evidence, source_slice
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from .templates.models import Check
-from .templates.compiler import sha256
-from .templates.projection import pointer_tokens, validate_payload
-from .templates.replies import REVIEW_PROTOCOL, check_references, review_protocol, review_schema
+from .templates.compiler import canonical, sha256
+from .templates.projection import SchemaFailure, pointer_tokens, resolve, schema_at, validate_payload
+from .templates.replies import FAILING_ONLY_PROTOCOLS, REVIEW_PROTOCOL, check_references, review_protocol, review_schema
 from .template_capture import item_identities
 
 
@@ -111,8 +113,90 @@ def grouped_checks(checks):
     return list(groups.values())
 
 
+def _verbatim(text, texts):
+    pattern = re.compile(r'(?<!\w)' + re.escape(text) + r'(?!\w)')
+    return any(pattern.search(value) for value in texts)
+
+
+def _categorical(schema, pointer):
+    """Whether the content schema at a payload pointer chooses from listed values (enum or const). Such a value is a
+    category the model judges (D115): «not published» states the word published, not the category."""
+    try:
+        node = schema_at(schema, pointer)
+    except SchemaFailure:
+        return True
+    def chooses(value, depth=0):
+        if not isinstance(value, dict) or depth > 16:
+            return False
+        if 'enum' in value or 'const' in value:
+            return True
+        if '$ref' in value:
+            try:
+                return chooses(resolve(schema, value['$ref']), depth + 1)
+            except SchemaFailure:
+                return True
+        return any(chooses(branch, depth + 1) for key in ('anyOf', 'oneOf', 'allOf') for branch in value.get(key) or [])
+    return chooses(node)
+
+
+def _within(span, scope):
+    return any(other.source_id == span.source_id and other.unit_id == span.unit_id and other.start <= span.start
+        and span.end <= other.end for other in scope)
+
+
+def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, previous=None, scope=None, content_schema=None):
+    """The checks the coordinator settles without the model (D115). A string value outside the rewritten fields that
+    stands word for word in a cited source line satisfies every check on its cell: the coordinator bound it there.
+    In a replacement review a value or relation the repair left as it was, same value and same evidence, keeps the
+    earlier receipt's result for each of its checks, a finding included. The scope check is never settled.
+    scope, for one entry of a block (D117), is the entry's lines: a value cited outside them stays with the model.
+    content_schema is the block's: a value it lets choose from listed values (enum, const) stays with the model."""
+    cells = {allocation.item_handle: allocation.cell_ids for allocation in allocations}
+    settled = {}
+    def settle(target, disposition, reason, evidence, actionable, origin):
+        settled[(target.rule_id, target.target_id)] = SettledCheck(ruleId=target.rule_id, targetId=target.target_id,
+            disposition=disposition, reason=reason, evidence=list(evidence), actionable=actionable, origin=origin)
+    for field in proposal.resolved_fields:
+        value = payload_value(proposal.reply.payload, field.pointer)
+        if (not isinstance(value, str) or not value.strip() or field.item_handle not in cells
+                or any(_matches(pattern, field.pointer) for pattern in rewrite_fields)
+                or content_schema is not None and _categorical(content_schema, field.pointer)):
+            continue
+        if not _verbatim(value.strip(), [source_slice(sources, span) for span in field.evidence]):
+            continue
+        if scope is not None and not all(_within(span, scope) for span in field.evidence):
+            continue
+        cell = cells[field.item_handle][field.field_key]
+        for target in targets:
+            if target.target_id == cell:
+                # Like an unlisted check of the model: satisfied, no reason, no cited refs (the field has its own).
+                settle(target, 'satisfied', '', [], False, 'verbatim')
+    if previous is not None:
+        earlier, receipt = previous
+        results = {(result.rule_id, result.target_id): result for result in receipt.reply.results}
+        def fields_of(value):
+            return {(field.item_handle, field.field_key): (canonical(payload_value(value.reply.payload, field.pointer)),
+                frozenset(digest(span) for span in field.evidence)) for field in value.resolved_fields}
+        def relations_of(value):
+            return {resolved.id: (resolved.kind, resolved.subject_id, resolved.target_id,
+                frozenset(digest(span) for span in proposed.evidence))
+                for resolved, proposed in zip(value.resolved_relations, value.reply.relations, strict=True)}
+        before, before_relations = fields_of(earlier), relations_of(earlier)
+        unchanged = {cells[handle][key] for (handle, key), same in fields_of(proposal).items()
+            if handle in cells and before.get((handle, key)) == same}
+        unchanged |= {identifier for identifier, same in relations_of(proposal).items() if before_relations.get(identifier) == same}
+        for target in targets:
+            result = results.get((target.rule_id, target.target_id))
+            if target.target_id in unchanged and result is not None and (target.rule_id, target.target_id) not in settled:
+                settle(target, result.disposition, result.reason, result.evidence, result.actionable, 'reused')
+    return [settled[(target.rule_id, target.target_id)] for target in targets if (target.rule_id, target.target_id) in settled]
+
+
 def make_review_input(operation, proposal, package, sources, policy, *, effective_cells, semantic_context,
-                      occurrence_context=None, occurrence_independent=True):
+                      occurrence_context=None, occurrence_independent=True, previous=None):
+    """The review of a proposal. previous, for a replacement review, is the reviewed proposal the repair corrects with
+    its receipt: the checks of what the repair left unchanged reuse that receipt (D115). The proposal of one entry of
+    a block (D117) settles verbatim values only within the entry's lines."""
     if proposal.state != 'provisional' or proposal.reply is None:
         raise TemplateImportFailure('IMPORT_PROPOSAL_NOT_REVIEWABLE')
     attempt = attempt_in(operation, proposal.attempt_id)
@@ -122,6 +206,12 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
     handles = set(task.allowed_handles) | {field.item_handle for field in proposal.resolved_fields}
     allocations = [allocation for allocation in item_identities(operation) if allocation.item_handle in handles]
     targets = expected_checks(task, proposal, allocations, rules)
+    settled = settled_checks(proposal, targets, allocations, sources, previous=previous,
+        rewrite_fields=block.rewrite.fields if operation.capture.allow_text_rewrite else [],
+        scope=task.entry.spans if task.entry is not None else None,
+        content_schema=next(value.full_schema for value in package.blocks if value.id == block.id))
+    asked = {(value.rule_id, value.target_id) for value in settled}
+    asked = [target for target in targets if (target.rule_id, target.target_id) not in asked]
     spans = [capture_span(source, unit) for source in sources for unit in source.units]
     spans += [span for field in proposal.resolved_fields for span in field.evidence]
     spans += [span for relation in proposal.reply.relations for span in relation.evidence]
@@ -135,7 +225,7 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         'evidence': [refs[digest(span)] for span in relation.evidence]} for relation in proposal.reply.relations]
     # The proposal is shown in its resolved form with evidence named by the review's references.
     context = {**semantic_context, 'replyProtocol': REVIEW_PROTOCOL, 'proposal': shown,
-        'checks': grouped_checks(review_checks(task, proposal, allocations, targets, refs))}
+        'checks': grouped_checks(review_checks(task, proposal, allocations, asked, refs))}
     if not operation.capture.allow_text_rewrite:
         context['sourceWordingPointers'] = sorted({field.pointer for field in proposal.resolved_fields
             if any(_matches(pattern, field.pointer) for pattern in block.rewrite.fields)})
@@ -143,7 +233,21 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         targets=targets, handleMap=allocations, rules=rules, sourceSpans=[], sourceTexts={}, evidence=evidence,
         effectiveCells=effective_cells, relations=proposal.resolved_relations, packageHash=package.package_hash,
         allowTextRewrite=operation.capture.allow_text_rewrite, semanticContext=context, policy=policy,
-        occurrenceContext=occurrence_context, occurrenceIndependent=occurrence_independent)
+        occurrenceContext=occurrence_context, occurrenceIndependent=occurrence_independent, settled=settled)
+
+
+def with_settled(reply, expected):
+    """The reply with the checks the coordinator settled, in the order of the expected targets; an entry the targets
+    do not name stays, so the completeness check still refuses it."""
+    if not expected.settled:
+        return reply
+    entries = {(result.rule_id, result.target_id): result for result in reply.results}
+    entries.update({(value.rule_id, value.target_id): ReviewDisposition(ruleId=value.rule_id, targetId=value.target_id,
+        disposition=value.disposition, reason=value.reason, evidence=value.evidence, actionable=value.actionable)
+        for value in expected.settled})
+    wanted = [(target.rule_id, target.target_id) for target in expected.targets]
+    return ReviewReply(results=[entries[pair] for pair in wanted if pair in entries]
+        + [result for pair, result in entries.items() if pair not in set(wanted)])
 
 
 def check_review_reply(reply, expected, sources):
@@ -167,9 +271,9 @@ def validate_review_reply(value, expected, sources):
     """Raw-before-decode validation of a provider review; version 2 replies select checks and evidence by reference."""
     validate_payload(review_schema(expected), value)
     if expected.schema_version == 1:
-        return check_review_reply(ReviewReply.model_validate(value, strict=True), expected, sources)
+        return check_review_reply(with_settled(ReviewReply.model_validate(value, strict=True), expected), expected, sources)
     referenced = ReferencedReviewReply.model_validate(value, strict=True)
-    if review_protocol(expected) == REVIEW_PROTOCOL['version']:
+    if review_protocol(expected) in FAILING_ONLY_PROTOCOLS:
         # Protocol 3 lists failing checks only; a check the reply does not list holds. Restored in check order, so a
         # receipt lists every check as protocol 2 did. A check listed twice (LIVE-11/12 summary: a violation and an
         # uncertain entry for the same target) merges into the worse disposition; an unknown check is refused by the
@@ -190,7 +294,7 @@ def validate_review_reply(value, expected, sources):
         'targetId': checks[result.check].target_id, 'disposition': result.disposition, 'reason': result.reason,
         'evidence': [span.model_dump(mode='json', by_alias=True) for span in restore_evidence(result.evidence, table, sources)],
         'actionable': result.actionable} for result in referenced.results]}, strict=True)
-    return check_review_reply(reply, expected, sources)
+    return check_review_reply(with_settled(reply, expected), expected, sources)
 
 
 SEVERITY = {'satisfied': 0, 'uncertain': 1, 'violation': 2}

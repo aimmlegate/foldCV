@@ -46,6 +46,10 @@ export type Extract = string[];
 export type Id4 = string;
 export type Mode = "model" | "derived" | "source_copy";
 export type Operation = string | null;
+/**
+ * Outline the list first, then extract its entries in parallel groups. A model list without item limits only.
+ */
+export type PerEntry = boolean;
 export type Order = number;
 export type Region = "header" | "sidebar" | "main";
 export type Fields1 = string[];
@@ -288,6 +292,7 @@ export interface Block {
   id: Id4;
   mode: Mode;
   operation: Operation;
+  per_entry?: PerEntry;
   placement: Placement;
   rewrite: Rewrite;
   selectors: Selectors;

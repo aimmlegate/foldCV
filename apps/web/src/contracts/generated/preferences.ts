@@ -8,6 +8,7 @@ export type Selectedagentmodel = string | null;
 export type Selectedfallbackmodel = string | null;
 export type Selectedimportmodel = string | null;
 export type Selectedmodel = string | null;
+export type Selectedrewritemodel = string | null;
 export type Rewritereasoningeffort1 =
   ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
 export type Schemaversion = 1;
@@ -15,6 +16,7 @@ export type Selectedfallbackmodel1 = string | null;
 export type Selectedimportmodel1 = string | null;
 export type Selectedmodel1 = string | null;
 export type Selectedprovider = "codex_cli" | "claude_cli";
+export type Selectedrewritemodel1 = string | null;
 export type Theme = "light" | "dark" | "system";
 
 export interface Preferences {
@@ -28,6 +30,7 @@ export interface Preferences {
   selectedImportModel?: Selectedimportmodel1;
   selectedModel: Selectedmodel1;
   selectedProvider?: Selectedprovider;
+  selectedRewriteModel?: Selectedrewritemodel1;
   theme: Theme;
 }
 export interface Providerselections {
@@ -43,4 +46,5 @@ export interface ProviderSelection {
   selectedFallbackModel?: Selectedfallbackmodel;
   selectedImportModel?: Selectedimportmodel;
   selectedModel?: Selectedmodel;
+  selectedRewriteModel?: Selectedrewritemodel;
 }

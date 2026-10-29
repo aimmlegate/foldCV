@@ -223,7 +223,8 @@ class CodexCliProvider:
         self.preflight_cache = PreflightCache[Probe](clock)
         self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock,
-                                     launch=experimental_profile.launch if experimental_profile else None)
+                                     launch=experimental_profile.launch if experimental_profile else None,
+                                     workdir=getattr(experimental_profile, "workdir", None))
 
     def invalidate_preflight(self):
         self.preflight_cache.invalidate()

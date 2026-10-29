@@ -41,8 +41,9 @@ class PreferencesStore:
             value = Preferences.model_validate(json.loads(raw, object_pairs_hook=unique))
             kept = [model for selection in value.provider_selections.values() for model in (
                 selection.selected_model, selection.selected_import_model, selection.selected_fallback_model,
-                selection.selected_agent_model)]
-            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model, *kept):
+                selection.selected_rewrite_model, selection.selected_agent_model)]
+            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model,
+                          value.selected_rewrite_model, *kept):
                 if model is not None and not MODEL.fullmatch(model):raise ValueError()
             if value.selected_provider in value.provider_selections:raise ValueError()
             return value
@@ -70,9 +71,24 @@ class PreferencesStore:
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read()
-                if value.selected_model != model:
+                if (value.selected_rewrite_model or value.selected_model) != model:
                     raise PreferencesFailure('MODEL_DENIED')
                 value.rewrite_reasoning_effort = effort
+                self._write(value)
+                return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
+    def select_rewrite_model(self, model, supported):
+        """`supported`: the levels the resulting rewrite model reports; a saved level outside them goes back to its default."""
+        if model is not None and not MODEL.fullmatch(model):
+            raise PreferencesFailure('MODEL_DENIED')
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.selected_rewrite_model = model
+                if value.rewrite_reasoning_effort not in supported:
+                    value.rewrite_reasoning_effort = None
                 self._write(value)
                 return value
         except StorageFailure:
@@ -136,13 +152,14 @@ class PreferencesStore:
                 selections = dict(value.provider_selections)
                 selections[value.selected_provider] = ProviderSelection(
                     selectedModel=value.selected_model, selectedImportModel=value.selected_import_model,
-                    selectedFallbackModel=value.selected_fallback_model,
+                    selectedFallbackModel=value.selected_fallback_model, selectedRewriteModel=value.selected_rewrite_model,
                     rewriteReasoningEffort=value.rewrite_reasoning_effort, selectedAgentModel=agent_model,
                     agentReasoningEffort=agent_effort)
                 restored = selections.pop(kind, ProviderSelection())
                 value.selected_provider = kind
                 value.selected_model, value.selected_import_model = restored.selected_model, restored.selected_import_model
                 value.selected_fallback_model = restored.selected_fallback_model
+                value.selected_rewrite_model = restored.selected_rewrite_model
                 value.rewrite_reasoning_effort = restored.rewrite_reasoning_effort
                 value.provider_selections = selections
                 self._write(value)

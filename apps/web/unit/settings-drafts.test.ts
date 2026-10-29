@@ -14,12 +14,20 @@ function setup() {
     assistant: { schemaVersion: 1, revision: 1, enabled: false, selectedAgentModel: null } as AgentSettings,
   };
   const calls: { part: SettingsPart; value: unknown }[] = [], fail = new Set<SettingsPart>();
+  // Like Python: a level is saved for the model rewriting runs on, and only a level that model reports.
+  const levels: Record<string, string[]> = { "model-a": ["low", "medium", "high"], "model-b": ["low", "high"], "model-c": ["high"] };
+  const rewriting = () => server.preferences.selectedRewriteModel ?? server.preferences.selectedModel ?? "";
   const api: SettingsApi = {
     preferences: async () => structuredClone(server.preferences), rules: async () => structuredClone(server.rules), assistant: async () => structuredClone(server.assistant),
     select: async model => { calls.push({ part: "model", value: model }); if (!model || fail.has("model")) throw new Error("unavailable"); server.preferences.selectedModel = model; return model; },
     saveReasoning: async (model, effort) => { calls.push({ part: "reasoning", value: { model, effort } });
-      if (fail.has("reasoning") || model !== server.preferences.selectedModel) throw new Error("unsupported");
+      if (fail.has("reasoning") || model !== rewriting() || effort && !levels[model]?.includes(effort)) throw new Error("unsupported");
       server.preferences.rewriteReasoningEffort = effort; return structuredClone(server.preferences); },
+    selectRewrite: async model => { calls.push({ part: "rewrite", value: model }); if (fail.has("rewrite")) throw new Error("unavailable");
+      server.preferences.selectedRewriteModel = model;
+      const effort = server.preferences.rewriteReasoningEffort;
+      if (effort && !levels[rewriting()]?.includes(effort)) server.preferences.rewriteReasoningEffort = null;
+      return structuredClone(server.preferences); },
     selectImport: async model => { calls.push({ part: "import", value: model }); if (fail.has("import")) throw new Error("unavailable");
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     selectFallback: async model => { calls.push({ part: "fallback", value: model }); if (fail.has("fallback")) throw new Error("unavailable");
@@ -64,10 +72,11 @@ test("the assistant effort is a draft saved with the assistant model and reread 
   assert.deepEqual(h.calls.at(-1), { part: "assistant", value: { expectedRevision: 1, enabled: false, selectedAgentModel: "agent-b", reasoningEffort: "high" } });
   assert.deepEqual(h.controller.dirty, []);
   // The server switched provider: other choices are in place now.
-  h.server.preferences = { ...h.server.preferences, selectedModel: "claude-model", rewriteReasoningEffort: "low" };
+  h.server.preferences = { ...h.server.preferences, selectedModel: "claude-model", selectedRewriteModel: "claude-rewrite", rewriteReasoningEffort: "low" };
   h.server.assistant = { ...h.server.assistant, revision: 3, selectedAgentModel: "claude-agent", reasoningEffort: null };
   await h.controller.reloadChoices();
   assert.equal(h.controller.state.draft.model, "claude-model"); assert.equal(h.controller.state.draft.reasoning, "low");
+  assert.equal(h.controller.state.draft.rewriteModel, "claude-rewrite");
   assert.equal(h.controller.state.draft.agentModel, "claude-agent"); assert.equal(h.controller.state.draft.agentEffort, null);
   assert.deepEqual(h.controller.dirty, []);
 });
@@ -217,4 +226,27 @@ test("reasoning saves with the chosen model, retains failed drafts and restores 
   assert.equal(h.calls.length, count);
   h.controller.change("reasoning", null); await h.controller.save();
   assert.equal(h.server.preferences.rewriteReasoningEffort, null);
+});
+
+test("the rewrite model saves before its level, which must be one that model reports", async () => {
+  const h = setup(); h.server.preferences.rewriteReasoningEffort = "low"; await h.controller.load();
+  h.controller.change("rewriteModel", "model-c"); assert.deepEqual(h.controller.dirty, ["rewrite", "reasoning"]);
+  await h.controller.save();
+  assert.deepEqual(h.calls.map(call => call.part), ["rewrite", "reasoning"]); assert.deepEqual(h.controller.state.saved, ["rewrite"]);
+  assert.equal(h.server.preferences.rewriteReasoningEffort, null); assert.ok(h.controller.state.errors.reasoning);
+  h.controller.change("reasoning", "high"); await h.controller.save();
+  assert.deepEqual(h.calls.at(-1), { part: "reasoning", value: { model: "model-c", effort: "high" } }); assert.deepEqual(h.controller.dirty, []);
+  // Back to the processing model: the level is saved again, for the model rewriting now runs on.
+  h.controller.change("rewriteModel", null); await h.controller.save();
+  assert.deepEqual(h.calls.slice(-2), [{ part: "rewrite", value: null }, { part: "reasoning", value: { model: "model-a", effort: "high" } }]);
+  assert.equal(h.server.preferences.rewriteReasoningEffort, "high"); assert.deepEqual(h.controller.dirty, []);
+});
+
+test("reopened Settings shows rewrite choices saved in the popover and keeps its own unsaved edits", async () => {
+  const h = setup(); await h.controller.load();
+  h.controller.change("importModel", "model-c");
+  Object.assign(h.server.preferences, { selectedRewriteModel: "model-b", rewriteReasoningEffort: "high", selectedImportModel: "model-a" });
+  await h.controller.refreshPreferences();
+  assert.equal(h.controller.state.draft.rewriteModel, "model-b"); assert.equal(h.controller.state.draft.reasoning, "high");
+  assert.equal(h.controller.state.draft.importModel, "model-c"); assert.deepEqual(h.controller.dirty, ["import"]);
 });

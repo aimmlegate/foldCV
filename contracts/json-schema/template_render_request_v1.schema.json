@@ -303,6 +303,12 @@
           ],
           "title": "Operation"
         },
+        "per_entry": {
+          "default": false,
+          "description": "Outline the list first, then extract its entries in parallel groups. A model list without item limits only.",
+          "title": "Per Entry",
+          "type": "boolean"
+        },
         "placement": {
           "$ref": "#/$defs/Placement"
         },

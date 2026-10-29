@@ -255,14 +255,45 @@ REVIEWS = {'F10': f10_review}
 
 
 def satisfied(value, verdict=None):
-    """Every check satisfied unless the case's verdict names another disposition for it."""
-    from tests.templates.evidence_references import expanded_checks
+    """Every check satisfied unless the case's verdict names another disposition for it. The checks the coordinator
+    settled (D115) are not the model's to answer, so only the model's targets are listed."""
+    from tests.templates.evidence_references import expanded_checks, model_targets
     results = []
-    for target, check in zip(value['targets'], expanded_checks(value), strict=True):
+    for target, check in zip(model_targets(value), expanded_checks(value), strict=True):
         disposition = verdict(check) if verdict else None
         results.append({'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': disposition or 'satisfied',
             'reason': '' if disposition is None else 'Not supported by the cited source.', 'evidence': [], 'actionable': False})
     return {'results': results}
+
+
+def entry_bounds(block, payload, src, cites, value, index):
+    """The first and last offered line the scripted entry `index` cites, by this request's refs (D117)."""
+    reply = block_reply(block, payload, src, cites)
+    cited = [field['evidence'] for field in reply['fields'] if pointer_tokens(field['pointer'])[:1] == [str(index)]]
+    lines = [option for option in value['evidence'] if '\n' not in option['text'].strip()]
+    # The offered evidence lists units and their lines in document order.
+    order = {option['ref']: position for position, option in enumerate(lines)}
+    holders = sorted({option['ref'] for spans in cited for cited_span in spans for option in lines
+        if option['span']['unitId'] == cited_span['unitId'] and option['span']['start'] <= cited_span['start']
+        and cited_span['end'] <= option['span']['end']}, key=order.get)
+    assert holders, 'scripted entry cites no offered line'
+    return holders[0], holders[-1]
+
+
+def entry_table(payload, cites, indices):
+    """The scripted block narrowed to the items of one entry, in order from /0, with their cites moved along."""
+    moved = {}
+    for position, index in enumerate(indices):
+        prefix = '/' + str(index) + '/'
+        moved.update({'/' + str(position) + '/' + pointer[len(prefix):]: cited for pointer, cited in cites.items()
+            if pointer.startswith(prefix)})
+    return [payload[index] for index in indices], moved
+
+
+def entry_items(block, payload, src, cites, value):
+    """The scripted items an entry request covers: those whose cited lines are the bounds of one of its parts."""
+    bounds = {entry_bounds(block, payload, src, cites, value, index): index for index in range(len(payload))}
+    return [bounds[(part['first'], part['last'])] for part in value['entry']['parts'] if (part['first'], part['last']) in bounds]
 
 
 def generic_script(src, table, verdict=None, package=None):
@@ -271,11 +302,22 @@ def generic_script(src, table, verdict=None, package=None):
     def script(_request, value):
         if 'targets' in value:
             return satisfied(value, verdict)
+        if value.get('slot') == 'outline_review':
+            return {'missing': [], 'remarks': []}
         block = blocks[value['declaration']['id']]
         if block.id in table:
             payload, cites = table[block.id]
         else:
             payload, cites = ([] if block.view.mode == 'items' else empty_object(block, package)), {}
+        if value.get('slot') == 'outline':
+            # D117: one entry per scripted item, in the table's order, bounded by the lines its values cite.
+            entries = []
+            for index, item in enumerate(payload):
+                first, last = entry_bounds(block, payload, src, cites, value, index)
+                entries.append({'title': item.get('company') or 'Entry ' + str(index + 1), 'first': first, 'last': last})
+            return {'entries': entries}
+        if 'entry' in value:
+            payload, cites = entry_table(payload, cites, entry_items(block, payload, src, cites, value))
         return block_reply(block, payload, src, cites, value)
     return script
 
@@ -287,14 +329,16 @@ def empty_object(block, package=None):
         for key, schema in properties.items()}
 
 
-async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None):
+async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None, concurrency=1):
     """A published Generic import of one synthetic fixture through the coordinator and the real materializer; wrap
-    changes the scripted answers. Another compiled package (CT08) imports with its own table."""
+    changes the scripted answers. Another compiled package (CT08) imports with its own table. With one call at a time
+    the projects block runs whole; with more it is outlined and its jobs run in groups (D117)."""
     from packages.resume_core.project_limits import finalization_seconds, import_seconds
     from packages.resume_core.templates.operations import derive_task
     from tests.templates.template_runtime_fixtures import EmploymentFixture
     src, raw = source_fixture(name)
-    fixture = EmploymentFixture(root, captured=package or generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False)
+    fixture = EmploymentFixture(root, captured=package or generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False,
+        concurrency=concurrency)
     fixture.command.capture.allow_text_rewrite = rewrite
     # The default Settings limits hold about thirty durable calls and the publication on the real clock (D096).
     fixture.command.capture.policy.processing_seconds = import_seconds()

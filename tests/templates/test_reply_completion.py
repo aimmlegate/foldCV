@@ -209,16 +209,21 @@ async def test_an_generic_import_with_lean_first_replies_publishes_the_same_bloc
     # lineage or relations. Repairs stay explicit. The published blocks match the explicit F10 import.
     import re
     from packages.resume_core.template_completion import stated_text
-    from tests.templates.generic_fixtures import F10_REJECTED, F10_RESULT, generic_import
+    from tests.templates.generic_fixtures import F10_REJECTED, F10_RESULT, entry_items, entry_table, generic_import
     from tests.templates.test_generic_import import views
     src = source_fixture('F10')[0]
     text, blocks = src.units[0].text, {block.id: block for block in generic_package().definition.blocks}
     def lean(script):
         def scripted(request, value):
+            if value.get('slot') in {'outline', 'outline_review'}:
+                # D117: the projects outline and its review are no extraction replies.
+                return script(request, value)
             if 'targets' not in value and value.get('slot') != 'initial':
                 # A repair selects the items the lean first reply allocated, named as the scripted reply names them.
                 block = blocks[value['declaration']['id']]
                 payload, cites = TABLES['F10'](True)[block.id]
+                if 'entry' in value:
+                    payload, cites = entry_table(payload, cites, entry_items(block, payload, src, cites, value))
                 named = {(item['semanticType'], item['pointer']): item['key']
                     for item in block_reply(block, payload, src, cites)['discoveries']}
                 def scripted_key(key):

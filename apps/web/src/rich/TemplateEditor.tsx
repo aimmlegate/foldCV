@@ -10,6 +10,7 @@ import type { AssistantFinding, AssistantSelection } from "../assistant/controll
 import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
+import type { PaneOrder } from "../workbench/settings/interface";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
@@ -45,9 +46,9 @@ function blockRevisions(response: TemplateProjectResponseV1): Map<string, number
 }
 
 /** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
-export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant }: {
+export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant, paneOrder }: {
   initial: TemplateProjectResponseV1; connection: ProjectEditorConnection; onStatus: (status: string) => void;
-  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode }) {
+  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode; paneOrder: PaneOrder }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
@@ -57,6 +58,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
   const [factsVisible, setFactsVisible] = useState(false);
+  // Blocks an assistant Apply changed, marked for a moment so the user sees where the edit landed.
+  const [changed, setChanged] = useState<{ blockIds: string[]; at: number } | null>(null);
+  useEffect(() => {
+    if (!changed) return;
+    const timer = setTimeout(() => setChanged(null), 3000);
+    return () => clearTimeout(timer);
+  }, [changed]);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("layout");
   const [sourceVisited, setSourceVisited] = useState(false);
   const [panelPending, setPanelPending] = useState<PanelCommand[]>([]);
@@ -113,7 +121,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     },
     navigate: () => session.navigateAway(), resume: () => session.resume(), refresh: () => session.refresh(),
     undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo"),
-    applyAssistant: (proposalId, allowEdits) => session.applyAssistant(proposalId, allowEdits),
+    applyAssistant: async (proposalId, allowEdits) => {
+      const result = await session.applyAssistant(proposalId, allowEdits);
+      showChanges(result.edit?.changedBlockIds ?? []);
+      return result;
+    },
     captureSelection: () => {
       const selected = editor.getSelection(), text = window.getSelection()?.toString().trim() ?? "";
       if (!selected?.blocks.length || !text) return null;
@@ -139,6 +151,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }
   useEffect(() => { if (mode === "recovering") void recover(); }, [mode]);
   const unsupported = () => setWarning(knownErrorMessage("V7_INPUT_UNSUPPORTED") ?? "");
+  function showChanges(blockIds: readonly string[]) {
+    const shown = blockIds.filter(id => editor.getBlock(id)), first = shown[0];
+    if (first === undefined) return;
+    document.querySelector(`.cv-document [data-id="${CSS.escape(first)}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setChanged({ blockIds: shown, at: Date.now() });
+  }
   function showBlock(blockId: string): boolean {
     if (!editor.getBlock(blockId)) return false;
     // A block without text (an item frame) cannot hold the caret; it is still scrolled to.
@@ -244,7 +262,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </div>}
       </aside>
       {/* The layout host: the facts panel floats over the document. */}
-      <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
+      <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
         close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace">
         <fieldset className="contents uir-editor-controls" disabled={locked}>
@@ -265,6 +283,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
             data-history-position={session.history.position} data-history-length={session.history.length}>
             {sheet && <style>{sheet.css}</style>}
+            {/* A style rule, not classes on the blocks: ProseMirror owns their DOM. */}
+            {changed && <style key={changed.at}>{`${changed.blockIds.map(id => `.cv-document .bn-block[data-id="${CSS.escape(id)}"] > :first-child`).join(", ")} { animation: assistant-change 3s ease-out; }`}</style>}
             <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} style={sheet?.variables}>
               {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
               <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}

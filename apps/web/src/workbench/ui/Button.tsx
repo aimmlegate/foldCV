@@ -1,7 +1,8 @@
-import type { ButtonHTMLAttributes } from "react";
-import { Spinner } from "./OperationStatus";
+import type { ComponentProps } from "react";
+// Not from OperationStatus: its Icon import (an SVG file) cannot load in the Node render tests.
+import { Spinner } from "./Spinner";
 
-export function Button({ variant = "default", className = "", busy = false, busyLabel = "Подождите…", children, disabled, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {
+export function Button({ variant = "default", className = "", busy = false, busyLabel = "Подождите…", children, disabled, ...props }: ComponentProps<"button"> & {
   variant?: "default" | "primary" | "quiet" | "danger";
   busy?: boolean; busyLabel?: string;
 }) {

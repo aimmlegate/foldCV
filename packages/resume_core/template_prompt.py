@@ -3,17 +3,19 @@
 The stored request keeps every span, identity and hash; the reply names only references (S, H, E, R refs and
 check refs C), so the model sees each offered entry as {ref, text} and none of the bookkeeping the
 coordinator restores from those references. Parts shared by the tasks of one import come first so a provider
-can reuse the cached prefix; block-specific parts follow. The text depends only on the request content, never
-on key insertion order, so a request reloaded from storage reads the same.
+can reuse the cached prefix: the protocol name and the offered evidence (the whole source, the same for every
+proposal and review of an import) open the text (D116), then the parts shared by one kind of request, then the
+block-specific ones. The text depends only on the request content, never on key insertion order, so a request
+reloaded from storage reads the same.
 """
 
 import json
 
-LEADING = ('protocol', 'replyProtocol', 'modelInstructions', 'allowTextRewrite', 'formattingAsOf',
-    'evidence', 'references', 'effectiveCells', 'effectiveRecords', 'manualScopes', 'relations', 'dependencies')
+LEADING = ('protocol', 'evidence', 'replyProtocol', 'modelInstructions', 'allowTextRewrite', 'formattingAsOf',
+    'references', 'effectiveCells', 'effectiveRecords', 'manualScopes', 'relations', 'dependencies')
 # Identities, hashes and spans a reply cannot use: it selects items, cells, relations and checks by reference.
 HIDDEN = {'allowedHandles', 'capturedHandles', 'capturedRelations', 'tools', 'packageHash', 'handleMap', 'targets',
-    'policy', 'proposalHash', 'sourceSpans', 'sourceTexts'}
+    'policy', 'proposalHash', 'sourceSpans', 'sourceTexts', 'settled'}
 
 
 # What a model can read in a cell: its identity, wording, value and standing; spans and receipts stay stored.

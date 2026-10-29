@@ -122,17 +122,19 @@ class ToolSession(PrivateMcp):
             delete_blocks {blockIds}; move_block {blockId, afterBlockId or parentId}; format_block {blockId, kind?,
             level?, alignment?, textColor?, backgroundColor?}; update_fact {recordId, field, value}; create_fact
             {kind, values, jobId?}; delete_fact {recordId}. history {direction} and action {action: rename,
-            formatting_date, archive, restore or delete; value?; targetId?} are proposals of their own."""
+            formatting_date, archive, restore or delete; value?; targetId?} are proposals of their own. One call carries
+            at most 64 KiB of JSON and 100 ops; split a larger edit into several proposals over different blocks."""
             return await self.call('propose_changes', lambda: self.propose(request))
 
         @tool
         async def publish_findings(request: PublishFindingsV1) -> CallToolResult:
             """Store remarks without editing. A target names blockId (with optional cellId, start, end) or recordId
-            (with optional fieldKey). sourceIds are ids returned by read_public_page."""
+            (with optional fieldKey). sourceIds are ids returned by read_public_page. One call carries at most 64 KiB
+            of JSON and 20 findings; publish more in further calls."""
             return await self.call('publish_findings', lambda: self.findings(request))
 
     # The listener's envelope checks before the SDK sees a call (agent/mcp.py).
-    def preflight(self, params):
+    def preflight(self, params, size):
         if not self.active or self.control.cancel.is_set():
             return 'AGENT_CANCELLED'
         if self.calls >= limits.TOOL_CALLS:
@@ -141,9 +143,15 @@ class ToolSession(PrivateMcp):
                 or not isinstance(params.get('arguments', {}), dict)):
             self.calls += 1
             return 'AGENT_ARGUMENT_INVALID'
+        if size > limits.CALL_BYTES:
+            self.calls += 1
+            return 'AGENT_CALL_TOO_LARGE'
         return None
 
-    def preflight_failure(self, code):
+    def preflight_failure(self, code, size):
+        if code == 'AGENT_CALL_TOO_LARGE':
+            return {'error': {'code': code}, 'detail': [f'This call is {size} bytes of JSON; one call may carry at most '
+                f'{limits.CALL_BYTES} bytes ({limits.CALL_BYTES // 1024} KiB). Split it into several smaller calls.']}
         return {'error': {'code': code}}
 
     def wire(self, value):
