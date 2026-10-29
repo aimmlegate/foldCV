@@ -482,7 +482,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             # A known exhausted plan is named as such; "connect a model" sent the user to Settings for nothing (D104).
             stored = stored_preferences()
             kind = catalog().get((stored.selected_import_model if stored else None) or processing_model())
-            raise ProjectFailure("QUOTA_EXHAUSTED" if kind and states[kind].quota.state == "exhausted"
+            # Without a chosen model, the plan is named when every provider that is on has used it up.
+            exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
+            raise ProjectFailure("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted"
+                                                                        for item in exhausted)
                                  else "CONNECTION_REQUIRED", 409)
         provider, model = selected
         reasoning = reasoning_of(model)
