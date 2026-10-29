@@ -10,6 +10,7 @@ import type { AssistantFinding, AssistantSelection } from "../assistant/controll
 import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
+import type { PaneOrder } from "../workbench/settings/interface";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
@@ -45,9 +46,9 @@ function blockRevisions(response: TemplateProjectResponseV1): Map<string, number
 }
 
 /** The V7 editor: the same BlockNote view and controls, bound to one TemplateEditorSession. */
-export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant }: {
+export function TemplateEditor({ initial, connection, onStatus, onShown, ref, portalHost, assistant, paneOrder }: {
   initial: TemplateProjectResponseV1; connection: ProjectEditorConnection; onStatus: (status: string) => void;
-  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode }) {
+  onShown: (response: TemplateProjectResponseV1) => void; ref: Ref<TemplateEditorHandle>; portalHost?: HTMLElement; assistant?: ReactNode; paneOrder: PaneOrder }) {
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
@@ -244,7 +245,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </div>}
       </aside>
       {/* The layout host: the facts panel floats over the document. */}
-      <ComparisonWorkspace view={workspaceView} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
+      <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
         close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace">
         <fieldset className="contents uir-editor-controls" disabled={locked}>

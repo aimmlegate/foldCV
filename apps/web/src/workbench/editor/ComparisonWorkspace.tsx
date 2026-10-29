@@ -25,7 +25,7 @@ export function WorkspaceViews({ view, change, hasSource, notices }: { view: Wor
   </div>;
 }
 
-export function ComparisonWorkspace({ view, layout, original, order = "layout-first" }: { view: WorkspaceView; layout: ReactNode; original: ReactNode; order?: PaneOrder }) {
+export function ComparisonWorkspace({ view, layout, original, order }: { view: WorkspaceView; layout: ReactNode; original: ReactNode; order: PaneOrder }) {
   const host = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState(savedRatio), [width, setWidth] = useState(0), [dragging, setDragging] = useState(false);
   function changeRatio(value: number) {

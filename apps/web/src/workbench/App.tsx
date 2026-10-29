@@ -97,7 +97,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" timed /></div>}
         {view === "editor" && template?.response.workspace.project && <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`}
           initial={template.response} connection={template.connection}
-          onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost}
+          onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} paneOrder={paneOrder}
           assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
             settingsOpen={settings} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
             title={projectTitle} settings={openSettings} />} />}
