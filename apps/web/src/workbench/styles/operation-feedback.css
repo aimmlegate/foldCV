@@ -42,7 +42,7 @@
 .job-details-loading { padding-top: 8px; }
 .chat-activity-preview { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-activity summary > .operation-copy { flex: 1; }
-.chat-activity > summary { min-height: 54px; align-items: center; }
+.chat-activity > summary { min-height: 54px; max-width: 100%; align-items: center; }
 .chat-activity-preview { max-width: 100%; min-height: 18px; }
 .agent-chat-panel { position: relative; }
 .chat-load-status { position: absolute; top: 58px; left: 16px; right: 16px; z-index: 3; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
