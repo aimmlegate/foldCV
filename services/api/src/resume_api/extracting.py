@@ -7,12 +7,11 @@ import json
 from pathlib import Path
 import re
 import subprocess
-import sys
 
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.extraction.parser import MAX_SOURCE
 
-from .lifecycle import OperationFiles
+from .lifecycle import OperationFiles, python_worker
 
 WORKER = Path(__file__).resolve().parents[4] / "packages/resume_core/extraction/worker.py"
 MAX_BODY = MAX_SOURCE + 8192
@@ -84,7 +83,7 @@ async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFile
     workspace = files.path
     (workspace / "source.bin").write_bytes(data)
     (workspace / "extract-input.json").write_text(json.dumps({"name": name, "pasted": pasted}, ensure_ascii=False), encoding="utf-8")
-    process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
+    process = files.spawn(*python_worker("extract", str(WORKER)), capture=False)
     try:
         while process.poll() is None:
             rss = await asyncio.to_thread(_rss_kb, process.pid)

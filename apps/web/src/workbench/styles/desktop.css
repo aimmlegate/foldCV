@@ -1,0 +1,9 @@
+/* The macOS app (apps/desktop) has no title bar: its window buttons sit over the top-left corner of the page,
+   and its preload adds the strip that drags the window. */
+html[data-desktop="macos"] .desktop-window-drag { position: fixed; inset: 0 0 auto; z-index: 1000; height: 30px; -webkit-app-region: drag; user-select: none; }
+html[data-desktop="macos"] .app-shell .history { padding-top: 39px; }
+/* Content-box keeps each breakpoint's header height and adds the inset on top. */
+html[data-desktop="macos"] .app-header { box-sizing: content-box; padding-top: 12px; }
+html[data-desktop="macos"] .workspace-operation { top: 106px; }
+/* No focus frame around the logo in the app window. */
+html[data-desktop="macos"] .app-shell .history .brand:is(:focus, :focus-visible) { outline: none; }

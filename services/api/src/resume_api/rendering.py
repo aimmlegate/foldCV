@@ -5,13 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-import sys
 import zipfile
 
 from packages.resume_core.rendering.models import RenderRequest
 from packages.resume_core.rendering.template import RenderFailure
 
-from .lifecycle import OperationFiles
+from .lifecycle import OperationFiles, python_worker
 
 WORKER = Path(__file__).resolve().parents[4] / "packages/resume_core/rendering/worker.py"
 MAX_ZIP = 16 * 1024 * 1024
@@ -33,7 +32,7 @@ class DocumentRenderer:
             raise RenderFailure("RENDER_FAILED")
         workspace = files.path
         (workspace / "render-input.json").write_bytes(request.model_dump_json(by_alias=True).encode("utf-8"))
-        process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
+        process = files.spawn(*python_worker("render", str(WORKER)), capture=False)
         try:
             code = await asyncio.get_running_loop().run_in_executor(self.executor, process.wait)
         finally:
@@ -81,7 +80,7 @@ class TemplateDocxRenderer:
     async def _run(self, files: OperationFiles) -> bytes:
         from packages.resume_core.rich_limits import DOCX_BYTES
         workspace = files.path
-        process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
+        process = files.spawn(*python_worker("render", str(WORKER)), capture=False)
         try:
             code = await asyncio.wait_for(asyncio.get_running_loop().run_in_executor(self.executor, process.wait), timeout=30)
         finally:

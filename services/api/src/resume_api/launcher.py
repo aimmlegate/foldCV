@@ -56,13 +56,13 @@ def bind_claude(slot: ProviderSlot, executable: Path) -> ProviderSlot:
                         slot.installation, runtime, rebind=bind_claude)
 
 
-def claude_slot(data_root: Path, temp_root: Path | None = None) -> ProviderSlot:
+def claude_slot(data_root: Path, temp_root: Path | None = None, *, managed_only: bool = False) -> ProviderSlot:
     """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing.
-    FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into.
-    Without `temp_root` the slot has no assistant runtime."""
+    FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into;
+    the desktop app passes managed_only. Without `temp_root` the slot has no assistant runtime."""
     installation = ClaudeInstallation(data_root / ("cli-runtime-" + claude.KIND))
     managed = installation.executable
-    executable = managed if managed.is_file() else claude.installed_executable() or managed
+    executable = managed if managed_only or managed.is_file() else claude.installed_executable() or managed
     profile = ClaudeCliProfile(data_root / ("cli-profile-" + claude.KIND), executable)
     runtime = ClaudeAgentRuntime(profile, temp_root) if temp_root is not None else None
     return bind_claude(ProviderSlot(None, profile=profile, installation=installation, runtime=runtime), executable)

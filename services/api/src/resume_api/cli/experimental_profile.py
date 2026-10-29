@@ -20,10 +20,32 @@ from . import distribution
 BINARY = Path("/Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 SYSTEM_SKILLS = ("imagegen", "openai-docs", "skill-creator", "skill-installer")
 MARKER = ".foldcv-cli-experiment-v1"
+SYSTEM_CA = Path("/private/etc/ssl/cert.pem")
+_system_certificates = False
 
 
 class ExperimentalProfileError(Exception):
     pass
+
+
+def use_system_certificates() -> None:
+    """Point every CLI launch of this process at the system PEM bundle; TLS checks stay on.
+
+    The macOS app needs it: native trust discovery failed the CLI token exchange on a macOS 14 Mac (2026-10-20).
+    """
+    global _system_certificates
+    _system_certificates = True
+
+
+def system_certificates() -> str:
+    try:
+        info = SYSTEM_CA.lstat()
+        if (any(path.is_symlink() for path in SYSTEM_CA.parents) or not stat.S_ISREG(info.st_mode)
+                or info.st_uid != 0 or info.st_mode & 0o022 or not 0 < info.st_size <= 4 * 1024 * 1024):
+            raise ExperimentalProfileError("CLI_CA_UNAVAILABLE")
+    except OSError:
+        raise ExperimentalProfileError("CLI_CA_UNAVAILABLE") from None
+    return str(SYSTEM_CA)
 
 
 def _literal(path: Path) -> str:
@@ -162,15 +184,20 @@ class ExperimentalCliProfile:
                "HOME": str(self.home), "CODEX_HOME": str(self.codex_home),
                "TMPDIR": str(owned / "tmp"), "XDG_CACHE_HOME": str(owned / "cache"),
                "XDG_DATA_HOME": str(owned / "data"), "XDG_STATE_HOME": str(owned / "state")}
+        if _system_certificates:
+            env["CODEX_CA_CERTIFICATE"] = system_certificates()
         command = ("-p", self._policy(owned, args), str(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, env
 
 
-def installed_profile(root: Path) -> ExperimentalCliProfile:
+def installed_profile(root: Path, *, managed_only: bool = False) -> ExperimentalCliProfile:
+    """The macOS app passes managed_only: it uses only the runtime it installs, on every Mac the same way."""
     import shutil
     from resume_api.agent.host_profile import check_host
 
     managed = distribution.managed_executable(root.parent / "cli-runtime")
+    if managed_only:
+        return ExperimentalCliProfile(root, managed)
     candidates = [managed, BINARY]
     detected = shutil.which("codex")
     if detected is not None:

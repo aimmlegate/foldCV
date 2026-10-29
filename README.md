@@ -12,6 +12,14 @@ Read [the manual-use guide](docs/gui/mvp-manual.md) for launch and connection st
 The recovery run is accepted with review debt; native CLI quality/usage/retention,
 Word and clean-host checks remain pending.
 
+## macOS app
+
+`tools/build-macos-dmg.sh` builds `FoldCV Local.app` and its DMG from this checkout in one step: the frontend, the
+local service frozen with PyInstaller, and the Electron window around it. It needs Apple Silicon, arm64 Node 22 and
+python.org Python 3.13, and writes to `output/foldcv-macos-<version>-<commit>/`. The app keeps its data in
+`~/Library/Application Support/FoldCV Desktop`, apart from the browser service's `FoldCV` root. The signature is ad
+hoc: on another Mac, allow the app once in System Settings → Privacy & Security.
+
 ## Setup
 
 ```sh

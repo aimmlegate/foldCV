@@ -30,6 +30,11 @@ def tune_garbage_collector() -> tuple[int, int, int]:
     return previous
 
 
+def python_worker(mode: str, *arguments: str) -> tuple[Path, tuple[str, ...]]:
+    """Run a worker on this interpreter, or as one mode of the frozen macOS helper, which has no scripts to run."""
+    return Path(sys.executable), (mode,) if getattr(sys, "frozen", False) else arguments
+
+
 def require_supported_host() -> None:
     if sys.platform != "darwin" or platform.machine() != "arm64":
         raise RuntimeError("Local service process cleanup supports macOS arm64 only")
