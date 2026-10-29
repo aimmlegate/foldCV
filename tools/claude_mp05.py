@@ -265,8 +265,10 @@ async def run_import(args) -> None:
             [operation] = owner.template_operations
             published = operation.state == "published" and saved.project is not None
             codes = Counter(attempt.error_code for attempt in operation.attempts if attempt.error_code)
-            # Source fallbacks also publish; the proof needs every model reply accepted.
-            passed = published and not codes
+            # Source fallbacks also publish; the proof needs model content in every block. A reply the import's
+            # own repair fixed is part of the design (D107), so codes alone do not fail the run (user, 2026-10-29).
+            passed = (published and cleanup_verified(operation)
+                      and not any(task.state == "source_fallback" for task in operation.tasks))
             if saved.project is not None:
                 began = time.monotonic()
                 opened = (await client.post("/v2/projects/" + project + "/open", json={})).json()
@@ -318,7 +320,9 @@ async def run_assistant(client, project, refused) -> None:
     capabilities = (await client.get(base + "/capabilities")).json()
     if not capabilities["ready"]:
         raise SystemExit("assistant not ready: " + json.dumps(capabilities.get("unavailable")))
-    conversation = (await client.post(base + "/conversations")).json()["id"]
+    created = await client.post(base + "/conversations", json={})
+    assert created.status_code == 201, created.text[:300]
+    conversation = created.json()["id"]
     charge({"id": "MP06a-1", "slice": "MP06a", "model": MODEL, "effort": EFFORT, "allowRepair": False,
             "path": "assistant run through the app routes on the MP05 import, Claude active, read-only",
             "status": "dispatched", "startedAt": now()}, after="MP05-2")
@@ -352,6 +356,31 @@ async def run_assistant(client, project, refused) -> None:
     print(json.dumps(value, indent=2, ensure_ascii=False))
 
 
+async def assistant_only(args) -> None:
+    """MP06a-1 on the project an earlier `import` left in its /private/tmp root."""
+    import httpx
+    from resume_api.app import create_app
+    from resume_api.providers.registry import ProviderRegistry
+    root = Path(args.root)
+    [directory] = (root / "data/projects").glob("project-*")
+    origin, secret = "http://127.0.0.1:39305", secrets.token_urlsafe(32)
+    slot, refused = claude_slot(DATA, root / "operations"), Refused()
+    wrapped = create_app(origin=origin, secret=secret, temp_root=root / "operations", dist=root / "dist",
+                         data_root=root / "data", template_import_call_cap=60,
+                         provider_registry=ProviderRegistry(frozenset({"claude_cli"})), provider_slots={"claude_cli": slot})
+    app = wrapped.app
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=origin,
+                                     headers={"Origin": origin}, timeout=120) as client:
+            assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
+            assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
+            status = (await client.post("/v1/host/status", json={})).json()
+            if status["state"] != "connected" or MODEL not in status["models"]:
+                raise SystemExit("Claude is not connected: " + status["state"])
+            await run_assistant(client, directory.name, refused)
+    slot.profile.wipe()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -362,9 +391,12 @@ def main() -> None:
     importing.add_argument("source")
     importing.add_argument("--retry", metavar="INSTRUCTION", help="the user's instruction to repeat the failed MP05-2")
     importing.add_argument("--assistant", action="store_true", help="then MP06a-1 on the imported project")
+    commands.add_parser("assistant").add_argument("root", help="the /private/tmp root of an earlier import")
     args = parser.parse_args()
     if args.command == "import":
         asyncio.run(run_import(args))
+    elif args.command == "assistant":
+        asyncio.run(assistant_only(args))
     else:
         {"schemas": schemas, "canary": canary}[args.command](args)
 
