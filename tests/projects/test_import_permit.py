@@ -1,4 +1,4 @@
-"""An import runs beside an assistant turn on the shared inference admission (D120, permit lifecycle)."""
+"""An import runs beside an assistant turn on the shared inference admission (D121, permit lifecycle)."""
 
 import asyncio
 from pathlib import Path

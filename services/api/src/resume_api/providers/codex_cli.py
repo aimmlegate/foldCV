@@ -394,7 +394,7 @@ class CodexCliProvider:
     def generate_owned(self, request, files, cancel, permit):
         try:
             with permit.hold(cancel):
-                # Model calls share the profile, so import blocks and other model work run at once (CT10, D120).
+                # Model calls share the profile, so import blocks and other model work run at once (CT10, D121).
                 with self._profile_owner(cancel, files.root):
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:

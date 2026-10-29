@@ -152,7 +152,7 @@ class _SharedHold:
         self.ready = threading.Event()
 
 
-# Model calls of this process hold the profile together (CT10, D120): the first takes the exclusive lock, later ones
+# Model calls of this process hold the profile together (CT10, D121): the first takes the exclusive lock, later ones
 # join it, and the last one out runs the cleanup and releases it. Exclusive owners and other processes still wait.
 _HOLDS, _HOLDS_GUARD = {}, threading.Lock()
 

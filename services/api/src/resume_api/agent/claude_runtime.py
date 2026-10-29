@@ -313,7 +313,7 @@ class ClaudeAgentRuntime:
 
     @contextmanager
     def owner(self, cancel, deadline):
-        # Plan 8.4: sessions, caches and logs go after the run, once no other model call shares the profile (D120).
+        # Plan 8.4: sessions, caches and logs go after the run, once no other model call shares the profile (D121).
         wipe = self.profile.wipe if self.profile is not None else None
         with native_profile(self.profile, cancel, deadline=deadline, operations_root=self.temp_root, shared=True,
                             cleanup=wipe):

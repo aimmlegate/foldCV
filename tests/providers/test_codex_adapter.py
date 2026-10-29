@@ -436,7 +436,7 @@ def test_cancel_after_completion_keeps_usage_while_another_instance_runs_beside_
     provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
     second = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
     with generating(provider, root, threading.Event(), cli.parent / "ready") as errors:
-        # D120: a model call no longer waits for another one on the same profile.
+        # D121: a model call no longer waits for another one on the same profile.
         configure("valid")
         with OperationFiles(root).open() as files:
             result = second.generate(request(), files, threading.Event())

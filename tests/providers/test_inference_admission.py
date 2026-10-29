@@ -65,7 +65,7 @@ async def test_borrowed_native_admission_requires_the_exact_live_reservation():
 
 @pytest.mark.asyncio
 async def test_model_work_runs_side_by_side_and_an_exclusive_holder_waits_for_all_of_it():
-    # D120: an import on one provider no longer stops another import, a rewrite or an assistant turn.
+    # D121: an import on one provider no longer stops another import, a rewrite or an assistant turn.
     from resume_api.inference_admission import AdmissionTimeout, InferenceAdmission
     admission = InferenceAdmission()
     first, second = await admission.reserve(asyncio.Event()), await admission.reserve(asyncio.Event())

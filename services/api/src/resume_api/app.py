@@ -388,7 +388,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     @asynccontextmanager
     async def model_slot(cancel):
-        # A rewrite waits in the inference admission, not for one of the local workers uploads and exports need (D120).
+        # A rewrite waits in the inference admission, not for one of the local workers uploads and exports need (D121).
         async with gate:
             if unsafe_cleanup:
                 raise SpikeError("PROCESS_CLEANUP_FAILED")

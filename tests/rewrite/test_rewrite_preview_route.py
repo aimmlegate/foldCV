@@ -116,7 +116,7 @@ def test_a_rewrite_finishes_while_an_import_holds_its_inference_permit(tmp_path)
     provider = Provider('Clear')
     with v2_app(tmp_path, [papers()], content_provider=provider) as (client, _application):
         editor = Editor(client, PROJECT)
-        # D120: a running import on either provider no longer queues the rewrite.
+        # D121: a running import on either provider no longer queues the rewrite.
         assert INFERENCE.acquire(blocking=False)
         try:
             assert preview(editor)['text'] == 'Clear'

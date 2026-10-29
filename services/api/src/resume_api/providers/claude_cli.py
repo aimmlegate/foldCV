@@ -362,7 +362,7 @@ class ClaudeCliProvider:
 
     @contextmanager
     def _profile_owner(self, cancel, operations_root):
-        # Model calls share the profile (D120); sessions, caches and logs go once the last of them ends.
+        # Model calls share the profile (D121); sessions, caches and logs go once the last of them ends.
         wipe = self.profile.wipe if self.profile is not None else None
         try:
             with native_profile(self.profile, cancel, deadline=time.monotonic() + 30,

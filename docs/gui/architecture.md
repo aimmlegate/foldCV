@@ -273,7 +273,7 @@ activity view (stage, elapsed time, saved discoveries, and `detail.progress` fro
 stall check). Nothing there is durable.
 
 - Imports of several projects run at once, beside rewrites and assistant turns on either
-  provider (D120): each holds a shared inference permit. Only a sign-in, CLI install or
+  provider (D121): each holds a shared inference permit. Only a sign-in, CLI install or
   connection check holds the exclusive one; an import started then waits with stage
   `queued` and its start reply returns at once. The client
   (`workbench/import/tracker.ts`) follows each project's task without blocking the

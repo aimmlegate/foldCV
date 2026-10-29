@@ -139,7 +139,7 @@ class ImportService:
                 except Exception:
                     pass
             # One shared permit for the whole run: its parallel blocks run under it, beside other imports, rewrites
-            # and assistant turns (D120); a sign-in or CLI install waits for it instead of changing the CLI mid-run.
+            # and assistant turns (D121); a sign-in or CLI install waits for it instead of changing the CLI mid-run.
             held['permit'], held['operation'] = await self._permit(task, operation_id, started), operation_id
             held['token'] = JOB_PERMIT.set(held['permit'])
             self.queue_moved = self.wall()

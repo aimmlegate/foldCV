@@ -155,7 +155,7 @@ async def test_a_second_project_imports_beside_the_first_and_both_finish(tmp_pat
         assert (held['phase'], held['done'], held['total'], held['current']) == ('processing', 0, 1, ['PROJECTS'])
         assert held['events'][0]['text'] == 'Извлекаем данные: «PROJECTS»' and held['stalled'] is False
         assert held['lastModelAt'] is not None
-        # D120: the second import does not queue behind the first; both model calls run at once.
+        # D121: the second import does not queue behind the first; both model calls run at once.
         beside = await start(client, second, 'import-b')
         assert beside.status_code == 202 and beside.json()['stage'] == 'processing', beside.text
         await until(lambda: len(provider.efforts) == 2)

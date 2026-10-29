@@ -74,7 +74,7 @@ def test_profile_ownership_excludes_another_process_and_is_cancellable(tmp_path)
 
 
 def test_shared_calls_hold_the_profile_together_and_the_last_one_cleans_and_releases_it(tmp_path):
-    # CT10, D120: model calls of any import, rewrite or turn run at once; an exclusive owner waits for all of them.
+    # CT10, D121: model calls of any import, rewrite or turn run at once; an exclusive owner waits for all of them.
     owned = profile(tmp_path / "native-profile")
     together, first_out, second_out = threading.Barrier(3, timeout=5), threading.Event(), threading.Event()
     errors, cleaned = [], []
