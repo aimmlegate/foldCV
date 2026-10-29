@@ -2,6 +2,7 @@
 the preview never edits the project, a stale selection is refused before the model, and Apply is an ordinary edit."""
 
 from packages.resume_core.preferences import PreferencesStore
+from tests.settings.test_rewrite_reasoning import Adapter
 from packages.resume_core.templates.presentation import snapshot_identity
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
 from resume_api.providers.content import ContentResult, ReportedUsage
@@ -57,6 +58,25 @@ def test_the_model_gets_only_the_selected_text_and_the_captured_reasoning_and_th
         assert history_file(application) == journal
         task, = [task for task in client.get('/v2/projects/' + PROJECT + '/tasks').json()['tasks'] if task['kind'] == 'rewrite']
         assert task['state'] == 'succeeded'
+
+
+def test_a_rewrite_runs_on_the_chosen_rewrite_model_at_a_level_that_model_reports(tmp_path):
+    provider = Provider('Clear')
+    with v2_app(tmp_path, [papers()], content_provider=provider, connection_adapter=Adapter()) as (client, _application):
+        client.post('/v1/host/status', json={})
+        client.post('/v1/host/select', json={'model': 'model-a'})
+        assert client.put('/v1/settings/rewrite-reasoning', json={'model': 'model-a', 'effort': 'low'}).status_code == 200
+        editor = Editor(client, PROJECT)
+        preview(editor, request_id='rewrite-a')
+        # A processing model changed elsewhere keeps the saved level; this model lacks it and runs at its default.
+        client.post('/v1/host/select', json={'model': 'model-b'})
+        preview(editor, request_id='rewrite-b')
+        client.post('/v1/host/select', json={'model': 'model-a'})
+        assert client.put('/v1/settings/rewrite-model', json={'model': 'model-b'}).status_code == 200
+        assert client.put('/v1/settings/rewrite-reasoning', json={'model': 'model-b', 'effort': 'high'}).status_code == 200
+        preview(editor, request_id='rewrite-c')
+    assert [(request.policy.model, request.policy.reasoning_effort) for request in provider.requests] == [
+        ('model-a', 'low'), ('model-b', None), ('model-b', 'high')]
 
 
 def test_an_unchanged_reply_is_a_preview_without_any_edit(tmp_path):

@@ -7,6 +7,7 @@ export type Schemaversion = 1;
 export type Selectedfallbackmodel = string | null;
 export type Selectedimportmodel = string | null;
 export type Selectedmodel = string | null;
+export type Selectedrewritemodel = string | null;
 export type Theme = "light" | "dark" | "system";
 
 export interface Preferences {
@@ -18,5 +19,6 @@ export interface Preferences {
   selectedFallbackModel?: Selectedfallbackmodel;
   selectedImportModel?: Selectedimportmodel;
   selectedModel: Selectedmodel;
+  selectedRewriteModel?: Selectedrewritemodel;
   theme: Theme;
 }

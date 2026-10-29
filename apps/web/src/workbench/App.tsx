@@ -104,7 +104,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "source" && !workspace.loading && <SourceForm active={!settings} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings open={settings} close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}

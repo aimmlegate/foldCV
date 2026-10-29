@@ -39,7 +39,7 @@ class PreferencesStore:
                     result[key] = value
                 return result
             value = Preferences.model_validate(json.loads(raw, object_pairs_hook=unique))
-            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model):
+            for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model, value.selected_rewrite_model):
                 if model is not None and not MODEL.fullmatch(model):raise ValueError()
             return value
         except (OSError, ValueError, ValidationError):
@@ -66,9 +66,24 @@ class PreferencesStore:
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read()
-                if value.selected_model != model:
+                if (value.selected_rewrite_model or value.selected_model) != model:
                     raise PreferencesFailure('MODEL_DENIED')
                 value.rewrite_reasoning_effort = effort
+                self._write(value)
+                return value
+        except StorageFailure:
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
+    def select_rewrite_model(self, model, supported):
+        """`supported`: the levels the resulting rewrite model reports; a saved level outside them goes back to its default."""
+        if model is not None and not MODEL.fullmatch(model):
+            raise PreferencesFailure('MODEL_DENIED')
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.selected_rewrite_model = model
+                if value.rewrite_reasoning_effort not in supported:
+                    value.rewrite_reasoning_effort = None
                 self._write(value)
                 return value
         except StorageFailure:

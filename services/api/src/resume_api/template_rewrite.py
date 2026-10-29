@@ -15,8 +15,9 @@ CANCEL_SECONDS = 65
 
 
 class TemplateRewrite:
-    def __init__(self, provider_factory, *, preferences, temp_root, worker_slot, cleanup_error):
+    def __init__(self, provider_factory, *, preferences, temp_root, worker_slot, cleanup_error, reasoning=lambda _model: None):
         self.provider_factory, self.preferences, self.temp_root = provider_factory, preferences, temp_root
+        self.reasoning = reasoning
         self.worker_slot, self.cleanup_error = worker_slot, cleanup_error
         self.tasks, self.cancels, self.files = {}, {}, {}
 
@@ -28,6 +29,10 @@ class TemplateRewrite:
             effort = self.preferences.load().rewrite_reasoning_effort if self.preferences else None
         except PreferencesFailure as error:
             raise ProjectFailure(error.code, 409) from None
+        # A level saved for another model runs at this model's default instead of failing the rewrite.
+        metadata = self.reasoning(selected[1])
+        if effort is not None and metadata is not None and effort not in metadata.supported:
+            effort = None
         key = (identifier, request_id)
         if key in self.cancels:
             raise ProjectFailure('REQUEST_IN_PROGRESS', 409)

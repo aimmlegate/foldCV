@@ -29,6 +29,9 @@ export function saveRulesRequest(body: SaveRulesRequest): Promise<RulesSettings>
 export function saveRewriteReasoningRequest(model: string | null, effort: Preferences["rewriteReasoningEffort"]): Promise<Preferences> {
   return request<Preferences>("/v1/settings/rewrite-reasoning", "PUT", { model, effort: effort ?? null });
 }
+export function saveRewriteModelRequest(model: string | null): Promise<Preferences> {
+  return request<Preferences>("/v1/settings/rewrite-model", "PUT", { model });
+}
 export function saveImportModelRequest(model: string | null): Promise<Preferences> {
   return request<Preferences>("/v1/settings/import-model", "PUT", { model });
 }

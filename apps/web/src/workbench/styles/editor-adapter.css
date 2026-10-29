@@ -228,6 +228,10 @@
 .uir-rewrite textarea { min-height: 58px; margin-bottom: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; }
 .uir-rewrite .rewrite-chips { gap: 6px; margin: 0 0 10px; }
 .uir-rewrite .rewrite-chips button { padding: 5px 8px; font-size: 10px; }
+.uir-rewrite .rewrite-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 10px; }
+.uir-rewrite .rewrite-options > div { min-width: 0; }
+.uir-rewrite .rewrite-options select { width: 100%; max-width: none; padding: 5px 8px; font-size: 11px; }
+.uir-rewrite .rewrite-options .notice { grid-column: 1 / -1; margin: 0; }
 .uir-rewrite .rewrite-progress-slot { height: auto; min-height: 24px; margin: 6px 0; }
 .uir-rewrite .rewrite-progress-slot:empty { display: none; }
 .uir-rewrite .rewrite-actions { display: flex; align-items: center; gap: 6px; }

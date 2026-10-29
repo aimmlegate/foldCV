@@ -5,6 +5,7 @@ import { Icon } from "../ui/Icon";
 import { rewriteCancellable, rewriteLabels, type RewriteActivity } from "../../rich/rewrite-progress";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
+import { RewriteOptions, useRewriteSettings } from "./RewriteOptions";
 
 // Used until the saved presets from Settings are read, and when that read fails.
 const builtInPresets = { shorten: "Сократи текст, сохрани факты и смысл.", clarify: "Сделай текст яснее, сохрани факты и смысл." };
@@ -18,6 +19,7 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
 }) {
   const dialog = useRef<HTMLElement>(null), returnFocus = useRef<HTMLElement | null>(null);
   const [presets, setPresets] = useState(builtInPresets);
+  const settings = useRewriteSettings(open);
   // Read on every opening: Settings may have saved new presets while this editor stayed mounted.
   useEffect(() => {
     if (!open) return;
@@ -44,7 +46,8 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     document.addEventListener("pointerdown", outside); return () => document.removeEventListener("pointerdown", outside);
   }, [open, close]);
   const fields = <><label htmlFor="uir-rewrite-instruction">Что изменить?</label><textarea id="uir-rewrite-instruction" rows={2} aria-label="Что изменить" disabled={busy} value={instruction} onChange={event => change(event.currentTarget.value)} />
-    <div className="rewrite-chips"><button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button><button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></div></>;
+    <div className="rewrite-chips"><button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button><button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></div>
+    <RewriteOptions settings={settings} disabled={busy} /></>;
   return <section ref={dialog} hidden={!open} role="dialog" aria-modal="false" className="rewrite-panel uir-rewrite" aria-labelledby="uir-rewrite-title"
     onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); returnFocus.current?.focus(); }
