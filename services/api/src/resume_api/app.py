@@ -386,6 +386,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         finally:
             active -= 1
 
+    @asynccontextmanager
+    async def model_slot(cancel):
+        # A rewrite waits in the inference admission, not for one of the local workers uploads and exports need (D120).
+        async with gate:
+            if unsafe_cleanup:
+                raise SpikeError("PROCESS_CLEANUP_FAILED")
+            if cancel.is_set():
+                raise AdmissionCancelled()
+        yield
+
     def provider_for(model):
         """The provider that runs a catalog model now, with the model; None while that provider cannot run it."""
         if content_provider is not None and not unsafe_cleanup:
@@ -437,7 +447,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         **({"clock": clock} if clock is not None else {}))
     app.state.intake = intake
     rewrite = TemplateRewrite(lambda: preferred_provider("selected_rewrite_model"), preferences=preferences_store,
-        temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of)
+        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of)
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
     mount_projects_v2(app, projects)
 
@@ -846,12 +856,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
             def execute():
                 if job == "install":
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), files.open():
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), files.open():
                         return work(files, cancel)
                 if profile is not None and not profile.executable.is_file():
                     raise ConnectionFailure("CLI_MISSING")
                 try:
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), native_profile(
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), native_profile(
                             profile, cancel, deadline=time.monotonic() + 15, blocking=False,
                             operations_root=temp_root):
                         with files.open():

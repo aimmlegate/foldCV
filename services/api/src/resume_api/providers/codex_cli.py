@@ -394,17 +394,17 @@ class CodexCliProvider:
     def generate_owned(self, request, files, cancel, permit):
         try:
             with permit.hold(cancel):
-                # Calls under one job permit share the profile, so independent import blocks run at once (CT10).
-                with self._profile_owner(cancel, files.root, share=permit):
+                # Model calls share the profile, so import blocks and other model work run at once (CT10, D120).
+                with self._profile_owner(cancel, files.root):
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
 
     @contextmanager
-    def _profile_owner(self, cancel, operations_root, share=None):
+    def _profile_owner(self, cancel, operations_root):
         try:
             with native_profile(self.experimental_profile, cancel, deadline=time.monotonic() + 30,
-                    operations_root=operations_root, share=share):
+                    operations_root=operations_root, shared=True):
                 yield
         except AdmissionBlocked:
             INFERENCE.block()

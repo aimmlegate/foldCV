@@ -355,22 +355,19 @@ class ClaudeCliProvider:
     def generate_owned(self, request, files, cancel, permit):
         try:
             with permit.hold(cancel):
-                with self._profile_owner(cancel, files.root, share=permit):
+                with self._profile_owner(cancel, files.root):
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
 
     @contextmanager
-    def _profile_owner(self, cancel, operations_root, share=None):
+    def _profile_owner(self, cancel, operations_root):
+        # Model calls share the profile (D120); sessions, caches and logs go once the last of them ends.
+        wipe = self.profile.wipe if self.profile is not None else None
         try:
             with native_profile(self.profile, cancel, deadline=time.monotonic() + 30,
-                                operations_root=operations_root, share=share):
-                try:
-                    yield
-                finally:
-                    # Shared holders may still run; the next exclusive operation wipes for them.
-                    if self.profile is not None and share is None:
-                        self.profile.wipe()
+                                operations_root=operations_root, shared=True, cleanup=wipe):
+                yield
         except AdmissionBlocked:
             INFERENCE.block()
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None

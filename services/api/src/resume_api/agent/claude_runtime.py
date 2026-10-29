@@ -313,13 +313,11 @@ class ClaudeAgentRuntime:
 
     @contextmanager
     def owner(self, cancel, deadline):
-        with native_profile(self.profile, cancel, deadline=deadline, operations_root=self.temp_root):
-            try:
-                yield
-            finally:
-                # Plan 8.4: sessions, caches and logs go after every assistant run.
-                if self.profile is not None:
-                    self.profile.wipe()
+        # Plan 8.4: sessions, caches and logs go after the run, once no other model call shares the profile (D120).
+        wipe = self.profile.wipe if self.profile is not None else None
+        with native_profile(self.profile, cancel, deadline=deadline, operations_root=self.temp_root, shared=True,
+                            cleanup=wipe):
+            yield
 
     def launch(self, token):
         def launch(executable, args, operation):

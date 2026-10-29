@@ -72,7 +72,8 @@ async def test_active_stop_writes_interrupt_without_waiting_for_another_output_e
 @pytest.mark.asyncio
 async def test_queued_stop_spends_no_start_and_never_creates_an_operation(tmp_path):
     admission = InferenceAdmission()
-    admission.acquire()
+    # A sign-in holds the exclusive permit; model work waits behind it.
+    admission.acquire(exclusive=True)
     started, cancel = [], threading.Event()
     value = input_value(before_start=lambda: started.append(True))
     driver = runtime(tmp_path, value, script(value), admission=admission)
@@ -214,7 +215,7 @@ def test_native_web_search_is_off_and_denied_with_or_without_internet(allow_web)
 
 def test_shared_permit_cancels_a_waiter_without_releasing_its_current_owner():
     permit = InferenceAdmission()
-    permit.acquire()
+    permit.acquire(exclusive=True)
     cancel = threading.Event()
     cancel.set()
     with pytest.raises(AdmissionCancelled):

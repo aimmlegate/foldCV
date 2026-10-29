@@ -124,8 +124,8 @@ def test_a_queued_import_is_answered_at_once_and_shows_that_it_waits(tmp_path):
         pipeline.read = service.repository.read
         service.imports.pipeline, service.imports.commands = pipeline, None
         admission = service.imports.admission = InferenceAdmission()
-        # An assistant turn has the permit; the start used to wait for it 30 s and then fail with 408.
-        assert admission.acquire(blocking=False)
+        # A sign-in has the exclusive permit; the start used to wait for it 30 s and then fail with 408.
+        assert admission.acquire(blocking=False, exclusive=True)
         started = start(client, 'request-1')
         assert started.status_code == 202, started.text
         assert (started.json()['state'], started.json()['stage']) == ('running', 'queued')

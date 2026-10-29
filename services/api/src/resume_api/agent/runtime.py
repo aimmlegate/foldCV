@@ -512,9 +512,10 @@ class CodexAgentRuntime:
         try:
             if len((value.prompt + BASE_INSTRUCTIONS + value.developer_instructions).encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")
+            # A turn runs beside imports and rewrites on either provider (D120).
             with self.admission.hold(cancel, deadline=queued + limits.ADMISSION_SECONDS), native_profile(
                     self.profile, cancel, deadline=queued + limits.ADMISSION_SECONDS,
-                    operations_root=self.temp_root), terminal_cleanup(
+                    operations_root=self.temp_root, shared=True), terminal_cleanup(
                     value, self.admission, lambda: cleanup_started):
                 result.timings["admission"] = time.monotonic() - queued
                 session = NativeSession(value, cancel, emit, startup=self.startup_seconds,

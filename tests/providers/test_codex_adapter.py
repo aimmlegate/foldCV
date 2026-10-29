@@ -430,24 +430,20 @@ def test_inflight_cancel_kills_descendants_and_cleans(fake) -> None:
     assert starts() == 1 and list(root.iterdir()) == [keep]
 
 
-def test_cancel_after_completion_keeps_usage_and_blocks_parallel_instances(fake) -> None:
+def test_cancel_after_completion_keeps_usage_while_another_instance_runs_beside_it(fake) -> None:
     cli, root, keep, configure, starts = fake
     configure("late")
     provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
     second = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
     with generating(provider, root, threading.Event(), cli.parent / "ready") as errors:
-        with pytest.raises(ContentFailure, match="BUSY") as busy:
-            with OperationFiles(root).open() as files:
-                second.generate(request(), files, threading.Event())
-        assert busy.value.logical_attempts == 0
+        # D120: a model call no longer waits for another one on the same profile.
+        configure("valid")
+        with OperationFiles(root).open() as files:
+            result = second.generate(request(), files, threading.Event())
+        assert result.logical_attempts == 1 and starts() == 2
     assert len(errors) == 1 and isinstance(errors[0], ContentFailure)
     assert errors[0].code == "CANCELLED"
     assert errors[0].usage.input_tokens == 100 and errors[0].usage.complete
-    assert starts() == 1 and list(root.iterdir()) == [keep]
-    configure("valid")
-    with OperationFiles(root).open() as files:
-        result = second.generate(request(), files, threading.Event())
-    assert result.logical_attempts == 1 and starts() == 2
     assert list(root.iterdir()) == [keep]
 
 
