@@ -89,6 +89,8 @@ class Control:
 class AssistantService:
     def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0):
         self.projects, self.runtime, self.connection = projects, runtime, connection
+        # The runtime of a model's provider (D119); without it every model runs on `runtime`.
+        self.runtime_for = lambda _model: self.runtime
         root = projects.repository.root
         self.store = AssistantStore(root)
         self.settings = AgentSettingsStore(root)
@@ -121,7 +123,7 @@ class AssistantService:
         settings = self.settings.load()
         model = settings.selected_agent_model
         reason = ('AGENT_DISABLED' if not settings.enabled else 'AGENT_CLEANUP_FAILED' if INFERENCE.blocked else
-            'AGENT_RUNTIME_UNSUPPORTED' if self.runtime is None else
+            'AGENT_RUNTIME_UNSUPPORTED' if self.runtime_for(model) is None else
             connection.reason or 'AGENT_CONNECTION_UNAVAILABLE' if not connection.ready else
             'AGENT_MODEL_REQUIRED' if model is None else
             'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else
@@ -130,7 +132,7 @@ class AssistantService:
         models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified')
             for value in connection.models]
         return AssistantCapabilitiesV1(ready=reason is None, unavailable=AssistantErrorV1(code=reason) if reason else None,
-            models=models, webAvailable=self.runtime is not None, tools=list(TOOL_NAMES))
+            models=models, webAvailable=self.runtime_for(model) is not None, tools=list(TOOL_NAMES))
 
     # Conversations
 
@@ -309,8 +311,9 @@ class AssistantService:
         tools = None
         loop = asyncio.get_running_loop()
         pin = ExitStack()
+        runtime = self.runtime_for(control.run.model)
         try:
-            if self.runtime is None:
+            if runtime is None:
                 raise AgentFailure('AGENT_RUNTIME_UNSUPPORTED')
             pinned, history = await asyncio.to_thread(self._pin, pin, control)
             prompt = context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
@@ -325,7 +328,7 @@ class AssistantService:
                 revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
                 developer_instructions=DEVELOPER_INSTRUCTIONS,
                 **({'reasoning_effort': control.effort} if control.effort else {}))
-            result = await self.runtime.run(value, control.cancel,
+            result = await runtime.run(value, control.cancel,
                 lambda kind, payload: self.emit(control, kind, payload))
         except asyncio.CancelledError:
             result = RuntimeResult(state='cancelled', error='AGENT_CANCELLED')
@@ -379,7 +382,7 @@ class AssistantService:
             control.run = control.run.model_copy(update={'state': state, 'finished_at': timestamp()})
             self._wake(control)
             return
-        if state == 'completed' and result.tool_calls and getattr(self.runtime, 'native', False):
+        if state == 'completed' and result.tool_calls and getattr(self.runtime_for(control.run.model), 'native', False):
             self.verified.add((self.connection().epoch, control.run.model))
         text = (result.text or control.text).encode()[:limits.ASSISTANT_TEXT_BYTES].decode('utf-8', 'ignore')
         error = AssistantErrorV1(code=result.error) if result.error and state != 'completed' else None

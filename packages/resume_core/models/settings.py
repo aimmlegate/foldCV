@@ -48,17 +48,6 @@ ProviderKind = Literal["codex_cli", "claude_cli"]
 DEFAULT_PROVIDER: ProviderKind = "codex_cli"
 
 
-class ProviderSelection(Wire):
-    """Choices kept for a provider while another one is active; restored when it is selected again."""
-    selected_model: str | None = None
-    selected_import_model: str | None = None
-    selected_fallback_model: str | None = None
-    selected_rewrite_model: str | None = None
-    rewrite_reasoning_effort: ReasoningEffort | None = None
-    selected_agent_model: str | None = None
-    agent_reasoning_effort: ReasoningEffort | None = None
-
-
 class Preferences(Wire):
     schema_version: Literal[1]
     automatic_analysis: bool
@@ -72,9 +61,8 @@ class Preferences(Wire):
     rewrite_reasoning_effort: ReasoningEffort | None = None
     import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
     project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
-    # The keys above belong to the active provider; files written before MP01 load as Codex.
-    selected_provider: ProviderKind = DEFAULT_PROVIDER
-    provider_selections: dict[ProviderKind, ProviderSelection] = Field(default_factory=dict)
+    # Providers that may run (D119); each model choice runs on the provider whose catalog lists it.
+    enabled_providers: list[ProviderKind] = Field(default_factory=lambda: [DEFAULT_PROVIDER], max_length=2)
 
 
 class SaveImportModelPreference(Wire):

@@ -229,8 +229,8 @@ async def run_import(args) -> None:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=origin,
                                      headers={"Origin": origin}, timeout=120) as client:
             assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
-            assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
-            status = (await client.post("/v1/host/status", json={})).json()
+            assert (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).status_code == 200
+            status = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
             if status["state"] != "connected" or MODEL not in status["models"]:
                 raise SystemExit("Claude is not connected: " + status["state"])
             selected = await client.post("/v1/host/select", json={"model": MODEL})
@@ -373,8 +373,8 @@ async def assistant_only(args) -> None:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=origin,
                                      headers={"Origin": origin}, timeout=120) as client:
             assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
-            assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
-            status = (await client.post("/v1/host/status", json={})).json()
+            assert (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).status_code == 200
+            status = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
             if status["state"] != "connected" or MODEL not in status["models"]:
                 raise SystemExit("Claude is not connected: " + status["state"])
             await run_assistant(client, directory.name, refused)

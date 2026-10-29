@@ -1,6 +1,7 @@
-"""MP07: a project made on Codex rewrites and exports on Claude without reprocessing (plan section 6, item 4), through
-the real Claude connection and provider over the CLI stand-in; Claude is listed without a preview switch. No fixture
-`content_provider`: that override would answer for every provider, so the active slot's provider must run."""
+"""MP07 and MP08: a project made on Codex rewrites and exports on Claude without reprocessing (plan section 6, item 4),
+through the real Claude connection and provider over the CLI stand-in, while Codex stays connected and keeps the
+processing model (D119). No fixture `content_provider`: that override would answer for every provider, so the provider
+of the chosen model must run."""
 
 from __future__ import annotations
 
@@ -40,9 +41,12 @@ async def test_a_codex_project_rewrites_and_exports_on_claude_without_reprocessi
     repository = app.app.state.projects.repository
     before = repository.read(PROJECT)
     async with signed_in(app) as client:
-        assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
-        assert (await client.post("/v1/host/status", json={})).json()["state"] == "connected"
-        assert (await client.post("/v1/host/select", json={"model": "claude-sonnet-5-5"})).status_code == 200
+        assert (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).status_code == 200
+        assert (await client.post("/v1/host/status", json={"provider": "codex_cli"})).json()["state"] == "connected"
+        connected = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
+        assert connected["state"] == "connected" and connected["providers"][0]["state"] == "connected"
+        assert (await client.post("/v1/host/select", json={"model": "gpt-6-luna"})).status_code == 200
+        assert (await client.put("/v1/settings/rewrite-model", json={"model": "claude-sonnet-5-5"})).status_code == 200
         editor = await open_project(client)
         token, snapshot = editor
         preview = await client.post(f"/v2/projects/{PROJECT}/rewrite/preview", json={

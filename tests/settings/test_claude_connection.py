@@ -42,9 +42,13 @@ def app_with(tmp_path, adapter):
 
 
 async def on_claude(client):
-    state = (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()
-    assert state["provider"] == "claude_cli"
+    state = (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).json()
+    assert state["provider"] == "claude_cli" and state["providers"][1]["enabled"]
     return state
+
+
+def summary(entry):
+    return {key: entry[key] for key in ("kind", "display", "subscription", "publisher", "loginCode", "installed")}
 
 
 @pytest.mark.asyncio
@@ -68,8 +72,10 @@ async def test_claude_connection_states(tmp_path, claude, case, version, state):
             assert result["versionStatus"] == "supported" and result["plan"] == "max"
             assert result["quota"] == {"state": "not_provided", "usedPercent": None, "resetsAt": None}
             assert "claude-sonnet-5-5" in result["models"] and result["modelReasoning"]["claude-sonnet-5-5"]["default"]
-        assert result["providers"][1] == {"kind": "claude_cli", "display": "Claude", "subscription": "Claude",
-                                          "publisher": "Anthropic", "loginCode": True, "installed": state != "cli_missing"}
+        assert summary(result["providers"][1]) == {"kind": "claude_cli", "display": "Claude", "subscription": "Claude",
+                                                   "publisher": "Anthropic", "loginCode": True,
+                                                   "installed": state != "cli_missing"}
+        assert result["providers"][1]["state"] == state
     assert not any(args[:1] == ["-p"] for args in audit())
 
 
@@ -78,7 +84,7 @@ async def test_missing_claude_cli_is_reported_without_a_process(tmp_path):
     app = app_with(tmp_path, ClaudeConnectionAdapter(None))
     async with client_session(app) as client:
         await on_claude(client)
-        result = (await client.post("/v1/host/status", json={})).json()
+        result = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
         assert result["state"] == "cli_missing" and result["providers"][1]["installed"] is False
 
 
@@ -91,18 +97,18 @@ async def test_sign_in_takes_the_pasted_code_once_and_never_logs_out(tmp_path, c
         await on_claude(client)
         refused = await client.post("/v1/host/login-code", json={"provider": "claude_cli", "code": "synthetic-code"})
         assert refused.status_code == 409 and refused.json()["error"]["code"] == "LOGIN_NOT_AVAILABLE"
-        assert (await client.post("/v1/host/status", json={})).json()["state"] == "login_required"
+        assert (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()["state"] == "login_required"
         login = asyncio.create_task(client.post("/v1/host/login", json={"provider": "claude_cli"}))
         for _ in range(400):
             if ["auth", "login", "--claudeai"] in audit():
                 break
             await asyncio.sleep(0.01)
         pending = (await client.get("/v1/settings/connection")).json()
-        assert pending["state"] == "login_pending"
+        assert pending["providers"][1]["state"] == "login_pending" and pending["providers"][0]["state"] == "unchecked"
         assert (await client.post("/v1/host/login-code", json={"code": "bad code"})).status_code == 422
         assert (await client.post("/v1/host/login-code", json={"provider": "codex_cli", "code": "x"})).status_code == 409
         sent = await client.post("/v1/host/login-code", json={"provider": "claude_cli", "code": "synthetic-code"})
         assert sent.status_code == 200
         assert (await asyncio.wait_for(login, 10)).json()["state"] == "login_required"
-        assert (await client.post("/v1/host/status", json={})).json()["state"] == "connected"
+        assert (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()["state"] == "connected"
     assert ["auth", "logout"] not in audit() and "synthetic-code" not in json.dumps(audit())
