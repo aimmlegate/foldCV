@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import functools
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import secrets
@@ -67,20 +68,37 @@ def fresh_root(label: str) -> Path:
     return Path(tempfile.mkdtemp(prefix=f"foldcv-mp05-{label}-", dir="/private/tmp"))
 
 
+class Refused(logging.Handler):
+    """Collects the stream events the provider refused, by kind only."""
+
+    def __init__(self):
+        super().__init__(logging.WARNING)
+        self.kinds = Counter()
+        logging.getLogger("resume_api.providers.claude_cli").addHandler(self)
+
+    def emit(self, record):
+        self.kinds[record.getMessage()] += 1
+
+
 def ledger() -> dict:
     return json.loads(LEDGER.read_text(encoding="utf-8"))
 
 
 def charge(entry: dict, *, after: str | None) -> dict:
-    """Record the run before it dispatches; refuse past the cap, a repeat, or after any failed run."""
+    """Record the run before it dispatches; refuse past the cap, a repeat, or after a failed run that the user has
+    not asked to retry (the retry names it in `retryOf`)."""
     book = ledger()
-    if book["spent"] >= book["cap"] or any(item["id"] == entry["id"] for item in book["attempts"]):
+    attempts = book["attempts"]
+    if book["spent"] >= book["cap"] or any(item["id"] == entry["id"] for item in attempts):
         raise SystemExit(f"{entry['id']}: allowance used or run already recorded")
-    if any(item["status"] != "completed" for item in book["attempts"]):
+    retried = {item.get("retryOf") for item in attempts if item["status"] == "completed"}
+    failed = [item["id"] for item in attempts if item["status"] != "completed" and item["id"] not in retried]
+    if failed and failed != [entry.get("retryOf")]:
         raise SystemExit("a recorded run did not complete; live work stops (decision 5)")
-    if after is not None and not any(item["id"] == after for item in book["attempts"]):
+    if after is not None and not any(item["status"] == "completed" and after in (item["id"], item.get("retryOf"))
+                                     for item in attempts):
         raise SystemExit(f"{entry['id']} needs {after} first")
-    book["attempts"].append(entry)
+    attempts.append(entry)
     book["spent"] += 1
     LEDGER.write_text(json.dumps(book, indent=1) + "\n", encoding="utf-8")
     return book
@@ -145,8 +163,10 @@ def schemas(_args) -> None:
                            "network": "denied for every real CLI run", "checks": checked})
 
 
-def canary(_args) -> None:
+def canary(args) -> None:
     """MP05-1: the synthetic structured task through the launcher's Claude provider, as the app runs it."""
+    run_id = "MP05-1b" if args.retry else "MP05-1"
+    retry = {"retryOf": "MP05-1", "instruction": args.retry} if args.retry else {}
     slot = claude_slot(DATA)
     provider, profile = slot.provider, slot.profile
     root = fresh_root("canary")
@@ -157,10 +177,10 @@ def canary(_args) -> None:
               "the word ready, count set to 3 and items set to alpha, beta and gamma in that order.")
     request = ContentInput(prompt, Synthetic, GenerationPolicy(MODEL, timeout_seconds=120, allow_repair=False,
                                                                reasoning_effort=EFFORT))
-    charge({"id": "MP05-1", "slice": "MP05", "model": MODEL, "effort": EFFORT, "allowRepair": False,
-            "path": "ClaudeCliProvider.generate from the launcher's Claude slot", "status": "dispatched",
+    charge({"id": run_id, "slice": "MP05", "model": MODEL, "effort": EFFORT, "allowRepair": False,
+            "path": "ClaudeCliProvider.generate from the launcher's Claude slot", **retry, "status": "dispatched",
             "startedAt": now()}, after="MP00-1")
-    started, code, result = time.monotonic(), None, None
+    started, code, result, refused = time.monotonic(), None, None, Refused()
     with OperationFiles(operations).open() as files:
         try:
             result = provider.generate(request, files, threading.Event())
@@ -168,14 +188,14 @@ def canary(_args) -> None:
             code = error.code
     elapsed = round(time.monotonic() - started, 2)
     passed = result is not None and result.cleanup_verified is True
-    settle("MP05-1", status="completed" if passed else "failed", finishedAt=now(), elapsedSeconds=elapsed,
+    settle(run_id, status="completed" if passed else "failed", finishedAt=now(), elapsedSeconds=elapsed,
            **({"code": code} if code else {}))
-    write("live-1.json", {
+    write(("live-1b.json" if args.retry else "live-1.json"), {
         "at": now(), "passed": passed, "code": code, "elapsedSeconds": elapsed, "executable": str(profile.executable),
         "value": result.value.model_dump() if result else None,
         "matchesExpected": bool(result) and result.value.model_dump() == EXPECTED,
         "cliVersion": result.cli_version if result else None, "effort": result.reasoning_effort if result else None,
-        "attempts": result.logical_attempts if result else None,
+        "attempts": result.logical_attempts if result else None, "refusedEvents": dict(refused.kinds),
         "usage": result.usage.__dict__ if result else None, "cleanupVerified": result.cleanup_verified if result else None,
         "profileFiles": sorted(path.name for path in profile.config_dir.iterdir()),
         "canaryHits": scan(profile, (operations,), mark)})
@@ -197,7 +217,7 @@ async def run_import(args) -> None:
     dist.mkdir()
     (dist / "index.html").write_text("MP05")
     origin, secret = "http://127.0.0.1:39305", secrets.token_urlsafe(32)
-    slot = claude_slot(DATA)
+    slot, refused = claude_slot(DATA), Refused()
     wrapped = create_app(origin=origin, secret=secret, temp_root=root / "operations", dist=dist, data_root=root / "data",
                          template_import_call_cap=60, provider_registry=ProviderRegistry(frozenset({"claude_cli"})),
                          provider_slots={"claude_cli": slot})
@@ -249,6 +269,9 @@ async def run_import(args) -> None:
                 if exported.status_code == 200:
                     (root / "CV-B.docx").write_bytes(exported.content)
     published = operation.state == "published" and saved.project is not None
+    codes = Counter(attempt.error_code for attempt in operation.attempts if attempt.error_code)
+    # Source fallbacks also publish; the proof needs every model reply accepted.
+    passed = published and not codes
     seconds = []
     for attempt in operation.attempts:
         if attempt.dispatched_at and attempt.returned_at:
@@ -258,17 +281,18 @@ async def run_import(args) -> None:
     for attempt in operation.attempts:
         for key in ("input_tokens", "cached_input_tokens", "output_tokens"):
             usage[key] += getattr(attempt.usage, key) or 0
-    settle("MP05-2", status="completed" if published else "failed", finishedAt=now(),
-           elapsedSeconds=steps["importSeconds"], calls=spent_calls(operation))
+    settle("MP05-2", status="completed" if passed else "failed", finishedAt=now(),
+           elapsedSeconds=steps["importSeconds"], calls=spent_calls(operation),
+           **({"code": codes.most_common(1)[0][0]} if codes else {}))
     write("live-2.json", {
-        "at": now(), "published": published, "task": {key: final.get(key) for key in ("state", "stage", "error")},
+        "at": now(), "passed": passed, "published": published, "task": {key: final.get(key) for key in ("state", "stage", "error")},
         "operationState": operation.state, **steps, "calls": spent_calls(operation),
         "cleanupVerified": cleanup_verified(operation),
         "tasks": dict(Counter(task.state for task in operation.tasks)),
         "taskKinds": dict(Counter(task.kind for task in operation.tasks)),
         "attemptSlots": dict(Counter(attempt.slot for attempt in operation.attempts)),
         "outcomes": dict(Counter(attempt.outcome or "none" for attempt in operation.attempts)),
-        "codes": dict(Counter(attempt.error_code for attempt in operation.attempts if attempt.error_code)),
+        "codes": dict(codes), "refusedEvents": dict(refused.kinds),
         "efforts": dict(Counter(attempt.model.effort for attempt in operation.attempts)),
         "callSeconds": {"count": len(seconds), "max": max(seconds, default=None),
                         "median": sorted(seconds)[len(seconds) // 2] if seconds else None, "total": round(sum(seconds), 1)},
@@ -281,7 +305,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("schemas")
-    commands.add_parser("canary")
+    canary_run = commands.add_parser("canary")
+    canary_run.add_argument("--retry", metavar="INSTRUCTION", help="the user's instruction to repeat the failed MP05-1")
     importing = commands.add_parser("import")
     importing.add_argument("source")
     args = parser.parse_args()

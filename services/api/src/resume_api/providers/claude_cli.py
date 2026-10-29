@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 import json
+import logging
 from pathlib import Path
 import shutil
 import threading
@@ -40,8 +41,16 @@ ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHA
           "rate_limit": "RATE_LIMITED", "model_not_found": "MODEL_DENIED", "invalid_request": "CLI_FAILED",
           "overloaded": "CLI_FAILED", "server_error": "CLI_FAILED"}
 # Notices that carry no model output; compaction and permission denials are never expected.
-NOTICES = {"api_retry", "status", "rate_limit_event"}
+# `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while (MP05-2).
+NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
 FORBIDDEN = {"compact_boundary", "permission_denied"}
+LOG = logging.getLogger(__name__)
+
+
+def _unknown(label: str) -> ContentFailure:
+    # Names only the event kind, never its content: a new CLI event is otherwise just INVALID_RESULT.
+    LOG.warning("Claude stream event refused: %s", label)
+    return ContentFailure("INVALID_RESULT")
 
 
 def _usage(raw: object) -> ReportedUsage:
@@ -91,7 +100,7 @@ class ClaudeEvents:
             raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
         elif kind in {"system", "rate_limit_event"}:
             if kind == "system" and subtype not in NOTICES:
-                raise ContentFailure("INVALID_RESULT")
+                raise _unknown(f"system/{subtype}")
         elif kind == "assistant":
             self._assistant(event)
         elif kind == "user":
@@ -99,7 +108,7 @@ class ClaudeEvents:
         elif kind == "result":
             self._result(event)
         else:
-            raise ContentFailure("INVALID_RESULT")
+            raise _unknown(kind)
 
     def _assistant(self, event: dict) -> None:
         message = event.get("message")
@@ -118,7 +127,7 @@ class ClaudeEvents:
                     raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
                 self.tool_ids.add(identifier)
             elif kind not in {"text", "thinking", "redacted_thinking"}:
-                raise ContentFailure("INVALID_RESULT")
+                raise _unknown(f"assistant block {kind}")
 
     def _user(self, event: dict) -> None:
         message = event.get("message")

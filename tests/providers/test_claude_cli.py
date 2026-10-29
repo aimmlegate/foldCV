@@ -136,11 +136,16 @@ def test_plain_text_drops_the_schema_and_returns_the_final_text(fake):
     ("init_mcp", "CLI_PROFILE_UNSAFE"), ("init_model", "CLI_PROFILE_UNSAFE"),
     ("init_plugin", "CLI_PROFILE_UNSAFE"), ("init_key", "CLI_PROFILE_UNSAFE"),
     ("bad_schema", "INVALID_SCHEMA"), ("unknown_option", "CLI_PROFILE_UNSAFE"),
-    ("incomplete", "INCOMPLETE_STREAM"),
+    ("incomplete", "INCOMPLETE_STREAM"), ("unknown_notice", "INVALID_RESULT"),
 ])
 def test_failures_are_typed_without_a_second_dispatch(fake, case, code):
     error = failure(fake, case, code, 1)
     assert error.logical_attempts == 1 and error.cleanup_verified
+
+
+def test_an_unknown_notice_is_named_in_the_log_without_its_content(fake, caplog):
+    failure(fake, "unknown_notice", "INVALID_RESULT", 1)
+    assert [record.getMessage() for record in caplog.records] == ["Claude stream event refused: system/new_notice"]
 
 
 def test_missing_structured_output_is_repaired_like_invalid_json(fake):

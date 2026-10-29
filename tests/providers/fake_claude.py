@@ -98,6 +98,9 @@ if case == "compact":
     emit({"type": "system", "subtype": "compact_boundary"})
 emit({"type": "system", "subtype": "api_retry", "attempt": 1, "error": "overloaded"} if case == "retry" else
      {"type": "rate_limit_event", "rate_limit_info": {"status": "allowed"}})
+emit({"type": "system", "subtype": "thinking_tokens", "estimated_tokens": 64, "estimated_tokens_delta": 64})
+if case == "unknown_notice":
+    emit({"type": "system", "subtype": "new_notice"})
 usage = {"input_tokens": 12, "cache_creation_input_tokens": 3, "cache_read_input_tokens": 5, "output_tokens": 7}
 
 
