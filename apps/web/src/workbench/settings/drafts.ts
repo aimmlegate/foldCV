@@ -96,12 +96,6 @@ export class SettingsDrafts {
     } else errors.assistant = "Не удалось загрузить настройки помощника. Повторите загрузку.";
     this.publish({ draft, errors, loading: false });
   }
-  /** A provider switch moved that provider's choices into place on the server; with clean drafts, read them again. */
-  async reloadChoices(): Promise<void> {
-    if (this.state.saving || this.closed || this.dirty.length > 0) return;
-    this.publish({ preferences: null, assistant: null, saved: [] });
-    await this.load();
-  }
   cancel(): void {
     if (this.state.saving) return;
     const { preferences, rules, assistant, draft } = this.state;

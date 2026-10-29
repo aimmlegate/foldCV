@@ -1,6 +1,6 @@
-import type { ConnectionState, ProviderSummary } from "./workflow";
+import type { ConnectionState, ProviderEntry } from "./workflow";
 
-type Names = Pick<ProviderSummary, "display" | "subscription">;
+type Names = Pick<ProviderEntry, "display" | "subscription">;
 
 export function connectionMessage(state: ConnectionState, { display, subscription }: Names): string {
   const messages: Record<ConnectionState, string> = {

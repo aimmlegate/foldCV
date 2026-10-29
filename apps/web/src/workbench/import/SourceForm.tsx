@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { preferencesRequest, saveImportModelRequest } from "../../api/client";
-import type { ConnectionSnapshot } from "../../connection/workflow";
+import { modelGroups, type ConnectionSnapshot } from "../../connection/workflow";
 import { isReasoningEffort, longReasoning, type ReasoningEffort } from "../../connection/reasoning";
 import { errorMessage } from "../../errors/messages";
 import { shownTemplate, templateImportStatus, type ImportOptions, type TemplateEntry } from "../../projects/api";
 import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSelect";
+import { ModelOptions } from "../settings/ModelSelect";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 
@@ -33,7 +34,6 @@ export function SourceForm({ active, busy, process, connection }: {
     }).catch(() => {});
     return () => { alive = false; };
   }, [active]);
-  const models = connection?.models ?? [];
   const model = importModel ?? connection?.selectedModel ?? null;
   const reasoning = model ? connection?.modelReasoning?.[model] : undefined;
   const chosen = effort && reasoning?.supported.includes(effort) ? effort : null;
@@ -67,8 +67,7 @@ export function SourceForm({ active, busy, process, connection }: {
         <select className="model-select" id="import-model" aria-label="Модель импорта" value={importModel ?? ""}
           disabled={busy || saving || !loaded || !connection?.metadataReady} onChange={event => void changeModel(event.currentTarget.value || null)}>
           <option value="">{connection?.selectedModel ? `Модель обработки · ${connection.selectedModel}` : "Модель обработки"}</option>
-          {(importModel && !models.includes(importModel) ? [importModel, ...models] : models).map(name =>
-            <option key={name} value={name} disabled={!models.includes(name)}>{name}{models.includes(name) ? "" : " · недоступна"}</option>)}
+          <ModelOptions groups={modelGroups(connection)} value={importModel} />
         </select></div>
       <div className="import-option"><label htmlFor="import-effort">Рассуждения</label>
         <select className="model-select" id="import-effort" aria-label="Уровень рассуждений импорта" value={chosen ?? ""}

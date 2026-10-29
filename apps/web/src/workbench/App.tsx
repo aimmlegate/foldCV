@@ -1,6 +1,6 @@
 import { errorMessage } from "../errors/messages";
 import { useEffect, useState } from "react";
-import { ConnectionWorkflow, providerNames, type ConnectionView } from "../connection/workflow";
+import { ConnectionWorkflow, connectionSummary, type ConnectionView } from "../connection/workflow";
 import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
 import { useResumeWorkspace } from "./useResumeWorkspace";
@@ -66,7 +66,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}>
     <History projects={projects} activeId={shown?.workspace.projectId ?? null} busy={busy} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings}
-      connection={connection?.snapshot.state === "connected" ? `${providerNames(connection.snapshot).display} · подписка` : connection?.snapshot.state === "unchecked" ? "Подключение не проверено" : "Модель отключена"} />
+      connection={connectionSummary(connection?.snapshot ?? null)} />
     <section className="main-area">
       <Header title={settings ? "Настройки" : shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
         subtitle={settings ? "FoldCV" : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}

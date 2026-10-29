@@ -41,8 +41,9 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
       } }, setView);
     controller.current = current; setView(current.view);
     void (async () => {
-      await connection.peek();
-      if (connection.view.snapshot.state === "unchecked" && (await api.settings()).enabled) await connection.refresh();
+      // Providers not checked yet are checked only when the assistant is on.
+      await connection.peek(false);
+      if ((await api.settings()).enabled) await connection.checkUnchecked();
       await current.init();
     })().catch(() => setFailure("REQUEST_FAILED"));
     return () => { connection.close(); current.close(); if (controller.current === current) controller.current = null; };
