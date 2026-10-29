@@ -22,9 +22,9 @@ export function Composer({ view, captured, active, applying, title, draft, flags
   const selected = view.settings?.selectedAgentModel ?? "", models = view.capabilities?.models ?? [];
   const choices = modelChoices(selected, models, view.capabilities?.ready === true && view.loading == null);
   return <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (enabled) send(); }}>
-    <div className="chat-context" aria-label="Область следующей задачи"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
+    <div className="chat-context" aria-label="Контекст"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
       <button className={`chat-scope${captured ? " has-selection" : ""}`} type="button" disabled={!captured} onClick={clear}
-        aria-label={captured ? "Убрать выделение из задачи" : "Доступ ко всему проекту"}>{captured ? <><Icon name="check" />Контекст: выделение · {captured}<Icon name="close" /></> : "Доступ ко всему проекту"}</button></div>
+        aria-label={captured ? `Убрать выделение: ${captured}` : "Весь проект"}>{captured ? <><Icon name="check" />Выделение · {captured}<Icon name="close" /></> : "Весь проект"}</button></div>
     <div className="chat-input-box">{commandOpen && <CommandMenu choices={suggestions} selected={selectedCommand} choose={chooseCommand} />}
       <textarea ref={input} id="chat-input" aria-label="Сообщение помощнику" value={view.draft} placeholder="Что проверить или изменить? / — команды" rows={2}
       role="combobox" aria-autocomplete="list" aria-expanded={commandOpen} aria-controls={commandOpen ? "assistant-commands" : undefined}
@@ -46,13 +46,13 @@ export function Composer({ view, captured, active, applying, title, draft, flags
       } }} />
       <div className="chat-composer-controls"><div className="chat-controls-left"><label className="chat-model-label"><span className="visually-hidden">Модель помощника</span>
         <select id="chat-model" aria-label="Модель помощника" value={selected} disabled={!view.settings || view.submitting} onChange={event => model(event.target.value || null)}>
-          <option value="">Выберите модель помощника</option>{choices.map(item => <option key={item.model} value={item.model}>{item.model}{item.state === "unavailable" ? " · недоступна" : item.state === "incompatible" ? " · инструменты недоступны" : ""}</option>)}
+          <option value="">Выберите модель</option>{choices.map(item => <option key={item.model} value={item.model}>{item.model}{item.state === "unavailable" ? " · недоступна" : item.state === "incompatible" ? " · не подходит" : ""}</option>)}
         </select></label>
         <label className="chat-mode"><input type="checkbox" checked={view.flags.allowEdits} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(event.target.checked, view.flags.allowWeb)} />Разрешить правки</label>
         <label className="chat-mode chat-internet"><input type="checkbox" checked={view.flags.allowWeb} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(view.flags.allowEdits, event.target.checked)} /><Icon name="globe" /><span>Интернет</span></label></div>
-        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем задачу" ? <Spinner /> : <Icon name="stop" />}</button>}
+        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем" ? <Spinner /> : <Icon name="stop" />}</button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
     {[...view.draft].length > 8000 && <p className="chat-error" role="alert">Сообщение длиннее 8000 символов.</p>}

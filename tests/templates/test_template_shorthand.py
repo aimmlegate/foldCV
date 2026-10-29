@@ -13,12 +13,13 @@ from packages.resume_core.templates.loading import load_declared_definition, loa
 from packages.resume_core.templates.models import TemplateDefinition
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.shorthand import STANDARD_SUPPORT, expand
-from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore
+from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore
 from resume_api.template_config import TemplateConfig
 from tools.shorten_template import shorten
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLICATIONS = ROOT / 'tests/fixtures/synthetic/templates/publications/template.yaml'
+GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 DEFINITIONS = {'text': {'type': ['string', 'null'], 'minLength': 1}, 'date': {'type': ['object', 'null']},
     'period': {'type': 'object'}, 'terms': {'type': 'object'}}
 
@@ -43,7 +44,7 @@ def test_the_bundled_short_template_is_the_same_package_as_its_full_form():
     assert len(BUNDLED_TEMPLATE.read_text(encoding='utf-8').splitlines()) < 1100
 
 
-@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, PUBLICATIONS], ids=['generic', 'publications'])
+@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC, PUBLICATIONS], ids=['generic', 'generic', 'publications'])
 def test_shortening_any_template_expands_back_to_the_same_definition(path):
     document = full(path)
     shortened = shorten(document)
@@ -155,12 +156,13 @@ def test_a_json_template_may_use_the_short_form_too():
     assert canonical(TemplateDefinition.model_validate(load_declared_definition(raw, 'json'))) == canonical(full(BUNDLED_TEMPLATE))
 
 
-def test_the_editor_schema_accepts_both_forms():
+@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC], ids=['generic', 'generic'])
+def test_the_editor_schema_accepts_both_forms(path):
     schema = json.loads((ROOT / 'contracts/template-source.schema.json').read_text(encoding='utf-8'))
     validator = jsonschema.Draft202012Validator(schema)
-    assert not list(validator.iter_errors(yaml.safe_load(BUNDLED_TEMPLATE.read_text(encoding='utf-8'))))
-    assert not list(validator.iter_errors(full(BUNDLED_TEMPLATE)))
-    typo = yaml.safe_load(BUNDLED_TEMPLATE.read_text(encoding='utf-8'))
+    assert not list(validator.iter_errors(yaml.safe_load(path.read_text(encoding='utf-8'))))
+    assert not list(validator.iter_errors(full(path)))
+    typo = yaml.safe_load(path.read_text(encoding='utf-8'))
     typo['blocks'][0]['extact'] = []
     assert list(validator.iter_errors(typo))
 
@@ -170,6 +172,6 @@ def test_settings_show_the_bundled_text_for_a_package_captured_from_the_old_long
     old = compile_bytes(yaml.safe_dump(document, allow_unicode=True, sort_keys=False).encode(), BUNDLED_TEMPLATE.parent)
     assert old.package_hash == compile_template(BUNDLED_TEMPLATE).package_hash
     TemplateStore(tmp_path / 'template-packages').activate(old)
-    state = TemplateConfig(tmp_path / 'template-packages').read()
+    state = TemplateConfig(tmp_path / 'template-packages').read(old.id)
     assert base64.b64decode(old.original_base64).decode() != BUNDLED_TEMPLATE.read_text(encoding='utf-8')
-    assert state['text'] == BUNDLED_TEMPLATE.read_text(encoding='utf-8') and state['bundled'] is True
+    assert state['text'] == BUNDLED_TEMPLATE.read_text(encoding='utf-8') and state['edited'] is False

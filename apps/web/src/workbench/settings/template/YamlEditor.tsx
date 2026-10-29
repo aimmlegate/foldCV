@@ -35,7 +35,7 @@ export default function YamlEditor({ value, change, problem, readOnly, technical
     if (!host.current) return;
     const model = monaco.editor.getModel(MODEL_URI) ?? monaco.editor.createModel(value, "yaml", MODEL_URI);
     const instance = monaco.editor.create(host.current, { model, theme: "vs", automaticLayout: true, minimap: { enabled: false },
-      fontSize: 13, tabSize: 2, insertSpaces: true, scrollBeyondLastLine: false, wordWrap: "off", renderWhitespace: "boundary" });
+      fontSize: 13, tabSize: 2, insertSpaces: true, scrollBeyondLastLine: false, wordWrap: "off", renderWhitespace: "none" });
     const listener = model.onDidChangeContent(() => { if (!external.current) changeRef.current(model.getValue()); });
     editor.current = instance;
     foldTechnical(instance, technicalRef.current);

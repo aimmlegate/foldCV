@@ -98,7 +98,7 @@ export class AssistantController {
       } catch (error) { this.publish({ error: code(error) }); }
     });
   }
-  async refresh(): Promise<void> { return this.wait("Обновляем подключение и диалоги", () => this.refreshWork()); }
+  async refresh(): Promise<void> { return this.wait("Обновляем", () => this.refreshWork()); }
   /** A quiet capability read: the connection check can finish after the panel opened, and nothing else re-reads it. */
   async refreshCapabilities(): Promise<void> {
     const capabilities = await this.api.capabilities();
@@ -117,7 +117,7 @@ export class AssistantController {
   }
 
   async chooseModel(model: string | null, enabled = this.view.settings?.enabled ?? false): Promise<void> {
-    return this.wait("Сохраняем модель помощника", async () => {
+    return this.wait("Сохраняем модель", async () => {
       const settings = this.view.settings;
       if (!settings) return;
       try {
@@ -313,7 +313,7 @@ export class AssistantController {
     finally { this.publish({ proposalBusy: null }); }
   }
 
-  async stop(): Promise<void> { return this.wait("Останавливаем задачу", () => this.stopWork()); }
+  async stop(): Promise<void> { return this.wait("Останавливаем", () => this.stopWork()); }
   private async stopWork(): Promise<void> {
     ++this.sendEpoch;
     const run = this.view.run;

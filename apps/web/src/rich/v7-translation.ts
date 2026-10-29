@@ -6,6 +6,8 @@ import { contentText, leafTarget, responseBlocks, responseLeaves, type ResponseL
 type Operation = TemplateEditPreparationV1["operations"][0];
 type ReplaceText = Extract<Operation, { kind: "replace_text" }>;
 type PanelRequest = Extract<Operation, { kind: "builtin_panel" }>["command"];
+/** The line a panel technology add goes to, as Python offered it. */
+export type PanelPlacement = NonNullable<Extract<Operation, { kind: "builtin_panel" }>["placementContext"]>;
 type PasteInline = Extract<Operation, { kind: "paste_inline" }>;
 type Capture = TemplateEditPreparationV1["capture"];
 /** A panel command before its revisions and capture are bound at issue time. */
@@ -14,18 +16,22 @@ type Styles = ReplaceText["styles"];
 type Target = NonNullable<ReplaceText["range"]["insertionTarget"]>;
 
 export type LocalContainer = { blockId: string; kind: "content" | "caption" | "cell"; cellId: string | null };
+/** A text block kind for `format_blocks`; the generated patch type does not spell out its variants. */
+export type BlockKind = { type: "paragraph" } | { type: "heading"; level: 1 | 2 | 3 } | { type: "bullet_list" }
+  | { type: "numbered_list"; start: number | null };
 export type Side = "before" | "after" | "interior" | "anchor";
 export type V7Operation =
   | { kind: "replace_text"; container: LocalContainer; start: number; end: number; text: string; styles: Styles; side: Side | null }
   | { kind: "set_marks"; container: LocalContainer; start: number; end: number; styles: Styles }
   | { kind: "split_block"; container: LocalContainer; offset: number; created: string }
   | { kind: "merge_blocks"; leading: LocalContainer; trailing: LocalContainer }
-  | { kind: "builtin_panel"; command: PanelCommandV7 }
+  | { kind: "builtin_panel"; command: PanelCommandV7; placementContext?: PanelPlacement }
   | { kind: "delete_entity"; recordId: string }
   // Structure commands are not optimistic: they name editor blocks and run after typing drains.
   | { kind: "move_block"; blockId: string; placement: Placement }
   | { kind: "remove_occurrences"; blockIds: string[] }
   | { kind: "set_link_target"; blockId: string; occurrenceId: string; href: string }
+  | { kind: "format_blocks"; blockIds: string[]; blockKind: BlockKind }
   | { kind: "paste_blocks"; clipboardCaptureId: string; placement: Placement }
   | { kind: "paste_inline"; container: LocalContainer; start: number; end: number; side: Side | null; source: PasteInline["source"] };
 export type Placement = { parentId: string; afterId: string | null };
@@ -171,7 +177,8 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       if (!capture) return conflict("panel command needs its request capture");
       const current = revisions(basis);
       return { kind: "operation", operation: { kind: "builtin_panel", opId, command: { ...structuredClone(value.command),
-        factsRevision: current.facts, documentRevision: current.document, capture: structuredClone(capture) } } };
+        factsRevision: current.facts, documentRevision: current.document, capture: structuredClone(capture) },
+        ...(value.placementContext ? { placementContext: structuredClone(value.placementContext) } : {}) } };
     }
     if (value.kind === "delete_entity") {
       const revision = revisions(basis).records.get(value.recordId);
@@ -184,6 +191,8 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       blocks: blockTargets(basis, value.blockIds) } };
     if (value.kind === "set_link_target") return { kind: "operation", operation: { kind: "set_link_target", opId,
       ...blockTarget(basis, value.blockId), occurrenceId: value.occurrenceId, href: value.href } };
+    if (value.kind === "format_blocks") return { kind: "operation", operation: { kind: "format_blocks", opId,
+      targets: blockTargets(basis, value.blockIds), patch: { blockKind: structuredClone(value.blockKind) } } };
     if (value.kind === "paste_blocks") return { kind: "operation", operation: { kind: "paste_blocks", opId,
       source: { kind: "same_project", clipboardCaptureId: value.clipboardCaptureId }, placement: placement(basis, value.placement) } };
     if (value.kind === "paste_inline") {

@@ -97,6 +97,13 @@ async def test_malformed_oversized_and_unavailable_routes_are_safe(tmp_path):
         closed = await client.post("/v1/rich/projects/template-input", headers=headers, files={"file": ("x.txt", b"x")})
         assert closed.status_code == 409 and closed.json()["error"]["code"] == "JOB_DISABLED"
         assert closed.headers["cache-control"] == "no-store"
+        # The upload with a chosen template has the upload limit, not the 1 MiB JSON one.
+        chosen = await client.post("/v1/rich/projects/template-input/generic-two-column", headers=headers,
+                                   files={"file": ("big.txt", b"a" * (service.MAX_BODY + 1))})
+        assert chosen.status_code == 409 and chosen.json()["error"]["code"] == "JOB_DISABLED"
+        too_big = await client.post("/v1/rich/projects/template-input/generic-two-column", headers=headers,
+                                    files={"file": ("big.txt", b"a" * (extracting.MAX_BODY + 1))})
+        assert too_big.status_code == 413 and too_big.json()["error"]["code"] == "INPUT_TOO_LARGE"
         assert (await client.post("/v1/host/login", headers=headers, json={"argv": ["codex", "login"]})).status_code == 422
         assert (await client.post("/v1/host/login", headers=headers, json={})).status_code == 409
         assert (await client.post(f"/v2/projects/{PROJECT}/export", headers=headers, json={})).status_code == 422

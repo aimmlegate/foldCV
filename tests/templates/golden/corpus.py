@@ -16,12 +16,17 @@ def results():
 
 
 def loaded(entry):
-    """A stored fixture; its package assets come from the bundled template, so a changed template fails to load."""
+    """A stored fixture; its package assets come from the bundled template, so a changed template fails to load.
+    Assets template 2.5.0 replaced are kept by hash in retained-assets.json: the old alias catalog, and the icons the
+    frozen Devicon folder still holds byte for byte."""
     from packages.resume_core.models.template_workspace import WorkspaceV7
     from packages.resume_core.templates.models import remember_asset
     from tests.templates.storage_fixtures import package
     for asset in package().assets:
         remember_asset(asset.sha256, asset.bytes_base64, asset.mime_type)
+    for digest, asset in json.loads((HERE / 'synthetic/retained-assets.json').read_text()).items():
+        text = asset.get('bytesBase64') or base64.b64encode((HERE.parents[2] / asset['path']).read_bytes()).decode('ascii')
+        remember_asset(digest, text, asset['mimeType'])
     return WorkspaceV7.model_validate(entry['workspace']), {key: base64.b64decode(raw) for key, raw in entry['sources'].items()}
 
 

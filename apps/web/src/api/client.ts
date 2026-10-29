@@ -38,10 +38,7 @@ export function saveFallbackModelRequest(model: string | null): Promise<Preferen
 export function saveLimitsRequest(body: SaveLimitsPreference): Promise<Preferences> {
   return request<Preferences>("/v1/settings/limits", "PUT", body);
 }
-export function preferencesRequest(automaticAnalysis?: boolean): Promise<Preferences> {
-  return automaticAnalysis === undefined ? request<Preferences>("/v1/settings/preferences")
-    : request<Preferences>("/v1/settings/preferences", "PUT", { automaticAnalysis });
-}
+export function preferencesRequest(): Promise<Preferences> { return request<Preferences>("/v1/settings/preferences"); }
 export async function exchangeSession(): Promise<void> {
   const secret = new URLSearchParams(location.hash.slice(1)).get("secret");
   if (secret === null) return;

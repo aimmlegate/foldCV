@@ -15,10 +15,10 @@ function savedRatio(): number {
 
 export function WorkspaceViews({ view, change, hasSource, notices }: { view: WorkspaceView; change: (view: WorkspaceView) => void; hasSource: boolean; notices: ReactNode }) {
   return <div className="workspace-view-bar">
-    <span className="workspace-view-label">Рабочая область</span>
+    <span className="workspace-view-label">Вид</span>
     <div className="workspace-views" role="group" aria-label="Режим просмотра">
-      <button aria-pressed={view === "layout"} onClick={() => change("layout")}><Icon name="file" />Макет</button>
-      <button aria-pressed={view === "compare"} disabled={!hasSource} onClick={() => change("compare")}><Icon name="panel" />Макет + оригинал</button>
+      <button aria-pressed={view === "layout"} onClick={() => change("layout")}><Icon name="file" />Резюме</button>
+      <button aria-pressed={view === "compare"} disabled={!hasSource} onClick={() => change("compare")}><Icon name="panel" />Резюме и оригинал</button>
       <button aria-pressed={view === "original"} disabled={!hasSource} onClick={() => change("original")}><Icon name="file" />Оригинал</button>
     </div>
     <div className="workspace-notices">{notices}</div>
@@ -46,11 +46,11 @@ export function ComparisonWorkspace({ view, layout, original, order = "layout-fi
   const style: CSSProperties = { gridTemplateColumns: view === "compare" ? `minmax(0, ${leftFraction}fr) ${dividerWidth}px minmax(0, ${1 - leftFraction}fr)` : "minmax(0, 1fr)" };
   return <div className="comparison-viewport">
     <div ref={host} className="comparison-workspace" data-view={view} data-order={order} data-resizing={dragging} style={style}>
-      <section className="workspace-pane layout-pane" aria-label="Макет резюме" hidden={view === "original"}>{layout}</section>
-      <div className="workspace-divider" role="separator" tabIndex={0} aria-label="Ширина макета" aria-orientation="vertical"
+      <section className="workspace-pane layout-pane" aria-label="Резюме" hidden={view === "original"}>{layout}</section>
+      <div className="workspace-divider" role="separator" tabIndex={0} aria-label="Ширина резюме" aria-orientation="vertical"
         aria-valuemin={Math.round(minimum * 100)} aria-valuemax={Math.round((1 - minimum) * 100)} aria-valuenow={Math.round(fraction * 100)}
-        aria-valuetext={`${Math.round(fraction * 100)}% макет, ${Math.round((1 - fraction) * 100)}% оригинал`}
-        hidden={view !== "compare"} title="Потяните для изменения ширины. Двойной щелчок — поровну."
+        aria-valuetext={`${Math.round(fraction * 100)}% резюме, ${Math.round((1 - fraction) * 100)}% оригинал`}
+        hidden={view !== "compare"} title="Потяните. Двойной щелчок — поровну."
         onDoubleClick={() => changeRatio(0.5)} onKeyDown={event => {
           const value = event.key === "ArrowLeft" ? fraction + (reversed ? 0.05 : -0.05) : event.key === "ArrowRight" ? fraction + (reversed ? -0.05 : 0.05)
             : event.key === "Home" ? minimum : event.key === "End" ? 1 - minimum : null;
@@ -68,7 +68,7 @@ export function ComparisonWorkspace({ view, layout, original, order = "layout-fi
           if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
           setDragging(false);
         }} onLostPointerCapture={() => setDragging(false)} onPointerCancel={() => setDragging(false)} />
-      <section className="workspace-pane original-pane" aria-label="Оригинал резюме" hidden={view === "layout"}>{original}</section>
+      <section className="workspace-pane original-pane" aria-label="Оригинал" hidden={view === "layout"}>{original}</section>
     </div>
   </div>;
 }

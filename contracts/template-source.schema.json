@@ -691,7 +691,10 @@
           "type": "number"
         },
         "missing_icon": {
-          "const": "text_only",
+          "enum": [
+            "text_only",
+            "initial"
+          ],
           "title": "Missing Icon",
           "type": "string"
         },

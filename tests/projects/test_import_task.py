@@ -128,8 +128,8 @@ def test_a_queued_import_is_answered_at_once_and_shows_that_it_waits(tmp_path):
         assert admission.acquire(blocking=False)
         started = start(client, 'request-1')
         assert started.status_code == 202, started.text
-        assert (started.json()['state'], started.json()['stage']) == ('running', 'waiting')
-        assert status(client, started.json()['id'])['stage'] == 'waiting'
+        assert (started.json()['state'], started.json()['stage']) == ('running', 'queued')
+        assert status(client, started.json()['id'])['stage'] == 'queued'
         admission.release()
         for _ in range(500):
             if status(client, started.json()['id'])['stage'] == 'processing':

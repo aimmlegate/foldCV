@@ -15,6 +15,7 @@ from packages.resume_core.template_archive import archive_payload_v7, open_archi
 from packages.resume_core.template_export import capture_export, snapshot_identity
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes
+from packages.resume_core.templates.focus import icon_catalog
 from packages.resume_core.templates.materialize_nodes import link_part, reference
 from packages.resume_core.templates.presentation_plan import hyperlink_target
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
@@ -30,6 +31,8 @@ URL = 'https://example.org/portfolio'
 def view_package():
     config = employment_package().definition.model_dump(mode='json', by_alias=True)
     config['template'].update(id='synthetic-view-adapters', name='Links and Focus')
+    # Catalog icons only: rows without one stay text, as packages before 2.7.0 show them.
+    config['style']['focus']['missing_icon'] = 'text_only'
     config['fact_types'] += [
         {'id': 'portfolio', 'schema_version': '1', 'schema': object_schema({'name': TEXT, 'url': TEXT}),
             'builtin_kind': None, 'relations': []},
@@ -191,7 +194,7 @@ async def test_focus_entries_keep_stated_durations_and_show_catalog_icons_only(t
     embedded = anchor.xpath('.//a:blip/@r:embed', namespaces={**NS, 'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'})
     rels = etree.fromstring(parts(content)['word/_rels/document.xml.rels'])
     target = next(child.get('Target') for child in rels if child.get('Id') == embedded[0])
-    python = next(asset for asset in workspace.project.template_package.assets if asset.id == 'python')
+    python = icon_catalog(workspace.project.template_package).files['python']
     assert parts(content)['word/' + target] == base64.b64decode(python.bytes_base64)
     # Each entry stays on one page: its lines keep with the next; the last line does not.
     keep = {name: tree.xpath('string(//w:p[.//w:t[text()="%s"]]/w:pPr/w:keepNext/@w:val)' % name, namespaces=NS) for name in ['SQL', 'about 2.5 years']}

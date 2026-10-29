@@ -32,9 +32,9 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       {snapshot.providers.map(item => <option key={item.kind} value={item.kind}>{item.display}{item.installed ? "" : " · не установлен"}</option>)}
     </select>
     <div className="connection-status"><span className="connection-check">{view.pending || view.detaching || snapshot.state === "login_pending" ? <Spinner /> : <Icon name={snapshot.state === "connected" ? "check" : "info"} />}</span>
-      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : installing ? `Подготавливаем подключение ${display}…` : snapshot.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : view.pending ? "Проверяем CLI, вход и доступные модели…" : connectionMessage(snapshot.state, { display, subscription })}</strong>
-        <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Сведения о подписке ещё не получены"}</small></div></div>
-    {snapshot.versionStatus === "graceful" && <p className="small muted">Версия CLI новее проверенной в FoldCV. Её возможности проверены перед подключением.</p>}
+      <div><strong role="status">{view.detaching ? "Останавливаем подключение…" : installing ? `Устанавливаем ${display}…` : snapshot.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : view.pending ? "Проверяем подключение…" : connectionMessage(snapshot.state, { display, subscription })}</strong>
+        <small>{[snapshot.plan, snapshot.version].filter(Boolean).join(" · ") || "Нет сведений о подписке"}</small></div></div>
+    {snapshot.versionStatus === "graceful" && <p className="small muted">Версия новее проверенной в FoldCV; её возможности проверены при подключении.</p>}
     <ModelSelect id="model-select" label="Модель обработки" value={model} models={snapshot.models}
       disabled={disabled || selectionDisabled || view.pending || !snapshot.metadataReady}
       change={value => { if (value) change(value); }} />
@@ -62,9 +62,8 @@ export function Connection({ view, workflow, model, change, disabled, selectionD
       {codeSent && <p className="small muted" role="status">Код передан. Дождитесь завершения входа.</p>}
     </form>}
     {view.error && <p className="notice error" role="alert">{errorMessage(view.error)}</p>}
-    <p className="settings-disclosure">Проверка, вход, отключение и смена провайдера выполняются сразу. Отмена черновика настроек их не отменяет.</p>
-    {snapshot.experimentalMode ? <p className="settings-disclosure">Текст передаётся через {display} CLI по вашей подписке {subscription}; действуют правила хранения провайдера.
-      CLI может предоставлять встроенные инструменты и сохранять запросы и ответы. Вход остаётся после отключения.</p>
+    {snapshot.experimentalMode ? <p className="settings-disclosure">Текст уходит в {publisher}, действуют её правила хранения. {display} может сохранять
+      запросы и ответы. Вход остаётся после отключения.</p>
       : <p className="settings-disclosure">Обработка недоступна в текущем режиме подключения.</p>}
   </>;
 }

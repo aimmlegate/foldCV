@@ -10,6 +10,7 @@ from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.template_export import capture_export, snapshot_identity
 from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.templates.focus import icon_catalog
 from tests.templates.generic_fixtures import direct_generic, generic_import, export_through_service as exported
 from tests.templates.storage_fixtures import source_fixture
 from tests.templates.test_captured_docx import NS, emitted, parts, recapture, xml
@@ -108,7 +109,8 @@ async def test_branded_export_carries_logo_repeating_footer_captured_fonts_and_e
     def images(part):
         relations = etree.fromstring(archive['word/_rels/' + part + '.rels'])
         return [sha256(archive['word/' + child.get('Target')]) for child in relations if child.get('Type').endswith('/image')]
-    assert images('header1.xml') == [assets['generic']] and images('document.xml') == [assets['python']]
+    python = icon_catalog(package).files['python'].sha256
+    assert images('header1.xml') == [assets['generic']] and images('document.xml') == [python]
     references = {(node.tag, node.get(qn('w:type'))) for node in tree.xpath('//w:sectPr/w:footerReference', namespaces=NS)}
     assert references == {(qn('w:footerReference'), 'default'), (qn('w:footerReference'), 'first')}
     assert tree.xpath('//w:sectPr/w:titlePg', namespaces=NS)

@@ -12,7 +12,7 @@ import yaml
 from packages.resume_core.templates.compiler import compile_bytes, compile_template
 from packages.resume_core.templates.loading import CONFIG_DEPTH, load_definition
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
-from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore, verify_package
+from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore, verify_package
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_equivalent_yaml_json_keeps_originals_and_compiled_assets(config):
     assert yaml_package.recipe.style.text["body"].size == 10
     assert yaml_package.recipe.layout.regions[1].width == 118.5
     assert yaml_package.recipe.style.footer.text == "mail@example.com"
-    assert {asset.role for asset in yaml_package.assets} == {"font", "logo", "catalog", "icon"}
+    assert {asset.role for asset in yaml_package.assets} == {"font", "logo", "catalog"}
     assert verify_package(yaml_package) == yaml_package
 
 
@@ -105,6 +105,27 @@ def test_excessive_nesting_has_a_technical_error():
 def test_invalid_candidate_references_shapes_and_cycles(config, mutate, reason):
     mutate(config)
     with pytest.raises(SchemaFailure, match=reason): compile_config(config)
+
+
+@pytest.mark.parametrize("mutate,path", [
+    (lambda c:next(b for b in c['blocks'] if b['id']=='education')['placement'].update(region='sidebar'), '/blocks/education/placement'),
+    (lambda c:c['layout'].update(reading_order=['header','sidebar','main']), '/layout'),
+    (lambda c:c['layout']['regions'].reverse(), '/layout'),
+    (lambda c:c['layout'].update(regions=c['layout']['regions'][1:], reading_order=['main']), '/layout'),
+])
+def test_a_one_column_layout_has_no_sidebar_and_refuses_a_block_placed_there(mutate, path):
+    config = load_definition(BUNDLED_TEMPLATES['generic-one-column'].read_bytes())
+    assert [region.id for region in compile_config(deepcopy(config)).recipe.layout.regions] == ['header', 'main']
+    mutate(config)
+    with pytest.raises(SchemaFailure) as error: compile_config(config)
+    assert error.value.path == path
+
+
+@pytest.mark.parametrize("template_id", ["a/b", "../generic", ".hidden", "with space", "шаблон", "x" * 201])
+def test_a_new_template_id_is_one_url_path_segment(config, template_id):
+    config['template']['id'] = template_id
+    with pytest.raises(SchemaFailure) as error: compile_config(config)
+    assert error.value.path == "/template/id"
 
 
 def test_provider_envelope_uses_only_reachable_definitions_and_keeps_server_constraints(config):

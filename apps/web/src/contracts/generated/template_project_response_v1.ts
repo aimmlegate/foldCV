@@ -26,6 +26,7 @@ export type Blocks2 = [string, ...string[]];
 export type Icon = string | null;
 export type Links = string[];
 export type Style = string;
+export type Records = string[];
 export type Fonts = string[];
 export type Icons = string[];
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
@@ -36,6 +37,12 @@ export type Italic1 = string | null;
 export type Regular = string | null;
 export type Lineheight = number;
 export type Size1 = number;
+export type Blockid = string;
+export type Jobid = string | null;
+export type Label = string;
+export type Afterid = string | null;
+export type Parentid = string;
+export type Technologytargets = EditorTechnologyTarget[];
 export type Capabilities = string[];
 export type AllowMorePages = true;
 export type AllowProjectSplit = true;
@@ -61,7 +68,7 @@ export type IconHeight = number;
 export type IconWidth = number;
 export type IconX = number;
 export type MinimumRowHeight = number;
-export type MissingIcon = "text_only";
+export type MissingIcon = "text_only" | "initial";
 export type TextX = number;
 export type BaselineY = number;
 export type CenterX = number;
@@ -232,7 +239,7 @@ export type Detailtype = "phone" | "email" | "url" | "messenger" | "age" | "birt
 export type Evidence3 = EvidenceSpan[];
 export type Id8 = string;
 export type Kind2 = "detail";
-export type Label1 = string;
+export type Label2 = string;
 export type Origin2 = "source" | "user";
 export type Revision5 = number;
 export type Usercorrected3 = boolean;
@@ -259,7 +266,7 @@ export type Revision9 = number;
 export type Usercorrected6 = boolean;
 export type Evidence6 = EvidenceSpan[];
 export type Id11 = string;
-export type Jobid = string;
+export type Jobid1 = string;
 export type Kind4 = "subproject";
 export type Origin4 = "source" | "user";
 export type Periods1 = WorkingPeriod[];
@@ -267,7 +274,7 @@ export type Revision10 = number;
 export type Usercorrected7 = boolean;
 export type Evidence7 = EvidenceSpan[];
 export type Id12 = string;
-export type Jobid1 = string | null;
+export type Jobid2 = string | null;
 export type Kind5 = "technology";
 export type Origin5 = "source" | "user";
 export type Revision11 = number;
@@ -294,7 +301,7 @@ export type Revision14 = number;
 export type Usercorrected11 = boolean;
 export type Evidence11 = EvidenceSpan[];
 export type Id16 = string;
-export type Jobid2 = string | null;
+export type Jobid3 = string | null;
 export type Kind9 = "claim";
 export type Origin9 = "source" | "user";
 export type Revision15 = number;
@@ -302,7 +309,7 @@ export type Subprojectid1 = string | null;
 export type Usercorrected12 = boolean;
 export type Evidence12 = EvidenceSpan[];
 export type Id17 = string;
-export type Jobid3 = string | null;
+export type Jobid4 = string | null;
 export type Kind10 = "metric";
 export type Origin10 = "source" | "user";
 export type Revision16 = number;
@@ -325,7 +332,7 @@ export type Unit = string;
 export type Uppernumber = number | null;
 export type Evidence13 = EvidenceSpan[];
 export type Id18 = string;
-export type Jobid4 = string | null;
+export type Jobid5 = string | null;
 export type Kind11 = "leadership";
 export type Origin11 = "source" | "user";
 export type Revision18 = number;
@@ -346,7 +353,7 @@ export type Origin12 = "source" | "user";
 export type Revision20 = number;
 export type Status7 = "unresolved" | "pending" | "conflict";
 export type Usercorrected17 = boolean;
-export type Records = (
+export type Records1 = (
   | CandidateRecord
   | DetailRecord
   | EmploymentRecord
@@ -814,7 +821,7 @@ export type Taskid5 = string;
 export type Taskresults = TaskResultRecord[];
 export type Allowedhandles = string[];
 export type Attemptids = string[];
-export type Blockid = string;
+export type Blockid1 = string;
 export type Dependencies1 = string[];
 export type Expectedchecks1 = CheckTarget[];
 export type Id39 = string;
@@ -1406,7 +1413,7 @@ export type Relationid2 = string | null;
  * @maxItems 1000
  */
 export type Remainingoccurrenceids = [string, ...string[]];
-export type Afterid = string | null;
+export type Afterid1 = string | null;
 export type Beforerevision = number | null;
 export type Block1 =
   | TemplateParagraphBlock
@@ -1423,17 +1430,17 @@ export type Block1 =
   | TemplateSectionBlock;
 export type Keepchildren = boolean;
 export type Kind45 = "put_block";
-export type Parentid = string;
-export type Beforerevision1 = number;
-export type Blockid1 = string;
-export type Kind46 = "remove_block";
-export type Afterid1 = string | null;
-export type Beforerevision2 = number;
-export type Blockid2 = string;
-export type Kind47 = "move_block";
 export type Parentid1 = string;
-export type Beforerevision3 = number;
+export type Beforerevision1 = number;
+export type Blockid2 = string;
+export type Kind46 = "remove_block";
+export type Afterid2 = string | null;
+export type Beforerevision2 = number;
 export type Blockid3 = string;
+export type Kind47 = "move_block";
+export type Parentid2 = string;
+export type Beforerevision3 = number;
+export type Blockid4 = string;
 export type Cellid3 = string | null;
 export type Content14 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 /**
@@ -1513,7 +1520,7 @@ export type Kind62 = "coverage";
 export type Aftersemantichash = string;
 export type Beforerevision10 = number;
 export type Beforesemantichash = string;
-export type Blockid4 = string;
+export type Blockid5 = string;
 export type Kind63 = "restore_authored_block_patch";
 /**
  * @minItems 1
@@ -1537,7 +1544,7 @@ export type Kind67 = "splice_text";
 export type Pointer8 = string;
 export type Start4 = number;
 export type Text12 = string;
-export type Blockid5 = string;
+export type Blockid6 = string;
 export type Cellid5 = string | null;
 export type Field5 = "content" | "caption";
 export type Inlineindex = number;
@@ -1563,7 +1570,7 @@ export type Activecellids = [string, ...string[]];
  * @maxItems 1000
  */
 export type Fragments = [ScopeDisplayFragment, ...ScopeDisplayFragment[]];
-export type Blockid6 = string;
+export type Blockid7 = string;
 export type Cellid6 = string | null;
 export type Field6 = "content" | "caption";
 export type Fragmenthash = string;
@@ -1603,7 +1610,7 @@ export type Syncid = string;
 export type Rewriteresult = string | null;
 export type Rewritesource = string | null;
 export type Schemaversion13 = 2;
-export type Blockid7 = string;
+export type Blockid8 = string;
 export type Cellid7 = string | null;
 /**
  * UTF-16 code units within the block or cell.
@@ -1625,7 +1632,7 @@ export type Fieldkeys2 = string[];
 export type Id78 = string;
 export type Instruction1 = string | null;
 export type Kind72 = "completion" | "rewrite" | "reconciliation" | "conflict" | "panel";
-export type Afterid2 = string | null;
+export type Afterid3 = string | null;
 export type Beforerevision11 = number | null;
 export type Block2 =
   | ParagraphBlock
@@ -1906,9 +1913,9 @@ export type Revision58 = number;
 export type Type32 = "paragraph";
 export type Keepchildren1 = boolean;
 export type Kind73 = "put_block";
-export type Parentid2 = string;
+export type Parentid3 = string;
 export type Beforerevision12 = number;
-export type Blockid8 = string;
+export type Blockid9 = string;
 export type Cellid8 = string | null;
 export type Content28 = (StyledText | Hyperlink | FactFieldSpan)[];
 /**
@@ -2003,25 +2010,41 @@ export interface StyleOverrides {
  */
 export interface EditorPlanV1 {
   blocks: Blocks1;
+  focusPanel?: EditorFocusPanel | null;
   fonts: Fonts;
+  iconFiles?: Iconfiles;
   icons: Icons;
   styles: Styles;
+  technologyTargets?: Technologytargets;
 }
 export interface Blocks1 {
   [k: string]: EditorBlock;
 }
 export interface EditorBlock {
   band?: Band;
+  chips?: Chips;
   focus?: EditorFocus | null;
   inline?: Inline;
   links?: Links;
   style: Style;
+}
+export interface Chips {
+  [k: string]: string;
 }
 export interface EditorFocus {
   blocks: Blocks2;
   icon: Icon;
 }
 export interface Inline {
+  [k: string]: string;
+}
+/**
+ * The facts panel can add, remove and move Focus rows and set their years.
+ */
+export interface EditorFocusPanel {
+  records: Records;
+}
+export interface Iconfiles {
   [k: string]: string;
 }
 export interface Styles {
@@ -2039,6 +2062,23 @@ export interface EditorFaces {
   boldItalic: Bolditalic;
   italic: Italic1;
   regular: Regular;
+}
+/**
+ * Where the facts panel adds a technology: a line of one scope, a job section that has none yet, or a group view
+ * the document no longer shows (block id view:<view id>).
+ */
+export interface EditorTechnologyTarget {
+  blockId: Blockid;
+  jobId: Jobid;
+  label: Label;
+  placement: EditorPlacement;
+}
+/**
+ * A block's parent block or region and the sibling before it, as a panel placement context names them.
+ */
+export interface EditorPlacement {
+  afterId: Afterid;
+  parentId: Parentid;
 }
 export interface CompiledRecipe {
   capabilities: Capabilities;
@@ -2178,7 +2218,7 @@ export interface ViewNode {
   fields?: Fields;
   header_slot?: HeaderSlot;
   item_field?: ItemField;
-  label?: Label;
+  label?: Label1;
   name_field?: NameField;
   prefix?: Prefix;
   separator?: Separator;
@@ -2186,7 +2226,7 @@ export interface ViewNode {
   type: Type;
   url_field?: UrlField;
 }
-export interface Label {
+export interface Label1 {
   [k: string]: string;
 }
 export interface Prefix {
@@ -2252,7 +2292,7 @@ export interface WorkingFactsV2 {
   manualScopes: Manualscopes;
   mode?: Mode1;
   observations: Observations;
-  records: Records;
+  records: Records1;
   relations: Relations1;
   revision: Revision21;
   schemaVersion: Schemaversion4;
@@ -2400,7 +2440,7 @@ export interface DetailRecord {
   evidence: Evidence3;
   id: Id8;
   kind: Kind2;
-  label: Label1;
+  label: Label2;
   origin: Origin2;
   revision: Revision5;
   userCorrected?: Usercorrected3;
@@ -2444,7 +2484,7 @@ export interface WorkingFieldBool {
 export interface SubprojectRecord {
   evidence: Evidence6;
   id: Id11;
-  jobId: Jobid;
+  jobId: Jobid1;
   kind: Kind4;
   name: WorkingFieldStr;
   origin: Origin4;
@@ -2459,7 +2499,7 @@ export interface TechnologyRecord {
   evidence: Evidence7;
   experience?: WorkingFieldStr;
   id: Id12;
-  jobId: Jobid1;
+  jobId: Jobid2;
   kind: Kind5;
   origin: Origin5;
   revision: Revision11;
@@ -2503,7 +2543,7 @@ export interface CertificationRecord {
 export interface ClaimRecord {
   evidence: Evidence11;
   id: Id16;
-  jobId: Jobid2;
+  jobId: Jobid3;
   kind: Kind9;
   origin: Origin9;
   revision: Revision15;
@@ -2514,7 +2554,7 @@ export interface ClaimRecord {
 export interface MetricRecord {
   evidence: Evidence12;
   id: Id17;
-  jobId: Jobid3;
+  jobId: Jobid4;
   kind: Kind10;
   origin: Origin10;
   revision: Revision16;
@@ -2545,7 +2585,7 @@ export interface MetricValue {
 export interface LeadershipRecord {
   evidence: Evidence13;
   id: Id18;
-  jobId: Jobid4;
+  jobId: Jobid5;
   kind: Kind11;
   origin: Origin11;
   revision: Revision18;
@@ -3161,7 +3201,7 @@ export interface TaskResultRecord {
 export interface ImportTask {
   allowedHandles: Allowedhandles;
   attemptIds: Attemptids;
-  blockId: Blockid;
+  blockId: Blockid1;
   dependencies: Dependencies1;
   expectedChecks: Expectedchecks1;
   id: Id39;
@@ -3809,28 +3849,28 @@ export interface TemplateOwnershipConflict {
   remainingOccurrenceIds: Remainingoccurrenceids;
 }
 export interface TemplatePutBlock {
-  afterId: Afterid;
+  afterId: Afterid1;
   beforeRevision: Beforerevision;
   block: Block1;
   keepChildren?: Keepchildren;
   kind: Kind45;
-  parentId: Parentid;
+  parentId: Parentid1;
 }
 export interface RemoveBlock {
   beforeRevision: Beforerevision1;
-  blockId: Blockid1;
+  blockId: Blockid2;
   kind: Kind46;
 }
 export interface MoveBlock {
-  afterId: Afterid1;
+  afterId: Afterid2;
   beforeRevision: Beforerevision2;
-  blockId: Blockid2;
+  blockId: Blockid3;
   kind: Kind47;
-  parentId: Parentid1;
+  parentId: Parentid2;
 }
 export interface TemplateReplaceInlineRange {
   beforeRevision: Beforerevision3;
-  blockId: Blockid3;
+  blockId: Blockid4;
   cellId: Cellid3;
   content: Content14;
   end: End2;
@@ -3927,7 +3967,7 @@ export interface RestoreAuthoredBlockPatch {
   afterSemanticHash: Aftersemantichash;
   beforeRevision: Beforerevision10;
   beforeSemanticHash: Beforesemantichash;
-  blockId: Blockid4;
+  blockId: Blockid5;
   kind: Kind63;
   patch: Patch;
 }
@@ -3964,7 +4004,7 @@ export interface ScopeDisplayAssignment {
   beforeHash: Beforehash;
 }
 export interface ScopeDisplayAddress {
-  blockId: Blockid5;
+  blockId: Blockid6;
   cellId: Cellid5;
   field: Field5;
   inlineIndex: Inlineindex;
@@ -3986,7 +4026,7 @@ export interface ScopeDisplaySource {
   scopeId: Scopeid2;
 }
 export interface ScopeDisplayFragment {
-  blockId: Blockid6;
+  blockId: Blockid7;
   cellId: Cellid6;
   field: Field6;
   fragmentHash: Fragmenthash;
@@ -4006,7 +4046,7 @@ export interface RichSelection {
   textSha256: Textsha256;
 }
 export interface RichPosition {
-  blockId: Blockid7;
+  blockId: Blockid8;
   cellId: Cellid7;
   offset: Offset;
 }
@@ -4028,12 +4068,12 @@ export interface RichSyncRecord {
   status: Status10;
 }
 export interface PutBlock {
-  afterId: Afterid2;
+  afterId: Afterid3;
   beforeRevision: Beforerevision11;
   block: Block2;
   keepChildren?: Keepchildren1;
   kind: Kind73;
-  parentId: Parentid2;
+  parentId: Parentid3;
 }
 export interface ParagraphBlock {
   children: Children14;
@@ -4192,7 +4232,7 @@ export interface TableCell {
 }
 export interface ReplaceInlineRange {
   beforeRevision: Beforerevision12;
-  blockId: Blockid8;
+  blockId: Blockid9;
   cellId: Cellid8;
   content: Content28;
   end: End4;

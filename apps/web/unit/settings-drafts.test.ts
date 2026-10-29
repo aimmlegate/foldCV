@@ -24,8 +24,6 @@ function setup() {
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     selectFallback: async model => { calls.push({ part: "fallback", value: model }); if (fail.has("fallback")) throw new Error("unavailable");
       server.preferences.selectedFallbackModel = model; return structuredClone(server.preferences); },
-    analysis: async automatic => { calls.push({ part: "analysis", value: automatic }); if (fail.has("analysis")) throw new Error("disk full");
-      server.preferences.automaticAnalysis = automatic; return structuredClone(server.preferences); },
     saveLimits: async value => { calls.push({ part: "limits", value });
       if (fail.has("limits") || !Number.isInteger(value.importMinutes) || !Number.isInteger(value.projectMegabytes))
         throw Object.assign(new Error("invalid"), { code: "INVALID_REQUEST" });
@@ -44,14 +42,14 @@ function setup() {
 
 test("partial Save retains failed drafts and Cancel keeps successful writes", async () => {
   const h = setup(); await h.controller.load(); const originalRules = h.server.rules.markdown;
-  h.controller.change("model", "model-b"); h.controller.change("automatic", false); h.controller.change("agentEnabled", true);
+  h.controller.change("model", "model-b"); h.controller.change("importModel", "model-c"); h.controller.change("agentEnabled", true);
   h.controller.change("agentModel", "agent-b"); h.controller.change("markdown", `${originalRules}\nDraft rule.`);
   h.fail.add("assistant"); h.fail.add("rules"); await h.controller.save();
-  assert.deepEqual(h.controller.state.saved, ["model", "analysis"]); assert.deepEqual(h.controller.dirty, ["assistant", "rules"]);
-  assert.equal(h.controller.state.staleRules, true); assert.equal(h.server.preferences.selectedModel, "model-b"); assert.equal(h.server.preferences.automaticAnalysis, false);
+  assert.deepEqual(h.controller.state.saved, ["model", "import"]); assert.deepEqual(h.controller.dirty, ["assistant", "rules"]);
+  assert.equal(h.controller.state.staleRules, true); assert.equal(h.server.preferences.selectedModel, "model-b"); assert.equal(h.server.preferences.selectedImportModel, "model-c");
   assert.ok(h.controller.state.draft.markdown.endsWith("Draft rule."));
   const calls = h.calls.length; h.controller.cancel(); assert.equal(h.calls.length, calls);
-  assert.deepEqual(h.controller.dirty, []); assert.equal(h.controller.state.draft.model, "model-b"); assert.equal(h.controller.state.draft.automatic, false);
+  assert.deepEqual(h.controller.dirty, []); assert.equal(h.controller.state.draft.model, "model-b"); assert.equal(h.controller.state.draft.importModel, "model-c");
   assert.equal(h.controller.state.draft.agentEnabled, false); assert.equal(h.controller.state.draft.markdown, originalRules);
 });
 
@@ -88,7 +86,7 @@ test("limits show contract defaults, send numbers and keep a rejected draft for 
 });
 
 test("explicit retries reload conflict bases without replacing local choices or resaving accepted sections", async () => {
-  const h = setup(); await h.controller.load(); h.controller.change("automatic", false); h.controller.change("agentEnabled", true);
+  const h = setup(); await h.controller.load(); h.controller.change("importModel", "model-c"); h.controller.change("agentEnabled", true);
   h.controller.change("agentModel", "agent-b"); h.controller.change("markdown", "Local rules");
   h.fail.add("assistant"); h.fail.add("rules"); await h.controller.save();
   h.fail.clear(); h.server.assistant.revision = 7; h.server.rules = { ...h.server.rules, revision: 4, markdown: "External rules" };
@@ -96,7 +94,7 @@ test("explicit retries reload conflict bases without replacing local choices or 
   assert.equal(h.controller.state.draft.markdown, "Local rules"); assert.equal(h.controller.state.rules?.markdown, "External rules");
   assert.equal(h.controller.state.draft.agentEnabled, true); assert.equal(h.controller.state.comparison, true);
   await h.controller.save(); assert.deepEqual(h.controller.dirty, []);
-  assert.equal(h.calls.filter(call => call.part === "analysis").length, 1);
+  assert.equal(h.calls.filter(call => call.part === "import").length, 1);
   assert.deepEqual(h.calls.filter(call => call.part === "rules").at(-1)?.value, { baseRevision: 4, markdown: "Local rules" });
   assert.deepEqual(h.calls.filter(call => call.part === "assistant").at(-1)?.value, { expectedRevision: 7, enabled: true, selectedAgentModel: "agent-b", reasoningEffort: null });
 });
@@ -158,15 +156,15 @@ test("the fallback model saves on its own, clears to none and leaves the import 
 test("failed import saves keep the choice while other settings save successfully", async () => {
   const h = setup(); await h.controller.load(); h.fail.add("import");
   h.controller.change("importModel", "model-b"); h.controller.change("model", "model-c");
-  h.controller.change("automatic", false); await h.controller.save();
-  assert.deepEqual(h.controller.state.saved, ["model", "analysis"]);
+  h.controller.change("fallbackModel", "model-d"); await h.controller.save();
+  assert.deepEqual(h.controller.state.saved, ["model", "fallback"]);
   assert.deepEqual(h.controller.dirty, ["import"]);
   assert.equal(h.controller.state.draft.importModel, "model-b");
   assert.equal(h.server.preferences.selectedImportModel, undefined);
   h.fail.clear(); await h.controller.save();
   assert.equal(h.server.preferences.selectedImportModel, "model-b");
   assert.equal(h.server.preferences.selectedModel, "model-c");
-  assert.equal(h.server.preferences.automaticAnalysis, false);
+  assert.equal(h.server.preferences.selectedFallbackModel, "model-d");
 });
 
 test("an import save acknowledgment retains a newer model draft", async () => {
@@ -183,9 +181,18 @@ test("an import save acknowledgment retains a newer model draft", async () => {
 test("closing during Save invalidates late UI callbacks and unsent section writes", async () => {
   const h = setup(), entered = gate(), release = gate(); await h.controller.load();
   const select = h.api.select; h.api.select = async model => { entered.release(); await release.wait; return select(model); };
-  h.controller.change("model", "model-b"); h.controller.change("automatic", false);
+  h.controller.change("model", "model-b"); h.controller.change("importModel", "model-c");
   const pending = h.controller.save(); await entered.wait; h.controller.close(); const count = h.changes.length; release.release(); await pending;
-  assert.equal(h.changes.length, count); assert.deepEqual(h.calls.map(call => call.part), ["model"]); assert.equal(h.server.preferences.automaticAnalysis, true);
+  assert.equal(h.changes.length, count); assert.deepEqual(h.calls.map(call => call.part), ["model"]); assert.equal(h.server.preferences.selectedImportModel, undefined);
+});
+
+test("a stored automatic check choice is never a draft and Save never writes it", async () => {
+  for (const stored of [true, false]) {
+    const h = setup(); h.server.preferences.automaticAnalysis = stored; await h.controller.load();
+    assert.deepEqual(h.controller.dirty, []); assert.equal("automatic" in h.controller.state.draft, false);
+    h.controller.change("model", "model-b"); await h.controller.save(); h.controller.cancel();
+    assert.deepEqual(h.calls.map(call => call.part), ["model"]); assert.equal(h.server.preferences.automaticAnalysis, stored);
+  }
 });
 
 test("download names retain Unicode, remove path/control characters and stay within a filename byte limit", () => {

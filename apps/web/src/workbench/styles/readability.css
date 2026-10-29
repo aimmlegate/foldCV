@@ -4,11 +4,11 @@
 .app-shell :is(input, select, textarea), .modal :is(input, select, textarea) { color: var(--ink); }
 .app-shell :is(input, textarea)::placeholder, .modal :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 .project-select strong, .project-heading h1, .settings-content h3, .fact-edit strong { color: var(--ink); font-size: var(--ui-title); }
-.app-shell :is(.project-select small, .project-select em, .project-heading > span, .session-status, .connection-mini, .source-note, .source-form > p, .source-form label, .source-form .source-note, .source-form .dropzone small, .dropzone small, .settings-saved, .settings-content > p, .settings-content label, .switch-line label small, .connection-status small, .quota-line, .panel-intro, .fact-edit small, .panel-tip, .flow-footer, .technology-label, .technology-edit small, .source-viewer-note, .source-file-type, .operation-status-detail, .workspace-view-label),
+.app-shell :is(.project-select small, .project-select em, .project-heading > span, .session-status, .connection-mini, .source-note, .source-form > p, .source-form label, .source-form .source-note, .source-form .dropzone small, .dropzone small, .settings-saved, .settings-content > p, .settings-content label, .switch-line label small, .technology-note, .technology-group, .connection-status small, .quota-line, .panel-intro, .fact-edit small, .panel-tip, .flow-footer, .technology-label, .technology-edit small, .source-viewer-note, .source-file-type, .operation-status-detail, .workspace-view-label),
 .modal :is(label, .dialog-copy, .dialog-subtitle, .export-summary, .export-format small) { color: var(--muted); font-size: var(--ui-small); }
 .app-shell .source-form .source-note { font-size: var(--ui-small) !important; }
 .app-shell :is(.tool, .toolbar-select, .text-button, .new-button, .history-open, .history-footer button, .fact-add, .fact-group summary, .technology-option, .technology-search, .technology-expand, .settings-nav button, .workspace-views button, .source-viewer-file, .source-pdf-controls) { color: var(--ink); font-size: var(--ui-body); }
-.app-shell :is(.technology-chip, .technology-chip .technology-edit, .focus-years-row label, .uir-timeline, .uir-timeline small, .uir-timeline button, .notice-trigger, .rewrite-status-trigger),
+.app-shell :is(.technology-chip, .technology-chip .technology-edit, .focus-years-row .focus-name, .uir-timeline, .uir-timeline small, .uir-timeline button, .notice-trigger, .rewrite-status-trigger),
 .notice-panel :is(p, h3, strong, button), .uir-rewrite :is(label, summary, button, textarea), [data-uir-engine-ui] .uir-selection-action { font-size: var(--ui-small); }
 .app-shell :is(.source-text, .rules-text), .uir-rewrite textarea, .source-text-preview .bn-editor { color: var(--ink); font-size: var(--ui-body); line-height: 1.65; }
 .app-shell :is(.dropzone strong, .fact-edit strong, .technology-chip, .technology-option, .technology-no-results, .settings-nav button.active, .settings-content h3),
@@ -26,8 +26,6 @@
 .settings-screen .settings-nav button { white-space: normal; line-height: 1.5; text-align: left; }
 .app-shell .settings-layout { grid-template-columns: 210px minmax(0, 1fr); }
 .app-shell .workspace-views button { min-height: 34px; }
-.app-shell .project-select small { line-height: 1.5; }
-.app-shell .project-select strong { line-height: 1.4; }
 .app-shell .notice.error { color: var(--danger); }
 .app-shell .notice.warning { color: var(--warn); }
 @media (max-width: 800px) {

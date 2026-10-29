@@ -1,16 +1,6 @@
 .history[aria-busy="true"] button:disabled,
 .app-header[aria-busy="true"] button:disabled { opacity: 1; cursor: progress; }
 .app-shell[data-busy="true"] .uir-editor-controls:disabled :is(button, select, input):not([disabled]) { opacity: 1; }
-.project-select { gap: 2px; padding-block: 9px; }
-.project-select small { line-height: 1.35; }
-.project-select em { margin-top: 3px; }
-.project-row .project-select { padding-bottom: 31px; }
-.project-archive { position: absolute; bottom: 7px; left: 12px; border: 0; background: transparent; color: var(--muted); font-size: 10px; padding: 2px; }
-.project-archive:hover { color: var(--ink); }
-.project-list { gap: 3px; }
-.history-footer > button > svg:last-child { margin-left: auto; }
-.history-footer > button { border-radius: 5px; padding-inline: 4px; }
-.history-footer > button:hover { background: var(--wash); }
 .app-header, .header-actions, .project-heading { min-width: 0; }
 .project-heading h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-heading > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -2,13 +2,13 @@ import { errorMessage } from "../errors/messages";
 import type { AssistantView } from "./controller";
 
 export function errorText(code: string | null): string {
-  return code ? errorMessage(code, "Не удалось завершить задачу. Сохранённые результаты доступны в диалоге.") : "";
+  return code ? errorMessage(code, "Помощник не закончил работу. Готовое осталось в диалоге.") : "";
 }
 export function runText(view: AssistantView): string {
-  if (view.submitting) return "Отправляем задачу…";
-  if (view.pendingSend) return "Ответ на отправку потерян. Повторите ту же отправку или остановите задачу.";
-  const labels = { queued: "Ожидает очереди", running: "Выполняется",
-    cancelling: "Останавливаем…", cancelled: "Остановлено", interrupted: "Прервано", failed: "Не удалось завершить", completed: "Завершено" };
+  if (view.submitting) return "Отправляем…";
+  if (view.pendingSend) return "Нет ответа на отправку. Отправьте ещё раз или остановите.";
+  const labels = { queued: "В очереди", running: "Работает",
+    cancelling: "Останавливаем…", cancelled: "Остановлено", interrupted: "Прервано", failed: "Не удалось", completed: "Завершено" };
   return view.run ? labels[view.run.state] : "";
 }
 export function canSend(view: AssistantView, applying = false): boolean {

@@ -157,7 +157,8 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                    or path.startswith("/v1/rich/projects/template-input/"))
                 body_limit = (ARCHIVE_BYTES + 4096 if path == "/v2/projects/archive" else MAX_EXTRACT_BODY if project_upload
                     else MAX_BODY)
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
@@ -436,8 +437,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         except (PreferencesFailure, AgentFailure):
             pass
 
-    def template_import_model():
-        # The capture records the selected import model with its catalog default effort; nothing is chosen here.
+    def template_import_model(effort=None):
+        # The capture records the selected import model with the effort the import start chose, else its catalog
+        # default; a chosen effort the catalog does not offer for the model refuses the start.
         from packages.resume_core.models.template_import import ModelCapture
         from packages.resume_core.template_import import digest as capture_digest
         selected = import_selected_provider()
@@ -446,7 +448,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             raise ProjectFailure("QUOTA_EXHAUSTED" if connection_state.quota.state == "exhausted" else "CONNECTION_REQUIRED", 409)
         provider, model = selected
         reasoning = connection_state.modelReasoning.get(model)
-        effort = reasoning.default if reasoning is not None else None
+        if effort is not None and (reasoning is None or effort not in reasoning.supported):
+            raise ProjectFailure("IMPORT_EFFORT_UNSUPPORTED", 409)
+        effort = effort or (reasoning.default if reasoning is not None else None)
         if effort is None:
             raise ProjectFailure("MODEL_DENIED", 409)
         adapter = getattr(provider, "template_adapter", "codex_cli")
@@ -506,8 +510,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         concurrency=template_import_concurrency)
     intake.ready = v2_pipeline is not None
 
-    def import_command(identifier, request_id, allow_text_rewrite):
-        return intake.command(identifier, request_id, allow_text_rewrite, workspace=project_repository.read(identifier))
+    def import_command(identifier, request_id, allow_text_rewrite, effort=None):
+        return intake.command(identifier, request_id, allow_text_rewrite, effort, workspace=project_repository.read(identifier))
     projects.imports = ImportService(projects, v2_pipeline, commands=import_command)
 
     async def render_export(request):

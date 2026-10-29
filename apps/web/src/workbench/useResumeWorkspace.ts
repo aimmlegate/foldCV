@@ -3,35 +3,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { TemplateEditorHandle } from "../rich/TemplateEditor";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantHandle } from "../assistant/Drawer";
-import { hasInput, importBody, type ResumeInput } from "../rich/import-source";
-import { cancelImport, catalogFlag, createProject, deleteProject, listProjects, openFoldcv, projectTasks, resumeImport, startImport,
-  type ProjectList, type ProjectTask } from "../projects/api";
-import { IMPORT_WAIT_MS } from "../projects/import-wait";
+import { importBody } from "../rich/import-source";
+import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, projectTasks, resumeImport, startImport,
+  type ImportOptions, type ProjectList } from "../projects/api";
 import { ProjectApiFailure, type ProjectEditorConnection } from "../rich/v7-connection";
 import { openEditor } from "./open-editor";
 import { WorkspaceReads, type ReadCapture } from "./read-capture";
+import type { ImportEntry } from "./import/progress";
+import { ImportTracker } from "./import/tracker";
 
 function label(error: unknown): string { return errorMessage(error); }
 export type TemplateOpening = { response: TemplateProjectResponseV1; connection: ProjectEditorConnection };
 export function useResumeWorkspace() {
   const [template, setTemplate] = useState<TemplateOpening | null>(null);
   const [projects, setProjects] = useState<ProjectList | null>(null);
-  const [input, storeInput] = useState<ResumeInput>({ kind: "text", text: "" });
-  const [textDraft, setTextDraft] = useState("");
-  const [allowTextRewrite, setAllowTextRewrite] = useState(true);
-  function setInput(next: ResumeInput) { storeInput(next); if (next.kind === "text") setTextDraft(next.text); }
   const [error, setError] = useState("");
   const dismissError = useCallback(() => setError(""), []);
   const [status, setStatus] = useState("Сохранено");
   const [busy, setBusy] = useState(false);
-  const [importTask, setImportTask] = useState<ProjectTask | null>(null);
-  const [operation, setOperation] = useState<{ label: string; startedAt: number; cancel?: () => Promise<void> } | null>(null);
-  function stage(label: string, cancel?: () => Promise<void>) {
-    setOperation(current => {
-      const next = cancel ?? current?.cancel;
-      const startedAt = current?.startedAt ?? Date.now();
-      return next ? { label, startedAt, cancel: next } : { label, startedAt };
-    });
+  // Imports run beside every other action (feedback item 20); the tracker follows each project's task.
+  const [imports, setImports] = useState<ReadonlyMap<string, ImportEntry>>(() => new Map());
+  const tracker = useRef<ImportTracker | null>(null);
+  const [operation, setOperation] = useState<{ label: string; startedAt: number } | null>(null);
+  function stage(label: string) {
+    setOperation(current => ({ label, startedAt: current?.startedAt ?? Date.now() }));
   }
   const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
   const [settings, setSettings] = useState(false);
@@ -65,18 +60,23 @@ export function useResumeWorkspace() {
     if (!reads.current.selectionCurrent(capture)) return null;
     if (connection.response.workspace.projectId !== id) throw new ProjectApiFailure("INVALID_RESULT");
     const catalog = await listProjects();
-    return { connection, catalog };
+    // A pre-draft may be importing already (another tab session, a reload): follow its running task.
+    const tasks = connection.response.workspace.project ? [] : await projectTasks(id);
+    return { connection, catalog, running: tasks.find(task => task.kind === "import" && task.state === "running") ?? null };
   }
   function show(result: NonNullable<Awaited<ReturnType<typeof load>>>, capture: ReadCapture) {
     selectTemplate(result.connection, capture);
     setProjects(result.catalog);
+    const { workspace } = result.connection.response;
+    if (result.running && tracker.current?.get(workspace.projectId)?.task.id !== result.running.id)
+      tracker.current?.track(workspace.projectId, result.running, workspace.title);
   }
   async function leave(current: () => boolean) {
     const previousEditor = templateEditor.current, previousAssistant = assistant.current;
     if (!previousEditor?.background) await previousAssistant?.stop();
     if (current()) await previousEditor?.navigate();
   }
-  async function action(work: (current: () => boolean) => Promise<void>, labelText = "Сохраняем последние изменения"): Promise<boolean> {
+  async function action(work: (current: () => boolean) => Promise<void>, labelText = "Сохраняем изменения"): Promise<boolean> {
     const owner = lifetime.current;
     if (!owner || acting.current) return false;
     const current = () => lifetime.current === owner, operation = {};
@@ -97,19 +97,19 @@ export function useResumeWorkspace() {
   }
   function clear() {
     reads.current.clear(); setOpening(null); activeProject.current = null; setTemplate(null); setStatus("Сохранено");
-    setAllowTextRewrite(true);
-    setInput({ kind: "text", text: "" }); history.replaceState(null, "", location.pathname);
+    history.replaceState(null, "", location.pathname);
   }
   async function fresh() {
     await action(async current => {
       await leave(current);
       if (!current()) return;
       clear(); setSettings(false);
-    }, "Подготавливаем новое резюме");
+    }, "Готовим новое резюме");
   }
   async function open(id: string) {
     return action(async current => {
-      if (activeProject.current === id && template) { await templateEditor.current?.resume(); if (current()) setSettings(false); return; }
+      // A shown pre-draft is read again: its import may have published it meanwhile.
+      if (activeProject.current === id && template?.response.workspace.project) { await templateEditor.current?.resume(); if (current()) setSettings(false); return; }
       await leave(current);
       if (!current()) return;
       const capture = reads.current.beginSelection(id);
@@ -117,8 +117,7 @@ export function useResumeWorkspace() {
         const result = await load(id, capture);
         if (result && reads.current.selectionCurrent(capture)) {
           show(result, capture);
-          setStatus("Сохранено");
-          setInput({ kind: "text", text: "" }); setSettings(false);
+          setStatus("Сохранено"); setSettings(false);
         }
       } finally { reads.current.cancelSelection(capture); }
     }, "Открываем резюме");
@@ -127,8 +126,11 @@ export function useResumeWorkspace() {
     return action(async current => {
       if (activeProject.current === id) await leave(current);
       if (!current()) return;
+      // The service refuses to delete a project whose import still runs.
+      await tracker.current?.stop(id);
       // The project is gone from the list either way; "failed" means its files could not all be removed.
       const incomplete = (await deleteProject(id)).cleanupStatus === "failed";
+      tracker.current?.dismiss(id);
       if (!current()) return;
       if (template?.response.workspace.projectId === id) clear();
       const catalog = await listProjects();
@@ -146,7 +148,7 @@ export function useResumeWorkspace() {
       if (archived && activeProject.current === id) clear();
       const catalog = await listProjects();
       if (current()) setProjects(catalog);
-    }, archived ? "Перемещаем резюме в архив" : "Восстанавливаем резюме");
+    }, archived ? "Переносим в архив" : "Возвращаем из архива");
   }
   async function projectLifecycle(id: string, kind: "archive" | "delete") {
     return action(async current => {
@@ -158,10 +160,18 @@ export function useResumeWorkspace() {
       if (current()) setProjects(catalog);
     });
   }
+  // The tracker outlives renders; its callback reads the latest closures through this ref.
+  const finished = useRef<(entry: ImportEntry) => void>(() => {});
+  finished.current = entry => {
+    void listProjects().then(next => { if (lifetime.current) setProjects(next); }).catch(() => {});
+    if (entry.task.state === "succeeded" && activeProject.current === entry.projectId) void reopenImported(entry.projectId);
+  };
   useEffect(() => {
     const owner = {};
     lifetime.current = owner;
     let alive = true;
+    const following = new ImportTracker(setImports, entry => finished.current(entry));
+    tracker.current = following;
     const id = new URLSearchParams(location.search).get("project");
     const capture = id ? reads.current.beginSelection(id) : null;
     if (id && capture) void load(id, capture).then(result => {
@@ -173,84 +183,59 @@ export function useResumeWorkspace() {
     void listProjects().then(next => { if (alive) setProjects(next); }).catch(error => { if (alive) setError(label(error)); });
     return () => {
       alive = false;
+      following.close();
+      if (tracker.current === following) tracker.current = null;
       if (lifetime.current === owner) { lifetime.current = null; acting.current = null; reads.current.clear(); }
     };
   }, [adoptTemplate]);
-  async function finishTemplateImport(id: string, first: ProjectTask, current: () => boolean, startedAt = Date.now()) {
-    let task = first;
-    let operationId: string | null = null, stopped = false;
-    // Time queued behind another import or an assistant turn does not count against this import's own limit.
-    let since: number | null = first.stage === "waiting" ? null : startedAt;
-    const stop = async () => {
-      try { await cancelImport(id, task.id); stopped = true; }
-      catch (error) { if (current()) setError(label(error)); }
-    };
-    stage("Запускаем импорт", stop);
-    setImportTask(task);
-    while (task.state === "running") {
-      if (!current() || stopped) return;
-      if (task.stage !== "waiting") since ??= Date.now();
-      const policySeconds = task.detail["processingSeconds"];
-      const wait = typeof policySeconds === "number" ? policySeconds * 1000 + 223000 : IMPORT_WAIT_MS;
-      if (since !== null && Date.now() - since > wait) throw new ProjectApiFailure("PROCESS_TIMEOUT");
-      const named = task.detail["operationId"];
-      if (typeof named === "string" && named) operationId = named;
-      stage(task.stage === "processing" ? "Импортируем по шаблону"
-        : task.stage === "waiting" ? "Импорт ждёт очереди: модель занята другой задачей" : "Запускаем импорт", stop);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      if (!current() || stopped) return;
-      const tasks = await projectTasks(id);
-      const next = tasks.find(item => item.id === task.id);
-      if (!next) {
-        if (!operationId) throw new ProjectApiFailure("PROCESS_FAILED");
-        task = await resumeImport(id, operationId);
-        continue;
-      }
-      task = next;
-      setImportTask(task);
-    }
-    if (!current() || stopped) return;
-    if (task.state === "cancelled") throw new ProjectApiFailure("CANCELLED");
-    if (task.state !== "succeeded") throw new ProjectApiFailure(task.error ?? "PROCESS_FAILED");
-    if (!current()) return;
-    const capture = reads.current.beginSelection(id);
-    try {
-      const result = await load(id, capture);
-      if (result && reads.current.selectionCurrent(capture)) {
-        show(result, capture); setInput({ kind: "text", text: "" });
-      }
-    } finally { reads.current.cancelSelection(capture); }
+  /** Open the project again after its import published it; the import screen keeps an Open button if this is refused. */
+  async function reopenImported(id: string) {
+    return action(async () => {
+      const capture = reads.current.beginSelection(id);
+      try {
+        const result = await load(id, capture);
+        if (result && reads.current.selectionCurrent(capture)) show(result, capture);
+      } finally { reads.current.cancelSelection(capture); }
+    }, "Открываем резюме");
   }
   async function resumeTemplate() {
     const workspace = template?.response.workspace;
     const operation = workspace?.preDraft?.templateOperations.at(-1);
     if (!workspace) return false;
-    return action(async current => {
+    return action(async () => {
       const tasks = await projectTasks(workspace.projectId);
       const running = tasks.find(task => task.kind === "import" && task.state === "running");
       const task = running ?? (operation ? await resumeImport(workspace.projectId, operation.id)
-        : await startImport(workspace.projectId, { clientRequestId: crypto.randomUUID(), allowTextRewrite }));
-      await finishTemplateImport(workspace.projectId, task, current);
+        : await startImport(workspace.projectId, { clientRequestId: crypto.randomUUID(), allowTextRewrite: true, effort: null }));
+      tracker.current?.track(workspace.projectId, task, workspace.title);
     }, "Продолжаем импорт");
   }
-  /** The pasted text or file becomes a V7 pre-draft; one import task fills it and the result opens in the editor. */
-  async function process() {
+  /** The file becomes a V7 pre-draft and its import starts; the action ends there, so other resumes, Settings and more
+   * imports stay available while the tracker follows this one. */
+  async function process(file: File, options: ImportOptions, templateId: string | null) {
     await action(async current => {
-      if (!hasInput(input)) return;
       const version = reads.current.beginReplacement();
       let id: string;
       try {
-        const created = await createProject(importBody(input));
+        const created = await createProject(importBody({ kind: "file", file }), templateId);
         if (!reads.current.replacementCurrent(version)) return;
         id = created.workspace.projectId;
       } finally { reads.current.cancelReplacement(version); }
       const catalog = await listProjects();
       if (current()) setProjects(catalog);
-      const startedAt = Date.now();
-      const task = await startImport(id, { clientRequestId: crypto.randomUUID(), allowTextRewrite });
-      const url = new URL(location.href); url.searchParams.set("project", id); history.replaceState(null, "", url.pathname + url.search);
-      await finishTemplateImport(id, task, current, startedAt);
-    }, input.kind === "file" ? "Загружаем и читаем файл" : "Читаем исходный текст");
+      stage("Запускаем импорт");
+      let refused: unknown = null;
+      try { tracker.current?.track(id, await startImport(id, { clientRequestId: crypto.randomUUID(), ...options }), file.name, options); }
+      catch (error) { refused = error; }
+      if (!current()) return;
+      // The new resume opens either way: its import screen, or the pre-draft with «Продолжить импорт».
+      const capture = reads.current.beginSelection(id);
+      try {
+        const result = await load(id, capture);
+        if (result && reads.current.selectionCurrent(capture)) { show(result, capture); setSettings(false); }
+      } finally { reads.current.cancelSelection(capture); }
+      if (refused) throw refused;
+    }, "Читаем файл");
   }
   async function upload(file: File) {
     return action(async current => {
@@ -263,11 +248,11 @@ export function useResumeWorkspace() {
         const connection = await openEditor(opened.workspace.projectId);
         if (!reads.current.replacementCurrent(version)) return;
         selectTemplate(connection, reads.current.beginSelection(opened.workspace.projectId));
-        setInput({ kind: "text", text: "" }); setSettings(false);
+        setSettings(false);
         const capture = reads.current.opening, catalog = await listProjects();
         if (reads.current.matchesOpening(capture)) setProjects(catalog);
       } finally { reads.current.cancelReplacement(version); }
-    }, "Открываем файл проекта");
+    }, "Открываем файл");
   }
   async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string)) {
     const deliver = (blob: Blob, name: string) => {
@@ -278,13 +263,13 @@ export function useResumeWorkspace() {
     const fallback = kind === "export" ? "resume.docx" : "project.foldcv";
     return action(async () => {
       const capture = reads.current.begin(kind);
-      if (!capture) throw new Error("Откройте резюме перед сохранением файла.");
+      if (!capture) throw new Error("Сначала откройте резюме.");
       await templateEditor.current?.flush();
       const connection = template?.connection;
       const current = connection?.response ?? template?.response;
-      if (!current || !connection) throw new Error("Откройте резюме перед сохранением файла.");
+      if (!current || !connection) throw new Error("Сначала откройте резюме.");
       if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
-      stage(kind === "export" ? "Создаём документ DOCX" : "Собираем файл проекта");
+      stage(kind === "export" ? "Готовим DOCX" : "Готовим файл .foldcv");
       // The editor token and the flushed revision go with the file.
       const blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv();
       if (!reads.current.current(kind, capture)) return;
@@ -292,7 +277,7 @@ export function useResumeWorkspace() {
       // Refresh adopts the export record. The file is already delivered, so a failed refresh is not this action's error:
       // the editor reports its own save problems, and queued input meets the new revision itself.
       await templateEditor.current?.refresh().catch(() => {});
-    }, "Сохраняем изменения перед скачиванием");
+    }, "Сохраняем изменения");
   }
   async function renameTemplate(title: string) {
     const next = title.trim();
@@ -307,7 +292,11 @@ export function useResumeWorkspace() {
       await templateEditor.current?.refresh();
     }, "Переименовываем резюме");
   }
-  return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects, input, setInput, textDraft,
-    allowTextRewrite, setAllowTextRewrite, error, status, setStatus, busy, operation, importTask, resumeTemplate, loading, settings, setSettings,
+  const importActions = {
+    stop: (id: string) => void tracker.current?.stop(id), retry: (id: string) => void tracker.current?.retry(id),
+    dismiss: (id: string) => tracker.current?.dismiss(id), reopen: (id: string) => void reopenImported(id),
+  };
+  return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects,
+    error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, settings, setSettings,
     assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, renameTemplate, dismissError };
 }

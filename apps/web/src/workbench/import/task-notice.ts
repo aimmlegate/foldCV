@@ -1,15 +1,27 @@
-import type { ProjectTask } from "../../projects/api";
+import { errorMessage } from "../../errors/messages";
+import { importView, stepText, type ImportEntry } from "./progress";
 
-export type TaskNotice = { id: string; state: "running" | "done" | "stopped"; text: string; startedAt: string };
+export type TaskNotice = {
+  projectId: string; title: string; startedAt: string; stopping: boolean;
+  state: "running" | "queued" | "stalled" | "failed" | "done" | "stopped"; text: string;
+};
 
-/** The import task as one notification: running with Stop, or finished until closed. A failure is already in «Ошибки». */
-export function taskNotice(task: ProjectTask | null, closed: string | null): TaskNotice | null {
-  if (!task || task.kind !== "import" || task.id === closed) return null;
-  const entry = { id: task.id, startedAt: task.startedAt };
-  if (task.state === "running") {
-    return { ...entry, state: "running", text: task.stage === "waiting" ? "Импорт ждёт очереди" : "Идёт импорт резюме" };
-  }
-  if (task.state === "succeeded") return { ...entry, state: "done", text: "Импорт завершён" };
-  if (task.state === "cancelled") return { ...entry, state: "stopped", text: "Импорт остановлен" };
-  return null;
+/** Every followed import as one notification in «Импорт»: running and queued ones with Stop, finished ones until closed. */
+export function taskNotices(entries: Iterable<ImportEntry>, now: number, titleOf: (projectId: string) => string | undefined = () => undefined): TaskNotice[] {
+  return [...entries].map(entry => {
+    const view = importView(entry, now);
+    const base = { projectId: entry.projectId, title: titleOf(entry.projectId) || entry.title, startedAt: entry.task.startedAt,
+      stopping: entry.stopping };
+    switch (view.kind) {
+      case "running": {
+        if (view.phase === "queued") return { ...base, state: "queued", text: "Импорт в очереди" };
+        const step = stepText(view.progress);
+        return { ...base, state: "running", text: step ? `Идёт импорт · ${step}` : "Идёт импорт" };
+      }
+      case "stalled": return { ...base, state: "stalled", text: "Импорт не отвечает" };
+      case "failed": return { ...base, state: "failed", text: `${view.lost ? "Нет связи с импортом" : "Импорт не удался"}. ${errorMessage(view.code)}` };
+      case "cancelled": return { ...base, state: "stopped", text: "Импорт остановлен" };
+      case "succeeded": return { ...base, state: "done", text: "Импорт завершён" };
+    }
+  });
 }

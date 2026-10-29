@@ -1,4 +1,8 @@
-"""Immutable packages and an atomic, explicitly selected active pointer."""
+"""Immutable packages, the current version of each template and the default template for new imports.
+
+`active.json` names the default id and the package each id uses when the user saved one; an id without a saved
+package uses its bundled file. Schema 1 named one active package: it is the current version of its id and the default.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,12 @@ from .loading import load_declared_definition,load_definition
 from .models import TemplateDefinition, TemplatePackage
 from .projection import SchemaFailure, validate_schema
 
-BUNDLED_TEMPLATE = Path(__file__).resolve().parents[3] / "templates/generic-two-column/template.yaml"
+BUNDLED_DIR = Path(__file__).resolve().parents[3] / "templates/bundled"
+# Templates shipped with the app by id, sharing one asset folder; the first one is the default until the user picks
+# another.
+BUNDLED_TEMPLATES = {"generic-two-column": BUNDLED_DIR / "generic-two-column.yaml",
+    "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml"}
+BUNDLED_TEMPLATE = BUNDLED_TEMPLATES["generic-two-column"]
 _VERIFIED_PACKAGES = OrderedDict()
 _VERIFIED_LOCK = threading.Lock()
 
@@ -85,6 +94,27 @@ def verify_package(package: TemplatePackage) -> TemplatePackage:
     return package
 
 
+class UnknownTemplate(LookupError):
+    """No bundled template and no saved package has this id."""
+
+
+def bundled_package(template_id: str) -> TemplatePackage | None:
+    path = BUNDLED_TEMPLATES.get(template_id)
+    if path is None: return None
+    package = compile_template(path)
+    if package.id != template_id: raise SchemaFailure("/template/id", "bundled template id mismatch")
+    return package
+
+
+def bundled_folder(template_id: str) -> Path:
+    """Where new asset paths of an edited template are read; an id the app does not ship uses the first bundled folder."""
+    return Path(BUNDLED_TEMPLATES.get(template_id) or next(iter(BUNDLED_TEMPLATES.values()))).parent
+
+
+def _digest(value) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+
 class TemplateStore:
     def __init__(self, root: Path):
         self.root = Path(root) / "template-packages"
@@ -93,15 +123,74 @@ class TemplateStore:
         owned_file(path, 2 * PACKAGE_BYTES)
         return strict_json(path.read_bytes())
 
+    def _stored(self, digest, template_id=None) -> TemplatePackage:
+        if not _digest(digest): raise SchemaFailure("/store/active", "invalid package hash")
+        package = verify_package(TemplatePackage.model_validate(self._read(self.root / digest / "package.json")))
+        if package.package_hash != digest: raise SchemaFailure("/store/active", "package hash mismatch")
+        if template_id is not None and package.id != template_id: raise SchemaFailure("/store/active", "package id mismatch")
+        return package
+
+    def _pointer(self):
+        """(chosen default id or None, {id: saved package hash})."""
+        path = self.root / "active.json"
+        if not path.exists() and not path.is_symlink(): return None, {}
+        pointer = self._read(path)
+        if isinstance(pointer,dict) and set(pointer) == {"schemaVersion","packageHash"} and pointer["schemaVersion"] == 1:
+            package = self._stored(pointer["packageHash"])
+            return package.id, {package.id: package.package_hash}
+        if (not isinstance(pointer,dict) or set(pointer) != {"schemaVersion","defaultId","current"} or pointer["schemaVersion"] != 2
+                or not (pointer["defaultId"] is None or isinstance(pointer["defaultId"],str)) or not isinstance(pointer["current"],dict)):
+            raise SchemaFailure("/store/active", "invalid active template pointer")
+        if not all(_digest(value) for value in pointer["current"].values()):
+            raise SchemaFailure("/store/active", "invalid package hash")
+        return pointer["defaultId"], dict(pointer["current"])
+
+    def _write(self, default_id, current) -> None:
+        atomic_write(self.root / "active.json", canonical({"schemaVersion":2,"defaultId":default_id,"current":current}))
+
+    @staticmethod
+    def _default(default_id, current) -> str:
+        # A chosen id that no longer exists (a bundled template an update removed) falls back to the first bundled one.
+        return default_id if default_id in BUNDLED_TEMPLATES or default_id in current else next(iter(BUNDLED_TEMPLATES))
+
+    def _versions(self, template_id, current):
+        bundled = bundled_package(template_id)
+        if template_id in current: return self._stored(current[template_id], template_id), bundled
+        if bundled is None: raise UnknownTemplate(template_id)
+        return bundled, bundled
+
+    def versions(self, template_id: str):
+        """(current package, bundled package or None) of one template id."""
+        return self._versions(template_id, self._pointer()[1])
+
+    def _current(self, template_id, current) -> TemplatePackage:
+        # A saved version needs no bundled compile; otherwise the bundled one is current.
+        if template_id in current: return self._stored(current[template_id], template_id)
+        return self._versions(template_id, current)[0]
+
+    def current(self, template_id: str) -> TemplatePackage:
+        """The package new imports with this id use: the one saved last, else the bundled one."""
+        return self._current(template_id, self._pointer()[1])
+
+    def default_id(self) -> str:
+        return self._default(*self._pointer())
+
+    def templates(self):
+        """(default id, [(current package, bundled package or None)]): bundled ids in order, then ids only saved here."""
+        default_id, current = self._pointer()
+        ids = [*BUNDLED_TEMPLATES, *sorted(set(current) - set(BUNDLED_TEMPLATES))]
+        return self._default(default_id, current), [self._versions(template_id, current) for template_id in ids]
+
     def revision_taken(self, package: TemplatePackage) -> bool:
-        """True when the package's ID/revision already names different stored bytes, so activation would refuse it."""
+        """True when the package's ID/revision already names different stored bytes, so saving would refuse it."""
         registry_path = self.root / "identities.json"
         if not registry_path.exists(): return False
         registry = self._read(registry_path)
         retained = registry.get(canonical([package.id,package.revision]).decode("utf-8")) if isinstance(registry,dict) else None
         return retained is not None and retained != package.package_hash
 
-    def activate(self, package: TemplatePackage) -> None:
+    def save(self, package: TemplatePackage, *, default: bool = False) -> None:
+        """Store the package as the current version of its id; `default` also makes that id the one new imports use."""
         verify_package(package)
         with locked_root(self.root, ".templates.lock"):
             registry_path = self.root / "identities.json"
@@ -111,6 +200,7 @@ class TemplateStore:
             retained = registry.get(identity)
             if retained is not None and retained != package.package_hash:
                 raise SchemaFailure("/template/revision", "ID/revision already identifies different package bytes")
+            default_id, current = self._pointer()
             path = self.root / package.package_hash / "package.json"
             if path.exists():
                 existing = verify_package(TemplatePackage.model_validate(self._read(path)))
@@ -119,17 +209,28 @@ class TemplateStore:
                 atomic_write(path, canonical(package))
             registry[identity] = package.package_hash
             atomic_write(registry_path, canonical(registry))
-            atomic_write(self.root / "active.json", canonical({"schemaVersion":1,"packageHash":package.package_hash}))
+            current[package.id] = package.package_hash
+            self._write(package.id if default else default_id, current)
+
+    def activate(self, package: TemplatePackage) -> None:
+        """Save the package and make its id the default for new imports."""
+        self.save(package, default=True)
+
+    def set_default(self, template_id: str) -> None:
+        with locked_root(self.root, ".templates.lock"):
+            _default_id, current = self._pointer()
+            if template_id not in BUNDLED_TEMPLATES and template_id not in current: raise UnknownTemplate(template_id)
+            self._write(template_id, current)
+
+    def reset(self, template_id: str) -> None:
+        """Drop the saved version of a bundled template; its bundled file is the current version again."""
+        if template_id not in BUNDLED_TEMPLATES: raise UnknownTemplate(template_id)
+        with locked_root(self.root, ".templates.lock"):
+            default_id, current = self._pointer()
+            if current.pop(template_id, None) is not None:
+                self._write(default_id, current)
 
     def active(self) -> TemplatePackage:
-        path = self.root / "active.json"
-        if not path.exists() and not path.is_symlink(): return compile_template(BUNDLED_TEMPLATE)
-        pointer = self._read(path)
-        if not isinstance(pointer,dict) or set(pointer) != {"schemaVersion","packageHash"} or pointer["schemaVersion"] != 1:
-            raise SchemaFailure("/store/active", "invalid active template pointer")
-        digest = pointer["packageHash"]
-        if not isinstance(digest,str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
-            raise SchemaFailure("/store/active", "invalid package hash")
-        package = verify_package(TemplatePackage.model_validate(self._read(self.root / digest / "package.json")))
-        if package.package_hash != digest: raise SchemaFailure("/store/active", "package hash mismatch")
-        return package
+        """The current version of the default template."""
+        default_id, current = self._pointer()
+        return self._current(self._default(default_id, current), current)

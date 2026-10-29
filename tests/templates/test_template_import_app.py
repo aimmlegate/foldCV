@@ -53,9 +53,10 @@ async def app_client(tmp_path, *, call_cap, provider, concurrency=1, adapter=Non
             yield client, app
 
 
-async def upload(client, name='F01'):
+async def upload(client, name='F01', template_id=None):
     raw = Path('tests/fixtures/synthetic/templates/' + name + '.txt').read_bytes()
-    return await client.post('/v1/rich/projects/template-input', files={'file': (name + '.txt', raw, 'text/plain')})
+    path = '/v1/rich/projects/template-input' + ('' if template_id is None else '/' + template_id)
+    return await client.post(path, files={'file': (name + '.txt', raw, 'text/plain')})
 
 
 async def run_import(client, app, project, request_id, *, allow_text_rewrite=True):
@@ -88,13 +89,14 @@ async def test_upload_import_task_publishes_a_v7_employment_project_with_two_cal
     provider = ScriptedTemplateProvider()
     async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
         status = (await client.get('/v1/rich/template-import')).json()
-        assert status['available'] is True and status['package']['name'] == 'Employment subset'
+        [default] = [value for value in status['templates'] if value['id'] == status['defaultId']]
+        assert status['available'] is True and default['name'] == 'Employment subset'
         created = await upload(client)
         assert created.status_code == 201, created.text
         workspace = created.json()['workspace']
         project = workspace['projectId']
         assert workspace['schemaVersion'] == 7 and workspace['project'] is None
-        assert workspace['preDraft']['templatePackage']['packageHash'] == status['package']['packageHash']
+        assert workspace['preDraft']['templatePackage']['packageHash'] == default['packageHash']
         done = await run_import(client, app, project, 'import-1')
         assert (done['kind'], done['state'], done['error']) == ('import', 'succeeded', None), done
         assert operation_of(app, project).capture.policy.call_cap == 4
@@ -152,10 +154,30 @@ async def test_an_import_captures_the_configured_concurrency_and_a_stored_one_ke
 
 
 @pytest.mark.asyncio
+async def test_an_upload_captures_the_chosen_template_and_the_old_path_the_default(tmp_path, monkeypatch):
+    from packages.resume_core.templates.compiler import compile_template
+    from tests.templates.test_template_store import SECOND, second_bundled
+    second = compile_template(second_bundled(tmp_path, monkeypatch))
+    async with app_client(tmp_path, call_cap=4, provider=ScriptedTemplateProvider()) as (client, _app):
+        chosen = await upload(client, template_id=SECOND)
+        assert chosen.status_code == 201, chosen.text
+        assert chosen.json()['workspace']['preDraft']['templatePackage']['packageHash'] == second.package_hash
+        default = (await upload(client)).json()['workspace']['preDraft']['templatePackage']
+        assert default['packageHash'] == employment_package().package_hash
+        missing = await upload(client, template_id='missing')
+        assert (missing.status_code, missing.json()['error']['code']) == (404, 'TEMPLATE_NOT_FOUND')
+        # An unknown template answers before the body is parsed: a body that is not an upload still gets 404, not 422.
+        unparsed = await client.post('/v1/rich/projects/template-input/missing', json={})
+        assert (unparsed.status_code, unparsed.json()['error']['code']) == (404, 'TEMPLATE_NOT_FOUND')
+        assert len((await client.get('/v2/projects')).json()['entries']) == 2
+
+
+@pytest.mark.asyncio
 async def test_without_an_explicit_call_cap_strict_import_is_unavailable(tmp_path):
     provider = ScriptedTemplateProvider()
     async with app_client(tmp_path, call_cap=None, provider=provider) as (client, _app):
-        assert (await client.get('/v1/rich/template-import')).json() == {'schemaVersion': 1, 'available': False, 'package': None}
+        status = (await client.get('/v1/rich/template-import')).json()
+        assert status['available'] is False and status['defaultId'] == employment_package().id
         refused = await upload(client)
         assert refused.status_code == 409 and refused.json()['error']['code'] == 'JOB_DISABLED'
         assert provider.calls == []

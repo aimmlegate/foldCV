@@ -105,7 +105,8 @@ class Focus(Definition):
     text_x: Points
     minimum_row_height: Positive
     icon_fit: Literal["contain"]
-    missing_icon: Literal["text_only"]
+    # initial: a grey square with the first letter of the name (D113); text_only keeps earlier packages as they were.
+    missing_icon: Literal["text_only", "initial"]
 
 
 class Footer(Definition):
@@ -303,7 +304,7 @@ class ViewNode(Definition):
             raise ValueError(f"{self.type} requires {', '.join(required)}")
         allowed = set(required) | {"style", "type", "prefix", "label"}
         if self.type in {'text', 'join_fields'}: allowed.add('header_slot')
-        if self.type in {"join_fields", "join_items"}: allowed.add("separator")
+        if self.type in {"join_fields", "join_items", "tags"}: allowed.add("separator")
         if self.type in {"join_items", "bullets", "tags"}: allowed.add("item_field")
         if self.type == "focus_entry": allowed.add("detail_style")
         if self.type == "tags": allowed.add("background")

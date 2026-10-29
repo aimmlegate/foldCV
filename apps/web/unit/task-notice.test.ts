@@ -1,22 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { taskNotice } from "../src/workbench/import/task-notice";
+import { taskNotices } from "../src/workbench/import/task-notice";
+import type { ImportEntry } from "../src/workbench/import/progress";
 import type { ProjectTask } from "../src/projects/api";
 
-const task = (state: ProjectTask["state"], kind: ProjectTask["kind"] = "import"): ProjectTask => ({ id: "task-1", projectId: "project-1",
-  kind, state, stage: "processing", startedAt: "2026-10-28T00:00:00+00:00", elapsed: 3, detail: {}, error: null });
+const NOW = Date.parse("2026-10-28T00:01:00+00:00");
+const task = (projectId: string, state: ProjectTask["state"], detail: ProjectTask["detail"] = {}, error: string | null = null): ProjectTask => ({
+  id: `task-${projectId}`, projectId, kind: "import", state, stage: "processing", startedAt: "2026-10-28T00:00:00+00:00", elapsed: 3, detail, error });
+const entry = (value: ProjectTask): ImportEntry => ({ projectId: value.projectId, title: `${value.projectId}.pdf`, task: value, polledAt: NOW,
+  failure: null, stopping: false, retrying: false });
+const progress = (phase: string, done: number, total: number, stalled = false) => ({ progress: { phase, done, total, current: [], events: [],
+  lastEventAt: null, lastModelAt: null, quietSeconds: 1, quietLimitSeconds: 245, stalled } });
 
-test("an import task is one notification until it is closed; a failure stays in «Ошибки» only", () => {
-  assert.deepEqual(taskNotice(task("running"), null), { id: "task-1", startedAt: "2026-10-28T00:00:00+00:00", state: "running",
-    text: "Идёт импорт резюме" });
-  assert.equal(taskNotice(task("succeeded"), null)?.text, "Импорт завершён");
-  assert.equal(taskNotice(task("cancelled"), null)?.text, "Импорт остановлен");
-  assert.equal(taskNotice(task("succeeded"), "task-1"), null);
-  assert.equal(taskNotice(task("failed"), null), null);
-  assert.equal(taskNotice(task("running", "export"), null), null);
-  assert.equal(taskNotice(null, null), null);
-});
-
-test("an import queued behind other model work says that it waits", () => {
-  assert.equal(taskNotice({ ...task("running"), stage: "waiting" }, null)?.text, "Импорт ждёт очереди");
+test("every followed import is its own notice, named by its resume and state", () => {
+  const notices = taskNotices([entry(task("a", "running", progress("processing", 2, 9))), entry(task("b", "running", progress("queued", 0, 0))),
+    entry(task("c", "running", progress("processing", 1, 9, true))), entry(task("d", "failed", {}, "IMPORT_EFFORT_UNSUPPORTED")),
+    entry(task("e", "cancelled")), entry(task("f", "succeeded"))], NOW, id => id === "a" ? "Резюме A" : undefined);
+  assert.deepEqual(notices.map(notice => [notice.projectId, notice.title, notice.state]), [["a", "Резюме A", "running"], ["b", "b.pdf", "queued"],
+    ["c", "c.pdf", "stalled"], ["d", "d.pdf", "failed"], ["e", "e.pdf", "stopped"], ["f", "f.pdf", "done"]]);
+  assert.equal(notices[0]?.text, "Идёт импорт · Шаг 3 из 9");
+  assert.match(notices[3]?.text ?? "", /^Импорт не удался\. Выбранный уровень рассуждений недоступен/);
 });

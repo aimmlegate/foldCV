@@ -187,8 +187,8 @@ async def test_an_unowned_claim_stays_exact_source_text_under_no_employer(tmp_pa
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('rewrite', [True, False])
-async def test_the_ten_year_window_compacts_only_wholly_old_jobs_and_keeps_every_fact(tmp_path_factory, rewrite):
-    # B04/B05: the cutoff is 2016-10-21; year-only 2016 and month-only 2016-10 may end after it.
+async def test_the_fifteen_year_window_compacts_only_wholly_old_jobs_and_keeps_every_fact(tmp_path_factory, rewrite):
+    # B04/B05: the cutoff is 2011-10-21; year-only 2011 and month-only 2011-10 may end after it.
     _fixture, _result, workspace, _originals = await shared(tmp_path_factory, 'F04-on' if rewrite else 'F04-off')
     shown = views(workspace)
     companies = ['Early Systems', 'Year Boundary', 'Month Boundary', 'Current Systems']
@@ -264,8 +264,11 @@ async def test_a_manual_focus_duration_and_order_stay_exact_through_transfer_and
     ordered = edit(typed, {'kind': 'move_block', 'blockId': moved.id, 'beforeRevision': moved.revision,
         'placement': {'parentId': region.id, 'afterId': heading.id}}, 'order')
     plan = editor_plan(ordered.project)
-    assert [(text(block.children[0]), plan['blocks'][block.id]['focus']['icon']) for block in ordered.project.document.blocks()
-        if block.id in plan['blocks'] and 'focus' in plan['blocks'][block.id]] == [('SQL', None), ('Python', 'python'), ('UnknownTool', None)]
+    icons = [(text(block.children[0]), plan['blocks'][block.id]['focus']['icon']) for block in ordered.project.document.blocks()
+        if block.id in plan['blocks'] and 'focus' in plan['blocks'][block.id]]
+    # A row without a catalog icon shows the template's first-letter placeholder (D113).
+    assert [name for name, _icon in icons] == ['SQL', 'Python', 'UnknownTool'] and icons[1][1] == 'python'
+    assert icons[0][1].startswith('initial-') and icons[2][1].startswith('initial-') and icons[0][1] != icons[2][1]
     copy = transferred(ordered, originals)
     assert views(copy)['focus'] == ['ФОКУС', 'SQL', 'about 3 years', 'Python', '10 months', 'UnknownTool', '7 weeks']
     shown = emitted(xml(render(copy, tmp_path)))
@@ -303,7 +306,7 @@ async def test_a_long_document_keeps_every_marker_once_and_in_order_and_exports(
 @pytest.mark.asyncio
 async def test_a_focus_entry_without_a_stated_length_shows_the_time_its_jobs_span(tmp_path_factory):
     # D104: the user chose durations counted from projects. PostgreSQL and Docker are listed in 03.2020–11.2023 (45
-    # months, 4 years); Perl in 2010–2012, year precision (between 14 and 36 months, the middle rounds to 2 years).
+    # months, 4 years); Perl in 2006–2008, year precision (between 14 and 36 months, the middle rounds to 2 years).
     _fixture, _result, workspace, _originals = await shared(tmp_path_factory, 'F10-durations')
     assert views(workspace)['focus'] == ['ФОКУС', 'Python', '3 years', 'PostgreSQL', '4 года', 'Perl', '2 года', 'Docker', '4 года']
     # The computed text is shown, not stored as stated experience.

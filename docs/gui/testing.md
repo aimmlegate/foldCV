@@ -136,7 +136,8 @@ cd apps/web && npm run build && cd ../..
 - Projects are created through the repository. The connection, content provider, assistant
   runtime and web fetcher are scripted, so no model or native process starts.
   `--employment` picks the fixture (`issues`, `views`, `generic-f06`, `generic-f10`);
-  `--template-call-cap N` allows template imports.
+  `--template-call-cap N` allows template imports; `--template-delay S` holds each scripted
+  template call S seconds, so a running or queued import can be watched and stopped.
 - `--live-assistant` runs the assistant on the real Codex sign-in (`cli-experiment`, used in
   place) with synthetic projects in the temp root. Every start is charged before it runs to
   `docs/gui/handoffs/SIMPLIFY/logs/sr08-live-ledger.jsonl`, and starts past the allowance are
