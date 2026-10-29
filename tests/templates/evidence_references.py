@@ -18,12 +18,28 @@ def evidence_ref(span, table):
     return min(holders, key=lambda option: option['span']['end'] - option['span']['start'])['ref']
 
 
+def model_pairs(value):
+    """The rule/target pairs the model is asked about: the captured targets without the settled checks (D115)."""
+    settled = {(check['ruleId'], check['targetId']) for check in value.get('settled') or []}
+    return [(target['ruleId'], target['targetId']) for target in value['targets']
+        if (target['ruleId'], target['targetId']) not in settled]
+
+
+def model_targets(value):
+    """The captured targets the model is asked about, as the request dicts them."""
+    pairs = set(model_pairs(value))
+    return [target for target in value['targets'] if (target['ruleId'], target['targetId']) in pairs]
+
+
 def review_entry(entry, value, table):
-    """A review answer names its check by reference; an uncaptured rule/target pair gets an invalid reference."""
+    """A review answer names its check by reference; an uncaptured rule/target pair gets an invalid reference and a
+    settled one, which the model is not asked about, is left out."""
     if not isinstance(entry, dict) or 'check' in entry or 'ruleId' not in entry:
         return entry
-    pairs = [(target['ruleId'], target['targetId']) for target in value['targets']]
+    pairs = model_pairs(value)
     pair = (entry['ruleId'], entry['targetId'])
+    if pair not in pairs and any((target['ruleId'], target['targetId']) == pair for target in value['targets']):
+        return None
     converted = {key: child for key, child in entry.items() if key not in {'ruleId', 'targetId'}}
     converted['check'] = 'C' + str(pairs.index(pair) + 1) if pair in pairs else 'C0'
     if isinstance(converted.get('evidence'), list):
@@ -79,12 +95,13 @@ def by_reference(answer, value):
         result.setdefault('relations', [])
         proposal_entries(result, value, table)
     elif 'targets' in value and isinstance(result.get('results'), list):
-        result['results'] = [review_entry(entry, value, table) for entry in result['results']]
-        if review_protocol(value) == 'template-review-protocol-3':
+        result['results'] = [converted for converted in (review_entry(entry, value, table) for entry in result['results'])
+            if converted is not None]
+        if review_protocol(value) in {'template-review-protocol-3', 'template-review-protocol-4', 'template-review-protocol-5'}:
             # Protocol 3 lists only failing checks, or ones with a reason or evidence; an unlisted check holds. Only a
             # clean answer is shortened: an extra, repeated or conflicting entry stays for the test to refuse.
             answered = [entry.get('check') for entry in result['results'] if isinstance(entry, dict)]
-            refs = {'C' + str(index) for index in range(1, len(value['targets']) + 1)}
+            refs = {'C' + str(index) for index in range(1, len(model_pairs(value)) + 1)}
             if len(answered) == len(set(answered)) == len(result['results']) and set(answered) <= refs:
                 result['results'] = [entry for entry in result['results'] if not (entry.get('disposition') == 'satisfied'
                     and not entry.get('reason') and not entry.get('evidence') and not entry.get('actionable'))]

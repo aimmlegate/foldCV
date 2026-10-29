@@ -207,23 +207,6 @@
           "title": "Depends On",
           "type": "array"
         },
-        "effort": {
-          "anyOf": [
-            {
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Effort"
-        },
         "extract": {
           "items": {
             "type": "string"
@@ -270,6 +253,12 @@
         "order": {
           "title": "Order",
           "type": "integer"
+        },
+        "per_entry": {
+          "default": false,
+          "description": "Outline the list first, then extract its entries in parallel groups. A model list without item limits only.",
+          "title": "Per Entry",
+          "type": "boolean"
         },
         "placement": {
           "$ref": "#/$defs/Placement"

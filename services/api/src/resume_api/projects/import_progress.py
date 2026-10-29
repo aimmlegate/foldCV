@@ -6,10 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ..importer.template_pipeline import RETRY_SECONDS
-
-# The CLI streams nothing before its reply, so one call may stay silent for its whole limit; this covers process
-# cleanup and the work between calls (task inputs, parsing, saving).
+# The CLI streams nothing before its reply, so one call may stay silent until the import limit (D114); this covers
+# process cleanup and the work between calls (task inputs, parsing, saving).
 QUIET_GRACE_SECONDS = 60
 # Before admission only the capture and the operation's first save run.
 STARTING_QUIET_SECONDS = 2 * QUIET_GRACE_SECONDS
@@ -21,7 +19,8 @@ OPERATION_TITLES = {'partition_employment': 'Опыт по проектам', 's
 UNTITLED_BLOCK = 'Шапка'
 CALLED = {'initial': 'Извлекаем данные', 'review': 'Проверяем результат',
     'primary_repair': 'Исправляем ответ', 'fallback_repair': 'Исправляем ответ резервной моделью',
-    'replacement_review': 'Проверяем исправление'}
+    'replacement_review': 'Проверяем исправление', 'outline': 'Размечаем записи',
+    'outline_review': 'Проверяем разметку записей'}
 RETURNED = {'completed': 'Ответ получен', 'timed_out': 'Нет ответа в срок',
     'invalid_payload': 'Ответ в неверном формате', 'refused': 'Модель отказалась отвечать',
     'incomplete': 'Ответ неполный', 'cancelled': 'Остановлено', 'transport_failure': 'Сбой связи с моделью',
@@ -56,7 +55,8 @@ def quiet_limit(phase, policy):
         return whole_import_seconds(policy)
     if phase == 'publication':
         return policy.finalization_seconds + QUIET_GRACE_SECONDS
-    return min(policy.processing_seconds, RETRY_SECONDS + policy.cleanup_seconds + QUIET_GRACE_SECONDS)
+    # A call has no limit of its own, so a healthy import may stay silent until its time limit.
+    return policy.processing_seconds + policy.cleanup_seconds + QUIET_GRACE_SECONDS
 
 
 def phase_of(stage, operation):
@@ -74,12 +74,21 @@ def step_titles(package):
     return titles
 
 
+def task_titles(operation, titles):
+    """Each task by its block title; an entry task (D117) adds the entry's title."""
+    names = {}
+    for task in operation.tasks:
+        entry = getattr(task, 'entry', None)
+        names[task.id] = titles.get(task.block_id, task.block_id) + (': ' + entry.title if entry is not None else '')
+    return names
+
+
 def activity(operation, titles):
     """Model calls and returns, then publication, newest first, as short Russian lines; and the latest model event."""
-    tasks = {task.id: task.block_id for task in operation.tasks}
+    tasks = task_titles(operation, titles)
     events = []
     for attempt in operation.attempts:
-        title = '«' + titles.get(tasks.get(attempt.task_id), attempt.task_id) + '»'
+        title = '«' + tasks.get(attempt.task_id, attempt.task_id) + '»'
         called = moment(attempt.dispatched_at)
         if called is not None:
             events.append((called, CALLED.get(attempt.slot, CALLED['initial']) + ': ' + title))
@@ -131,8 +140,11 @@ def import_progress(operation, package, *, stage, now, started_at, queued_at=Non
         captured = {value.task_id for value in operation.task_inputs}
         busy = {attempt.task_id for attempt in operation.attempts if attempt.state in {'reserved', 'dispatch_started'}}
         total, done = len(operation.tasks), sum(task.id in finished for task in operation.tasks)
-        current = [titles.get(task.block_id, task.block_id) for task in operation.tasks
-            if task.id not in finished and (task.id in busy or task.id in captured)]
+        names = task_titles(operation, titles)
+        # A block extracted entry by entry (D117) is shown by its running entries and outline review, not by itself.
+        split = {getattr(task, 'parent_task_id', None) for task in operation.tasks} - {None}
+        current = list(dict.fromkeys(names[task.id] for task in operation.tasks
+            if task.id not in finished and task.id not in split and (task.id in busy or task.id in captured)))
     return {'phase': phase, 'done': done, 'total': total, 'current': current,
         'events': [{'at': at.isoformat(), 'text': text} for at, text in events[:EVENTS_SHOWN]],
         'lastEventAt': anchor.isoformat() if anchor is not None else None,

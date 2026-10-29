@@ -14,11 +14,12 @@ function entry(progress: Partial<ImportProgress> | null, state: ProjectTask["sta
 test("the service's stall flag ends the spinner; a service that stops answering does too", () => {
   assert.equal(importView(entry({ quietSeconds: 30 }), POLLED + 1000).kind, "running");
   assert.deepEqual(importView(entry({ quietSeconds: 246, stalled: true }), POLLED), { kind: "stalled", code: "IMPORT_STALLED", quietSeconds: 246 });
-  // No reply for longer than the bound the service gave last: the client stops waiting with the same error.
-  assert.equal(importView(entry({ quietSeconds: 10, quietLimitSeconds: 245 }), POLLED + 244_000).kind, "running");
-  const silent = importView(entry({ quietSeconds: 10, quietLimitSeconds: 245 }), POLLED + 246_000);
+  // No reply to polls for longer than the client's two minutes: the client stops waiting with the same error. The
+  // service's own bound is the import limit (D114), so it does not apply to unanswered polls.
+  assert.equal(importView(entry({ quietSeconds: 10, quietLimitSeconds: 3665 }), POLLED + 119_000).kind, "running");
+  const silent = importView(entry({ quietSeconds: 10, quietLimitSeconds: 3665 }), POLLED + 121_000);
   assert.equal(silent.kind, "stalled");
-  assert.equal(silent.kind === "stalled" && silent.quietSeconds, 256);
+  assert.equal(silent.kind === "stalled" && silent.quietSeconds, 131);
   // Before the first progress block the bound is two minutes.
   assert.equal(importView(entry(null), POLLED + 121_000).kind, "stalled");
 });

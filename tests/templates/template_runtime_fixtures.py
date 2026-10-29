@@ -73,10 +73,11 @@ class RuntimeFixture:
 
     project = 'pipeline-project'
 
-    def __init__(self, root, *, scripted=None, cap=8, fallback=True, captured=None, src=None, original_bytes=None, concurrency=1):
+    def __init__(self, root, *, scripted=None, cap=8, fallback=True, captured=None, src=None, original_bytes=None, concurrency=1,
+                 review=None):
         self.root, self.now, self.external_authority = root, NOW, True
         operation, self.command, self.package, self.source, self.facts = setup_operation(cap=cap, fallback=fallback,
-            captured=captured, src=src, concurrency=concurrency)
+            captured=captured, src=src, concurrency=concurrency, review=review)
         if src is None:
             from tests.templates.storage_fixtures import source
             original_bytes = source()[1]

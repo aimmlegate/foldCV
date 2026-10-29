@@ -88,12 +88,16 @@ for value in ['forced_login_method="chatgpt"', 'model_provider="openai"', 'histo
 for name in ["shell_tool", "unified_exec", "browser_use", "computer_use", "apps", "plugins", "hooks", "memories", "multi_agent", "image_generation", "goals", "daemon_auto_start"]:
     assert "features." + name + "=false" in settings
 assert not any(key.startswith(("OPENAI_", "CODEX_", "T3CODE_", "PYTHON", "HTTP_PROXY", "HTTPS_PROXY")) for key in os.environ)
+# The CLI's temp and state roots live in one owned operation directory, with the schema; the cwd is the profile's
+# shared working directory (D116), so none of them is read relative to it.
+owned = Path(os.environ["TMPDIR"]).parent
 for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
-    assert Path(os.environ[key]).is_relative_to(Path.cwd())
+    assert Path(os.environ[key]).parent == owned
 if config.get("plain_text"):
-    assert "--output-schema" not in args and not Path("schema.json").exists()
+    assert "--output-schema" not in args and not (owned / "schema.json").exists()
     schema = {}
 else:
+    assert Path(args[args.index("--output-schema") + 1]).parent == owned
     schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
     assert schema["required"] == config.get("schema_required", ["summary"]) and schema["additionalProperties"] is False
 

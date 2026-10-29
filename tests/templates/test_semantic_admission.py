@@ -13,7 +13,7 @@ from packages.resume_core.template_proposals import parse_proposal
 from packages.resume_core.template_review import (decide_review, make_review_input, record_review, reusable_receipt,
     validate_review_reply)
 from packages.resume_core.templates.projection import SchemaFailure, project_payload, validate_payload
-from packages.resume_core.templates.replies import proposal_schema, review_schema
+from packages.resume_core.templates.replies import model_targets, proposal_schema, review_schema
 from packages.resume_core.templates.compiler import sha256
 from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, setup_operation, usage
@@ -66,6 +66,13 @@ def review_attempt(operation, proposal, package, source, *, fail_target=None):
     return operation, attempt, value, results
 
 
+def model_result(results, value, *, cell=True):
+    """The first scripted result of a check the model is asked about: D115 settles the verbatim cells before it."""
+    asked = {(target.rule_id, target.target_id) for target in model_targets(value)}
+    return next(result for result in results if (result['ruleId'], result['targetId']) in asked
+        and not (cell and result['targetId'].startswith('scope-')))
+
+
 def test_raw_schema_failure_is_retained_without_observations_handles_or_review():
     operation, facts, proposal, _, _ = proposed(corrupt=lambda value: value['payload'][0].update({'year': 'forthcoming'}))
     assert proposal.state == 'invalid' and proposal.errors
@@ -86,11 +93,11 @@ def test_safe_proposal_is_provisional_and_duplicate_return_reuses_allocations_an
 def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
     # Review protocol 3: a check the reply leaves out holds (protocol 2 omission: test_evidence_references).
     operation, facts, proposal, package, source = proposed()
-    operation, attempt, _, results = review_attempt(operation, proposal, package, source)
+    operation, attempt, value, results = review_attempt(operation, proposal, package, source)
     if failure == 'extra':
         results.append({**results[0], 'targetId': 'unknown-target'})
     else:
-        results[0]['evidence'] = ['S99']
+        model_result(results, value)['evidence'] = ['S99']
     operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
     with pytest.raises((TemplateImportFailure, ValueError)):
@@ -102,20 +109,22 @@ def test_incomplete_review_has_no_receipt_or_effective_promotion(failure):
 def test_a_check_listed_twice_merges_into_one_receipt_entry(failure):
     # I1 (LIVE-11/12): the model listed one check twice; the worse disposition stands instead of losing the review.
     operation, facts, proposal, package, source = proposed()
-    operation, attempt, _, results = review_attempt(operation, proposal, package, source)
-    results.append({**results[0], 'disposition': 'violation', 'reason': 'Значение не подтверждено'} if failure == 'conflict' else results[0])
+    operation, attempt, value, results = review_attempt(operation, proposal, package, source)
+    listed = model_result(results, value)
+    results.append({**listed, 'disposition': 'violation', 'reason': 'Значение не подтверждено'} if failure == 'conflict' else listed)
     operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
     operation, receipt = record_review(operation, attempt, [source], NOW)
     assert len(receipt.reply.results) == len(operation.review_inputs[-1].value.targets)
-    first = next(result for result in receipt.reply.results if result.target_id == results[0]['targetId'] and result.rule_id == results[0]['ruleId'])
-    assert first.disposition == ('violation' if failure == 'conflict' else results[0]['disposition'])
+    first = next(result for result in receipt.reply.results if result.target_id == listed['targetId'] and result.rule_id == listed['ruleId'])
+    assert first.disposition == ('violation' if failure == 'conflict' else listed['disposition'])
     assert not facts.extensions
 
 
 def test_complete_receipt_promotes_only_supported_cells_and_retains_rejected_observation():
     operation, facts, proposal, package, source = proposed()
-    rejected = operation.allocations[1].cell_ids['journal']
+    # The status is a category the source does not spell, so the model checks it (D115 settles the verbatim journal).
+    rejected = operation.allocations[1].cell_ids['status']
     operation, attempt, value, _ = review_attempt(operation, proposal, package, source, fail_target=rejected)
     operation, receipt = record_review(operation, attempt, [source], NOW)
     decision = decide_review(value, receipt, proposal)
@@ -123,10 +132,10 @@ def test_complete_receipt_promotes_only_supported_cells_and_retains_rejected_obs
     operation, facts = admit_proposal(operation, proposal.id, receipt.id, package, [source], facts,
         expected_revisions={}, expected_relation_revisions={})
     assert len(facts.extensions) == 2
-    assert [cell.typed_value for cell in facts.extensions[0].cells if cell.field_key == 'journal'] == ['Systems Notes']
-    assert 'journal' not in {cell.field_key for cell in facts.extensions[1].cells}
+    assert [cell.typed_value for cell in facts.extensions[0].cells if cell.field_key == 'status'] == ['published']
+    assert 'status' not in {cell.field_key for cell in facts.extensions[1].cells}
     assert next(value for value in facts.observations if value.item_handle == operation.allocations[1].item_handle
-        and value.field_key == 'journal').admission == 'rejected'
+        and value.field_key == 'status').admission == 'rejected'
     assert operation.proposals[0].applied_receipt_id == receipt.id
     assert admit_proposal(operation, proposal.id, receipt.id, package, [source], facts,
         expected_revisions={}, expected_relation_revisions={}) == (operation, facts)
@@ -166,13 +175,14 @@ def test_receipt_reuse_requires_equal_full_semantic_input(changed):
 def test_uncertainty_needs_a_concrete_actionable_reason_to_enter_repair():
     operation, _, proposal, package, source = proposed()
     operation, attempt, value, results = review_attempt(operation, proposal, package, source)
-    target = next(result for result in results if not result['targetId'].startswith('scope-'))
+    target = model_result(results, value)
     target.update({'disposition': 'uncertain', 'reason': 'Unclear attribution', 'actionable': False})
     operation.attempts[-1].raw_return = json.dumps({'payload': by_reference({'results': results}, operation.review_inputs[-1].value)})
     operation.attempts[-1].raw_return_hash = operation.attempts[-1].return_hash = sha256(operation.attempts[-1].raw_return.encode())
     operation, receipt = record_review(operation, attempt, [source], NOW)
     assert not decide_review(value, receipt, proposal).feedback
-    receipt.reply.results[next(i for i, result in enumerate(results) if result is target)].actionable = True
+    next(result for result in receipt.reply.results
+        if (result.rule_id, result.target_id) == (target['ruleId'], target['targetId'])).actionable = True
     assert decide_review(value, receipt, proposal).feedback
 
 

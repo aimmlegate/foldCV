@@ -31,8 +31,9 @@ export function operationOf(task: ProjectTask): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
-/** The import screen's state. A running import is stalled when the service says so from its timestamps, or when the
- * service itself has not answered for longer than that bound. */
+/** The import screen's state. A running import is stalled when the service says so from its timestamps (its bound
+ * is the import limit: a call has no limit of its own since D114), or when the service itself has not answered polls
+ * for longer than the client's own bound. */
 export function importView(entry: ImportEntry, now: number): ImportView {
   const { task } = entry;
   if (task.state === "succeeded") return { kind: "succeeded" };
@@ -43,7 +44,7 @@ export function importView(entry: ImportEntry, now: number): ImportView {
   const progress = importProgress(task);
   const unanswered = Math.max(0, now - entry.polledAt) / 1000;
   const quietSeconds = (progress?.quietSeconds ?? 0) + unanswered;
-  if (progress?.stalled || unanswered > (progress?.quietLimitSeconds ?? DEFAULT_QUIET_SECONDS))
+  if (progress?.stalled || unanswered > DEFAULT_QUIET_SECONDS)
     return { kind: "stalled", code: "IMPORT_STALLED", quietSeconds };
   const phase: ImportPhase = progress?.phase ?? (task.stage === "queued" ? "queued" : task.stage === "publication" ? "publication"
     : task.stage === "processing" ? "processing" : "starting");

@@ -14,6 +14,11 @@ def scripted_template_answer(value):
     if 'targets' in value:
         return by_reference({'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
             'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}, value)
+    if value.get('slot') == 'outline':
+        # A block declared per_entry (D117) runs whole here: an outline of no entries.
+        return {'entries': []}
+    if value.get('slot') == 'outline_review':
+        return {'missing': [], 'remarks': []}
     # Whole-unit evidence entries name every unit the task may cite, with their texts.
     units = {}
     for option in value['evidence']:

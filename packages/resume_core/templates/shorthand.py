@@ -30,7 +30,7 @@ EXTENSIONS = {'.ttf': ('font', 'font/ttf', 'allowed'), '.otf': ('font', 'font/ot
     '.jpeg': ('icon', 'image/jpeg', 'not_applicable'), '.json': ('catalog', 'application/json', 'not_applicable'),
     '.txt': ('catalog', 'text/plain', 'not_applicable')}
 RELATIONS = ('extension_of', 'owned_by', 'related_to')
-BLOCK_KEYS = {'id', 'effort', 'mode', 'selectors', 'schema', 'content_schema', 'facts', 'bindings', 'extract', 'rewrite',
+BLOCK_KEYS = {'id', 'effort', 'per_entry', 'mode', 'selectors', 'schema', 'content_schema', 'facts', 'bindings', 'extract', 'rewrite',
     'review', 'checks', 'depends_on', 'operation', 'when', 'region', 'order', 'placement', 'view'}
 FACT_TYPE_KEYS = {'id', 'schema_version', 'fields', 'schema', 'builtin', 'builtin_kind', 'relations', 'builtin_fields'}
 
@@ -197,6 +197,8 @@ def expand_block(item, definitions, path):
     result = {'id': block}
     if 'effort' in item:
         result['effort'] = item['effort']
+    if 'per_entry' in item:
+        result['per_entry'] = item['per_entry']
     result.update({'mode': item.get('mode', 'model'),
         'selectors': expand_inputs(item.get('selectors', ['source:all']), path + '/selectors'),
         'content_schema': schema,
@@ -342,7 +344,8 @@ def source_schema(definition):
             'extension_of projects.'}, {'$ref': '#/$defs/RelationDeclaration'}]}},
         'builtin_fields': {'type': 'object', 'additionalProperties': {'anyOf': [{**word, 'description': 'field, or '
             'field @period'}, {'$ref': '#/$defs/BuiltinFieldBinding'}]}}}}
-    block = defs['Block']['properties']
+    # effort has no effect since D114: old templates still parse it; authors are not offered it.
+    block = {key: value for key, value in defs['Block']['properties'].items() if key != 'effort'}
     placement = defs['Placement']['properties']
     defs['Block'] = {'type': 'object', 'additionalProperties': False, 'required': ['id', 'view'], 'properties': {**block,
         'region': placement['region'], 'order': placement['order'], 'schema': field_type,

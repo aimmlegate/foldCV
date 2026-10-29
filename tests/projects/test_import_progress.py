@@ -48,8 +48,9 @@ def progress(value, seconds, **times):
 
 
 def test_quiet_bounds_cover_the_longest_call_and_the_captured_time_limits():
-    # One call may stay silent for its 180 s retry limit; cleanup 5 s and 60 s grace follow.
-    assert quiet_limit('processing', POLICY) == 245
+    # D114: a call has no limit of its own, so one may stay silent for the whole 3600 s import limit; cleanup 5 s and
+    # 60 s grace follow.
+    assert quiet_limit('processing', POLICY) == 3600 + 5 + 60
     assert quiet_limit('publication', POLICY) == 158 + 60
     # A whole import under its captured limits may run ahead of a queued one.
     assert quiet_limit('queued', POLICY) == 3600 + 5 + 158 + 60
@@ -68,11 +69,26 @@ def test_steps_and_activity_come_from_the_operation_records():
     assert (found['quietSeconds'], found['stalled']) == (9.0, False)
 
 
-def test_an_import_is_stalled_after_a_silence_longer_than_any_call_or_past_its_whole_time_limit():
+def test_entry_steps_carry_the_entry_title_and_the_outline_calls_have_their_own_lines():
+    # D117: a block extracted entry by entry adds steps while it runs; each shows the block and the entry.
+    value = operation(attempt('task-projects', 'outline', 10, 20, 'completed'), attempt('task-outline-review', 'outline_review', 21),
+        attempt('task-entry-2', 'initial', 22))
+    value.tasks += [SimpleNamespace(id='task-outline-review', block_id='projects', entry=None),
+        SimpleNamespace(id='task-entry-1', block_id='projects', entry=SimpleNamespace(title='Example Labs')),
+        SimpleNamespace(id='task-entry-2', block_id='projects', entry=SimpleNamespace(title='Old Systems'))]
+    value.task_inputs.append(SimpleNamespace(task_id='task-entry-1', captured_at=at(21)))
+    found = progress(value, 30, admitted_at=at(5))
+    assert (found['done'], found['total'], found['current']) == (0, 6, ['Шапка', 'ПРОЕКТЫ', 'ПРОЕКТЫ: Example Labs', 'ПРОЕКТЫ: Old Systems'])
+    assert [event['text'] for event in found['events']][:3] == ['Извлекаем данные: «ПРОЕКТЫ: Old Systems»',
+        'Проверяем разметку записей: «ПРОЕКТЫ»', 'Ответ получен: «ПРОЕКТЫ»']
+
+
+def test_an_import_is_stalled_after_a_silence_longer_than_its_time_limit_or_past_its_whole_time_limit():
+    # D114: a call has no limit of its own, so the silence bound is the import limit with cleanup and grace.
     value = operation(attempt('task-projects', 'initial', 100))
-    assert progress(value, 100 + 245, admitted_at=at(5))['stalled'] is False
-    late = progress(value, 100 + 246, admitted_at=at(5))
-    assert (late['quietSeconds'], late['quietLimitSeconds'], late['stalled']) == (246.0, 245, True)
+    assert progress(value, 100 + 3665, admitted_at=at(5))['stalled'] is False
+    late = progress(value, 100 + 3666, admitted_at=at(5))
+    assert (late['quietSeconds'], late['quietLimitSeconds'], late['stalled']) == (3666.0, 3665, True)
     # Events keep arriving, but the run is past processing, cleanup, publication and the grace.
     busy = operation(attempt('task-projects', 'initial', 3800))
     assert progress(busy, 3810, admitted_at=at(5))['stalled'] is False
@@ -177,5 +193,6 @@ async def test_the_start_effort_reaches_the_capture_and_an_unoffered_one_refuses
         if runner is not None:
             await runner
         assert (await task_of(client, project, chosen.json()['id']))['state'] == 'succeeded'
-        captured = operation_of(app, project).capture.primary
-        assert captured.effort == 'high' and provider.efforts == ['high', 'high']
+        capture = operation_of(app, project).capture
+        # D116: the review runs at low, which this catalog offers; the proposal keeps the chosen high.
+        assert capture.primary.effort == 'high' and capture.review.effort == 'low' and provider.efforts == ['high', 'low']

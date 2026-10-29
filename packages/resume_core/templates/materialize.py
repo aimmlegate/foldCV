@@ -72,7 +72,10 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 root = tuple(tokens[:1]) if declaration.view.mode == 'items' else ()
                 item_root = _bound_root(field.pointer, identity.semantic_type, field.field_key, declaration.bindings)
                 if tuple(item_root) == root and identity.record_id in active_records:
-                    roots[(declaration.id, identity.record_id)] = (root, identity)
+                    # An entry extracted on its own (D117) is item 0 of its own reply; the block shows its entries in
+                    # the facts' order, which the block's close set, like captured items.
+                    shown = (str(record_order[identity.record_id]),) if task.entry is not None and root else root
+                    roots[(declaration.id, identity.record_id)] = (shown, identity)
                 cell = current.get(identifier)
                 if identifier not in proposal.admitted_cell_ids or cell is None:
                     continue

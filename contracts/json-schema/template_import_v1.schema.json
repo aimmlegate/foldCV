@@ -342,6 +342,76 @@
       "title": "DroppedValue",
       "type": "object"
     },
+    "EntryPart": {
+      "additionalProperties": false,
+      "description": "One entry the outline named (D117): its title and its source lines.",
+      "properties": {
+        "spans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Spans",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "spans"
+      ],
+      "title": "EntryPart",
+      "type": "object"
+    },
+    "EntryScope": {
+      "additionalProperties": false,
+      "description": "The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,\nthe outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)\nand whether the outline or its review named them.",
+      "properties": {
+        "index": {
+          "minimum": 1,
+          "title": "Index",
+          "type": "integer"
+        },
+        "origin": {
+          "enum": [
+            "outline",
+            "review"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "parts": {
+          "items": {
+            "$ref": "#/$defs/EntryPart"
+          },
+          "minItems": 1,
+          "title": "Parts",
+          "type": "array"
+        },
+        "spans": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Spans",
+          "type": "array"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "title",
+        "spans",
+        "parts",
+        "origin"
+      ],
+      "title": "EntryScope",
+      "type": "object"
+    },
     "EvidenceOption": {
       "additionalProperties": false,
       "properties": {
@@ -1019,7 +1089,9 @@
             "review",
             "primary_repair",
             "fallback_repair",
-            "replacement_review"
+            "replacement_review",
+            "outline",
+            "outline_review"
           ],
           "title": "Slot",
           "type": "string"
@@ -1166,6 +1238,17 @@
         },
         "primary": {
           "$ref": "#/$defs/ModelCapture"
+        },
+        "review": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelCapture"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "sourceHashes": {
           "additionalProperties": {
@@ -1343,6 +1426,17 @@
           "title": "Dependencies",
           "type": "array"
         },
+        "entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntryScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "expectedChecks": {
           "items": {
             "$ref": "#/$defs/CheckTarget"
@@ -1373,7 +1467,8 @@
             "extract",
             "rewrite",
             "derive",
-            "source_copy"
+            "source_copy",
+            "outline_review"
           ],
           "title": "Kind",
           "type": "string"
@@ -1382,6 +1477,19 @@
           "minLength": 1,
           "title": "Operationid",
           "type": "string"
+        },
+        "parentTaskId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parenttaskid"
         },
         "proposalHash": {
           "anyOf": [
@@ -2418,6 +2526,13 @@
           "title": "Semanticcontext",
           "type": "object"
         },
+        "settled": {
+          "items": {
+            "$ref": "#/$defs/SettledCheck"
+          },
+          "title": "Settled",
+          "type": "array"
+        },
         "sourceSpans": {
           "items": {
             "$ref": "#/$defs/SourceSpan"
@@ -2605,6 +2720,65 @@
         "fallbackRepairs"
       ],
       "title": "RuntimePolicy",
+      "type": "object"
+    },
+    "SettledCheck": {
+      "additionalProperties": false,
+      "description": "A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's\nresult for a value the repair left as it was.",
+      "properties": {
+        "actionable": {
+          "title": "Actionable",
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "satisfied",
+            "violation",
+            "uncertain"
+          ],
+          "title": "Disposition",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "verbatim",
+            "reused"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "ruleId": {
+          "minLength": 1,
+          "title": "Ruleid",
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "title": "Targetid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId",
+        "targetId",
+        "disposition",
+        "reason",
+        "evidence",
+        "actionable",
+        "origin"
+      ],
+      "title": "SettledCheck",
       "type": "object"
     },
     "SourceSpan": {

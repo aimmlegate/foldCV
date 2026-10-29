@@ -94,10 +94,8 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     assert {block for block, state in states.items() if state == 'empty'} == {
         'key_skills', 'role_tools', 'portfolio', *([] if rewrite else ['other_projects'])}
     assert states['projects'] == 'accepted' and states['other_projects'] == ('accepted' if rewrite else 'empty')
-    # D101 probe H: the projects block declares effort high; every other block keeps the captured effort.
-    blocks = {task.id: task.block_id for task in result.tasks}
-    efforts = {blocks[attempt.task_id]: attempt.model.effort for attempt in result.attempts if attempt.slot == 'initial'}
-    assert efforts['projects'] == 'high' and all(effort == result.capture.primary.effort for block, effort in efforts.items() if block != 'projects')
+    # D114: every block, the projects block included, runs the effort chosen for the import.
+    assert {attempt.model.effort for attempt in result.attempts} == {result.capture.primary.effort}
     shown = views(workspace)
     assert order(workspace) == ['identity', 'focus', 'education', 'courses', 'location', 'languages', 'opensource', 'summary',
         'projects', *(['other_projects'] if rewrite else []), 'career_highlights', 'programming', 'data_and_tools', 'infrastructure']
@@ -313,3 +311,26 @@ async def test_a_focus_entry_without_a_stated_length_shows_the_time_its_jobs_spa
     stated = {record.display.raw_text: record.experience.raw_text for record in records(workspace, 'technology')
         if record.display.raw_text in {'PostgreSQL', 'Perl', 'Docker'} and record.job_id is None}
     assert stated and set(stated.values()) == {''}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(('name', 'key', 'groups'), [('F10', 'F10-on', 2), ('F04', 'F04-on', 3)])
+async def test_with_three_calls_at_once_the_projects_block_runs_in_groups_and_shows_what_the_whole_block_shows(
+        tmp_path_factory, name, key, groups):
+    # D117: the outline names every job, the jobs run in at most three groups beside the other blocks, and the document
+    # is the one the sequential whole-block import publishes, F10's rejected result and F04's fifteen-year window too.
+    _whole_fixture, whole, whole_workspace, _originals = await shared(tmp_path_factory, key)
+    fixture, result, workspace, _originals = await generic_import(tmp_path_factory.mktemp(key + '-split'), name, rewrite=True,
+        concurrency=3)
+    assert result.state == 'published' and result.publication.state == 'saved'
+    parent = next(task for task in result.tasks if task.block_id == 'projects' and task.parent_task_id is None)
+    entries = [task for task in result.tasks if task.parent_task_id == parent.id and task.entry is not None]
+    assert len(entries) == groups and [attempt.slot for attempt in result.attempts].count('outline') == 1
+    assert sum(len(task.entry.parts) for task in entries) == len(TABLES[name](True)['projects'][0])
+    assert views(workspace) == views(whole_workspace)
+    assert sorted(record.employer.raw_text for record in records(workspace, 'employment')) == sorted(
+        record.employer.raw_text for record in records(whole_workspace, 'employment'))
+    assert [(issue.code, issue.rule_id) for issue in workspace.project.import_issues] == [
+        (issue.code, issue.rule_id) for issue in whole_workspace.project.import_issues]
+    # The outline and its review, then one call and one review per group, replace the block's call and review.
+    assert spent_calls(result) == spent_calls(whole) - 2 + 2 + 2 * groups

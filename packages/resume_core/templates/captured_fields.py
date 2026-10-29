@@ -30,7 +30,8 @@ def visible_path(declaration, path):
 def capture_fields(declarations, operations, current, record_order):
     fields, roots, unassigned = {}, {}, {}
     for operation in operations:
-        tasks = {task.block_id: task for task in operation.tasks}
+        # The block task: entries of a block extracted on their own (D117) share its block id.
+        tasks = {task.block_id: task for task in operation.tasks if getattr(task, 'parent_task_id', None) is None}
         for identity in operation.captured_items:
             if identity.record_id not in record_order:
                 continue

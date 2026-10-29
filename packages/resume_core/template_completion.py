@@ -236,7 +236,7 @@ def without_unbound(reply, unbound, instances):
     return {**reply, 'payload': payload, 'fields': fields, 'discoveries': discoveries or reply.get('discoveries')}, dropped
 
 
-def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None):
+def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
@@ -244,7 +244,11 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
 
     dropped, when a list, collects the values no entry can cite as {pointer, fieldKey, text}; they leave the payload
     (I4: a repair that still states a value no source line states) and the reduced reply is completed instead. None
-    keeps them, so the existing checks refuse the reply with the binding named and the model gets its one repair."""
+    keeps them, so the existing checks refuse the reply with the binding named and the model gets its one repair.
+
+    preferred, for one entry of a block (D117), is the part of the table that holds the entry's lines: a value is
+    cited from those lines first and from the whole table only when they do not state it. A value that four entries
+    share otherwise took the first lines that state it, another entry's, and failed its own entry's review."""
     if not isinstance(reply, dict) or not bindings:
         return reply
     payload = reply.get('payload')
@@ -324,7 +328,11 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
         text = stated_text(payload, pointer)
         if not text:
             return None
-        return stating(text, table) or stating_words(text, table) or stating_stems(text, table, anchors_for(pointer)) or None
+        for scope in ([preferred, table] if preferred else [table]):
+            found = stating(text, scope) or stating_words(text, scope) or stating_stems(text, scope, anchors_for(pointer))
+            if found:
+                return found
+        return None
     given = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries}
     unbound = []
     for pointer in sorted(instances, key=_natural):
@@ -339,7 +347,7 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     if unbound:
         reduced, gone = without_unbound(reply, unbound, instances)
         dropped.extend(gone)
-        return complete_reply(reduced, bindings, table, references, allowed_relations)
+        return complete_reply(reduced, bindings, table, references, allowed_relations, preferred=preferred)
     for entry in entries:
         if not entry.get('evidence') and not entry.get('effectiveCells') and entry.get('pointer') in instances:
             entry['evidence'] = derived_evidence(entry['pointer']) or []

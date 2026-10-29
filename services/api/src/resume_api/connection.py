@@ -125,8 +125,9 @@ class ConnectionAdapter:
         launcher, prefix = self._launcher()
         try:
             return ProcessRunner(launcher, launch=self.experimental_profile.launch
-                                 if self.experimental_profile is not None else None).run(files, (*prefix, *args), cancel=cancel,
-                                                      deadline=deadline, **kwargs)
+                                 if self.experimental_profile is not None else None,
+                                 workdir=getattr(self.experimental_profile, "workdir", None)).run(
+                files, (*prefix, *args), cancel=cancel, deadline=deadline, **kwargs)
         except ExperimentalProfileError as error:
             raise ConnectionFailure(str(error)) from None
         except ProcessExit as error:

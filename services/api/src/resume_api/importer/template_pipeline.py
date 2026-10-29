@@ -10,6 +10,7 @@ import threading
 import time
 
 from packages.resume_core.project_repository import RepositoryFailure, decode_project, rich_snapshot_bytes, verifying
+from packages.resume_core.project_store import strict_json
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, PublicationOutcome,
     ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.template_admission import admit_proposal, task_facts_digest
@@ -18,18 +19,20 @@ from packages.resume_core.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
 from packages.resume_core.template_identity import (capture_span, empty_value, evidence_options, line_spans,
     offered_evidence, source_slice)
-from packages.resume_core.template_import import (ProcessingDeadline, TemplateImportFailure, admit_operation, attempt_in,
-    authorization, cancel_operation, capture_finalization, capture_task_input, checked, digest, dispatch_attempt, identity,
-    observe_time, record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls,
-    start_operation, task_in)
+from packages.resume_core.template_entries import (closed_state, entry_part, entry_records, grouped, line_options,
+    ordered_entries, outline_part, parse_outline, parse_outline_review, reorder_records, splits_entries)
+from packages.resume_core.template_import import (GENERATION_SLOTS, ProcessingDeadline, TemplateImportFailure, add_entry_tasks,
+    add_outline_review, admit_operation, attempt_in, authorization, cancel_operation, capture_finalization, capture_task_input,
+    checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time, record_return, reconcile_cleanup,
+    recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
-from packages.resume_core.templates.replies import BOOKKEEPING_KEYS, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL
+from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL, outline_review_schema,
+    outline_schema, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL)
 
-from ..providers.content import (ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy,
-    MAX_GENERATION_SECONDS, outcome_state)
+from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
 from ..providers.dynamic_result import dynamic_result
 from .template_sidecar import OperationSidecar
 
@@ -59,6 +62,15 @@ class DerivedTask:
     source_spans: tuple
     item_handles: tuple
     issues: tuple = ()
+
+
+@dataclass(frozen=True)
+class Spawned:
+    """What a task's run added to the import (D117): the tasks that now belong to the block task `parent`, and
+    whether the task that ran stays open until the block's children ended (the block task) or ended itself."""
+    parent: str
+    children: tuple
+    open: bool
 
 
 def reference_table(captured, cells, relations):
@@ -98,9 +110,8 @@ def reply_feedback(task_id, errors):
     return {'ruleId': 'reply-format', 'targetId': 'scope-' + task_id, 'reason': (errors[0] if errors else 'invalid reply')[:300]}
 
 
-# Normal calls take 3-35 s and the CLI streams nothing before the reply, so a stalled call (LIVE-04: 180 s) is
-# only seen at its limit; a first call that runs out gets one retry with the full provider limit.
-CALL_SECONDS, RETRY_SECONDS = 90, MAX_GENERATION_SECONDS
+# A call has no time limit of its own: it may use the import's remaining time (D114: on the projects block Sol
+# took 84-127 s where a 90 s call limit stood and spent the repair slot). Only the import limit ends a silent call.
 # Import reads kept, one per project; a running import hits its own between sidecar steps.
 CACHED_READS = 4
 
@@ -119,6 +130,11 @@ def unbound_issues(id_factory, task_id, proposal, fingerprint):
         category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND', message=UNBOUND_MESSAGE.format(values=values),
         importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
         retiredByAction=None)]
+
+
+# D117: the outline review of a block names what the outline missed (added as entries) or doubts (shown once).
+OUTLINE_REMARK = 'Разметка записей блока под вопросом: {reasons}'
+OUTLINE_UNCHECKED = 'Проверка полноты записей блока не завершилась.'
 
 
 FALLBACK_MESSAGES = {'content_violation': 'проверка нашла ошибку в извлечённых данных.',
@@ -207,11 +223,6 @@ def applied_receipt(operation, task_id):
     task = task_in(operation, task_id)
     applied = {proposal.applied_receipt_id for proposal in operation.proposals if proposal.applied_receipt_id is not None}
     return next((value for value in reversed(operation.receipts) if value.id in task.receipt_ids and value.id in applied), None)
-
-
-def timeout_feedback(task_id):
-    return {'ruleId': 'reply-time', 'targetId': 'scope-' + task_id,
-        'reason': 'No reply arrived within the call time limit. Return the whole reply.'}
 
 
 def repair_feedback(feedback, task_id, errors):
@@ -449,35 +460,63 @@ class TemplatePipeline:
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
-        at once (CT10). Concurrency 1 is the sequential loop. After a failure or a cancel nothing new starts, the
-        running tasks end, and the first failure is raised."""
-        order = [task.id for task in operation.tasks]
+        at once (CT10); concurrency 1 awaits each task in place. A block that extracts its entries on their own
+        (D117) adds them while it runs, stays open until they all ended and then closes. After a failure or a
+        cancel nothing new starts, the running tasks end, and the first failure is raised."""
+        # The children a block added before (a resumed import) are reported by the block when it runs again.
+        order = [task.id for task in operation.tasks if getattr(task, 'parent_task_id', None) is None]
         width = operation.capture.policy.concurrency
-        if width == 1:
-            for identifier in order:
-                if cancel.is_set():
-                    break
-                await self.execute_task(project, operation.id, identifier, deadline, cancel)
-            return
         waits = {task.id: (set(task.dependencies) | (implicit or {}).get(task.id, set())) & set(order) for task in operation.tasks}
         pending, running, ended, failure = list(order), {}, set(), None
+        parents, children = {}, {}
+
+        def ready_tasks():
+            ready = [value for value in pending if waits[value] <= ended]
+            if not ready and not running and pending:
+                # A dependency no task here can end (a cycle) runs in declaration order, as sequentially.
+                ready = pending[:1]
+            return ready
+
+        async def settle(identifier, spawned):
+            if isinstance(spawned, Spawned):
+                added = [child for child in spawned.children if child not in children.get(spawned.parent, set())]
+                for child in added:
+                    waits[child], parents[child] = waits[spawned.parent], spawned.parent
+                    children.setdefault(spawned.parent, set()).add(child)
+                # The entries are the rest of the block's chain, which its dependents wait for: they start before the
+                # blocks still queued, not after them.
+                pending[0:0] = added
+                if spawned.open:
+                    return
+            ended.add(identifier)
+            parent = parents.get(identifier)
+            if parent is not None and parent not in ended and children[parent] <= ended and not cancel.is_set():
+                await self.close_entries(project, operation.id, parent)
+                ended.add(parent)
+
+        if width == 1:
+            while pending and not cancel.is_set():
+                identifier = ready_tasks()[0]
+                pending.remove(identifier)
+                await settle(identifier, await self.execute_task(project, operation.id, identifier, deadline, cancel))
+            return
         try:
             while pending or running:
                 if failure is None and not cancel.is_set():
-                    ready = [value for value in pending if waits[value] <= ended]
-                    if not ready and not running and pending:
-                        # A dependency no task here can end (a cycle) runs in declaration order, as sequentially.
-                        ready = pending[:1]
-                    for identifier in ready[:width - len(running)]:
+                    for identifier in ready_tasks()[:max(width - len(running), 0)]:
                         pending.remove(identifier)
                         running[asyncio.ensure_future(self.execute_task(project, operation.id, identifier, deadline, cancel))] = identifier
                 if not running:
                     break
                 finished, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
                 for future in finished:
-                    ended.add(running.pop(future))
-                    if failure is None and not future.cancelled() and future.exception() is not None:
-                        failure = future.exception()
+                    identifier = running.pop(future)
+                    if future.cancelled() or future.exception() is not None or failure is not None:
+                        ended.add(identifier)
+                        if failure is None and not future.cancelled() and future.exception() is not None:
+                            failure = future.exception()
+                        continue
+                    await settle(identifier, future.result())
         except BaseException:
             for future in running:
                 future.cancel()
@@ -491,6 +530,13 @@ class TemplatePipeline:
         return resume_operation(operation, command, self.wall())
 
     def task_input(self, operation, task, data):
+        if task.parent_task_id is not None:
+            # D117: an entry or the outline review reads the block's captured input, plus the part that names its scope.
+            parent = next(value.value for value in operation.task_inputs if value.task_id == task.parent_task_id)
+            offered = offered_evidence(parent) or {}
+            part = ({'outline': outline_part(operation, task.parent_task_id, offered)} if task.kind == 'outline_review'
+                else {'entry': entry_part(operation, task, offered)})
+            return {**parent, **part}, list(task_in(operation, task.parent_task_id).allowed_handles)
         declaration = next(value for value in [*data.template_package.definition.operations, *data.template_package.definition.blocks]
             if value.id == task.block_id)
         selectors = declaration.inputs if hasattr(declaration, 'inputs') else declaration.selectors
@@ -567,7 +613,14 @@ class TemplatePipeline:
             await self.finish_task(project, operation_id, task_id, derived.value, derived.source_spans,
                 derived.item_handles, 'empty' if empty_value(derived.value) else 'derived', issues)
             return
-        feedback, unresolved, previous = (), [], None
+        if task.kind == 'outline_review':
+            return await self.review_outline(project, operation_id, task_id, deadline, cancel)
+        block = next(value for value in data.template_package.definition.blocks if value.id == task.block_id)
+        if task.parent_task_id is None and splits_entries(block):
+            spawned = await self.outline(project, operation_id, task_id, deadline, cancel)
+            if spawned is not None:
+                return spawned
+        feedback, unresolved, previous, previous_receipt = (), [], None, None
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
@@ -601,16 +654,14 @@ class TemplatePipeline:
                 if offered is not None:
                     references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
                     request['references'] = references.model_dump(mode='json', by_alias=True)
-                    request['replyProtocol'] = proposal_protocol(references)
+                    request['replyProtocol'] = proposal_protocol(references, entry=task.entry is not None)
                 if previous is not None:
                     # D107: a repair that saw only the findings wrote the block anew and lost admitted values.
                     request['previousReply'] = previous_reply(previous, offered, references)
-                retry = any(value['ruleId'] == 'reply-time' for value in feedback)
                 try:
                     attempt_id = await self.call(project, operation_id, task_id, slot, request,
                         proposal_schema(next(value.full_schema for value in data.template_package.blocks
-                            if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel,
-                        seconds=RETRY_SECONDS if retry else CALL_SECONDS)
+                            if value.id == task.block_id), None if offered is None else list(offered), references), deadline, cancel)
                 except AccountStop:
                     raise
                 except TemplateImportFailure as error:
@@ -631,9 +682,6 @@ class TemplatePipeline:
                 if refusal is not None:
                     # A reply the transport refused by schema is repaired like a refused proposal.
                     feedback = repair_feedback(feedback, task_id, [refusal])
-                    continue
-                if slot == 'initial' and attempt.error_code == 'DEADLINE_EXCEEDED':
-                    feedback = (timeout_feedback(task_id),)
                     continue
                 if slot == 'primary_repair' and feedback:
                     continue
@@ -656,7 +704,8 @@ class TemplatePipeline:
                     feedback = repair_feedback(feedback, task_id, proposal.errors)
                     continue
                 break
-            policy = attempt.model
+            # Reviews run with the captured review model (D116: low); captures made before keep the proposal's.
+            policy = operation.capture.review or attempt.model
             # Identical replies of different blocks share a proposal hash; only this task's own review input is reusable.
             prior_review = next((value.value for value in operation.review_inputs
                 if value.value.proposal_hash == proposal.proposal_hash and value.value.policy == policy
@@ -670,7 +719,9 @@ class TemplatePipeline:
                     if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
                 semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
                     'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
-                    'otherBlocks': other_blocks(operation, task, data.template_package)})
+                    'otherBlocks': other_blocks(operation, task, data.template_package)},
+                # D115: what the repair left as it was keeps the reviewed reply's receipt results.
+                previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
             try:
@@ -705,7 +756,7 @@ class TemplatePipeline:
             except (TemplateImportFailure, ValueError) as error:
                 unresolved.append(getattr(error, 'code', 'IMPORT_REVIEW_INVALID'))
                 break
-            feedback, previous = decision.feedback, proposal
+            feedback, previous, previous_receipt = decision.feedback, proposal, receipt
             # A clean repair that was not better leaves the first reply and its findings in place.
             if not decision.unresolved_target_ids and not kept_first[0]:
                 await self.finish_admitted(project, operation_id, task_id, proposal)
@@ -725,19 +776,164 @@ class TemplatePipeline:
         await self.finish_task(project, operation_id, task_id, None, (), handles,
             'empty' if empty_value(proposal.reply.payload) else 'admitted', unbound_issues(self.id_factory, task_id, proposal, fingerprint))
 
-    async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None,
-            seconds=CALL_SECONDS):
+    async def outline(self, project, operation_id, task_id, deadline, cancel):
+        """The outline call of a block that extracts its entries on their own (D117): what the block task added, or
+        None when the block runs whole instead: it ran whole already, calls run one at a time, the outline would not
+        fit the call cap, the call gave no reply, or the reply named no two entries on offered lines without a shared
+        line."""
+        workspace = await self.view(project)
+        operation, data = operation_in(workspace, operation_id), owner(workspace)
+        children = children_of(operation, task_id)
+        if children:
+            # Resumed after its entries were added: they run on and the block closes when they all ended.
+            return Spawned(task_id, tuple(child.id for child in children), True)
+        existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id and attempt.slot == 'outline'
+            and attempt.state != 'released'), None)
+        if existing is None:
+            if any(attempt.task_id == task_id and attempt.slot in GENERATION_SLOTS for attempt in operation.attempts):
+                return None
+            stored = next(value for value in operation.task_inputs if value.task_id == task_id)
+            offered = offered_evidence(stored.value)
+            lines = line_options(offered, data.sources) if offered is not None else []
+            # Two entries need two lines and two calls at once: one call at a time would run the groups one after
+            # another, and the whole block is faster. The outline, its review and two groups of a call and a review
+            # each must fit the cap; with less, the whole block's call and review are what admits values.
+            if (len(lines) < 2 or operation.capture.policy.concurrency < 2
+                    or operation.capture.policy.call_cap - spent_calls(operation) < 2 + 2 * 2):
+                return None
+            request = {**stored.value, 'slot': 'outline', 'replyProtocol': OUTLINE_PROTOCOL}
+            try:
+                # Bounds name lines only: a whole page or unit as a bound would move the entry's first line.
+                attempt_id = await self.call(project, operation_id, task_id, 'outline', request,
+                    outline_schema([option.ref for option in lines]), deadline, cancel)
+            except AccountStop:
+                raise
+            except TemplateImportFailure:
+                return None
+        else:
+            attempt_id = existing.id
+        workspace = await self.view(project)
+        operation, data = operation_in(workspace, operation_id), owner(workspace)
+        attempt = attempt_in(operation, attempt_id)
+        if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+            # A fenced or cancelled import: the task ends here like any block's, without a result.
+            return Spawned(task_id, (), False)
+        if attempt.outcome != 'completed' or attempt.raw_return is None:
+            return None
+        try:
+            outer = strict_json(attempt.raw_return)
+            if not isinstance(outer, dict) or set(outer) != {'payload'}:
+                raise ValueError('outline needs its payload envelope')
+            scopes = parse_outline(outer['payload'], offered_evidence(attempt.request_value), data.sources)
+        except (ValueError, TypeError, KeyError, RecursionError):
+            return None
+        # Each group needs its call and its review after the outline review; other blocks spent calls meanwhile.
+        room = (operation.capture.policy.call_cap - spent_calls(operation) - 1) // 2
+        count = min(operation.capture.policy.concurrency, room)
+        if len(scopes) < 2 or count < 2:
+            return None
+        groups = grouped(scopes, count)
+        def spawn(value, _data, _workspace):
+            # The review goes first so it starts beside the first entries and adds a missed one early.
+            value = add_outline_review(value, task_id, id_factory=self.id_factory)
+            return add_entry_tasks(value, task_id, groups, 'outline', id_factory=self.id_factory)
+        workspace = await asyncio.to_thread(self.update_operation, project, operation_id, spawn, copy_on_write=True)
+        operation = operation_in(workspace, operation_id)
+        return Spawned(task_id, tuple(child.id for child in children_of(operation, task_id)), True)
+
+    async def review_outline(self, project, operation_id, task_id, deadline, cancel):
+        """The review of a block's outline (D117): an entry it names as missing joins the block; its remarks are
+        the block's one notice; a review that did not complete says so. Returns the entries added."""
+        workspace = await self.view(project)
+        operation, data = operation_in(workspace, operation_id), owner(workspace)
+        task = task_in(operation, task_id)
+        parent_id = task.parent_task_id
+        stored = next(value for value in operation.task_inputs if value.task_id == task_id)
+        existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
+            and attempt.slot == 'outline_review' and attempt.state != 'released'), None)
+        unresolved, missing, remarks = [], [], []
+        if existing is None:
+            offered = offered_evidence(stored.value) or {}
+            request = {**stored.value, 'slot': 'outline_review', 'replyProtocol': OUTLINE_REVIEW_PROTOCOL,
+                'otherBlocks': other_blocks(operation, task, data.template_package)}
+            try:
+                attempt_id = await self.call(project, operation_id, task_id, 'outline_review', request,
+                    outline_review_schema([option.ref for option in line_options(offered, data.sources)]), deadline, cancel)
+            except AccountStop:
+                raise
+            except TemplateImportFailure as error:
+                unresolved.append(error.code)
+                attempt_id = None
+        else:
+            attempt_id = existing.id
+        workspace = await self.view(project)
+        operation, data = operation_in(workspace, operation_id), owner(workspace)
+        if attempt_id is not None:
+            attempt = attempt_in(operation, attempt_id)
+            if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+                return None
+            if attempt.outcome == 'completed' and attempt.raw_return is not None:
+                try:
+                    outer = strict_json(attempt.raw_return)
+                    if not isinstance(outer, dict) or set(outer) != {'payload'}:
+                        raise ValueError('outline review needs its payload envelope')
+                    taken = [span for entry in entries_of(operation, parent_id) for span in entry.entry.spans]
+                    missing, remarks = parse_outline_review(outer['payload'], offered_evidence(attempt.request_value),
+                        data.sources, taken=taken)
+                except (ValueError, TypeError, KeyError, RecursionError):
+                    unresolved.append('IMPORT_OUTLINE_REVIEW_INVALID')
+            else:
+                unresolved.append(attempt.error_code or attempt.outcome or 'IMPORT_RETURN_UNKNOWN')
+        added = []
+        if missing:
+            before = {child.id for child in children_of(operation, parent_id)}
+            # Each missed entry runs on its own: they are few, and the groups already run.
+            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, lambda value, _data, _workspace:
+                add_entry_tasks(value, parent_id, [[scope] for scope in missing], 'review', id_factory=self.id_factory),
+                copy_on_write=True)
+            operation = operation_in(workspace, operation_id)
+            added = [child.id for child in children_of(operation, parent_id) if child.id not in before]
+        issues = []
+        if unresolved or remarks:
+            issues.append(ImportIssue(id=self.id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id],
+                blockIds=[], category='check_not_completed' if unresolved else 'uncertain_interpretation',
+                code='IMPORT_OUTLINE_UNCHECKED' if unresolved else 'IMPORT_OUTLINE_REMARK',
+                message=OUTLINE_UNCHECKED if unresolved else OUTLINE_REMARK.format(reasons=' '.join(remarks)),
+                importedFingerprint=digest(stored.value), reviewInputHash=None, lifecycleId=self.id_factory('issue-lifecycle'),
+                state='active', retiredByAction=None))
+        await self.finish_task(project, operation_id, task_id, {'added': added, 'remarks': remarks, 'diagnostics': unresolved},
+            (), (), 'derived', issues)
+        return Spawned(parent_id, tuple(added), False)
+
+    async def close_entries(self, project, operation_id, parent_id):
+        """A block whose entries ran on their own ends with what they collected (D117): their handles, admitted when
+        any entry was, its records in the entries' order. The entries' own results place their lines."""
+        def close(operation, current, _workspace):
+            if operation.state in {'cancelled', 'fenced'} or any(result.task_id == parent_id for result in operation.task_results):
+                return operation
+            parent = task_in(operation, parent_id)
+            results = {result.task_id: result for result in operation.task_results}
+            if any(child.id not in results for child in children_of(operation, parent_id)):
+                raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
+            entries = ordered_entries(operation, parent_id, current.sources)
+            done = [results[task.id] for task in entries]
+            current.facts = reorder_records(current.facts, entry_records(operation, entries))
+            parent.state, disposition = closed_state(entries)
+            operation.task_results.append(TaskResultRecord(id=self.id_factory('task-result'), taskId=parent_id,
+                inputHash=parent.input_hash, value={'entries': [task.id for task in entries]}, sourceSpans=[],
+                itemHandles=list(dict.fromkeys(handle for result in done for handle in result.item_handles)), issueIds=[],
+                disposition=disposition))
+            return operation
+        await asyncio.to_thread(self.update_operation, project, operation_id, close)
+
+    async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None):
         workspace = await self.view(project)
         operation = operation_in(workspace, operation_id)
         await asyncio.to_thread(self.guard, project, operation)
         remaining = deadline.remaining(operation, self.wall(), self.elapsed())
-        policy = review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair' else operation.capture.primary
-        if review is None:
-            block = next(value for value in owner(workspace).template_package.definition.blocks if value.id == task_in(operation, task_id).block_id)
-            if block.effort and block.effort != policy.effort:
-                # The block declares its own extraction effort (D101 probe H: the projects block is complete at high
-                # where medium stopped after one to five jobs); the attempt records the policy actually used.
-                policy = policy.model_copy(update={'effort': block.effort})
+        # Every call runs the model and effort chosen for the import (D114 removed the block-level effort).
+        policy = (review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair'
+            else (operation.capture.review or operation.capture.primary) if slot == 'outline_review' else operation.capture.primary)
         launch_owner = self.transport.reserve_owner(operation, task_in(operation, task_id), policy)
         reserved = []
         def reserve(result, _data, _workspace):
@@ -788,7 +984,7 @@ class TemplatePipeline:
                 return reconcile_cleanup(result, proof, self.wall()) if proof is not None else result
             self.update_operation(project, operation_id, retain, copy_on_write=True)
         request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
-            GenerationPolicy(policy.model, timeout_seconds=min(seconds, max(0.001, remaining)), allow_repair=False,
+            GenerationPolicy(policy.model, timeout_seconds=max(0.001, remaining), allow_repair=False,
                 reasoning_effort=policy.effort), on_return=returned, request_value=value)
         def launch():
             current = operation_in(self.read(project), operation_id)
@@ -798,7 +994,7 @@ class TemplatePipeline:
                 self.update_operation(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
                     observe_time(result, self.wall(), elapsed_remaining=0), attempt_id, self.wall()))
                 return None
-            bounded = replace(request, policy=replace(request.policy, timeout_seconds=min(seconds, remaining)))
+            bounded = replace(request, policy=replace(request.policy, timeout_seconds=remaining))
             return self.transport.generate(bounded, cancel)
         try:
             response = await asyncio.to_thread(launch)
@@ -899,6 +1095,9 @@ class TemplatePipeline:
             spans, scope, leftover = [*cited, *missing], 'cited', [digest(span) for span in missing]
         else:
             spans = cited_spans(operation, task_id, offered)
+            if not spans and task.entry is not None:
+                # One entry of a block (D117) shows its own lines: the outline named them for it.
+                spans = list(task.entry.spans)
             scope = 'cited' if spans else 'uncited'
             if not spans:
                 # No reply is not evidence of absence: a block offers its scope and the materializer places only the
@@ -1009,9 +1208,20 @@ class TemplatePipeline:
             if any(result.task_id == task_id for result in operation.task_results):
                 continue
             task = task_in(operation, task_id)
+            if task.parent_task_id is None and children_of(operation, task_id):
+                # A block with entries closes after them, below.
+                continue
             if not any(value.task_id == task_id for value in operation.task_inputs):
                 value, handles = self.task_input(operation, task, data)
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory))
+            if task.kind == 'outline_review':
+                await self.finish_task(project, operation_id, task_id, None, (), (), 'empty', [])
+                continue
             await self.fallback(project, operation_id, task_id, ['IMPORT_PROCESSING_STOPPED'])
+        operation = operation_in(await self.view(project), operation_id)
+        for task in operation.tasks:
+            if (task.parent_task_id is None and children_of(operation, task.id)
+                    and not any(result.task_id == task.id for result in operation.task_results)):
+                await self.close_entries(project, operation_id, task.id)
         return operation_in(await self.view(project), operation_id)

@@ -28,10 +28,13 @@ class ProcessExit(SpikeError):
 class ProcessRunner:
     def __init__(self, executable: Path, *, clock: Callable[[], float] = time.monotonic,
                  launch: Callable[[Path, tuple[str, ...], Path],
-                                  tuple[Path, tuple[str, ...], dict[str, str]]] | None = None):
+                                  tuple[Path, tuple[str, ...], dict[str, str]]] | None = None,
+                 workdir: Path | None = None):
         self.executable = executable
         self.clock = clock
         self.launch = launch
+        # The process cwd; None runs each call in its own operation directory.
+        self.workdir = workdir
 
     def run(self, files: OperationFiles, arguments: tuple[str, ...], *, data: bytes = b"",
             deadline: float, cancel: threading.Event,
@@ -56,7 +59,7 @@ class ProcessRunner:
             executable, args, environment = (self.launch(self.executable, arguments, files.path)
                                              if self.launch is not None and files.path is not None
                                              else (self.executable, arguments, None))
-            process = files.spawn(executable, args, environment=environment)
+            process = files.spawn(executable, args, environment=environment, cwd=self.workdir)
             if on_spawn is not None:
                 on_spawn()
             assert process.stdin is not None and process.stdout is not None and process.stderr is not None

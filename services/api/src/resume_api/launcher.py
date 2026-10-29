@@ -24,8 +24,9 @@ from .cli.experimental_profile import installed_profile
 ROOT = Path(__file__).resolve().parents[4]
 STARTUP_TIMEOUT_SECONDS = 5
 SHUTDOWN_TIMEOUT_SECONDS = 5
-# Template import is the default flow; the cap bounds one import's model calls (the CT06 live runs used 60).
-TEMPLATE_IMPORT_CALL_CAP = 60
+# Template import is the default flow; the cap bounds one import's model calls (the CT06 live runs used 60; D117 adds
+# an outline, its review and two calls per entry of a block extracted entry by entry).
+TEMPLATE_IMPORT_CALL_CAP = 150
 
 
 class HostLaunchOptions(Transport):

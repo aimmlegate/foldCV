@@ -236,7 +236,11 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
                 for relation in declaration.relations for target in relation.target_types}
             # A repair that still states a value no source line states loses that value and keeps the block (I4).
             dropped = [] if attempt.slot in {'primary_repair', 'fallback_repair'} else None
-            completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped)
+            # One entry of a block (D117) cites its own lines first.
+            lines = {digest(span) for span in task.entry.spans} if task.entry is not None else set()
+            preferred = {ref: option for ref, option in table.items() if digest(option.span) in lines} or None
+            completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped,
+                preferred=preferred)
             proposal.dropped_values = [DroppedValue.model_validate(value) for value in dropped or []]
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}

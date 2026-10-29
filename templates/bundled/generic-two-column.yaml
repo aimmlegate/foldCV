@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.7.0
+  revision: 2.8.0
   name: Две колонки
   default_locale: ru
 model:
@@ -267,7 +267,7 @@ blocks:
 - id: projects
   region: main
   order: 20
-  effort: high
+  per_entry: true
   schema:
   - company: text
     project?:

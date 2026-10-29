@@ -6,6 +6,10 @@ const efforts: readonly string[] = ["none", "minimal", "low", "medium", "high", 
 export function isReasoningEffort(value: unknown): value is ReasoningEffort {
   return typeof value === "string" && efforts.includes(value);
 }
+/** "high" and above: an import at this level takes noticeably longer. */
+export function longReasoning(value: ReasoningEffort): boolean {
+  return efforts.indexOf(value) >= efforts.indexOf("high");
+}
 export function validReasoning(value: unknown, models: readonly unknown[]): value is Record<string, ModelReasoning> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   return Object.entries(value).every(([model, entry]: [string, unknown]) => {

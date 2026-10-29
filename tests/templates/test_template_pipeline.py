@@ -9,6 +9,7 @@ from tests.templates.pipeline_fixtures import resume_command
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from tests.templates.template_runtime_fixtures import import_task
 from tests.templates.test_semantic_admission import raw_proposal
+from tests.templates.evidence_references import model_targets
 
 
 async def run_entry(fixture):
@@ -46,16 +47,23 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
         return {'results': [*results, {**results[0], 'targetId': 'unknown-target'}] if review_failure == 'unknown' else results}
     fixture.transport.scripted = script
     result = await run_entry(fixture)
-    assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
+    assert result.state == 'published' and result.task_results[0].disposition == 'source_fallback'
     assert len(fixture.transport.calls) == 2 and result.issues
-    assert not fixture.current().project.facts.extensions
     assert fixture.source.units[0].text in fixture.text()
     assert len(result.receipts) == (1 if review_failure == 'uncertain' else 0)
     # One notice for the block, whatever the number of failing checks.
     [issue] = result.issues
-    assert issue.message == ('Показан исходный текст: проверка не подтвердила извлечённые данные. Attribution is unclear. '
-        'Ещё замечаний: ' + str(len(issue.target_ids) - 1) + '.' if review_failure == 'uncertain'
-        else 'Показан исходный текст: проверку извлечённых данных не удалось завершить.')
+    if review_failure == 'uncertain':
+        # D115: the verbatim title, journal and url are settled by the coordinator and stay; the model's uncertain
+        # checks on the category and year leave the block with a remark, not as a failed import.
+        records = fixture.current().project.facts.extensions
+        assert result.tasks[0].state == 'accepted' and len(records) == 2
+        assert {cell.field_key for record in records for cell in record.cells} == {'title', 'journal', 'url'}
+        assert issue.message == ('Проверка не подтвердила извлечённые данные. Attribution is unclear. '
+            'Ещё замечаний: ' + str(len(issue.target_ids) - 1) + '.')
+    else:
+        assert result.tasks[0].state == 'source_fallback' and not fixture.current().project.facts.extensions
+        assert issue.message == 'Показан исходный текст: проверку извлечённых данных не удалось завершить.'
 
 
 @pytest.mark.asyncio
@@ -191,6 +199,21 @@ def satisfied_review(value):
         'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
 
 
+@pytest.mark.asyncio
+async def test_reviews_run_with_the_captured_review_model_and_extraction_keeps_the_chosen_effort(tmp_path):
+    # D116: the capture names a review model at low; the proposal keeps the effort the import chose.
+    from tests.templates.pipeline_fixtures import model
+    fixture, efforts = RuntimeFixture(tmp_path, review=model(effort='low')), []
+    def script(request, value):
+        efforts.append(request.policy.reasoning_effort)
+        return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.state == 'published' and efforts == ['medium', 'low']
+    assert [(attempt.slot, attempt.model.effort) for attempt in result.attempts] == [('initial', 'medium'), ('review', 'low')]
+    assert result.review_inputs[0].value.policy.effort == 'low'
+
+
 def refused_first(fixture, refuse):
     """The first reply of the block is refused as refuse makes it; the repair and the review answer correctly."""
     def script(_request, value):
@@ -316,40 +339,36 @@ def timing_out(fixture, limits, *, slots=('initial',), review=False):
 
 
 @pytest.mark.asyncio
-async def test_a_first_call_that_runs_out_of_time_is_retried_once_with_the_full_limit(tmp_path):
-    # LIVE-04: the projects call stalled for 180 s; the same request then answered in 15-19 s (PROBE-02).
-    from resume_api.importer.template_pipeline import CALL_SECONDS, RETRY_SECONDS
+async def test_every_call_gets_the_remaining_import_time_instead_of_a_call_limit(tmp_path):
+    # D114: on the projects block Sol at high took 84-127 s where a 90 s call limit stood; the captured import limit
+    # (here 300 s, less the time already spent) is the only bound of a call.
     fixture, limits = RuntimeFixture(tmp_path), []
-    fixture.transport.scripted = timing_out(fixture, limits)
+    fixture.transport.scripted = timing_out(fixture, limits, slots=())
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.tasks[0].state == 'accepted' and not result.issues
-    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
-    assert (result.attempts[0].outcome, result.attempts[0].error_code) == ('timed_out', 'DEADLINE_EXCEEDED')
-    assert fixture.transport.calls[1]['feedback'] == [{'ruleId': 'reply-time', 'targetId': 'scope-' + result.tasks[0].id,
-        'reason': 'No reply arrived within the call time limit. Return the whole reply.'}]
-    assert limits == [CALL_SECONDS, RETRY_SECONDS, CALL_SECONDS] and CALL_SECONDS < RETRY_SECONDS == 180
-    assert len(fixture.current().project.facts.extensions) == 2
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'review']
+    assert len(limits) == 2 and all(290 < limit <= 300 for limit in limits)
 
 
 @pytest.mark.asyncio
-async def test_a_retry_that_also_runs_out_of_time_falls_back_without_a_third_call(tmp_path):
+async def test_a_call_that_runs_out_of_the_import_time_falls_back_without_a_retry(tmp_path):
     fixture, limits = RuntimeFixture(tmp_path, fallback=False), []
-    fixture.transport.scripted = timing_out(fixture, limits, slots=('initial', 'primary_repair'))
+    fixture.transport.scripted = timing_out(fixture, limits)
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
-    assert len(fixture.transport.calls) == 2 and [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair']
+    assert (result.attempts[0].outcome, result.attempts[0].error_code) == ('timed_out', 'DEADLINE_EXCEEDED')
+    assert len(fixture.transport.calls) == 1 and [attempt.slot for attempt in result.attempts] == ['initial']
     assert fixture.text() == '' and result.issues[0].message.startswith('Блок не заполнен')
 
 
 @pytest.mark.asyncio
 async def test_a_review_that_runs_out_of_time_is_not_retried(tmp_path):
-    # K01: an incomplete review follows source fallback; only extraction gets the retry.
-    from resume_api.importer.template_pipeline import CALL_SECONDS
+    # K01: an incomplete review follows source fallback.
     fixture, limits = RuntimeFixture(tmp_path), []
     fixture.transport.scripted = timing_out(fixture, limits, review=True)
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.tasks[0].state == 'source_fallback'
-    assert limits == [CALL_SECONDS, CALL_SECONDS] and [attempt.slot for attempt in result.attempts] == ['initial', 'review']
+    assert len(limits) == 2 and [attempt.slot for attempt in result.attempts] == ['initial', 'review']
     assert fixture.source.units[0].text in fixture.text()
     # The review never finished, so nothing was admitted and the notice still names the source text.
     assert result.issues[0].message.startswith('Показан исходный текст')
@@ -363,7 +382,7 @@ async def test_a_repair_whose_review_finds_more_problems_does_not_replace_the_fi
         if 'targets' not in value:
             return raw_proposal(fixture.source)
         reviews.append(value)
-        failing = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
+        failing = [target for target in model_targets(value) if not target['targetId'].startswith('scope-')]
         failing = failing[:1] if len(reviews) == 1 else failing
         return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
             'disposition': 'violation' if target in failing else 'satisfied', 'reason': 'Неверно' if target in failing else '',
@@ -377,7 +396,7 @@ async def test_a_repair_whose_review_finds_more_problems_does_not_replace_the_fi
     assert first.applied_receipt_id == result.receipts[0].id and repair.applied_receipt_id is None
     assert first.admitted_cell_ids
     [issue] = result.issues
-    cell = next(target['targetId'] for target in reviews[0]['targets'] if not target['targetId'].startswith('scope-'))
+    cell = next(target['targetId'] for target in model_targets(reviews[0]) if not target['targetId'].startswith('scope-'))
     assert issue.target_ids == [cell, 'scope-' + result.tasks[0].id]
     assert issue.message.startswith('Проверка нашла ошибку') and not issue.message.startswith('Показан исходный текст')
     assert 'Ещё замечаний' not in issue.message and 'Неверно' in issue.message
@@ -397,8 +416,10 @@ async def test_two_findings_on_an_admitted_block_are_one_notice(tmp_path):
         if 'targets' not in value:
             return raw_proposal(fixture.source)
         reviews.append(value)
-        cells = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
-        return failing_review(value, cells[:2])
+        # Both reviews reject the same two values (the categories): chosen by field, not by the order of cell ids,
+        # which the hash seed decides and which made the repair look better than the first reply.
+        categories = {allocation['cellIds']['status'] for allocation in value['handleMap']}
+        return failing_review(value, [target for target in model_targets(value) if target['targetId'] in categories])
     fixture.transport.scripted = script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
@@ -467,7 +488,7 @@ async def test_a_repair_that_drops_an_admitted_value_does_not_replace_the_first(
                 return papers(fixture.source, ['a', 'b'])
             return papers(fixture.source, ['b'], {'b': captured_handles(value)['a']})
         reviews.append(value)
-        cells = [target for target in value['targets'] if not target['targetId'].startswith('scope-')]
+        cells = [target for target in model_targets(value) if not target['targetId'].startswith('scope-')]
         return failing_review(value, cells[:1] if len(reviews) == 1 else [])
     fixture.transport.scripted = script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
@@ -538,7 +559,11 @@ async def test_a_review_that_admits_nothing_keeps_the_source_notice(tmp_path):
     fixture = RuntimeFixture(tmp_path, fallback=False)
     def script(_request, value):
         if 'targets' not in value:
-            return raw_proposal(fixture.source)
+            # Reworded values, so no check is settled by the coordinator (D115) and the review decides every cell.
+            reply = raw_proposal(fixture.source)
+            for paper in reply['payload']:
+                paper.update(title=paper['title'] + ' (reworded)', journal=paper['journal'] + ' (reworded)', url=paper['url'] + '/draft')
+            return reply
         return failing_review(value, list(value['targets']))
     fixture.transport.scripted = script
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)

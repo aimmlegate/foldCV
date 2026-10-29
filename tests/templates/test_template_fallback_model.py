@@ -103,8 +103,9 @@ async def test_a_running_import_keeps_its_captured_models_when_settings_change(t
 @pytest.mark.parametrize('available', [True, False])
 async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_when_unavailable(tmp_path, available):
     # The selected model's first reply and repair are refused; the captured fallback makes one more repair, reviewed by
-    # the model that wrote it, as every review is. When it
-    # left the catalog, the attempt is refused before any process and the block keeps its source wording.
+    # the captured review model (D116: the import model, at low when the catalog offers it; here it offers medium
+    # alone), as every review is. When the fallback left the catalog, the attempt is refused before any process and
+    # the block keeps its source wording.
     def refuse(value, model):
         if 'targets' in value or model == 'assistant-model':
             return None
@@ -128,7 +129,7 @@ async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_wh
         slots = [(attempt.slot, attempt.model.model) for attempt in operation.attempts]
         if available:
             assert slots == [('initial', 'processing-model'), ('primary_repair', 'processing-model'),
-                ('fallback_repair', 'assistant-model'), ('replacement_review', 'assistant-model')]
+                ('fallback_repair', 'assistant-model'), ('replacement_review', 'processing-model')]
             assert operation.tasks[0].state == 'accepted'
         else:
             assert provider.models == ['processing-model', 'processing-model']

@@ -342,9 +342,13 @@ class Condition(Definition):
 class Block(Definition):
     id: Id
     mode: Literal["model", "derived", "source_copy"]
-    # Reasoning effort for this block's extraction calls; None keeps the captured model's effort (D101 probe H: the
-    # whole projects block came back complete at high where medium stopped after one to five jobs).
+    # No effect since D114: every call runs the effort chosen for the import. Kept so packages captured with the
+    # D101 block-level effort still verify against their original text; the short form no longer offers the key.
     effort: Literal["low", "medium", "high"] | None = Field(default=None, exclude_if=lambda value: value is None)
+    # D117: one outline call names the entries of a list block and their source lines; the entries then run in as many
+    # groups as calls run at once, beside an outline review. Shorter calls in parallel for a long block.
+    per_entry: bool = Field(default=False, exclude_if=lambda value: not value,
+        description='Outline the list first, then extract its entries in parallel groups. A model list without item limits only.')
     selectors: list[InputRef]
     content_schema: JsonObject
     bindings: list[Binding]

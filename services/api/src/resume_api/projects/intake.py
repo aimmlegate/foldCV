@@ -33,6 +33,10 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+# Reviews read a finished reply against its evidence; low is enough and keeps them short (D116: at the proposal's
+# effort the projects review took 67-81 s on Sol).
+REVIEW_EFFORT = 'low'
+
 class TemplateIntake:
     def __init__(self, repository, *, temp_root, worker_slot, cleanup_error, clock=_now):
         self.repository, self.temp_root = repository, temp_root
@@ -150,23 +154,39 @@ class TemplateIntake:
         return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
             capture=capture)
 
+    def review_model(self, primary):
+        """The capture reviews run with: the import model at REVIEW_EFFORT when its catalog offers it (D116), else the
+        primary capture itself."""
+        if primary.effort == REVIEW_EFFORT:
+            return primary
+        try:
+            return self.model(effort=REVIEW_EFFORT)
+        except ProjectFailure as error:
+            if error.code != 'IMPORT_EFFORT_UNSUPPORTED':
+                raise
+            return primary
+
     def capture(self, workspace, allow_text_rewrite, models=None, *, effort=None):
         data = workspace.project or workspace.pre_draft
         package, sources = data.template_package, {source.id: source.byte_sha256 for source in data.sources}
         if models is not None:
-            primary, fallback = models
+            primary, fallback, review = models
         else:
             primary = self.model(effort=effort)
             fallback = self.fallback(primary) if self.fallback else None
+            review = self.review_model(primary)
         models = {'model': primary.model_dump(mode='json', by_alias=True)}
         if fallback is not None:
             models['fallback'] = fallback.model_dump(mode='json', by_alias=True)
+        if review is not None:
+            # Captures made before D116 have no review model and keep their authority hash.
+            models['review'] = review.model_dump(mode='json', by_alias=True)
         return ImportCapture(packageHash=package.package_hash, sourceHashes=sources,
             factRevisions={record.id: record.revision for record in [*data.facts.records, *data.facts.extensions]
                 if getattr(record, 'active', True)},
             authorityHash=digest({'project': workspace.project_id, **models}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
-            primary=primary, fallback=fallback, formattingAsOf=workspace.formatting_as_of,
+            primary=primary, fallback=fallback, review=review, formattingAsOf=workspace.formatting_as_of,
             policy=RuntimePolicy(callCap=self.call_cap, concurrency=self.concurrency,
                 processingSeconds=import_seconds(), cleanupSeconds=5,
                 finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
@@ -176,18 +196,20 @@ class TemplateIntake:
         if data is None or data.template_package is None or self.call_cap is None:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
         # Facts advance through admitted proposals; the pipeline checks their captured revisions separately.
-        # A stored import keeps the time limits, concurrency and models captured at its start when Settings change
-        # (E07); a new one must match.
+        # A stored import keeps the time limits, concurrency, call cap and models captured at its start when Settings
+        # change (E07); a new one must match.
         # A published project names its records by history file (D104).
         stored = any(value.id == operation.id for value in data.template_operations) or any(
             ref.operation_id == operation.id for ref in getattr(data, 'import_history', []))
         try:
             # A new operation carries the effort its start chose; the catalog must still offer it.
             expected = self.capture(workspace, operation.capture.allow_text_rewrite,
-                models=(operation.capture.primary, operation.capture.fallback) if stored else None,
+                models=(operation.capture.primary, operation.capture.fallback, operation.capture.review) if stored else None,
                 effort=None if stored else operation.capture.primary.effort)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
-        ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds', 'concurrency'}} if stored else {})}
+        # D117 raised the launcher's call cap: an import saved with the old one resumes with it.
+        ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds', 'concurrency',
+            'call_cap'}} if stored else {})}
         if expected.model_dump(exclude=ignored) != operation.capture.model_dump(exclude=ignored):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')

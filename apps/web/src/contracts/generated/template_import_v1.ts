@@ -58,7 +58,8 @@ export type Returnhash = string | null;
 export type Returnedat = string | null;
 export type Reviewinputrecordid = string | null;
 export type Reviewreceiptid = string | null;
-export type Slot = "initial" | "review" | "primary_repair" | "fallback_repair" | "replacement_review";
+export type Slot =
+  "initial" | "review" | "primary_repair" | "fallback_repair" | "replacement_review" | "outline" | "outline_review";
 export type State1 = "reserved" | "dispatch_started" | "returned" | "outcome_unknown" | "reconciled" | "released";
 export type Taskid1 = string;
 export type Cachedinputtokens = number | null;
@@ -286,6 +287,14 @@ export type Instructions = string[];
 export type Version = 1;
 export type Rules = Check[];
 export type Schemaversion1 = 1 | 2;
+export type Actionable1 = boolean;
+export type Disposition1 = "satisfied" | "violation" | "uncertain";
+export type Evidence6 = SourceSpan[];
+export type Origin1 = "verbatim" | "reused";
+export type Reason1 = string;
+export type Ruleid3 = string;
+export type Targetid4 = string;
+export type Settled = SettledCheck[];
 export type Sourcespans = SourceSpan[];
 export type Targets = CheckTarget[];
 export type Reviewinputs = ReviewInputRecord[];
@@ -297,7 +306,7 @@ export type Id12 = string;
 export type Inputhash3 = string;
 export type Taskid4 = string;
 export type Taskinputs = TaskInputRecord[];
-export type Disposition1 = "admitted" | "derived" | "source_fallback" | "empty";
+export type Disposition2 = "admitted" | "derived" | "source_fallback" | "empty";
 export type Id13 = string;
 export type Inputhash4 = string;
 export type Issueids = string[];
@@ -309,12 +318,23 @@ export type Allowedhandles = string[];
 export type Attemptids = string[];
 export type Blockid = string;
 export type Dependencies = string[];
+export type Index = number;
+export type Origin2 = "outline" | "review";
+/**
+ * @minItems 1
+ */
+export type Parts = [EntryPart, ...EntryPart[]];
+export type Spans = SourceSpan[];
+export type Title = string;
+export type Spans1 = SourceSpan[];
+export type Title1 = string;
 export type Expectedchecks1 = CheckTarget[];
 export type Id14 = string;
 export type Inputhash5 = string;
 export type Issueids1 = string[];
-export type Kind11 = "extract" | "rewrite" | "derive" | "source_copy";
+export type Kind11 = "extract" | "rewrite" | "derive" | "source_copy" | "outline_review";
 export type Operationid4 = string;
+export type Parenttaskid = string | null;
 export type Proposalhash2 = string | null;
 export type Receiptids = string[];
 export type State9 =
@@ -459,6 +479,7 @@ export interface ImportCapture {
   packageHash: Packagehash;
   policy: RuntimePolicy;
   primary: ModelCapture;
+  review?: ModelCapture | null;
   sourceHashes: Sourcehashes;
 }
 export interface Factrevisions {
@@ -728,6 +749,7 @@ export interface ReviewInput {
   rules: Rules;
   schemaVersion: Schemaversion1;
   semanticContext: Semanticcontext;
+  settled?: Settled;
   sourceSpans: Sourcespans;
   sourceTexts: Sourcetexts;
   targets: Targets;
@@ -764,6 +786,19 @@ export interface CheckParameters {
 export interface Semanticcontext {
   [k: string]: JsonValue;
 }
+/**
+ * A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's
+ * result for a value the repair left as it was.
+ */
+export interface SettledCheck {
+  actionable: Actionable1;
+  disposition: Disposition1;
+  evidence: Evidence6;
+  origin: Origin1;
+  reason: Reason1;
+  ruleId: Ruleid3;
+  targetId: Targetid4;
+}
 export interface Sourcetexts {
   [k: string]: string;
 }
@@ -778,7 +813,7 @@ export interface Value {
   [k: string]: JsonValue;
 }
 export interface TaskResultRecord {
-  disposition: Disposition1;
+  disposition: Disposition2;
   id: Id13;
   inputHash: Inputhash4;
   issueIds: Issueids;
@@ -792,13 +827,34 @@ export interface ImportTask {
   attemptIds: Attemptids;
   blockId: Blockid;
   dependencies: Dependencies;
+  entry?: EntryScope | null;
   expectedChecks: Expectedchecks1;
   id: Id14;
   inputHash: Inputhash5;
   issueIds: Issueids1;
   kind: Kind11;
   operationId: Operationid4;
+  parentTaskId?: Parenttaskid;
   proposalHash: Proposalhash2;
   receiptIds: Receiptids;
   state: State9;
+}
+/**
+ * The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
+ * the outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)
+ * and whether the outline or its review named them.
+ */
+export interface EntryScope {
+  index: Index;
+  origin: Origin2;
+  parts: Parts;
+  spans: Spans1;
+  title: Title1;
+}
+/**
+ * One entry the outline named (D117): its title and its source lines.
+ */
+export interface EntryPart {
+  spans: Spans;
+  title: Title;
 }

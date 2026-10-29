@@ -154,6 +154,21 @@ async def test_an_import_captures_the_configured_concurrency_and_a_stored_one_ke
 
 
 @pytest.mark.asyncio
+async def test_a_stored_import_keeps_its_call_cap_when_the_configured_cap_changes(tmp_path):
+    # Parallel review (2026-10-29): D117 raised the launcher's cap from 60 to 150, and an import saved with 60 failed
+    # IMPORT_CAPTURE_STALE on resume. A stored import keeps its cap as it keeps its limits and concurrency (E07).
+    provider = ScriptedTemplateProvider()
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
+        intake = app.state.intake
+        project = (await upload(client)).json()['workspace']['projectId']
+        assert (await run_import(client, app, project, 'import-1'))['state'] == 'succeeded'
+        operation, workspace = operation_of(app, project), saved(app, project)
+        intake.call_cap = 150
+        intake.validate(operation, workspace)
+        assert operation.capture.policy.call_cap == 4 and intake.capture(workspace, True).policy.call_cap == 150
+
+
+@pytest.mark.asyncio
 async def test_an_upload_captures_the_chosen_template_and_the_old_path_the_default(tmp_path, monkeypatch):
     from packages.resume_core.templates.compiler import compile_template
     from tests.templates.test_template_store import SECOND, second_bundled

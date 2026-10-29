@@ -201,6 +201,39 @@ class CheckTarget(Wire):
     target_id: Id
 
 
+class OutlineEntry(Wire):
+    """One entry of a block as an outline names it (D117): its title and the refs of its first and last source line."""
+    title: str
+    first: EvidenceRef
+    last: EvidenceRef
+
+
+class OutlineReply(Wire):
+    entries: list[OutlineEntry]
+
+
+class OutlineRemark(Wire):
+    entries: list[int]
+    reason: str
+
+
+class OutlineReviewReply(Wire):
+    missing: list[OutlineEntry]
+    remarks: list[OutlineRemark]
+
+
+class SettledCheck(Wire):
+    """A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's
+    result for a value the repair left as it was."""
+    rule_id: Id
+    target_id: Id
+    disposition: Literal["satisfied", "violation", "uncertain"]
+    reason: str
+    evidence: list[SourceSpan]
+    actionable: bool
+    origin: Literal["verbatim", "reused"]
+
+
 class ModelCapture(Wire):
     adapter: Id
     model: Id
@@ -229,6 +262,8 @@ class ReviewInput(Wire):
     occurrence_independent: bool
     # Version 2 offers evidence by reference; version 1 keeps its digest-keyed spans and texts.
     evidence: list[EvidenceOption] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # Checks of the targets the model is not asked about; the receipt carries their results as given here (D115).
+    settled: list[SettledCheck] = Field(default_factory=list, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def evidence_form(self):
@@ -320,6 +355,8 @@ class ImportCapture(Wire):
     allow_text_rewrite: bool
     primary: ModelCapture
     fallback: ModelCapture | None
+    # The model and effort reviews run with (D116: low when the catalog offers it); None in captures made before.
+    review: ModelCapture | None = Field(default=None, exclude_if=lambda value: value is None)
     formatting_as_of: PartialDate
     policy: RuntimePolicy
 
@@ -367,11 +404,28 @@ class TaskResultRecord(Wire):
     disposition: Literal['admitted', 'derived', 'source_fallback', 'empty']
 
 
+class EntryPart(Wire):
+    """One entry the outline named (D117): its title and its source lines."""
+    title: str
+    spans: list[SourceSpan]
+
+
+class EntryScope(Wire):
+    """The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
+    the outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)
+    and whether the outline or its review named them."""
+    index: int = Field(ge=1)
+    title: str
+    spans: list[SourceSpan]
+    parts: list[EntryPart] = Field(min_length=1)
+    origin: Literal["outline", "review"]
+
+
 class ImportTask(Wire):
     id: Id
     operation_id: Id
     block_id: Id
-    kind: Literal["extract", "rewrite", "derive", "source_copy"]
+    kind: Literal["extract", "rewrite", "derive", "source_copy", "outline_review"]
     dependencies: list[Id]
     input_hash: Sha256
     allowed_handles: list[Id]
@@ -382,6 +436,10 @@ class ImportTask(Wire):
     proposal_hash: Sha256 | None
     receipt_ids: list[Id]
     issue_ids: list[Id]
+    # D117: a task added while the import runs belongs to the block task named here: one entry of the block, or the
+    # review of the block's outline (kind outline_review, no entry).
+    parent_task_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    entry: EntryScope | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class LaunchOwner(Wire):
@@ -418,7 +476,7 @@ class ImportAttempt(Wire):
     id: Id
     operation_id: Id
     task_id: Id
-    slot: Literal["initial", "review", "primary_repair", "fallback_repair", "replacement_review"]
+    slot: Literal["initial", "review", "primary_repair", "fallback_repair", "replacement_review", "outline", "outline_review"]
     input_hash: Sha256
     model: ModelCapture
     state: Literal["reserved", "dispatch_started", "returned", "outcome_unknown", "reconciled", "released"]
@@ -573,9 +631,19 @@ class ImportOperation(Wire):
         for name in ("tasks","attempts","proposals","review_inputs","receipts","export_attempts"):
             _unique([value.id for value in getattr(self,name)],"import "+name)
         tasks={t.id for t in self.tasks};attempts={a.id for a in self.attempts}
+        by_task = {task.id: task for task in self.tasks}
         for task in self.tasks:
             if task.operation_id != self.id or not set(task.dependencies)<=tasks or not set(task.attempt_ids)<=attempts:
                 raise ValueError("task/operation identity mismatch")
+            parent = by_task.get(task.parent_task_id) if task.parent_task_id is not None else None
+            if task.parent_task_id is not None and (parent is None or parent.parent_task_id is not None
+                    or parent.block_id != task.block_id or parent.kind not in {'extract', 'rewrite'}):
+                raise ValueError('task belongs to no block task')
+            if (task.kind == 'outline_review') != (task.parent_task_id is not None and task.entry is None):
+                raise ValueError('outline review task shape')
+            if task.entry is not None and (parent is None or task.kind != parent.kind):
+                raise ValueError('entry task kind differs from its block task')
+        _unique([(task.parent_task_id, task.entry.index) for task in self.tasks if task.entry is not None], 'block entry')
         for attempt in self.attempts:
             if attempt.operation_id != self.id or attempt.task_id not in tasks:
                 raise ValueError("attempt/operation identity mismatch")

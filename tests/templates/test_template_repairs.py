@@ -38,6 +38,9 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
         result['discoveries'], result['lineage'] = [], []
         for field in result['fields']:
             field['item'] = {'kind': 'handle', 'itemHandle': handles[field['item']['key']]}
+        if repair == 'fallback_failure':
+            # A reworded journal is the model's to check; the verbatim one would be settled by the coordinator (D115).
+            result['payload'][1]['journal'] = 'Queue Review Quarterly'
         return result
     fixture.transport.scripted = script
     operation = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
@@ -52,6 +55,12 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
         assert next(cell for record in facts.extensions for cell in record.cells if cell.id == rejected[0]).typed_value == 'Queue Review'
         assert len(operation.receipts) == 2 and reviews[0] != reviews[-1]
         assert len(fixture.transport.calls) == (4 if repair == 'primary' else 5)
+        # D115: the replacement review reuses the first receipt for what the repair left as it was; the corrected
+        # journal is verbatim in the source, so the model is asked about the coverage of the block alone.
+        settled = operation.review_inputs[-1].value.settled
+        assert {value.origin for value in settled} == {'reused', 'verbatim'}
+        assert [target['targetId'] for target in reviews[-1]['targets'] if (target['ruleId'], target['targetId'])
+            not in {(value.rule_id, value.target_id) for value in settled}] == ['scope-' + operation.tasks[0].id]
     else:
         assert operation.issues and operation.tasks[0].state == 'accepted'
         assert operation.task_results[0].disposition == 'source_fallback'
