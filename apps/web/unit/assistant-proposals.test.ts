@@ -6,7 +6,7 @@ import { ProposalPreview, proposalControls, proposalTitle } from "../src/assista
 import { proposal } from "./support/assistant";
 
 const render = (props: Partial<Parameters<typeof ProposalPreview>[0]>) => renderToStaticMarkup(createElement(ProposalPreview, {
-  value: proposal(), busy: false, stale: false, allowEdits: true, apply: () => {}, discard: () => {}, ...props }));
+  value: proposal(), busy: false, applying: false, stale: false, allowEdits: true, apply: () => {}, discard: () => {}, ...props }));
 
 test("the preview shows the server's before and after text as plain text, with native controls and no modal", () => {
   const value = proposal({ preview: [{ target: "block-paper-a", label: "set_block_text", before: "Разработал API 😀",
@@ -29,6 +29,19 @@ test("Apply needs a current draft and the edits flag; Discard needs only a draft
   for (const state of ["applied", "discarded"] as const) assert.deepEqual(proposalControls({ ...value, state }, false, false, true), { apply: false, discard: false, reason: null });
   assert.ok(render({ stale: true }).includes("Правки устарели"));
   assert.ok(render({ value: { ...value, state: "applied" } }).includes("Правки применены"));
+});
+
+test("Apply shows its own progress; a decided proposal shows its outcome, not dead buttons", () => {
+  const value = proposal();
+  const applying = render({ busy: true, applying: true });
+  assert.ok(applying.includes("Применяем…") && applying.includes('aria-busy="true"'));
+  assert.equal(render({ busy: true }).includes("Применяем…"), false);
+  const applied = render({ value: { ...value, state: "applied" } });
+  assert.ok(applied.includes('data-state="applied"') && applied.includes("внесены в резюме"));
+  for (const html of [applied, render({ value: { ...value, state: "discarded" } })]) {
+    assert.equal(/>Применить<|>Отклонить<|одним шагом/u.test(html), false);
+  }
+  assert.ok(render({ stale: true }).includes(">Применить<"));
 });
 
 test("history and project actions name what Apply does", () => {

@@ -43,7 +43,7 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
       <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
         <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
-        {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null}
+        {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null} applying={view.proposalBusy === value.id}
           stale={view.staleProposals.includes(value.id)} allowEdits={view.flags.allowEdits}
           apply={() => props.applyProposal(value)} discard={() => props.discardProposal(value)} />)}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
