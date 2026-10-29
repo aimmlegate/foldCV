@@ -49,8 +49,10 @@ BASE_INSTRUCTIONS = (
 )
 DEVELOPER_INSTRUCTIONS = (
     "Use only the bound FoldCV MCP tools and native web search when enabled. Do not use shell, files, "
-    "plugins, host skills, other agents or alternate providers. Read context before editing. Prepare and apply "
-    "at most one successful batch, then reread and check it. Tool success requires a durable save. "
+    "plugins, host skills, other agents or alternate providers. Read context before editing. A proposal is only "
+    "a preview: reads keep showing the resume as it was when the task started. Split a large edit into several "
+    "proposals over different blocks; the user applies and undoes each one separately. "
+    "Tool success requires a durable save. "
     "Keep unsupported facts as findings. Explain source failures and unresolved edit outcomes accurately."
     " If a tool returns argumentIssues, correct its shape to the declared schema and retry that tool within "
     "the same turn. Do not retry permission/owner/mode denial or start another model turn."

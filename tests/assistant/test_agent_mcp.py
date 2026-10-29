@@ -6,6 +6,8 @@ import json
 import httpx
 import pytest
 
+from packages.resume_core import agent_limits as limits
+from resume_api.agent.runtime import DEVELOPER_INSTRUCTIONS
 from resume_api.assistant.tools import TOOL_NAMES
 from tests.support.assistant_tools import mcp_client, tool_call, tool_session
 
@@ -37,7 +39,7 @@ async def test_private_mcp_rejects_host_origin_duplicate_auth_and_oversized_body
                 assert (await client.post("/mcp", json=INITIALIZE, headers=invalid)).status_code == 403
             duplicate = list(client.headers.items()) + [("Authorization", "Bearer " + session.token)]
             assert (await client.post("/mcp", json=INITIALIZE, headers=duplicate)).status_code == 403
-            assert (await client.post("/mcp", content=b"x" * 65537)).status_code == 413
+            assert (await client.post("/mcp", content=b"x" * (limits.CALL_READ_BYTES + 1))).status_code == 413
             tools = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
             assert {tool["name"] for tool in tools.json()["result"]["tools"]} == set(TOOL_NAMES)
             unknown = await client.post("/mcp", json=tool_call(3, "get_working_facts", {"query": {"projectId": "foreign"}}))
@@ -52,6 +54,40 @@ async def test_private_mcp_rejects_host_origin_duplicate_auth_and_oversized_body
             assert "structuredContent" not in good.json()["result"]
     finally:
         await session.close()
+
+
+@pytest.mark.asyncio
+async def test_an_oversized_tool_call_gets_a_tool_error_with_the_limit_and_counts_as_a_call():
+    session = tool_session()
+    try:
+        async with mcp_client(session) as client:
+            ops = [{"op": "set_block_text", "blockId": "block-paper-a", "text": "Я" * 15000} for _ in range(3)]
+            reply = await client.post("/mcp", json=tool_call(7, "propose_changes", {"request": {"summary": "Правка", "ops": ops}}))
+            result = reply.json()["result"]
+            failure = json.loads(result["content"][0]["text"])
+            assert reply.status_code == 200 and result["isError"] and failure["error"]["code"] == "AGENT_CALL_TOO_LARGE"
+            assert str(limits.CALL_BYTES) in failure["detail"][0] and "Я" * 100 not in reply.text and session.calls == 1
+            # Anything else over the call limit, and any body over the read limit, is still refused outright.
+            padded = {**INITIALIZE, "params": {**INITIALIZE["params"], "padding": "x" * limits.CALL_BYTES}}
+            assert (await client.post("/mcp", json=padded)).status_code == 413
+            assert (await client.post("/mcp", content=b"x" * (limits.CALL_READ_BYTES + 1))).status_code == 413
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_the_model_is_told_the_call_limits_and_may_split_a_large_edit():
+    session = tool_session()
+    try:
+        async with mcp_client(session) as client:
+            tools = await client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+            described = {tool["name"]: " ".join(tool["description"].split()) for tool in tools.json()["result"]["tools"]}
+    finally:
+        await session.close()
+    assert f"{limits.CALL_BYTES // 1024} KiB of JSON and {limits.EDIT_OPERATIONS} ops" in described["propose_changes"]
+    assert f"{limits.CALL_BYTES // 1024} KiB" in described["publish_findings"]
+    # The old one-batch rule made the model squeeze a whole-resume edit into one proposal.
+    assert "at most one successful batch" not in DEVELOPER_INSTRUCTIONS and "several proposals" in DEVELOPER_INSTRUCTIONS
 
 
 @pytest.mark.xfail(strict=True, reason="SDK argument validation errors echo input values; the old listener answered with the shape only")

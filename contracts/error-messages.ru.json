@@ -357,6 +357,7 @@
     "AGENT_ARGUMENT_INVALID": "agentEdit",
     "AGENT_AUTH_REQUIRED": "agent_auth_required",
     "AGENT_BUSY": "agent_busy",
+    "AGENT_CALL_TOO_LARGE": "agentEdit",
     "AGENT_CANCELLED": "agent_cancelled",
     "AGENT_CLEANUP_FAILED": "agent_cleanup_failed",
     "AGENT_CLEANUP_INCOMPLETE": "cleanup",
