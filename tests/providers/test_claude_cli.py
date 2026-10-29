@@ -128,8 +128,19 @@ def test_plain_text_drops_the_schema_and_returns_the_final_text(fake):
     assert result.value.text == "Rewritten line" and "--json-schema" not in starts[0]["args"]
 
 
+def test_a_run_that_renews_the_sign_in_runs_once_more(fake):
+    result, starts = generate(fake, "renewal")
+    assert result.value.summary == "Synthetic summary" and len(starts) == 2 and result.logical_attempts == 2
+    assert starts[0]["args"] == starts[1]["args"]
+
+
+def test_a_sign_in_that_stays_refused_fails_after_the_second_run(fake):
+    error = failure(fake, "auth", "AUTH_REQUIRED", 2)
+    assert error.cleanup_verified
+
+
 @pytest.mark.parametrize(("case", "code"), [
-    ("auth", "AUTH_REQUIRED"), ("rate_limit", "RATE_LIMITED"), ("quota", "QUOTA_EXHAUSTED"),
+    ("rate_limit", "RATE_LIMITED"), ("quota", "QUOTA_EXHAUSTED"),
     ("model", "MODEL_DENIED"), ("billing", "QUOTA_EXHAUSTED"), ("max_retries", "INVALID_RESULT"),
     ("tool", "UNEXPECTED_TOOL_ACTIVITY"), ("subagent", "UNEXPECTED_TOOL_ACTIVITY"),
     ("compact", "UNEXPECTED_TOOL_ACTIVITY"), ("denied", "UNEXPECTED_TOOL_ACTIVITY"),

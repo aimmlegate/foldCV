@@ -78,6 +78,12 @@ class ClaudeEvents:
         self.usage = ReportedUsage()
         self.tool_ids: set[str] = set()
         self.error: str | None = None
+        self.output = False
+
+    @property
+    def renewal(self) -> bool:
+        """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it (MP05)."""
+        return self.error == "authentication_failed" and not self.output
 
     def accept(self, raw: bytes) -> None:
         event = strict_json(raw, max_bytes=self.max_bytes)
@@ -118,6 +124,8 @@ class ClaudeEvents:
             raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
         if isinstance(event.get("error"), str):
             self.error = event["error"]
+        else:
+            self.output = True
         for block in message["content"]:
             kind = block.get("type") if isinstance(block, dict) else None
             if kind == "tool_use":
@@ -439,7 +447,10 @@ class ClaudeCliProvider:
             if files.path is None:
                 raise ContentFailure("TEMP_FAILED")
             attempt_limit = 2 if policy.allow_repair and not plain else 1
-            for index in range(attempt_limit):
+            # The run that renews an expired sign-in ends "Not logged in" before any model call, and the
+            # renewal is saved (MP05 finding 3): one more run follows, never counted as a repair.
+            renew, index = True, 0
+            while index < attempt_limit:
                 self.process._check(deadline, cancel)
                 prompt = original if index == 0 else original + b"\n\n" + REPAIR_FEEDBACK.encode()
                 consumed_input += len(prompt)
@@ -505,6 +516,13 @@ class ClaudeCliProvider:
                 except InvalidFinal:
                     if index == attempt_limit - 1:
                         raise
+                except ContentFailure as error:
+                    if error.code != "AUTH_REQUIRED" or not renew or not events.renewal:
+                        raise
+                    renew = False
+                    consumed_input -= len(prompt)
+                    continue
+                index += 1
             raise ContentFailure("INVALID_RESULT")
         except SpikeError as error:
             observed(outcome_state(error.code), error.code)

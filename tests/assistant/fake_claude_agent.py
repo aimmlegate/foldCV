@@ -14,6 +14,9 @@ import urllib.request
 base = Path(__file__).resolve().parent
 case = json.loads((base / "fixture.json").read_text())["case"]
 args = sys.argv[1:]
+runs = len((base / "audit.jsonl").read_text().splitlines()) + 1 if (base / "audit.jsonl").exists() else 1
+if case == "renewal":
+    case = "auth" if runs == 1 else "complete"
 with (base / "audit.jsonl").open("a") as audit:
     audit.write(json.dumps({"args": args, "environment": sorted(os.environ)}) + "\n")
 

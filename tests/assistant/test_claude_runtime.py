@@ -68,8 +68,10 @@ async def run(tmp_path, case, *, cancel=None, prompt="Проверь резюм�
     await listener.start()
     events, audit = [], []
     listener.issued = listener.token
+    # As `ToolSession.revoke`: the listener refuses every later request.
     value = RuntimeInput(model="claude-sonnet-5-5", prompt=prompt, url=listener.url, token=listener.token, tools=TOOLS,
-                         allow_web=False, reasoning_effort="high", **options)
+                         allow_web=False, reasoning_effort="high", revoke=lambda: setattr(listener, "active", False),
+                         **options)
     runtime = ClaudeAgentRuntime(None, operations, fixture_executable=cli, admission=InferenceAdmission(),
                                  interrupt_grace=grace, audit=audit.append)
     try:
@@ -158,6 +160,23 @@ async def test_failures_are_typed_and_cleaned_up(tmp_path, case, code):
         assert listener.dispatcher_state.calls == 0
     if case == "big":
         assert result.truncated and len(result.text.encode()) <= 16 * 1024
+
+
+@pytest.mark.asyncio
+async def test_a_run_that_renews_the_sign_in_runs_once_more_with_the_same_tools(tmp_path):
+    started = []
+    result, events, calls, listener, audit, _directory = await run(tmp_path, "renewal",
+                                                                  before_start=lambda: started.append(1))
+    assert result.state == "completed" and result.tool_calls == 1 and listener.dispatcher_state.calls == 1
+    assert len(calls) == 2 and calls[0]["args"] == calls[1]["args"] and started == [1]
+    # The renewal run publishes nothing: no usage, no text.
+    assert [kind for kind, _payload in events].count("usage.reported") == 1 and audit["operationRemoved"]
+
+
+@pytest.mark.asyncio
+async def test_a_sign_in_that_stays_refused_fails_after_the_second_run(tmp_path):
+    result, _events, calls, *_rest = await run(tmp_path, "auth")
+    assert (result.state, result.error) == ("failed", "AGENT_AUTH_REQUIRED") and len(calls) == 2
 
 
 @pytest.mark.asyncio

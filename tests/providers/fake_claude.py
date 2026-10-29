@@ -114,6 +114,8 @@ errors = {"auth": ("authentication_failed", "Not logged in · Please run /login"
           "quota": ("rate_limit", "You've hit your usage limit · resets 5pm"),
           "model": ("model_not_found", "There's an issue with the selected model"),
           "billing": ("billing_error", "Credit balance is too low")}
+if case == "renewal" and count == 1:
+    case = "auth"
 if case in errors:
     kind, text = errors[case]
     emit({"type": "assistant", "error": kind, "is_api_error_message": True, "parent_tool_use_id": None,

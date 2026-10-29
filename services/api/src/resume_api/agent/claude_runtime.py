@@ -46,6 +46,10 @@ EXIT_GRACE = 2.0
 MAX_LINE = 2 * 1024 * 1024
 
 
+class Renewal(Exception):
+    """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it (MP05 finding 3)."""
+
+
 def public_id(value: str) -> str:
     return "call_" + hashlib.sha256(value.encode()).hexdigest()[:24]
 
@@ -53,8 +57,12 @@ def public_id(value: str) -> str:
 class MessagesStreamSession:
     """Strict reader of one assistant run's `stream-json` output, normalized to the FoldCV events (plan 8.3)."""
 
-    def __init__(self, value, cancel, emit, *, startup, active, interrupt_grace, clock=time.monotonic):
+    def __init__(self, value, cancel, emit, *, startup, active, interrupt_grace, clock=time.monotonic,
+                 renew=False, announced=False):
         self.value, self.cancel, self.emit, self.clock = value, cancel, emit, clock
+        # `renew` allows one more run after a renewal; `announced` means an earlier run already started this one.
+        self.renew, self.announced = renew, announced
+        self.output = self.renewing = False
         self.startup, self.active, self.interrupt_grace = startup, active, interrupt_grace
         self.tools = frozenset(PREFIX + name for name in value.tools)
         self.started = clock()
@@ -150,7 +158,8 @@ class MessagesStreamSession:
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED") from None
         if self.cancel.is_set():
             raise AgentFailure("AGENT_CANCELLED")
-        self.value.before_start()
+        if not self.announced:
+            self.value.before_start()
         self.active_started = self.clock()
         self.result.native_started = True
         return None
@@ -164,6 +173,7 @@ class MessagesStreamSession:
             delta = event.get("delta")
             if not isinstance(delta, dict):
                 raise AgentFailure("AGENT_PROTOCOL")
+            self.output = True
             if delta.get("type") == "text_delta":
                 text = delta.get("text")
                 if not isinstance(text, str):
@@ -179,6 +189,8 @@ class MessagesStreamSession:
             raise AgentFailure("AGENT_PROTOCOL")
         if isinstance(event.get("error"), str):
             self.error = event["error"]
+        else:
+            self.output = True
         for block in message["content"]:
             kind = block.get("type") if isinstance(block, dict) else None
             if kind == "tool_use":
@@ -230,6 +242,11 @@ class MessagesStreamSession:
                 "error": {"code": "AGENT_TOOL_DENIED"} if failed else None})
 
     def finish(self, event):
+        # Before any event or revocation: the next run uses the same tools.
+        if (self.renew and event.get("is_error") is True and self.error == "authentication_failed"
+                and not self.output and not self.calls and self.interrupt_at is None):
+            self.renewing = True
+            raise Renewal()
         self.usage(event.get("usage"))
         self.done, self.done_at = True, self.clock()
         self.cleanup_at = self.cleanup_at or self.done_at
@@ -332,11 +349,7 @@ class ClaudeAgentRuntime:
                     cancel, queued + limits.ADMISSION_SECONDS), terminal_cleanup(
                     value, self.admission, lambda: cleanup_started):
                 result.timings["admission"] = time.monotonic() - queued
-                session = MessagesStreamSession(value, cancel, emit, startup=self.startup_seconds,
-                                                active=active_seconds, interrupt_grace=self.interrupt_grace,
-                                                clock=elapsed)
-                session.result.timings = result.timings
-                result = session.result
+                timings = result.timings
                 with OperationFiles(self.temp_root).open() as files:
                     operation_path = files.path
                     (files.path / "tmp").mkdir(mode=0o700, exist_ok=True)
@@ -347,36 +360,50 @@ class ClaudeAgentRuntime:
                         json.dump({"mcpServers": {SERVER: {"type": "http", "url": value.url, "timeout": 20000,
                             "headers": {"Authorization": "Bearer ${" + TOKEN_ENV + "}"}}}}, stream)
                     argv = profile_rules.agent_arguments(config, value.model, value.reasoning_effort,
-                                                         tuple(sorted(session.tools)), system,
+                                                         tuple(sorted(PREFIX + name for name in value.tools)), system,
                                                          max_turns=limits.TOOL_CALLS + 2)
                     runner = ProcessRunner(self.executable, launch=self.launch(value.token), clock=elapsed)
 
                     def interrupt():
                         if files.process is not None and files.process.poll() is None:
                             os.killpg(files.process.pid, signal.SIGINT)
-                    session.interrupt = interrupt
 
                     def before_cleanup():
                         nonlocal cleanup_started
+                        # A renewal run's cleanup is not the end of the run: the tools stay bound.
+                        if session is not None and session.renewing:
+                            return
                         if cleanup_started is None:
-                            cleanup_started = session.cleanup_at or elapsed()
+                            cleanup_started = (session.cleanup_at if session is not None else None) or elapsed()
                         value.revoke()
                     try:
-                        try:
-                            runner.run(files, argv, data=value.prompt.encode(), cancel=threading.Event(),
-                                       deadline=elapsed() + self.startup_seconds + active_seconds + EXIT_GRACE,
-                                       on_line=session.accept, poll_input=session.poll, before_cleanup=before_cleanup,
-                                       on_spawn=value.child_started, max_line=MAX_LINE, max_stdout=8 * 1024 * 1024,
-                                       max_stderr=256 * 1024, max_output=8 * 1024 * 1024 + 256 * 1024)
-                        except SessionFinished:
-                            pass
-                        except ProcessExit:
-                            # A run that ends with an error result exits non-zero; the result decides.
-                            if not session.done:
-                                raise
+                        for renew in (True, False):
+                            session = MessagesStreamSession(value, cancel, emit, startup=self.startup_seconds,
+                                                            active=active_seconds, interrupt_grace=self.interrupt_grace,
+                                                            clock=elapsed, renew=renew, announced=not renew)
+                            session.result.timings = timings
+                            result, session.interrupt = session.result, interrupt
+                            try:
+                                runner.run(files, argv, data=value.prompt.encode(), cancel=threading.Event(),
+                                           deadline=elapsed() + self.startup_seconds + active_seconds + EXIT_GRACE,
+                                           on_line=session.accept, poll_input=session.poll,
+                                           before_cleanup=before_cleanup, on_spawn=value.child_started,
+                                           max_line=MAX_LINE, max_stdout=8 * 1024 * 1024, max_stderr=256 * 1024,
+                                           max_output=8 * 1024 * 1024 + 256 * 1024)
+                            except Renewal:
+                                continue
+                            except SessionFinished:
+                                pass
+                            except ProcessExit:
+                                # A run that ends with an error result exits non-zero; the result decides.
+                                if not session.done:
+                                    raise
+                            break
                         if not session.done:
                             raise AgentFailure("AGENT_PROTOCOL")
                     finally:
+                        if session is not None:
+                            session.renewing = False
                         before_cleanup()
                         files.stop_worker()
                 result.timings["cleanup"] = elapsed() - cleanup_started
