@@ -121,16 +121,18 @@ class ScriptedInstallation(ClaudeInstallation):
                 self.update(downloadedBytes=target.stat().st_size)
 
 
-def scripted_claude_slot(root, missing):
+def scripted_claude_slot(root, missing, runtime):
+    """The assistant runs the same scripted runtime with Claude active."""
     if not missing:
-        return ProviderSlot(ScriptedClaude(), profile=ScriptedProfile(root / 'claude-profile'))
+        return ProviderSlot(ScriptedClaude(), profile=ScriptedProfile(root / 'claude-profile'), runtime=runtime)
     installation = ScriptedInstallation(root / 'claude-runtime')
 
     def rebind(slot, executable):
         return ProviderSlot(slot.connection, None, ScriptedProfile(slot.profile.root, executable), installation,
-                            rebind=rebind)
+                            runtime, rebind=rebind)
     return ProviderSlot(ScriptedClaude(installation), None,
-                        ScriptedProfile(root / 'claude-profile', installation.executable), installation, rebind=rebind)
+                        ScriptedProfile(root / 'claude-profile', installation.executable), installation, runtime,
+                        rebind=rebind)
 
 
 class ScriptedContent:
@@ -328,7 +330,7 @@ async def main(args):
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
                 template_import_call_cap=args.template_call_cap,
                 provider_registry=ProviderRegistry(frozenset({'claude_cli'})) if args.preview_claude else None,
-                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing)}
+                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)}
                 if args.preview_claude else None)
         app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository

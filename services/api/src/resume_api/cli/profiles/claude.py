@@ -123,7 +123,7 @@ class ClaudeCliProfile:
                 "CLAUDE_CODE_TMPDIR": str(operation / "tmp"), "CLAUDE_CONFIG_DIR": str(self.config_dir),
                 **SWITCHES}
 
-    def policy(self, operation: Path, args: tuple[str, ...], *, network: bool = True) -> str:
+    def policy(self, operation: Path, args: tuple[str, ...], *, network: bool | str = True) -> str:
         paths = (self.root.resolve(), operation.resolve())
         binary = Path(os.path.realpath(self.executable))
         # The CLI keeps its sign-in in the login keychain and rewrites it on token refresh;
@@ -132,8 +132,11 @@ class ClaudeCliProfile:
         read = " ".join("(subpath " + _literal(path) + ")" for path in paths) + " " + keychains
         write = read
         rules = ["(version 1)", "(allow default)"]
-        if not network:
+        if network is not True:
             rules.append("(deny network*)")
+            if network == "loopback":
+                # Dispatch-free assistant gates: FoldCV's MCP listener is reachable, the model API is not.
+                rules.append('(allow network-outbound (remote ip "localhost:*"))')
         rules += [
             '(deny file-read-data (subpath "/Users") (subpath "/Volumes") (subpath "/Network") '
             '(subpath "/private/tmp") (subpath "/private/var") (subpath "/tmp") (subpath "/var"))',
@@ -153,7 +156,7 @@ class ClaudeCliProfile:
                              max_turns: int = STRUCTURED_MAX_TURNS) -> tuple[str, ...]:
         return structured_arguments(schema, model, effort, max_turns=max_turns)
 
-    def launch(self, executable: Path, args: tuple[str, ...], operation: Path, *, network: bool = True
+    def launch(self, executable: Path, args: tuple[str, ...], operation: Path, *, network: bool | str = True
                ) -> tuple[Path, tuple[str, ...], dict[str, str]]:
         self.prepare()
         if executable != self.executable:
@@ -191,6 +194,20 @@ def structured_arguments(schema: str | None, model: str, effort: str | None, *,
     )
 
 
+def agent_arguments(mcp_config: Path, model: str, effort: str | None, tools: tuple[str, ...], system_prompt: str, *,
+                    max_turns: int) -> tuple[str, ...]:
+    """One assistant run (plan 8.1): only the FoldCV MCP tools, the bearer token expanded from the environment."""
+    return (
+        "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
+        "--model", model, *(("--effort", effort) if effort else ()),
+        "--restricted", "--tools", "", "--strict-mcp-config", "--mcp-config", str(mcp_config),
+        "--allowedTools", ",".join(tools), "--disable-slash-commands",
+        "--settings", json.dumps(SETTINGS, separators=(",", ":")), "--no-session-persistence",
+        "--permission-mode", "dontAsk", "--permission-prompts", "none",
+        "--max-turns", str(max_turns), "--system-prompt", system_prompt,
+    )
+
+
 def check_init(event: dict, *, model: str, version: str, tools: tuple[str, ...],
                mcp_servers: tuple[dict, ...] = ()) -> None:
     """The CLI's own report of the session must match the profile before any output is trusted."""
@@ -198,6 +215,11 @@ def check_init(event: dict, *, model: str, version: str, tools: tuple[str, ...],
                 "skills": [], "plugins": [], "permissionMode": "dontAsk", "model": model,
                 "apiKeySource": "none", "claude_code_version": version}
     actual = {key: sorted(event.get(key) or []) if key == "tools" else event.get(key) for key in expected}
+    # 2.1.308 adds `"source": "dynamic"` to each server; the name and the status are what is checked.
+    servers = event.get("mcp_servers")
+    if isinstance(servers, list):
+        actual["mcp_servers"] = [{"name": item.get("name"), "status": item.get("status")} if isinstance(item, dict)
+                                 else item for item in servers]
     if event.get("type") != "system" or event.get("subtype") != "init":
         raise ClaudeProfileError("INVALID_RESULT")
     if actual != expected:

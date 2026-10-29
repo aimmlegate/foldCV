@@ -15,6 +15,7 @@ import webbrowser
 from pydantic import Field
 import uvicorn
 
+from .agent.claude_runtime import ClaudeAgentRuntime
 from .app import ProviderSlot, create_app
 from .host_models import Transport
 from .lifecycle import require_supported_host, tune_garbage_collector
@@ -49,18 +50,21 @@ def trusted_temp_root() -> Path:
 
 def bind_claude(slot: ProviderSlot, executable: Path) -> ProviderSlot:
     profile = ClaudeCliProfile(slot.profile.root, executable)
+    runtime = ClaudeAgentRuntime(profile, slot.runtime.temp_root) if slot.runtime is not None else None
     return ProviderSlot(ClaudeConnectionAdapter(profile), ClaudeCliProvider(executable, profile=profile), profile,
-                        slot.installation, rebind=bind_claude)
+                        slot.installation, runtime, rebind=bind_claude)
 
 
-def claude_slot(data_root: Path) -> ProviderSlot:
+def claude_slot(data_root: Path, temp_root: Path | None = None) -> ProviderSlot:
     """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing.
-    FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into."""
+    FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into.
+    Without `temp_root` the slot has no assistant runtime."""
     installation = ClaudeInstallation(data_root / ("cli-runtime-" + claude.KIND))
     managed = installation.executable
     executable = managed if managed.is_file() else claude.installed_executable() or managed
     profile = ClaudeCliProfile(data_root / ("cli-profile-" + claude.KIND), executable)
-    return bind_claude(ProviderSlot(None, profile=profile, installation=installation), executable)
+    runtime = ClaudeAgentRuntime(profile, temp_root) if temp_root is not None else None
+    return bind_claude(ProviderSlot(None, profile=profile, installation=installation, runtime=runtime), executable)
 
 
 async def launch(*, port: int = 0, open_browser: bool = True,
@@ -82,7 +86,8 @@ async def launch(*, port: int = 0, open_browser: bool = True,
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
                          experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP,
-                         provider_slots={"claude_cli": claude_slot(Path.home() / "Library/Application Support/FoldCV")}
+                         provider_slots={"claude_cli": claude_slot(Path.home() / "Library/Application Support/FoldCV",
+                                                                   temp_root)}
                          if experimental_cli else None)
         tune_garbage_collector()
         config = uvicorn.Config(app, host="127.0.0.1", port=actual_port, proxy_headers=False,
