@@ -1,87 +1,130 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { checkCount, checkRemarks, EMPTY_BLOCK, importRemarks, LINK_WITHOUT_TARGET, placeRemarks, type OutlineDocument, type Remark }
-  from "../src/rich/remarks";
+import { Schema, type Node } from "@tiptap/pm/model";
+import { EditorState } from "@tiptap/pm/state";
+import { DecorationSet } from "@tiptap/pm/view";
+import { DOUBTFUL_VALUE, remarkMarks, remarkMarksPlugin, type RemarkMarks } from "../src/rich/remarks";
+import { groupAnchors, type OutlineDocument } from "../src/rich/outline";
 
 type Block = OutlineDocument["regions"][number]["blocks"][number];
-const text = (value: string) => [{ type: "text", text: value, styles: {} }];
-const line = (id: string, value: string, children: Block[] = []): Block => ({ id, type: "paragraph", content: text(value), children });
-const heading = (id: string, value: string): Block => ({ id, type: "heading", content: text(value), children: [] });
-const item = (id: string, children: Block[]): Block => ({ id, type: "section", children });
+const text = (value: string) => ({ type: "text", text: value, styles: {} });
+const fact = (recordId: string, key: string, value: string) => ({ type: "fact_field", recordId, fieldKey: key,
+  cellId: JSON.stringify(["fact", recordId, key]), text: value, styles: {} });
+const line = (id: string, content: unknown[], children: Block[] = []): Block => ({ id, type: "paragraph", content, children });
+const heading = (id: string, value: string): Block => ({ id, type: "heading", content: [text(value)], children: [] });
+const item = (id: string, recordId: string | null, children: Block[]): Block =>
+  ({ id, type: "section", content: [], props: recordId ? { recordId } : {}, children });
+const cell = (recordId: string, key: string) => JSON.stringify(["fact", recordId, key]);
 
-// A header without a heading, a sidebar Focus list and a main column with projects and a loose fallback line.
+// A header without a heading, Focus rows in the sidebar, then jobs with technology chips and claims, and a tools line
+// that is no item.
 const document: OutlineDocument = { regions: [
-  { id: "header", role: "header", blocks: [item("identity", [line("name", "Alex Example"), line("title", "Backend engineer")])] },
+  { id: "header", role: "header", blocks: [item("identity", "candidate", [line("name", [fact("candidate", "name", "Alex Example")])])] },
   { id: "sidebar", role: "sidebar", blocks: [heading("focus", "ФОКУС"),
-    item("focus-python", [line("python", "Python"), line("python-years", "3 years")]),
-    item("focus-teamcity", [line("teamcity", "TeamCity"), line("teamcity-years", "1 year")])] },
-  { id: "main", role: "main", blocks: [heading("projects", "ПРОЕКТЫ"),
-    item("labs", [line("labs-title", "Example Labs — Queue Platform"), line("labs-role", "Роль: backend engineer"),
-      { id: "labs-link", type: "paragraph", content: [{ type: "bound_link", href: "", content: text("Портфолио") }], children: [] }]),
-    item("old", [line("old-title", "Old Systems")]), line("fallback", "Reduced median latency by 80%."),
-    heading("summary", "О СЕБЕ"), line("empty", "")] },
+    item("focus-python", "python", [line("python", [fact("python", "display", "Python")]), line("python-years", [text("3 года")])]),
+    heading("education", "ОБРАЗОВАНИЕ"), item("school", "school", [line("school-name", [fact("school", "institution", "MIT")])])] },
+  { id: "main", role: "main", blocks: [heading("summary", "О СЕБЕ"), line("about", [text("Backend engineer.")]),
+    heading("projects", "ПРОЕКТЫ"),
+    item("labs", "labs", [line("labs-title", [fact("labs", "employer", "Example Labs")]),
+      line("labs-dates", [fact("labs", "period:p1:start", "весна 2021"), text(" — "), fact("labs", "period:p1:end", "н.в.")]),
+      line("labs-chips", [fact("python", "display", "Python"), text(" "), fact("nginx", "display", "Nginx")]),
+      line("labs-claim", [fact("claim", "value", "Cut latency")])]),
+    line("fallback", [text("Reduced median latency by 80%.")]),
+    heading("tools", "ИНСТРУМЕНТЫ"), line("tools-line", [fact("nginx", "display", "Nginx"), text(", "), fact("kafka", "display", "Kafka")])] },
 ] };
-const remark = (id: string, blockIds: string[], message = `Замечание ${id}`): Remark => ({ id, source: "import", message, blockIds });
+const issue = (targetIds: string[], blockIds: string[], message = "Замечание", state = "active") => ({ state, message, targetIds, blockIds });
+const known = (rawText: string) => ({ rawText, value: rawText, status: "known" });
+const unresolved = (rawText: string) => ({ rawText, value: null, status: "unresolved" });
+const sorted = (map: ReadonlyMap<string, readonly string[]>) => [...map].sort(([left], [right]) => left.localeCompare(right));
 
-test("sections follow the document headings; a header without one is named by its region", () => {
-  const placed = placeRemarks(document, []);
-  assert.deepEqual(placed.sections.map(section => [section.id, section.title, section.focusId]),
-    [["header", "Шапка", "name"], ["focus", "ФОКУС", "focus"], ["projects", "ПРОЕКТЫ", "projects"], ["summary", "О СЕБЕ", "summary"]]);
-  assert.equal(placed.count, 0);
-  assert.ok(placed.sections.every(section => section.items.length === 0 && section.remarks.length === 0), "only items with remarks are listed");
+test("a remark marks the fields it names wherever the text shows them, not the blocks Python placed it on", () => {
+  // As the skill group remark: technology cells as targets, and blocks found by shared source lines.
+  const marks = remarkMarks(document, [issue([cell("nginx", "display")], ["about", "focus-python", "labs-chips"], "Группа не определена.")]);
+  assert.deepEqual(sorted(marks.cells), [[cell("nginx", "display"), ["Группа не определена."]]], "the chip and the tools line share one cell");
+  assert.equal(marks.blocks.size, 0);
 });
 
-test("a remark on one item marks that item; on several items, a heading or two sections it marks each section heading", () => {
-  const placed = placeRemarks(document, [
-    remark("teamcity", ["teamcity-years"]),
-    remark("role", ["labs-role", "labs"]),
-    remark("two-items", ["labs-title", "old-title"]),
-    remark("heading", ["focus"]),
-    remark("across", ["python", "fallback"]),
-    remark("loose", ["fallback"]),
-    remark("gone", ["deleted-block"]),
-    remark("teamcity", ["python"], "Повтор того же замечания"),
-    remark("blank", ["python"], "   "),
+test("a remark without a shown field marks its blocks; a named heading stands for its whole section", () => {
+  const marks = remarkMarks(document, [
+    issue([cell("gone", "display"), "scope-task"], ["fallback", "tools-line"], "Показан исходный текст."),
+    issue(["scope-outline"], ["projects", "labs", "labs-title", "labs-claim", "fallback"], "Разметка записей под вопросом."),
+    issue(["scope-other"], ["school", "deleted-block"], "Образование под вопросом."),
   ]);
-  const [header, focus, projects, summary] = placed.sections;
-  assert.ok(header && focus && projects && summary);
-  assert.deepEqual(focus.items.map(entry => [entry.blockId, entry.focusId, entry.label, entry.remarks.map(value => value.id)]),
-    [["focus-teamcity", "teamcity", "TeamCity", ["teamcity"]]]);
-  assert.deepEqual(focus.remarks.map(value => value.id), ["heading", "across"]);
-  assert.deepEqual(projects.items.map(entry => [entry.blockId, entry.label, entry.remarks.map(value => value.id)]),
-    [["labs", "Example Labs — Queue Platform", ["role"]], ["fallback", "Reduced median latency by 80%.", ["loose"]]]);
-  assert.deepEqual(projects.remarks.map(value => value.id), ["two-items", "across"], "a remark spanning two sections is at both headings");
-  assert.deepEqual(header.remarks, []);
-  assert.deepEqual(placed.unplaced.map(value => value.id), ["gone"]);
-  assert.equal(placed.count, 7, "a repeated id and a blank message are not counted");
+  assert.deepEqual(sorted(marks.blocks), [
+    ["projects", ["Разметка записей под вопросом."]],
+    ["school-name", ["Образование под вопросом."]],
+    ["tools-line", ["Показан исходный текст."]],
+    ["fallback", ["Показан исходный текст."]],
+  ].sort(([left], [right]) => String(left).localeCompare(String(right))),
+  "a section's other blocks keep only remarks that do not name its heading; an item frame marks its lines");
+  assert.equal(marks.cells.size, 0);
 });
 
-test("active import issues become remarks; retired ones and empty messages do not", () => {
-  assert.deepEqual(importRemarks([
-    { id: "a", state: "active", message: " Проверьте роль ", blockIds: ["labs-role"] },
-    { id: "b", state: "retired", message: "Старое", blockIds: ["labs-role"] },
-    { id: "c", state: "active", message: "", blockIds: ["old-title"] },
-  ]), [{ id: "a", source: "import", message: "Проверьте роль", blockIds: ["labs-role"] }]);
+test("retired, blank and target-less remarks mark nothing; one place keeps each distinct message once", () => {
+  const marks = remarkMarks(document, [
+    issue([cell("kafka", "display")], [], "Старое", "retired"),
+    issue([cell("kafka", "display")], [], "   "),
+    issue([], ["about", "labs-title"], "Тип роли не определён."),
+    issue([cell("kafka", "display")], [], "Первое"),
+    issue([cell("kafka", "display"), cell("nginx", "display")], [], "Первое"),
+    issue([cell("kafka", "display")], [], "Второе"),
+  ]);
+  assert.deepEqual(sorted(marks.cells), [[cell("kafka", "display"), ["Первое", "Второе"]], [cell("nginx", "display"), ["Первое"]]]);
+  assert.equal(marks.blocks.size, 0);
 });
 
-test("check findings are placed like import remarks and counted with the open import issues", () => {
-  const result = { emptyBlocks: ["empty", "summary"], linksWithoutTarget: ["labs-link", "labs-link"], openImportIssues: [{ id: "x", blockIds: [] }] };
-  const remarks = checkRemarks(result);
-  assert.deepEqual(remarks.map(value => [value.id, value.message]), [["check-empty:empty", EMPTY_BLOCK], ["check-empty:summary", EMPTY_BLOCK],
-    ["check-link:labs-link", LINK_WITHOUT_TARGET]]);
-  assert.equal(checkCount(result), 4);
-  assert.equal(checkCount({ emptyBlocks: [], linksWithoutTarget: [], openImportIssues: [] }), 0);
-  const summary = placeRemarks(document, remarks).sections.find(section => section.id === "summary");
-  assert.deepEqual(summary?.items.map(entry => [entry.blockId, entry.label, entry.focusId]), [["empty", "", "empty"]],
-    "an empty item has no label; the panel names it «Без текста»");
-  assert.deepEqual(summary?.remarks.map(value => value.id), ["check-empty:summary"], "an empty heading is a section remark");
-  const projects = placeRemarks(document, remarks).sections.find(section => section.id === "projects");
-  assert.deepEqual(projects?.items.map(entry => entry.blockId), ["labs"], "a link inside an item marks that item");
+test("values Python could not read are marked where shown; a current end label and a catalog key are not doubts", () => {
+  const facts = { records: [
+    { id: "labs", kind: "employment", employer: known("Example Labs"),
+      periods: [{ id: "p1", start: unresolved("весна 2021"), end: unresolved("н.в."), present: { ...known("н.в."), value: true } }] },
+    { id: "python", kind: "technology", display: known("Python"), canonicalId: unresolved("python?") },
+    { id: "kafka", kind: "technology", display: unresolved("Kafka?") },
+    { id: "hidden", kind: "language", language: unresolved("Klingon") },
+  ] };
+  assert.deepEqual(sorted(remarkMarks(document, [], facts).cells),
+    [[cell("kafka", "display"), [DOUBTFUL_VALUE]], [cell("labs", "period:p1:start"), [DOUBTFUL_VALUE]]]);
+  const dated = { records: [{ id: "labs", kind: "employment",
+    periods: [{ id: "p1", start: known("2021"), end: known("2025-03"), present: { ...known("н.в."), value: true } }] }] };
+  assert.deepEqual(sorted(remarkMarks(document, [], dated).cells), [[cell("labs", "period:p1:end"), [DOUBTFUL_VALUE]]],
+    "a dated end beside «present» is a doubt");
 });
 
-test("an empty region adds no section, so a one-column resume lists only its header and main sections", () => {
-  const [header, , main] = document.regions;
-  assert.ok(header && main);
-  const placed = placeRemarks({ regions: [header, { id: "sidebar", role: "sidebar", blocks: [] }, main] }, [remark("labs", ["labs-role"])]);
-  assert.deepEqual(placed.sections.map(section => section.title), ["Шапка", "ПРОЕКТЫ", "О СЕБЕ"]);
+test("each fact group jumps to the section listing its records as items, else to one showing its fields", () => {
+  const kinds = new Map([["candidate", "candidate"], ["python", "technology"], ["nginx", "technology"], ["kafka", "technology"],
+    ["school", "education"], ["labs", "employment"], ["claim", "claim"]]);
+  assert.deepEqual([...groupAnchors(document, kinds)].sort(), [["candidate", "name"], ["education", "education"], ["employment", "projects"],
+    ["technology", "focus"]], "the header has no heading; job chips and claims inside a job do not count");
+  // Without Focus rows the technologies are the tools line, not the chips of the first job.
+  const oneColumn: OutlineDocument = { regions: document.regions.map(region => region.role === "sidebar" ? { ...region, blocks: [] } : region) };
+  assert.equal(groupAnchors(oneColumn, kinds).get("technology"), "tools");
+});
+
+// The editor's node names; the plugin reads only the container IDs and the field cell IDs.
+const schema = new Schema({ nodes: {
+  doc: { content: "blockGroup" }, blockGroup: { content: "blockContainer+" },
+  blockContainer: { content: "paragraph blockGroup?", attrs: { id: { default: "block" } } },
+  paragraph: { content: "inline*" }, templateField: { inline: true, group: "inline", content: "text*", attrs: { cellId: { default: "" } } },
+  text: { group: "inline" },
+} });
+
+function decorations(doc: Node, marks: RemarkMarks | null) {
+  const plugin = remarkMarksPlugin(() => marks), set = plugin.props.decorations?.call(plugin, EditorState.create({ schema, doc, plugins: [plugin] }));
+  return set instanceof DecorationSet ? set.find() : [];
+}
+
+test("the plugin marks a field node and a block's own text, and nothing while the switch is off", () => {
+  const field = schema.node("templateField", { cellId: "cell-1" }, schema.text("Nginx"));
+  const nested = schema.node("blockContainer", { id: "child" }, schema.node("paragraph", null, schema.text("Nested")));
+  const doc = schema.node("doc", null, schema.node("blockGroup", null, [
+    schema.node("blockContainer", { id: "line" }, schema.node("paragraph", null, [schema.text("Uses "), field])),
+    schema.node("blockContainer", { id: "parent" }, [schema.node("paragraph", null, schema.text("Parent")),
+      schema.node("blockGroup", null, nested)]),
+  ]));
+  const at = (name: string) => { let found = -1; doc.descendants((node, pos) => { if (found < 0 && node.isText && node.text === name) found = pos; }); return found; };
+  const marks: RemarkMarks = { cells: new Map([["cell-1", ["Группа не определена."]]]), blocks: new Map([["parent", ["Под вопросом."]]]) };
+  const found = decorations(doc, marks).map(value => [value.from, value.to]).sort((left, right) => (left[0] ?? 0) - (right[0] ?? 0));
+  // The field node starts one step before its text; the parent's own text, not its nested child, is marked.
+  assert.deepEqual(found, [[at("Nginx") - 1, at("Nginx") + "Nginx".length + 1], [at("Parent"), at("Parent") + "Parent".length]]);
+  assert.deepEqual(decorations(doc, null), []);
+  assert.deepEqual(decorations(doc, { cells: new Map(), blocks: new Map() }), []);
 });

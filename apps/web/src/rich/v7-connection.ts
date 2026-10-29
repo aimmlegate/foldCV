@@ -7,7 +7,6 @@ import type { EditResultV1 } from "../contracts/generated/edit_result_v1";
 import type { ProjectOpenResultV1 } from "../contracts/generated/project_open_result_v1";
 import type { HistoryStateV1 } from "../contracts/generated/history_state_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
-import type { ProjectCheckResultV1 } from "../contracts/generated/project_check_result_v1";
 import { templateExportArtifact } from "../contracts/template-export";
 import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 
@@ -141,11 +140,6 @@ export class ProjectEditorConnection {
     const value = await this.editing(token => v2Request<{ cancelled: boolean }>(this.path("/rewrite/cancel"), "POST",
       { requestId, editorToken: token }, this.fetcher));
     return value.cancelled;
-  }
-
-  /** The deterministic resume check of the committed state. It only reads, so an unknown token re-opens and repeats it. */
-  async check(): Promise<ProjectCheckResultV1> {
-    return this.editing(token => v2Request<ProjectCheckResultV1>(this.path("/check"), "POST", { editorToken: token }, this.fetcher));
   }
 
   async rename(title: string): Promise<TemplateProjectResponseV1> {

@@ -1,0 +1,9 @@
+/* Remarks and doubtful values marked in the resume text. A mark is an editor decoration: never saved, copied or exported.
+   The chip selector outranks a chip's own shade. */
+.fcv-sheet .fcv-remark, .fcv-sheet [data-fcv-chip].fcv-remark { background-color: #f8e3a0; border-radius: 1.5pt;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* A Facts group's jump to its section, in the summary row before the fold mark; the section lands below the page top. */
+.fact-group-frame { position: relative; }
+.fact-group-jump { position: absolute; top: 9px; right: 16px; width: 26px; height: 26px; padding: 5px; }
+.fact-group-jump svg { width: 15px; height: 15px; }
+.fcv-sheet .bn-block-outer { scroll-margin-top: 16px; }

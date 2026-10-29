@@ -1,122 +1,121 @@
-/** Remarks are shown in the Facts panel by resume section, never inside the document text. A section starts at each
- * heading of a region; every other top-level block of a region is one item of the section before it. */
+/** Import remarks and doubtful values, marked in the resume text. A mark is an editor decoration, outside the document,
+ * so saving, copying and export never see it. */
 
-type OutlineBlock = { id: string; type: string; content?: unknown; props?: unknown; children: readonly OutlineBlock[] };
-/** The fields the section outline reads from a document. */
-export type OutlineDocument = { regions: readonly { id: string; role: string; blocks: readonly OutlineBlock[] }[] };
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { currentMarker, needsCheck } from "./fact-fields";
+import { allSpans, field, isFrame, ownSpans, subtree, type OutlineBlock, type OutlineDocument } from "./outline";
 
-export type Remark = { id: string; source: "import" | "check"; message: string; blockIds: readonly string[] };
-export type RemarkItem = { blockId: string; focusId: string; label: string; remarks: Remark[] };
-export type RemarkSection = { id: string; title: string; focusId: string | null; remarks: Remark[]; items: RemarkItem[] };
-/** Sections in document order; an item is listed only when a remark concerns exactly that item. */
-export type PlacedRemarks = { sections: RemarkSection[]; unplaced: Remark[]; count: number };
+type IssueInput = { state: string; message: string; targetIds: readonly string[]; blockIds: readonly string[] };
+type FactsInput = { records: readonly unknown[] };
 
-const REGION_TITLES: Readonly<Record<string, string>> = { header: "Шапка", sidebar: "Боковая колонка", main: "Основная колонка" };
-export const EMPTY_BLOCK = "Пустой блок.";
-export const LINK_WITHOUT_TARGET = "Ссылка без адреса.";
+/** The marked places with the remarks on each: shown fields by cell ID, and blocks whose own text is marked. */
+export type RemarkMarks = { cells: ReadonlyMap<string, readonly string[]>; blocks: ReadonlyMap<string, readonly string[]> };
 
-function field(value: unknown, key: string): unknown { return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined; }
+export const DOUBTFUL_VALUE = "Значение не распознано однозначно. Проверьте его.";
+export const remarkMarksMeta = "foldcv-remark-marks";
 
-function spansText(content: unknown): string {
-  if (!Array.isArray(content)) return "";
-  return content.map((span: unknown) => {
-    const text = field(span, "text");
-    return typeof text === "string" ? text : spansText(field(span, "content"));
-  }).join("");
+const cellId = (recordId: string, key: string): string => JSON.stringify(["fact", recordId, key]);
+
+function shownCells(block: OutlineBlock): string[] {
+  return allSpans(ownSpans(block)).flatMap(span => {
+    const type = field(span, "type");
+    const value = type === "fact_field" ? field(span, "cellId")
+      : type === "bound_link" ? field(field(span, "labelBinding") ?? field(span, "urlBinding"), "cellId") : null;
+    return typeof value === "string" && value ? [value] : [];
+  });
 }
 
-function ownText(block: OutlineBlock): string {
-  if (block.type === "image") return spansText(field(block.props, "caption"));
-  if (block.type === "table") {
-    const rows = field(block.content, "rows");
-    return Array.isArray(rows) ? rows.flatMap((row: unknown) => {
-      const cells = field(row, "cells");
-      return Array.isArray(cells) ? cells.map((cell: unknown) => spansText(field(cell, "content"))) : [];
-    }).filter(text => text.trim()).join(" · ") : "";
-  }
-  return spansText(block.content);
-}
-
-/** The first block with text in a subtree, in document order. */
-function firstText(block: OutlineBlock): OutlineBlock | null {
-  if (ownText(block).trim()) return block;
-  for (const child of block.children) {
-    const found = firstText(child);
-    if (found) return found;
-  }
-  return null;
-}
-
-function label(block: OutlineBlock): string {
-  const found = firstText(block), text = (found ? ownText(found) : "").replace(/\s+/gu, " ").trim();
-  return text.length > 80 ? `${text.slice(0, 79)}…` : text;
-}
-
-type Place = { section: number; item: string | null };
-type Outline = { sections: (Omit<RemarkSection, "items"> & { items: Map<string, RemarkItem> })[]; places: Map<string, Place> };
-
-function outline(document: OutlineDocument): Outline {
-  const sections: Outline["sections"] = [], places = new Map<string, Place>();
-  const mark = (block: OutlineBlock, place: Place) => { places.set(block.id, place); block.children.forEach(child => mark(child, place)); };
-  for (const region of document.regions) {
-    let current = -1;
-    for (const block of region.blocks) {
-      if (block.type === "heading") {
-        sections.push({ id: block.id, title: ownText(block).trim() || "Без названия", focusId: block.id, remarks: [], items: new Map() });
-        current = sections.length - 1;
-        mark(block, { section: current, item: null });
+/** The fields Python could not read as one value (the panel's «Проверьте значение»), as fact cell IDs. A current period's
+ * end label is no doubt; a dated end beside «present» is. */
+function doubtfulCells(facts: FactsInput | undefined): string[] {
+  const result: string[] = [];
+  for (const record of facts?.records ?? []) {
+    const id = field(record, "id");
+    if (typeof id !== "string" || typeof record !== "object" || record === null) continue;
+    for (const [key, value] of Object.entries(record)) {
+      if (key === "periods") {
+        for (const period of Array.isArray(value) ? value : []) {
+          const periodId = field(period, "id"), present = field(field(period, "present"), "value") === true;
+          if (typeof periodId !== "string") continue;
+          const end = field(field(period, "end"), "rawText");
+          const endDoubtful = present && typeof end === "string" && end.trim() ? !currentMarker(end) : needsCheck(field(period, "end"));
+          if (needsCheck(field(period, "start"))) result.push(cellId(id, `period:${periodId}:start`));
+          if (endDoubtful) result.push(cellId(id, `period:${periodId}:end`));
+          if (needsCheck(field(period, "present"))) result.push(cellId(id, `period:${periodId}:present`));
+        }
         continue;
       }
-      if (current < 0) {
-        sections.push({ id: region.id, title: REGION_TITLES[region.role] ?? "Без названия", focusId: firstText(block)?.id ?? null,
-          remarks: [], items: new Map() });
-        current = sections.length - 1;
+      // A technology's catalog key is internal; an unknown one does not make its source label doubtful.
+      if (key === "canonicalId" || typeof field(value, "status") !== "string") continue;
+      if (needsCheck(value)) result.push(cellId(id, key));
+    }
+  }
+  return result;
+}
+
+/** What the text marks. A remark marks the fields it names where the document shows them; otherwise the blocks Python
+ * placed it on, where a named heading stands for its whole section. A remark without targets names no place of its own
+ * (Python then lists every imported block) and is not marked. */
+export function remarkMarks(document: OutlineDocument, issues: readonly IssueInput[], facts?: FactsInput): RemarkMarks {
+  const blocks = new Map<string, OutlineBlock>(), sections = new Map<string, string>(), shown = new Set<string>();
+  for (const region of document.regions) {
+    let heading: string | null = null;
+    for (const top of region.blocks) {
+      if (top.type === "heading") heading = top.id;
+      for (const block of subtree(top)) {
+        blocks.set(block.id, block);
+        if (heading !== null) sections.set(block.id, heading);
+        shownCells(block).forEach(id => shown.add(id));
       }
-      const section = sections[current];
-      section?.items.set(block.id, { blockId: block.id, focusId: firstText(block)?.id ?? block.id, label: label(block), remarks: [] });
-      mark(block, { section: current, item: block.id });
     }
   }
-  return { sections, places };
-}
-
-/** A remark on blocks of exactly one item is shown at that item; one on several items, on a heading or on several
- * sections is shown at each section heading it touches; one whose blocks are all gone has no place. */
-export function placeRemarks(document: OutlineDocument, remarks: readonly Remark[]): PlacedRemarks {
-  const { sections, places } = outline(document), unplaced: Remark[] = [];
-  const seen = new Set<string>();
-  for (const remark of remarks) {
-    if (seen.has(remark.id) || !remark.message.trim()) continue;
-    seen.add(remark.id);
-    const found = remark.blockIds.flatMap(id => { const place = places.get(id); return place ? [place] : []; });
-    const [first] = found;
-    if (!first) { unplaced.push(remark); continue; }
-    if (first.item !== null && found.every(place => place.section === first.section && place.item === first.item)) {
-      sections[first.section]?.items.get(first.item)?.remarks.push(remark);
-      continue;
+  const cells = new Map<string, string[]>(), marked = new Map<string, string[]>();
+  const add = (into: Map<string, string[]>, id: string, message: string) => {
+    const messages = into.get(id) ?? [];
+    if (!messages.includes(message)) into.set(id, [...messages, message]);
+  };
+  // A frame's own line is hidden, so its lines carry its mark.
+  const lines = (block: OutlineBlock): string[] => isFrame(block) ? block.children.flatMap(lines) : [block.id];
+  for (const issue of issues) {
+    const message = issue.message.trim();
+    if (issue.state !== "active" || !message || !issue.targetIds.length) continue;
+    const fields = issue.targetIds.filter(id => shown.has(id));
+    if (fields.length) { fields.forEach(id => add(cells, id, message)); continue; }
+    const named = issue.blockIds.flatMap(id => { const block = blocks.get(id); return block ? [block] : []; });
+    const headings = new Set(named.filter(block => block.type === "heading").map(block => block.id));
+    for (const block of named) {
+      const heading = sections.get(block.id);
+      if (heading !== undefined && heading !== block.id && headings.has(heading)) continue;
+      lines(block).forEach(id => add(marked, id, message));
     }
-    for (const index of new Set(found.map(place => place.section))) sections[index]?.remarks.push(remark);
   }
-  return { count: seen.size, unplaced, sections: sections.map(section => ({ ...section,
-    items: [...section.items.values()].filter(item => item.remarks.length > 0) })) };
+  for (const id of doubtfulCells(facts)) if (shown.has(id)) add(cells, id, DOUBTFUL_VALUE);
+  return { cells, blocks: marked };
 }
 
-type IssueInput = { id: string; state: string; message: string; blockIds: readonly string[] };
-/** Active import issues with a message, as stored; their data model is not changed here. */
-export function importRemarks(issues: readonly IssueInput[]): Remark[] {
-  return issues.filter(issue => issue.state === "active" && issue.message.trim())
-    .map(issue => ({ id: issue.id, source: "import", message: issue.message.trim(), blockIds: issue.blockIds }));
-}
+const markAttributes = (messages: readonly string[]) => ({ class: "fcv-remark", title: messages.join("\n") });
 
-type CheckInput = { emptyBlocks: readonly string[]; linksWithoutTarget: readonly string[] };
-/** The explicit check's own findings; its open import issues are the import remarks already shown. */
-export function checkRemarks(result: CheckInput): Remark[] {
-  return [...result.emptyBlocks.map(id => ({ id: `check-empty:${id}`, source: "check" as const, message: EMPTY_BLOCK, blockIds: [id] })),
-    ...[...new Set(result.linksWithoutTarget)].map(id => ({ id: `check-link:${id}`, source: "check" as const,
-      message: LINK_WITHOUT_TARGET, blockIds: [id] }))];
-}
-
-/** How many remarks the check found: its empty blocks, links without a target and open import issues. */
-export function checkCount(result: CheckInput & { openImportIssues: readonly unknown[] }): number {
-  return new Set(result.emptyBlocks).size + new Set(result.linksWithoutTarget).size + result.openImportIssues.length;
+/** Decorations for the marks `current` returns; null shows none. */
+export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
+  return new Plugin({ key: new PluginKey(remarkMarksMeta), props: { decorations: state => {
+    const marks = current();
+    if (!marks || (!marks.cells.size && !marks.blocks.size)) return DecorationSet.empty;
+    const decorations: Decoration[] = [];
+    state.doc.descendants((node, position) => {
+      const name = node.type.name;
+      if (name === "templateField" || name === "boundLink") {
+        const cell: unknown = node.attrs["cellId"], messages = typeof cell === "string" ? marks.cells.get(cell) : undefined;
+        if (messages && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize, markAttributes(messages)));
+        return false;
+      }
+      if (name !== "blockContainer") return true;
+      const id: unknown = node.attrs["id"], messages = typeof id === "string" ? marks.blocks.get(id) : undefined;
+      const size = node.firstChild?.content.size ?? 0;
+      // The block's own content starts inside its content node, one step past the container's start.
+      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages)));
+      return true;
+    });
+    return DecorationSet.create(state.doc, decorations);
+  } } });
 }
