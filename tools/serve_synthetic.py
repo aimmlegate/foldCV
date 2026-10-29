@@ -31,7 +31,6 @@ from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
 from resume_api.app import ProviderSlot, create_app
 from resume_api.cli.installation import ClaudeInstallation
-from resume_api.providers.registry import ProviderRegistry
 from resume_api.connection import Metadata, Quota
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -336,9 +335,7 @@ async def main(args):
                 experimental_profile=None, connection_adapter=connection, content_provider=content,
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
                 template_import_call_cap=args.template_call_cap,
-                provider_registry=ProviderRegistry(frozenset({'claude_cli'})) if args.preview_claude else None,
-                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)}
-                if args.preview_claude else None)
+                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)})
         app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None and not args.reopen:
@@ -399,9 +396,7 @@ if __name__ == '__main__':
     parser.add_argument('--template', choices=['generic-two-column', 'generic-one-column'], default=None)
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
-    # Lists the scripted Claude provider next to Codex, as `preview_kinds` does in tests.
-    parser.add_argument('--preview-claude', action='store_true')
-    # With --preview-claude: Claude starts without a CLI and Settings installs a stub through the managed installer.
+    # Claude starts without a CLI and Settings installs a stub through the managed installer.
     parser.add_argument('--claude-missing', action='store_true')
     # Seconds each scripted template call waits before its reply, to watch a running import in the preview.
     parser.add_argument('--template-delay', type=float, default=0.0)

@@ -33,8 +33,9 @@ class Descriptor:
 
 CODEX = Descriptor("codex_cli", "Codex", "ChatGPT", "OpenAI", "codex", codex.TEAM_ID, codex.IDENTIFIER, codex.COMPATIBILITY,
                    ("chatgpt",), "cli", True, False, True)
+# Complete since MP07 (docs/gui/handoffs/MULTI-PROVIDER/parity-claude.md).
 CLAUDE = Descriptor("claude_cli", "Claude", "Claude", "Anthropic", "claude", claude.TEAM_ID, claude.IDENTIFIER,
-                    claude.COMPATIBILITY, (claude.ACCEPTED_AUTH,), "not_provided", True, True, False)
+                    claude.COMPATIBILITY, (claude.ACCEPTED_AUTH,), "not_provided", True, True, True)
 DESCRIPTORS: dict[str, Descriptor] = {item.kind: item for item in (CODEX, CLAUDE)}
 
 

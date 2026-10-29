@@ -1,5 +1,6 @@
 """MP01: listed providers, provider-aware host routes and switching between providers."""
 
+from dataclasses import replace
 import json
 
 import pytest
@@ -11,7 +12,8 @@ from packages.resume_core.rules import RulesStore
 from packages.resume_core.storage import atomic_write
 from resume_api.app import ProviderSlot
 from resume_api.connection import Metadata, Quota
-from resume_api.providers.registry import CODEX, ProviderRegistry
+from resume_api.providers import registry as providers
+from resume_api.providers.registry import CLAUDE, CODEX, ProviderRegistry
 from tests.settings.support import MetadataAdapter, application, client_session
 
 
@@ -36,7 +38,18 @@ async def host(client, path, body=None):
     return await client.post(f"/v1/host/{path}", json=body or {})
 
 
-def test_registry_lists_complete_kinds_unless_previewed():
+@pytest.fixture
+def incomplete(monkeypatch):
+    """Claude as it was before MP07, to keep the rules for a provider that is not offered yet."""
+    monkeypatch.setitem(providers.DESCRIPTORS, "claude_cli", replace(CLAUDE, complete=False))
+
+
+def test_claude_is_listed_after_mp07():
+    assert CLAUDE.complete and [item.kind for item in ProviderRegistry().listed()] == ["codex_cli", "claude_cli"]
+    assert ProviderRegistry().resolve("claude_cli") == "claude_cli"
+
+
+def test_registry_lists_complete_kinds_unless_previewed(incomplete):
     assert [item.kind for item in ProviderRegistry().listed()] == ["codex_cli"]
     assert [item.kind for item in ProviderRegistry(frozenset({"claude_cli"})).listed()] == ["codex_cli", "claude_cli"]
     assert ProviderRegistry().resolve("claude_cli") == "codex_cli" and ProviderRegistry().resolve(None) == "codex_cli"
@@ -46,8 +59,8 @@ def test_registry_lists_complete_kinds_unless_previewed():
 
 
 @pytest.mark.asyncio
-async def test_only_complete_providers_are_offered(tmp_path):
-    app = application(tmp_path)
+async def test_only_complete_providers_are_offered(tmp_path, incomplete):
+    app = application(tmp_path, provider_slots={"claude_cli": ProviderSlot(ClaudeAdapter())})
     async with client_session(app) as client:
         state = (await client.get("/v1/settings/connection")).json()
         assert state["provider"] == "codex_cli" and state["providerNotice"] is None
@@ -100,7 +113,7 @@ async def test_switch_detaches_restores_choices_and_never_runs_the_inactive_prov
 
 
 @pytest.mark.asyncio
-async def test_stored_unlisted_provider_falls_back_to_codex_with_a_notice(tmp_path):
+async def test_stored_unlisted_provider_falls_back_to_codex_with_a_notice(tmp_path, incomplete):
     root = tmp_path / "store"
     RulesStore(root).load()
     atomic_write(root / "preferences.json", json.dumps({
