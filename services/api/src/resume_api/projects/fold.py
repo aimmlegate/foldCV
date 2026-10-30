@@ -60,7 +60,7 @@ def fold_sidecar(session, after):
         raise RepositoryFailure('OUTCOME_UNKNOWN')
     discard = []
     for operation, _facts in older:
-        if _ahead(session, operation):
+        if ahead(session, operation):
             raise RepositoryFailure('OUTCOME_UNKNOWN')
         discard.append(operation.id)
     if not current:
@@ -143,7 +143,7 @@ def _forward(before, after):
     return True
 
 
-def _ahead(session, sidecar):
+def ahead(session, sidecar):
     """A sidecar whose attempts are further along than the saved project is a fenced import."""
     committed = next((item for item in _operations(session, session.workspace) if item.id == sidecar.id), None)
     if committed is None:

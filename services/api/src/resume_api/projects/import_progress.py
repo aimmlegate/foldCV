@@ -54,6 +54,7 @@ def quiet_limit(phase, policy):
         # A whole import (or an assistant turn) may run ahead of this one.
         return whole_import_seconds(policy)
     if phase == 'publication':
+        # Nothing stops a publication at this bound: past it the run only reports stalled.
         return policy.finalization_seconds + QUIET_GRACE_SECONDS
     # A call has no limit of its own, so a healthy import may stay silent until its time limit.
     return policy.processing_seconds + policy.cleanup_seconds + QUIET_GRACE_SECONDS
@@ -62,7 +63,12 @@ def quiet_limit(phase, policy):
 def phase_of(stage, operation):
     if stage in {'starting', 'queued'}:
         return stage
-    return 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+    if operation is None:
+        return 'processing'
+    # The document is assembled after the last step and before the finalization record is saved.
+    finished = {value.task_id for value in operation.task_results}
+    assembling = bool(operation.tasks) and all(task.id in finished for task in operation.tasks)
+    return 'publication' if operation.state == 'finalizing' or assembling else 'processing'
 
 
 def step_titles(package):

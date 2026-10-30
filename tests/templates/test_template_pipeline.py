@@ -799,6 +799,66 @@ async def test_an_import_task_stopped_by_the_account_reports_the_limit_and_saves
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('code', ['QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'])
+@pytest.mark.parametrize('stage', ['extraction', 'review'])
+async def test_a_resume_after_an_account_stop_runs_the_stopped_call_again(tmp_path, code, stage):
+    # D104: the resume took the stopped call as a finished failed attempt and published the block without content.
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False)
+    def script(_request, value):
+        if ('targets' in value) == (stage == 'review'):
+            account_failure(code)
+        return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    fixture.transport.scripted = script
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', code)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    fixture.transport.scripted = None
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    assert [task.state for task in published.tasks] == ['accepted', 'accepted'] and not published.issues
+    assert {result.disposition for result in published.task_results} == {'admitted'}
+    # The stopped call counts as spent and takes no repair slot.
+    assert spent_calls(published) == len(fixture.transport.calls) == 5
+    assert not any(attempt.slot in {'primary_repair', 'fallback_repair'} for attempt in published.attempts)
+
+
+@pytest.mark.asyncio
+async def test_a_resume_while_the_account_still_fails_stops_again_and_saves_nothing(tmp_path):
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False)
+    fixture.transport.scripted = lambda _request, _value: account_failure('QUOTA_EXHAUSTED')
+    await import_task(fixture)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    assert len(fixture.transport.calls) == 2 and fixture.current().project is None
+    assert fixture.current().pre_draft.template_operations[0].task_results == []
+
+
+@pytest.mark.asyncio
+async def test_a_repair_stopped_by_the_account_runs_again_on_resume(tmp_path):
+    fixture = RuntimeFixture(tmp_path, cap=20)
+    first = refused_first(fixture, without_journal)
+    repairs = []
+    def script(request, value):
+        if value.get('slot') == 'primary_repair' and not repairs:
+            repairs.append(value)
+            account_failure('QUOTA_EXHAUSTED')
+        return first(request, value)
+    fixture.transport.scripted = script
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    stopped = fixture.current().pre_draft.template_operations[0]
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    assert [attempt.slot for attempt in published.attempts] == ['initial', 'primary_repair', 'primary_repair', 'replacement_review']
+    assert published.tasks[0].state == 'accepted' and not published.issues
+
+
+@pytest.mark.asyncio
 async def test_a_failure_of_one_call_still_falls_back_for_that_block(tmp_path):
     # Only account-wide codes stop the import; a single broken call keeps the per-block fallback.
     fixture = RuntimeFixture(tmp_path, cap=20)

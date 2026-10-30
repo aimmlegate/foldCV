@@ -1,10 +1,12 @@
 """The provider transport runs under the job's inference permit and proves cleanup only from real evidence."""
 
+import asyncio
 import threading
 from types import SimpleNamespace
 
 import pytest
 
+from packages.resume_core.template_import import spent_calls
 from resume_api.importer.template_transport import JOB_PERMIT, ProviderTemplateTransport
 from resume_api.providers.content import ContentFailure
 
@@ -89,9 +91,11 @@ async def test_missing_connection_can_finalize_fallback_without_unknown_cleanup(
     assert result.attempts[0].cleanup.state == 'verified'
 
 
-@pytest.mark.parametrize('code', ['INPUT_TOO_LARGE', 'INVALID_INPUT', 'MODEL_DENIED'])
+@pytest.mark.parametrize('code', ['INPUT_TOO_LARGE', 'INVALID_INPUT', 'MODEL_DENIED', 'CLI_PROFILE_UNSAFE', 'INVALID_SCHEMA',
+    'CANCELLED', 'DEADLINE_EXCEEDED'])
 def test_provider_refusals_before_any_process_are_proved_undispatched(tmp_path, code):
-    # LIVE-04: an oversized review was refused before launch but stayed unverified and fenced the import.
+    # LIVE-04: an oversized review was refused before launch but stayed unverified and fenced the import. Any failure
+    # with no witness, no running process and no reply proves it, not a list of codes.
     class Refusing(Provider):
         def generate(self, _request, _files, _cancel):
             raise ContentFailure(code)
@@ -107,6 +111,43 @@ def test_provider_refusals_before_any_process_are_proved_undispatched(tmp_path, 
     with pytest.raises(ContentFailure) as kept:
         ProviderTemplateTransport(lambda: (Witnessed(), 'model-a'), tmp_path).generate(request(), threading.Event())
     assert kept.value.dispatch_witness == {'transport': 'codex'} and kept.value.cleanup_verified is not True
+
+
+@pytest.mark.parametrize('code,raw,failed', [('PROCESS_CLEANUP_FAILED', None, False), ('CLI_FAILED', 'partial', False),
+    ('CLI_FAILED', None, True), ('INVALID_RESULT', None, False)])
+def test_a_failure_that_may_have_run_keeps_its_unknown_cleanup(tmp_path, code, raw, failed):
+    class Failing(Provider):
+        def generate(self, _request, files, _cancel):
+            files.cleanup_failed = failed
+            raise ContentFailure(code, raw_return=raw)
+    transport = ProviderTemplateTransport(lambda: (Failing(), 'model-a'), tmp_path)
+    with pytest.raises(ContentFailure) as kept:
+        transport.generate(request(), threading.Event())
+    assert kept.value.dispatch_witness is None and kept.value.cleanup_verified is not True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code', ['CLI_PROFILE_UNSAFE', 'INVALID_SCHEMA'])
+async def test_a_refusal_before_any_process_falls_back_frees_the_permit_and_fences_nothing(tmp_path, code):
+    from resume_api.inference_admission import InferenceAdmission
+    from resume_api.projects.imports import ImportCommand, ImportService
+    from resume_api.projects.service import ProjectService
+    from tests.templates.template_runtime_fixtures import RuntimeFixture
+    class Refusing:
+        def generate(self, _request, _files, _cancel):
+            raise ContentFailure(code)
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    fixture.pipeline.transport = ProviderTemplateTransport(lambda: (Refusing(), 'synthetic-primary'), tmp_path / 'transport')
+    admission = InferenceAdmission()
+    projects = ProjectService(fixture.repository)
+    projects.imports = ImportService(projects, fixture.pipeline, commands=lambda *_args: fixture.command, admission=admission)
+    identifier = await projects.imports.start(fixture.project, ImportCommand(kind='start', clientRequestId='request'), asyncio.Event())
+    await projects.imports.runners[identifier]
+    assert projects.tasks.list(fixture.project)[0]['state'] == 'succeeded'
+    operation = fixture.current().project.template_operations[0]
+    assert operation.state == 'published' and operation.tasks[0].state == 'source_fallback'
+    assert operation.attempts[0].state == 'released' and spent_calls(operation) == 0
+    assert not admission.locked() and projects.imports.retained == {}
 
 
 def test_owned_codex_calls_under_one_permit_generate_at_once(tmp_path):

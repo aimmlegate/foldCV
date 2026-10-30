@@ -7,7 +7,7 @@ import pytest
 from packages.resume_core.models.template_import import CleanupOutcome
 from packages.resume_core.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure,
     admit_operation, cancel_operation, capture_task_input, digest, dispatch_attempt, observe_time, reconcile_cleanup,
-    record_return, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation)
+    record_return, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, stopped_call, stops_import)
 from tests.templates.pipeline_fixtures import (NOW, blocks_package, cleaned, owner, ready_operation, resume_command, setup_operation,
     usage)
 
@@ -172,6 +172,33 @@ def test_unknown_fallback_dispatch_stays_charged_after_verified_cleanup_and_resu
     assert resumed.attempts[-1].state == 'outcome_unknown' and spent_calls(resumed) == 3
     with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
         reserve(resumed, 'fallback_repair', 4)
+
+
+@pytest.mark.parametrize('outcome,code,free', [('cancelled', 'CANCELLED', True), ('transport_failure', 'QUOTA_EXHAUSTED', True),
+    ('transport_failure', 'AUTH_REQUIRED', True), ('transport_failure', 'CLI_FAILED', False), ('timed_out', 'DEADLINE', False),
+    ('completed', 'QUOTA_EXHAUSTED', False)])
+def test_only_a_call_stopped_from_outside_leaves_its_slot_free(outcome, code, free):
+    operation, attempt = reserve(ready_operation())
+    operation = dispatch_attempt(operation, attempt, NOW)
+    operation = record_return(operation, attempt, None, outcome, usage(), cleaned(), error_code=code)
+    assert stopped_call(operation, operation.attempts[0]) is free
+    if free:
+        operation, again = reserve(operation, index=2)
+        assert again != attempt and spent_calls(operation) == 2
+    else:
+        with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
+            reserve(operation, index=2)
+
+
+def test_a_refused_fallback_model_spends_its_own_slot():
+    # E07: only the import model being refused stops the import.
+    operation, attempt = reserve(ready_operation())
+    operation = dispatch_attempt(operation, attempt, NOW)
+    operation = record_return(operation, attempt, None, 'transport_failure', usage(), cleaned(), error_code='MODEL_DENIED')
+    stopped = operation.attempts[0]
+    assert stops_import(operation, stopped) and stopped_call(operation, stopped)
+    other = stopped.model_copy(update={'model': stopped.model.model_copy(update={'model': 'other-model'})})
+    assert not stops_import(operation, other) and not stopped_call(operation, other)
 
 
 def test_only_attempt_bound_never_dispatch_proof_releases_a_reservation():
