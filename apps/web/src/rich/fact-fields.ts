@@ -38,15 +38,19 @@ export function title(record: RecordValue): string {
 export function currentMarker(text: string): boolean {
   return /^(?:present|current|now|настоящее время|по настоящее время|н\.?\s*в\.?)$/iu.test(text.trim());
 }
+/** Text the user wrote or corrected is authoritative, so it is never a value to check. */
+export function userCorrected(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "userCorrected" in value && value.userCorrected === true;
+}
 export function needsCheck(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(needsCheck);
   if (typeof value !== "object" || value === null) return false;
-  if ("status" in value && "rawText" in value) return value.rawText !== "" && value.status !== "known";
+  if ("status" in value && "rawText" in value) return value.rawText !== "" && value.status !== "known" && !userCorrected(value);
   const current = "present" in value && typeof value.present === "object" && value.present !== null
     && "value" in value.present && value.present.value === true;
   if (current && "end" in value && typeof value.end === "object" && value.end !== null
     && "rawText" in value.end && typeof value.end.rawText === "string" && value.end.rawText.trim()) {
-    if (!currentMarker(value.end.rawText)) return true;
+    if (!currentMarker(value.end.rawText) && !userCorrected(value.end)) return true;
     return Object.entries(value).some(([key, field]) => key !== "end" && needsCheck(field));
   }
   return Object.entries(value).some(([key, field]) =>

@@ -14,3 +14,12 @@ test("fact warnings distinguish current labels and registry misses from unresolv
   assert.equal(needsCheck(technology), false);
   assert.equal(needsCheck({ ...technology, display: unresolved("Unclear skill?") }), true);
 });
+
+test("text the user typed is never a value to check", () => {
+  const typed = { rawText: "Sample Labs", value: null, status: "unresolved", userCorrected: true };
+  assert.equal(needsCheck(typed), false);
+  assert.equal(needsCheck({ kind: "employment", employer: typed }), false);
+  const present = { rawText: "н.в.", value: true, status: "known" };
+  assert.equal(needsCheck({ present, end: { rawText: "скоро", value: null, status: "unresolved", userCorrected: true } }), false);
+  assert.equal(needsCheck({ ...typed, userCorrected: false }), true);
+});
