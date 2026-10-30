@@ -378,6 +378,33 @@ test("retry saves corrected text and still reports the marks beside it", async (
   } finally { session.close(); }
 });
 
+test("input stays locked for a whole undo and opens again after it", async () => {
+  let release = (_reply: Reply) => {};
+  const { session, editor } = await scripted(response([{ id: "a", text: "aaa" }], 1), path => {
+    assert.ok(path.endsWith("/history"));
+    return new Promise<Reply>(resolve => { release = resolve; });
+  });
+  try {
+    assert.equal(editor.isEditable, true);
+    const undo = session.navigate("undo");
+    await settled();
+    assert.equal(editor.isEditable, false, "keystrokes cannot reach a filter that would drop them");
+    release(saved(response([{ id: "a", text: "aa" }], 2), "m"));
+    await undo;
+    assert.equal(editor.isEditable, true);
+    assert.deepEqual(paragraphs(editor), ["a=aa"]);
+  } finally { session.close(); }
+});
+
+test("a failed undo opens input again", async () => {
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "aaa" }], 1), () => refused("HISTORY_EMPTY", 409));
+  try {
+    await session.navigate("undo");
+    assert.equal(editor.isEditable, true);
+    assert.equal(warnings.length, 1);
+  } finally { session.close(); }
+});
+
 test("a late read in refresh does not take a newer edit back", async () => {
   let release = () => {}, reading = false;
   const late = response([{ id: "a", text: "aaa" }], 1);

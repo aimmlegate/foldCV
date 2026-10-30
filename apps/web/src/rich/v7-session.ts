@@ -174,9 +174,11 @@ export class TemplateEditorSession {
   async resume(): Promise<void> { this.setMode("normal"); await this.refresh(); }
 
   private lock(locked: boolean): void {
-    if (this.editor) this.editor.isEditable = !locked && this.mode !== "read_only";
-    if (locked && this.timer) { clearTimeout(this.timer); this.timer = null; }
-    if (!locked && this.deferred.length && this.writable) {
+    // One server-first step ending does not open input while another still runs.
+    const held = locked || this.panelBusy || this.navigating;
+    if (this.editor) this.editor.isEditable = !held && this.mode !== "read_only";
+    if (held && this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (!held && this.deferred.length && this.writable) {
       const deferred = this.deferred;
       this.deferred = [];
       for (const { value, kind } of deferred) this.enqueue(value, kind);
@@ -734,9 +736,10 @@ export class TemplateEditorSession {
     let settled = () => {};
     this.navigation = new Promise(resolve => { settled = resolve; });
     this.boundary();
-    this.navigating = true;
-    // The command locks input, and a contenteditable that turns read-only loses focus; give it back afterwards.
+    // Input stays locked to the end, and a contenteditable that turns read-only loses focus; give it back afterwards.
     const focused = this.editor?.isFocused() ?? false;
+    this.navigating = true;
+    this.lock(true);
     let reservation: HistoryReservation | null = null;
     try {
       await this.flush();
@@ -774,6 +777,7 @@ export class TemplateEditorSession {
     } finally {
       if (reservation) this.history.discard(reservation);
       this.navigating = false;
+      this.lock(!this.writable);
       settled();
       if (focused && this.editor?.isEditable) this.editor.focus();
     }
