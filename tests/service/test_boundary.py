@@ -317,3 +317,44 @@ async def test_html_entries_are_fresh_and_static_assets_keep_the_existing_cache_
         assert unavailable.json()["error"]["code"] == "FRONTEND_UNAVAILABLE"
         assert (await client.get("/legacy.html")).status_code == 200
 
+
+@pytest.mark.asyncio
+async def test_every_json_write_under_v1_refuses_duplicate_fields(tmp_path):
+    app = make_app(tmp_path)
+    routes = [route for route in app.app.routes if isinstance(route, APIRoute)]
+    puts = [route.path for route in routes if "PUT" in route.methods]
+    assert puts and all(service.takes_json("PUT", path) for path in puts)
+    async with client_for(app) as client:
+        await login(client)
+        headers = {"Origin": ORIGIN, "Content-Type": "application/json"}
+        bodies = {"/v1/settings/limits": '{"importMinutes":5,"importMinutes":90,"projectMegabytes":64}',
+                  "/v1/settings/preferences": '{"automaticAnalysis":true,"automaticAnalysis":false}',
+                  "/v1/settings/import-model": '{"model":"a","model":"b"}', "/v1/settings/fallback-model": '{"model":"a","model":"b"}',
+                  "/v1/settings/rewrite-model": '{"model":"a","model":"b"}',
+                  "/v1/settings/rewrite-reasoning": '{"model":"a","model":"b","effort":"low"}',
+                  "/v1/rich/template-default": '{"templateId":"a","templateId":"b"}',
+                  "/v1/rich/template-config/generic-two-column": '{"text":"a","text":"b"}'}
+        for path, content in bodies.items():
+            result = await client.put(path, headers=headers, content=content)
+            assert result.status_code == 422 and result.json()["error"]["code"] == "INVALID_REQUEST", path
+        check = await client.post("/v1/rich/template-config/generic-two-column/check", headers=headers, content='{"text":"a","text":"b"}')
+        assert check.status_code == 422 and check.json()["error"]["code"] == "INVALID_REQUEST"
+        wrong = await client.put("/v1/settings/limits", headers={"Origin": ORIGIN, "Content-Type": "text/plain"},
+                                 content='{"importMinutes":5,"projectMegabytes":64}')
+        assert wrong.status_code == 415
+        kept = (await client.get("/v1/settings/preferences")).json()
+        assert kept["importMinutes"] == 60
+
+
+@pytest.mark.asyncio
+async def test_template_text_up_to_the_compiler_limit_reaches_the_compiler(tmp_path):
+    from packages.resume_core.templates.loading import CONFIG_BYTES
+    app = make_app(tmp_path)
+    async with client_for(app) as client:
+        await login(client)
+        headers = {"Origin": ORIGIN, "Content-Type": "application/json"}
+        path = "/v1/rich/template-config/generic-two-column/check"
+        allowed = await client.post(path, headers=headers, content=json.dumps({"text": "#\n" * (CONFIG_BYTES // 2)}))
+        assert allowed.status_code != 413, allowed.text[:200]
+        beyond = await client.post(path, headers=headers, content=b"x" * (2 * CONFIG_BYTES + 1))
+        assert beyond.status_code == 413 and beyond.json()["error"]["code"] == "INPUT_TOO_LARGE"
