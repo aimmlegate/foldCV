@@ -158,6 +158,8 @@ class CreateFactOp(Wire):
     kind: Literal['candidate', 'employment', 'technology', 'education', 'language', 'claim', 'period']
     values: dict[str, str] = Field(default_factory=dict, max_length=20)
     job_id: Id | None = None
+    # The line a technology joins when its scope has several (the refusal lists them).
+    target_id: Id | None = None
 
 
 class DeleteFactOp(Wire):
