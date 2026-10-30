@@ -241,7 +241,7 @@ class ProjectJournal:
                 if not line.endswith(b'\n'):
                     raise ValueError('torn line')
                 self._replay(json.loads(line))
-            except (ValueError, KeyError, TypeError, JournalStale):
+            except (ValueError, KeyError, TypeError, RecursionError, JournalStale):
                 LOG.warning('journal tail truncated at byte %d', offset)
                 os.truncate(self.path, offset)
                 break

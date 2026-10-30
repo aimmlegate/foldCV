@@ -1,10 +1,18 @@
 """A .foldcv export imports to the same project, and the undo journal stays out of the file (plan SR04); the zip is
 built after the project lock is released."""
 
+import hashlib
 import io
+import json
 import threading
 import zipfile
 
+from PIL import Image
+import pytest
+
+from packages.resume_core.archive_zip import ArchiveFailure
+from packages.resume_core.models.rich_workspace import LocalImageAsset
+from packages.resume_core.template_archive import _verify_image
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 
@@ -72,3 +80,31 @@ def test_the_zip_is_built_after_the_project_lock_is_released(tmp_path, monkeypat
         downloaded = client.post('/v2/projects/' + PROJECT + '/archive', json=body)
         assert downloaded.status_code == 200, downloaded.text[:400]
         assert free == [True] and 'manifest.json' in zipfile.ZipFile(io.BytesIO(downloaded.content)).namelist()
+
+
+def test_a_png_with_a_bad_chunk_checksum_is_an_archive_image_mismatch():
+    buffer = io.BytesIO()
+    Image.new('RGB', (4, 4), 'red').save(buffer, format='PNG')
+    raw = bytearray(buffer.getvalue())
+    raw[raw.index(b'IDAT') + 5] ^= 0xFF
+    broken = bytes(raw)
+    digest = hashlib.sha256(broken).hexdigest()
+    asset = LocalImageAsset(id='asset-1', sha256=digest, path='images/' + digest + '.png', mimeType='image/png',
+        size=len(broken), width=4, height=4)
+    with pytest.raises(ArchiveFailure) as refused:
+        _verify_image(asset, broken)
+    assert refused.value.code == 'ARCHIVE_IMAGE_MISMATCH'
+
+
+def test_a_lost_history_file_gives_the_archive_its_own_code(tmp_path):
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        repository = application.state.projects.repository
+        target = repository.open(PROJECT).directory / 'workspace.json'
+        value = json.loads(target.read_bytes())
+        value['project']['importHistory'] = [{'operationId': 'operation-1', 'sha256': 'a' * 64}]
+        target.write_text(json.dumps(value))
+        target.chmod(0o600)
+        editor = Editor(client, PROJECT)
+        reply = client.post('/v2/projects/' + PROJECT + '/archive', json={'editorToken': editor.token,
+            'projectRevision': editor.revision, 'documentRevision': editor.response['workspace']['documentRevision']})
+        assert reply.status_code == 404 and reply.json()['error']['code'] == 'PROJECT_HISTORY_MISSING'

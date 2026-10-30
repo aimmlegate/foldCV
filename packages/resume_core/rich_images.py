@@ -62,5 +62,5 @@ def verify_image_bytes(asset: LocalImageAsset, raw: bytes) -> None:
             image.verify()
     except ImageFailure:
         raise
-    except (OSError, ValueError, Image.DecompressionBombError):
+    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
         raise ImageFailure("IMAGE_BYTES_MISMATCH") from None

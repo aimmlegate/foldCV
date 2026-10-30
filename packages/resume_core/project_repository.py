@@ -278,9 +278,9 @@ class ProjectSession:
             return self.editor_token
 
     def require_editor(self, token):
-        if token is not None and secrets.compare_digest(token, self.editor_token or ''):
+        if token is not None and _same_token(token, self.editor_token or ''):
             return
-        if token is not None and any(secrets.compare_digest(token, value) for value in self.replaced_tokens):
+        if token is not None and any(_same_token(token, value) for value in self.replaced_tokens):
             raise RepositoryFailure('EDITOR_REPLACED')
         raise RepositoryFailure('EDITOR_TOKEN_UNKNOWN')
 
@@ -289,6 +289,11 @@ class ProjectSession:
         self.clipboard.move_to_end(identifier)
         while len(self.clipboard) > CLIPBOARD_CAPTURES:
             self.clipboard.popitem(last=False)
+
+
+def _same_token(token, value):
+    # compare_digest refuses a non-ASCII str, and a request can carry any text.
+    return secrets.compare_digest(token.encode('utf-8', 'replace'), value.encode('utf-8'))
 
 
 def _now():
