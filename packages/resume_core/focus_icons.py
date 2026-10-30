@@ -55,7 +55,7 @@ class FocusIconStore:
         try:
             return self._update(changes)
         except OSError as error:
-            raise StorageFailure('FOCUS_ICONS_UNWRITABLE') from error
+            raise StorageFailure(str(error)) from error
 
     def _update(self, changes):
         with locked_root(self.root, '.focus-icons.lock'):
