@@ -1,4 +1,4 @@
-"""Scripted Generic replies: each block's payload, with the exact source phrase every value cites."""
+"""Scripted two-column replies: each block's payload, with the exact source phrase every value cites."""
 
 from functools import cache
 
@@ -330,7 +330,7 @@ def empty_object(block, package=None):
 
 
 async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None, concurrency=1):
-    """A published Generic import of one synthetic fixture through the coordinator and the real materializer; wrap
+    """A published two-column import of one synthetic fixture through the coordinator and the real materializer; wrap
     changes the scripted answers. Another compiled package (CT08) imports with its own table. With one call at a time
     the projects block runs whole; with more it is outlined and its jobs run in groups (D117)."""
     from packages.resume_core.project_limits import finalization_seconds, import_seconds

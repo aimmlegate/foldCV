@@ -44,7 +44,7 @@ def test_the_bundled_short_template_is_the_same_package_as_its_full_form():
     assert len(BUNDLED_TEMPLATE.read_text(encoding='utf-8').splitlines()) < 1100
 
 
-@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC, PUBLICATIONS], ids=['generic', 'generic', 'publications'])
+@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC, PUBLICATIONS], ids=['two-column', 'generic', 'publications'])
 def test_shortening_any_template_expands_back_to_the_same_definition(path):
     document = full(path)
     shortened = shorten(document)
@@ -156,7 +156,7 @@ def test_a_json_template_may_use_the_short_form_too():
     assert canonical(TemplateDefinition.model_validate(load_declared_definition(raw, 'json'))) == canonical(full(BUNDLED_TEMPLATE))
 
 
-@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC], ids=['generic', 'generic'])
+@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC], ids=['two-column', 'generic'])
 def test_the_editor_schema_accepts_both_forms(path):
     schema = json.loads((ROOT / 'contracts/template-source.schema.json').read_text(encoding='utf-8'))
     validator = jsonschema.Draft202012Validator(schema)

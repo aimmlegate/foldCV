@@ -1,4 +1,4 @@
-"""Facts panel edits outside employment on the Generic F10 import (D113): record fields, technologies in their lines,
+"""Facts panel edits outside employment on the two-column F10 import (D113): record fields, technologies in their lines,
 education and language removal; Undo restores each, and an action without an adapter is refused with a public code."""
 
 import asyncio
@@ -91,7 +91,7 @@ def main_views(workspace):
 
 
 def shown_in(workspace, view):
-    """The technology record of the first name span in a view; Generic's Focus and group views keep records of their own."""
+    """The technology record of the first name span in a view; the two-column Focus and group views keep records of their own."""
     return next(part.record_id for block in workspace.project.document.blocks() if block.presentation is not None
         and block.presentation.view_key == view and isinstance(block.content, list)
         for part in block.content if getattr(part, 'field_key', None) == 'display')
@@ -250,7 +250,7 @@ def test_clearing_the_general_list_keeps_focus_and_each_group_takes_technologies
 
 def test_a_technology_in_focus_and_in_a_group_is_renamed_and_added_back_on_its_own(before):
     grouped, focus = shown_in(before, 'programming'), shown_in(before, 'focus')
-    # The Generic pack's icons can be chosen for a row (D122).
+    # The two-column pack's icons can be chosen for a row (D122).
     assert editor_plan(before.project)['focusPanel'] == {'records': [focus], 'icons': True}
     after, _result = applied(before, request(before, 'edit', record_id=grouped, values={'display': 'PYTHON'}))
     assert lines(after, 'programming') == ['PYTHON, Perl'] and lines(after, 'focus') == ['Python', '3 years']
@@ -280,7 +280,7 @@ def test_a_group_line_that_also_shows_a_job_technology_stays_the_group_target(be
 
 
 def labelled_package():
-    """The Generic template with a label line before each job's technologies, as a custom template may declare."""
+    """The two-column template with a label line before each job's technologies, as a custom template may declare."""
     config = generic_package().definition.model_dump(mode='json', by_alias=True)
     projects = next(value for value in config['blocks'] if value['id'] == 'projects')
     projects['view']['nodes'][2]['label'] = {'ru': 'Стек:', 'en': 'Stack:'}

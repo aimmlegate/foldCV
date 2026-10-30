@@ -8,7 +8,7 @@
   "libreOfficeExecutableSha256": "c772a72b6f07e953a34956cebedf5d037b1ea841fad29014b1ee6355775c1d1e",
   "codexCliPinned": "0.162.0-alpha.2",
   "template": "generic 1.0.0",
-  "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+  "templatePackageSha256": "af3f212612f59650e1e9ea4c7cc32d2edfbbaa77c71cf3c34cc87ce06957d1f8",
   "pythonPackages": {
     "PyMuPDF": "1.28.2",
     "reportlab": "5.0.1",

@@ -38,6 +38,12 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 | `tools` | Launcher, checks and benchmarks |
 | `tests` | Python test suites |
 
+## Private templates
+
+Put a template YAML and its `assets/` folder into the ignored `templates/local/`. A local
+run or desktop build lists it first and uses it as the default. A clean clone ships only
+the bundled generic templates.
+
 ## Documentation
 
 - [Architecture](docs/gui/architecture.md): service, storage, API, CLI adapter and rendering.
@@ -55,7 +61,7 @@ PYTHONPATH=services/api/src .venv/bin/python -m pytest -q -p no:cacheprovider
 
 ## Command-line skill
 
-Original file → complete archive → selected resume JSON → fixed Generic PDF.
+Original file → complete archive → selected resume JSON → fixed PDF.
 
 The supplied outputs define the layout, not the candidate's facts. The skill
 handles extraction and rewriting; Python checks preservation and renders the

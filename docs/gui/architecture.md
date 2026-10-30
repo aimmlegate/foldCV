@@ -57,6 +57,7 @@ services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
 contracts/{json-schema,examples,error-messages.ru.json}
 templates/{generic,bundled,foldcv-reference}/   bundled: generic-two-column.yaml, generic-one-column.yaml, shared assets/
+templates/local/   ignored; private templates of a local build, each folder with its own assets/
 tests/  (layout in testing.md)
 tools/
 ```

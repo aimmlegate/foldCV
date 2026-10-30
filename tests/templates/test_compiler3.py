@@ -23,8 +23,8 @@ from tests.templates.storage_fixtures import workspace
 from tests.templates.test_compiler_versions import retained
 
 
-HISTORICAL={1:'32144b10ad171e5f171bbc020185c46b82e4d682ed841df3e1b8267c0d286d08',
-    2:'c9c359c894c49ec25247188fb1c411d6f5558dea8c7c1c41be7176edbe12df23'}
+HISTORICAL={1:'076661901e8f048dabf0260bb191535a15cb252b3d7ae9d932d6e50ace58549d',
+    2:'e62d12e542b35889483c1e0888c3e36a41cb0fc36d208357657090b1cc73a9ff'}
 
 
 def compile_config(config,tmp_path,*,original_format='json'):

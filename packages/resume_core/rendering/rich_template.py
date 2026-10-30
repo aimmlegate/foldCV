@@ -12,7 +12,7 @@ from ..models.contracts import AssetRef, TemplateManifest, _safe_path
 
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_PATH = ROOT / "templates/foldcv-reference/manifest.json"
-PACKAGE_SHA256 = "29e386d7ed0c3db4d99b7d67f440a11aeec05c08de6ad7eba623bca412a73529"
+PACKAGE_SHA256 = "0ae0ab6c33a5b42658f352695f1c5a991b2a94ded8491341188921fcbe4be78d"
 
 
 @dataclass(frozen=True)

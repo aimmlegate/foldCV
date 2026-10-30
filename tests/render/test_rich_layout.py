@@ -56,7 +56,7 @@ def test_native_template_keeps_measured_columns_bands_brand_and_repeat_footer():
         assert len(xml.xpath("//wp:docPr[@descr='Focus technology logo']", namespaces=NS)) == 9
         footers = [etree.fromstring(archive.read(name)) for name in archive.namelist() if name.startswith("word/footer") and name.endswith(".xml")]
         assert len(footers) == 2
-        assert all("".join(footer.xpath("//w:t/text()", namespaces=NS)) == "mail@example.com" for footer in footers)
+        assert all("".join(footer.xpath("//w:t/text()", namespaces=NS)) == "" for footer in footers)
         all_parts = [xml, *headers, *footers]
         ids = [id for part in all_parts for id in part.xpath("//wp:docPr/@id", namespaces=NS)]
         assert len(ids) == len(set(ids))

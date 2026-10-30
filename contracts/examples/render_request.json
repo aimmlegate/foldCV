@@ -73,9 +73,9 @@
     "projectRevision": 1,
     "rendererSha256": "a200bf877115a76e8049258c3fa20b137a3ebcc0ca430eedc287bd46aa602c31",
     "rendererVersion": "1.0.0",
-    "snapshotSha256": "68aae51459856f765d281b5bfa132289f99ec4dc91ca8888f96b3413fbe6284c",
+    "snapshotSha256": "851642b1d78717f744307ea355d120d3b7890ab1a97fca32fab2697b7b1f8c0f",
     "templateId": "generic",
-    "templatePackageSha256": "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9",
+    "templatePackageSha256": "af3f212612f59650e1e9ea4c7cc32d2edfbbaa77c71cf3c34cc87ce06957d1f8",
     "templateVersion": "1.0.0"
   }
 }

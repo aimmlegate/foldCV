@@ -1,4 +1,4 @@
-"""Chat fact ops prepare the same edit as the Facts panel on the Generic F10 import (plan 2.8 table)."""
+"""Chat fact ops prepare the same edit as the Facts panel on the two-column F10 import (plan 2.8 table)."""
 
 import pytest
 

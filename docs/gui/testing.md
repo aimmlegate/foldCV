@@ -85,7 +85,7 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
 | `tests/repository` | repository commit, atomic save, revisions and replay, build isolation, journal, editor token, concurrency, tasks |
 | `tests/projects` | `/v2` project routes: golden authored operations, edits, history, clipboard, import task, resume and permit, export, archive, images, sources, metadata, store and catalog; F10 composition (slow) |
 | `tests/assistant` | runs, tools, compiler, proposals, permissions, actions, store, MCP listener, runtime, web fetcher, skills |
-| `tests/templates` | V7 template domain: preparation, mutations, paste, scopes, relations, sync, import pipeline, sidecar, review, captured DOCX; scripted Generic and second-template imports (slow); golden corpus in `golden/` |
+| `tests/templates` | V7 template domain: preparation, mutations, paste, scopes, relations, sync, import pipeline, sidecar, review, captured DOCX; scripted two-column and second-template imports (slow); golden corpus in `golden/` |
 | `tests/facts` | facts panel, fact mutations, sync, dependencies, dates, technology lists |
 | `tests/render` | DOCX rendering, layout, Focus, localization; real conversions (slow) |
 | `tests/rewrite` | rewrite preview route, timing, text rewrite |

@@ -55,7 +55,7 @@ def nested_config():
 
 def test_captured_compiler1_definition_recipe_manifest_and_bytes_are_exact():
     raw = FIXTURE.read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == '3faba951ec4aa391791de42bd4b2259bba7b1f795d06fb0722fcda74e134ffce'
+    assert hashlib.sha256(raw).hexdigest() == 'fbaf25820c53b361d9e8f210c4c73acdee28443436917ff9837c246bc4e29a25'
     package = retained()
     assert canonical(package) == raw and verify_package(package) == package
     blocks, recipe, manifest = compile_definition_v1(package.definition)

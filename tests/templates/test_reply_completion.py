@@ -28,7 +28,7 @@ def refs(request):
 
 
 def parsed(block_id, reply_for):
-    """Parse the referenced reply reply_for(request) returns for one Generic block of the F10 source."""
+    """Parse the referenced reply reply_for(request) returns for one two-column block of the F10 source."""
     package = generic_package()
     src, _raw = source_fixture('F10')
     operation, _command, _package, _src, facts = setup_operation(captured=package, src=src, cap=4)

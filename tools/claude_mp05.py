@@ -1,4 +1,4 @@
-"""MP05 live proof on Claude (D098 item 5): a dispatch-free schema gate, the canary run and one Generic import.
+"""MP05 live proof on Claude (D098 item 5): a dispatch-free schema gate, the canary run and one two-column import.
 
 Each live run is written to native-attempts.json before it dispatches; a failed run stops the work. The import's CV,
 project, replies and DOCX stay in a new /private/tmp root; evidence keeps only models, timings, counts and codes.
@@ -124,7 +124,7 @@ def scan(profile: claude.ClaudeCliProfile, roots: tuple[Path, ...], needle: str)
 
 
 def schemas(_args) -> None:
-    """Every schema the Generic import sends, from the offline stand-in import, then the real CLI with network denied:
+    """Every schema the two-column import sends, from the offline stand-in import, then the real CLI with network denied:
     an invalid schema fails at startup, a valid one reaches `system/init` and only retries the network."""
     from tests.providers.claude_relay import audit, relay_import
     root = fresh_root("schemas")
@@ -206,7 +206,7 @@ def canary(args) -> None:
 
 
 async def run_import(args) -> None:
-    """MP05-2: CV-B through the app's routes with Claude active, the bundled Generic template and rewriting on."""
+    """MP05-2: CV-B through the app's routes with Claude active, the bundled two-column template and rewriting on."""
     import httpx
     from packages.resume_core.project_repository import decode_project
     from packages.resume_core.template_import import cleanup_verified, spent_calls
@@ -248,7 +248,7 @@ async def run_import(args) -> None:
             retry = {"retryOf": "MP05-2", "instruction": args.retry} if args.retry else {}
             charge({"id": run_id, "slice": "MP05", "model": MODEL, "effort": EFFORT, "allowRepair": False,
                     "path": "app routes: template-input upload, /v2 import task, Claude active",
-                    "source": "CV-B", "sourceSha256": CV_B, "template": "bundled Generic", "rewrite": True,
+                    "source": "CV-B", "sourceSha256": CV_B, "template": "bundled two-column", "rewrite": True,
                     "root": root.name, **retry, "status": "dispatched", "startedAt": now()}, after="MP05-1")
             began = time.monotonic()
             started = await client.post("/v2/projects/" + project + "/import",

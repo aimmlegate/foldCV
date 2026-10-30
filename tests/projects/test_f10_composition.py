@@ -1,4 +1,4 @@
-"""Scripted Generic F10 through the v2 import route matches the composition of a direct coordinator run (plan S12).
+"""Scripted two-column F10 through the v2 import route matches the composition of a direct coordinator run (plan S12).
 
 Revisions, timestamps and mutation-replay rows are the repository's commit record. Fact text, source text and the
 composition report of everything else must match. A semantic difference stops the slice; the golden is not updated.

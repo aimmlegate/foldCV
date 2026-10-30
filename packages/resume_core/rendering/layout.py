@@ -502,6 +502,6 @@ def render_docx(data: dict, target: Path) -> None:
             _main(main, main_pages[index], data.get("source_language", "ru"))
     footer = sec.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _font(footer.add_run(data.get("footer", "mail@example.com")), "light", 12)
+    _font(footer.add_run(data.get("footer", "")), "light", 12)
     target.parent.mkdir(parents=True, exist_ok=True)
     doc.save(target)

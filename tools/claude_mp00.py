@@ -278,7 +278,7 @@ def ledger() -> dict:
     return {"schemaVersion": 1, "cap": 4, "spent": 0,
             "authorization": {"decision": "D098 item 5, D099 item 20", "recordedAt": "2026-10-24",
                               "text": "Live allowance for Claude: three gate dispatches (MP00 synthetic structured task, "
-                                      "MP05 synthetic run, one assistant dispatch) plus one Generic import after the "
+                                      "MP05 synthetic run, one assistant dispatch) plus one two-column import after the "
                                       "canary passes; every run with allow_repair=False; stop after the first failure.",
                               "unit": "one live application-model dispatch; charged at dispatch, including unknown "
                                       "outcomes (D091)"},

@@ -151,7 +151,7 @@ def inspect_text(path, blob, indicators):
                     contacts.append(local + "@" + right[0])
         def private_contact(email):
             domain = email.rsplit("@", 1)[1]
-            return (email != "mail@example.com" and domain not in {"example.com", "example.net", "example.org"}
+            return (domain not in {"example.com", "example.net", "example.org"}
                 and not domain.endswith((".example.com", ".example.net", ".example.org", ".test", ".example", ".invalid")))
         def private_phone(number):
             digits = re.sub(r"\D", "", number)
