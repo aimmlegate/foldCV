@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.extraction.parser import MAX_SOURCE
@@ -18,6 +19,7 @@ WORKER = Path(__file__).resolve().parents[4] / "packages/resume_core/extraction/
 MAX_BODY = MAX_SOURCE + 8192
 MAX_RESULT = 4 * 1024 * 1024
 MAX_RSS_KB = 512 * 1024
+MAX_SECONDS = 120
 BOUNDARY = re.compile(rb"^[A-Za-z0-9'()+_,./:=?-]{1,70}$")
 ALLOWED_ERRORS = frozenset({"EXTRACT_EMPTY", "INPUT_TOO_LARGE", "EXTRACT_ENCODING", "EXTRACT_UNSUPPORTED",
                            "EXTRACT_MALFORMED", "EXTRACT_ENCRYPTED", "EXTRACT_PAGE_LIMIT", "EXTRACT_TEXT_LIMIT",
@@ -85,8 +87,12 @@ async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFile
     (workspace / "source.bin").write_bytes(data)
     (workspace / "extract-input.json").write_text(json.dumps({"name": name, "pasted": pasted}, ensure_ascii=False), encoding="utf-8")
     process = files.spawn(Path(sys.executable), (str(WORKER),), capture=False)
+    deadline = time.monotonic() + MAX_SECONDS
     try:
         while process.poll() is None:
+            if time.monotonic() > deadline:
+                files.stop_worker()
+                raise UploadFailure("EXTRACT_TIMEOUT")
             rss = await asyncio.to_thread(_rss_kb, process.pid)
             if rss is None and process.poll() is None:
                 files.stop_worker()

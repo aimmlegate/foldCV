@@ -28,13 +28,13 @@ class ParagraphStyles:
     def __init__(self, root=None):
         self.styles = {node.get(W + "styleId"): node for node in root.findall(W + "style")} if root is not None else {}
         self.defaults = root.find(W + "docDefaults/" + W + "rPrDefault/" + W + "rPr") if root is not None else None
+        self.default_paragraph = next((key for key, node in self.styles.items() if node.get(W + "type") == "paragraph"
+                                       and node.get(W + "default") in {"1", "true"}), None)
 
     def hidden(self, run, paragraph):
         properties = [run.find(W + "rPr")]
         for style_id in (value(run.find(W + "rPr"), W + "rStyle"),
-                         value(paragraph.find(W + "pPr"), W + "pStyle") or next(
-                             (key for key, node in self.styles.items() if node.get(W + "type") == "paragraph"
-                              and node.get(W + "default") in {"1", "true"}), None)):
+                         value(paragraph.find(W + "pPr"), W + "pStyle") or self.default_paragraph):
             seen = set()
             while style_id in self.styles and style_id not in seen and len(seen) < 32:
                 seen.add(style_id)
