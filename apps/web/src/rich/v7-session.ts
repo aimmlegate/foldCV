@@ -15,6 +15,7 @@ import { blockAt, copySource, correctionOperation, extractOperations, foldCompos
   itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
+import { serverRewriteStage, type RewriteStage } from "./rewrite-progress";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { changedBy, selectedTextBlocks, shownSelection, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
@@ -77,6 +78,8 @@ export class TemplateEditorSession {
   private formatting = false;
   private closed = false;
   private retries = 0;
+  // A cancel can come while the request still waits for typing to save; it is then never sent.
+  private readonly cancelledRewrites = new Set<string>();
 
   private modeValue: EditorMode = "recovering";
   private retention: Promise<void> = Promise.resolve();
@@ -93,7 +96,7 @@ export class TemplateEditorSession {
   private setMode(mode: EditorMode): void { this.modeValue = mode; this.port.mode(mode); this.lock(!this.writable); }
 
   constructor(readonly connection: ProjectEditorConnection, private readonly port: TemplateSessionPort, private readonly debounce = 400,
-    private readonly store: PendingStore = pendingStore()) {
+    private readonly store: PendingStore = pendingStore(), private readonly rewriteInterval = 500) {
     const sessionId = this.sessionId;
     this.history = new SessionHistory(sessionId, new Map(), () => {}, () => !this.closed, `${sessionId}:${crypto.randomUUID()}`, "server");
     this.queue = new RichSaveQueue({ durable: connection.response, sessionId, ports: {
@@ -384,22 +387,46 @@ export class TemplateEditorSession {
     return { container: at.container, start: at.start, end: at.end, prior: at.prior, text: at.prior.slice(at.start, at.end) };
   }
 
-  /** One generation for the selected range after typing drains; the document and history do not change. */
-  async rewritePreview(instruction: string, requestId: string = crypto.randomUUID()): Promise<TemplateRewrite> {
+  /** One generation for the selected range after typing drains; the document and history do not change. `stage` hears
+   * the save, the send and what the server then reports. */
+  async rewritePreview(instruction: string, requestId: string = crypto.randomUUID(), stage: (stage: RewriteStage) => void = () => {}): Promise<TemplateRewrite> {
     const source = this.rewriteSource();
     if (!source) throw new Error("V7_INPUT_UNSUPPORTED");
     if (this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
-    await this.flush();
-    const template = this.queue.template;
-    const range = verifiedRange(source, { response: template.durable, locals: template.localBlocks });
-    if ("conflict" in range) throw new Error("V7_INPUT_CONFLICT");
-    const preview = await this.connection.rewritePreview(requestId, this.snapshot(), range, instruction);
-    if (preview.source !== source.text) throw new Error("INVALID_RESULT");
-    return { requestId, instruction, container: source.container, start: source.start, end: source.end, prior: source.prior,
-      source: preview.source, text: preview.text };
+    stage("saving");
+    try {
+      await this.flush();
+      if (this.cancelledRewrites.has(requestId)) throw new ProjectApiFailure("CANCELLED", 409);
+      const template = this.queue.template;
+      const range = verifiedRange(source, { response: template.durable, locals: template.localBlocks });
+      if ("conflict" in range) throw new Error("V7_INPUT_CONFLICT");
+      stage("starting");
+      const stop = this.followRewrite(requestId, stage);
+      const preview = await this.connection.rewritePreview(requestId, this.snapshot(), range, instruction).finally(stop);
+      if (preview.source !== source.text) throw new Error("INVALID_RESULT");
+      return { requestId, instruction, container: source.container, start: source.start, end: source.end, prior: source.prior,
+        source: preview.source, text: preview.text };
+    } finally { this.cancelledRewrites.delete(requestId); }
   }
 
-  cancelRewrite(requestId: string): Promise<boolean> { return this.connection.rewriteCancel(requestId); }
+  /** Reads the server's stage until the reply arrives; a failed read leaves the shown stage as it is. */
+  private followRewrite(requestId: string, stage: (stage: RewriteStage) => void): () => void {
+    let stopped = false, timer: ReturnType<typeof setTimeout> | null = null;
+    const read = async () => {
+      const value = await this.connection.rewriteStage(requestId).catch(() => null);
+      if (stopped) return;
+      const known = serverRewriteStage(value);
+      if (known) stage(known);
+      timer = setTimeout(() => { void read(); }, this.rewriteInterval);
+    };
+    void read();
+    return () => { stopped = true; if (timer) clearTimeout(timer); };
+  }
+
+  cancelRewrite(requestId: string): Promise<boolean> {
+    this.cancelledRewrites.add(requestId);
+    return this.connection.rewriteCancel(requestId);
+  }
 
   /** Apply exactly the shown text as one replacement and one Undo; only the changed middle is replaced, so the rest keeps
    * its marks and owners. A container edited since the preview conflicts instead of applying. */
