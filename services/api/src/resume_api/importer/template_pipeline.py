@@ -21,10 +21,10 @@ from packages.resume_core.template_identity import (capture_span, empty_value, e
     offered_evidence, source_slice)
 from packages.resume_core.template_entries import (closed_state, entry_part, entry_records, grouped, line_options,
     ordered_entries, outline_part, parse_outline, parse_outline_review, reorder_records, splits_entries)
-from packages.resume_core.template_import import (GENERATION_SLOTS, ProcessingDeadline, TemplateImportFailure, add_entry_tasks,
-    add_outline_review, admit_operation, attempt_in, authorization, cancel_operation, capture_finalization, capture_task_input,
-    checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time, record_return, reconcile_cleanup,
-    recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, task_in)
+from packages.resume_core.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline, TemplateImportFailure,
+    add_entry_tasks, add_outline_review, admit_operation, attempt_in, authorization, cancel_operation, capture_finalization,
+    capture_task_input, checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time, record_return,
+    reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
@@ -1021,16 +1021,12 @@ class TemplatePipeline:
         return attempt_id
 
     def reconcile_unlaunched(self, operation, attempt_id, now):
+        """Release an attempt whose call stopped before the transport: that control flow is the never-dispatched proof."""
         result = operation.model_copy(deep=True)
         attempt = attempt_in(result, attempt_id)
         attempt.error_code = 'IMPORT_PROCESSING_EXHAUSTED'
-        proof = self.transport.reconcile(attempt)
-        if proof is not None:
-            return reconcile_cleanup(result, proof, now)
-        attempt.state = 'outcome_unknown'
-        attempt.cleanup = CleanupOutcome(state='unknown', evidenceHash=None, witness=None)
-        result.state = 'fenced'
-        return result
+        return reconcile_cleanup(result, CleanupProof(attempt.id, digest(attempt.owner), digest({'unlaunched': attempt.id}),
+            'coordinator-never-launched', True), now)
 
     async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False):
         def finish(operation, _data, _workspace):
