@@ -68,6 +68,20 @@ async def test_a_save_that_lost_sidecar_steps_or_a_damaged_sidecar_fences_the_re
         fixture.pipeline.read(fixture.project)
 
 
+@pytest.mark.parametrize('raw', [b'5', b'null', b'[{}]', b'"text"', b'[' * 200_000], ids=['number', 'null', 'list', 'string', 'deep'])
+@pytest.mark.asyncio
+async def test_a_sidecar_that_is_no_json_object_is_reported_as_corrupt(tmp_path, raw):
+    # A scalar, null or a list of objects raised TypeError: a raw 500 and PROCESS_FAILED instead of the corrupt code.
+    fixture = RuntimeFixture(tmp_path)
+    operation = await fixture.pipeline.start(fixture.project, fixture.command)
+    path = fixture.sidecar.path(fixture.project, operation.id)
+    path.parent.mkdir(mode=0o700)
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(RepositoryFailure, match='JOB_STORE_CORRUPT'):
+        fixture.pipeline.read(fixture.project)
+
+
 @pytest.mark.asyncio
 async def test_a_crash_between_sidecar_steps_recovers_from_them_without_a_resend(tmp_path):
     # P16: the dispatch exists only in the sidecar; a fresh pipeline sees it and never sends the request again.
