@@ -29,7 +29,7 @@ from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, I
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import PreflightCache, _stamp
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.rewrite_timing import add_phase, measure
 
@@ -269,7 +269,7 @@ class ClaudeCliProvider:
             raise ContentFailure(error.code) from None
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
-        end = deadline if deadline is not None else self.clock() + 15
+        end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
         fixture = self.fixture_transport is not None and self.fixture_transport.executable.absolute() == self.executable
         if not fixture:
             if self.profile is None:
@@ -318,7 +318,7 @@ class ClaudeCliProvider:
         if cached is not None:
             self.check_effort(cached, model, effort)
             return cached
-        probe = self.probe(files, cancel, deadline=deadline)
+        probe = self.probe(files, cancel, deadline=min(deadline, self.clock() + QUALIFICATION_SECONDS))
         if model not in probe.reasoning:
             raise ContentFailure("MODEL_DENIED")
         if key == self._key():
