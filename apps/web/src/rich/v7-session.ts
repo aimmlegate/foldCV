@@ -12,7 +12,7 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type Tem
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
@@ -417,16 +417,18 @@ export class TemplateEditorSession {
 
   private copy(view: EditorView, event: ClipboardEvent, cut: boolean): boolean {
     const editor = this.editor, data = event.clipboardData;
-    if (!editor || !data || this.closed) return false;
+    // A caret copies nothing, so the clipboard keeps what it holds.
+    if (!editor || !data || this.closed || view.state.selection.empty) return false;
     event.preventDefault();
     if (cut && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
       this.refuse("cut needs whole blocks or text inside one block"); return true;
     }
-    const { clipboardHTML, externalHTML, markdown } = selectedFragmentToHTML(view, editor);
+    const { clipboardHTML, externalHTML } = selectedFragmentToHTML(view, editor);
     data.clearData();
     data.setData("blocknote/html", clipboardHTML);
     data.setData("text/html", externalHTML);
-    data.setData("text/plain", markdown);
+    // The shown text, not BlockNote's Markdown: a paste elsewhere must not bring literal markers.
+    data.setData("text/plain", selectedText(view.state));
     const copied = this.copySelection(cut);
     if (copied) data.setData(clipboardType, JSON.stringify({ projectId: this.connection.project, token: copied.token }));
     return true;
@@ -440,7 +442,7 @@ export class TemplateEditorSession {
     const state = editor._tiptapEditor.state, source = copySource(state);
     if (!source) return null;
     const capture = this.capture(source);
-    const copied: Copied = { token: crypto.randomUUID(), text: state.doc.textBetween(state.selection.from, state.selection.to, "\n"), capture };
+    const copied: Copied = { token: crypto.randomUUID(), text: selectedText(state), capture };
     this.copied = copied;
     return { ...copied, done: cut ? this.cut(source, capture) : capture.then(() => {}) };
   }
@@ -499,9 +501,10 @@ export class TemplateEditorSession {
         source: { kind: "same_project", clipboardCaptureId: captured.id } }, prior: new Map([[containerKey(at.container), at.prior]]) }]);
       return;
     }
-    // Several paragraphs need a block-boundary representation Python does not offer yet.
-    if (text.includes("\n")) { this.refuse("multi-paragraph text paste"); return; }
-    if (text) editor._tiptapEditor.view.dispatch(state.tr.insertText(text));
+    // One copied line ends in a line end; several paragraphs need a block-boundary representation Python does not offer yet.
+    const line = text.replace(/\r?\n$/, "");
+    if (line.includes("\n")) { this.refuse("multi-paragraph text paste"); return; }
+    if (line) editor._tiptapEditor.view.dispatch(state.tr.insertText(line));
   }
 
   /** Moving the caret to another container ends the current typing action. */

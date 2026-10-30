@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { renderToStaticMarkup } from "react-dom/server";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
-import { knownErrorMessage } from "../src/errors/messages";
+import { selectedText } from "../src/rich/v7-extraction";
+import { BlockedInputNotice } from "../src/workbench/editor/BlockedInputNotice";
+import { errorMessage, knownErrorMessage } from "../src/errors/messages";
 import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
@@ -402,6 +405,62 @@ test("a failed undo opens input again", async () => {
     await session.navigate("undo");
     assert.equal(editor.isEditable, true);
     assert.equal(warnings.length, 1);
+  } finally { session.close(); }
+});
+
+test("a line copied with its line end pastes into one block; text inside it is still several paragraphs", async () => {
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "aaa" }], 1), () => refused("REQUEST_FAILED", 500));
+  try {
+    select(editor, blockStart(editor, "a") + 3);
+    await session.pasteFrom(null, "Senior engineer\n");
+    assert.deepEqual(paragraphs(editor), ["a=aaaSenior engineer"]);
+    await session.pasteFrom(null, "windows\r\n");
+    assert.deepEqual(paragraphs(editor), ["a=aaaSenior engineerwindows"]);
+    assert.deepEqual(warnings, []);
+    await session.pasteFrom(null, "one\ntwo\n");
+    assert.deepEqual(warnings, [knownErrorMessage("V7_INPUT_UNSUPPORTED")]);
+  } finally { session.close(); }
+});
+
+function clipboardEvent() {
+  const written = new Map<string, string>();
+  let prevented = false;
+  const data = { clearData: () => written.clear(), setData: (key: string, value: string) => written.set(key, value) };
+  return { written, prevented: () => prevented, event: { clipboardData: data, preventDefault: () => { prevented = true; } } };
+}
+function copy(session: TemplateEditorSession, editor: TemplateEditor, event: object): unknown {
+  const handler = session.clipboard.props.handleDOMEvents?.copy;
+  assert.ok(handler);
+  return handler.call(session.clipboard, editor._tiptapEditor.view, event as ClipboardEvent);
+}
+
+test("a copy with only a caret leaves the clipboard alone", async () => {
+  const { session, editor } = await scripted(response([{ id: "a", text: "aaa" }], 1), () => refused("REQUEST_FAILED", 500));
+  try {
+    select(editor, blockStart(editor, "a") + 1);
+    const { written, prevented, event } = clipboardEvent();
+    assert.equal(copy(session, editor, event), false);
+    assert.equal(prevented(), false);
+    assert.equal(written.size, 0);
+  } finally { session.close(); }
+});
+
+test("plain text on the clipboard is the shown text without Markdown markers", async () => {
+  // The copy event itself needs a browser DOM for its HTML, so the handler's text source is read from its code.
+  assert.match(readFileSync(new URL("../src/rich/v7-session.ts", import.meta.url), "utf8"), /setData\("text\/plain", selectedText\(view\.state\)\)/u);
+  const { session, editor } = await scripted(response([{ id: "a", text: "bold text", bold: true }], 1), () => refused("REQUEST_FAILED", 500));
+  try {
+    const a = blockStart(editor, "a");
+    select(editor, a, a + 9);
+    assert.equal(selectedText(editor._tiptapEditor.state), "bold text");
+  } finally { session.close(); }
+});
+
+test("a line break inside a selection is plain text too", async () => {
+  const { session, editor } = await scripted(response([{ id: "a", text: "one" }, { id: "b", text: "two" }], 1), () => refused("REQUEST_FAILED", 500));
+  try {
+    select(editor, blockStart(editor, "a") + 1, blockStart(editor, "b") + 2);
+    assert.equal(selectedText(editor._tiptapEditor.state), "ne\ntw");
   } finally { session.close(); }
 });
 
