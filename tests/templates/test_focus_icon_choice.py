@@ -1,6 +1,7 @@
 """A Focus row's icon chosen from the template's icons (D122): the editor and the DOCX show it, Undo takes it back, and
 rows added later, from the facts panel or by an import, take the icon remembered for their name."""
 
+import errno
 import hashlib
 import json
 import os
@@ -11,6 +12,7 @@ import pytest
 from packages.resume_core import focus_icons
 from packages.resume_core.focus_icons import FocusIconStore
 from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_assembly import assemble_template
 from packages.resume_core.template_panel_focus import icon_changes, icon_choices
 from packages.resume_core.template_preparation import prepare_edit
@@ -197,3 +199,29 @@ def test_the_store_keeps_the_newest_choices_within_its_limits(tmp_path, monkeypa
     small = FocusIconStore(tmp_path / 'bytes')
     small.update([('f', 'golang'), ('g', 'golang'), ('h', 'golang')])
     assert list(small.load()) == ['g', 'h']
+
+
+def test_a_reset_forgets_every_remembered_name_its_row_would_match(tmp_path):
+    store = FocusIconStore(tmp_path)
+    store.update([('Python 3.12', 'rust'), ('K8s', 'docker'), ('Go', 'mysql')])
+    store.update([('Python', None), ('Kubernetes', None)])
+    assert store.load() == {'go': 'mysql'}
+    store.update([('Python', 'rust')])
+    store.update([('Python 3.12', None)])
+    assert store.load() == {'go': 'mysql'}
+
+
+def test_a_deeply_nested_store_reads_as_empty(tmp_path):
+    (tmp_path / 'focus-icons.json').write_bytes(b'[' * 200000)
+    assert FocusIconStore(tmp_path).load() == {}
+
+
+def test_a_failing_disk_never_escapes_the_store_as_a_plain_os_error(tmp_path, monkeypatch):
+    def full(*_args, **_kwargs):
+        raise OSError(errno.ENOSPC, 'no space')
+    store = FocusIconStore(tmp_path)
+    monkeypatch.setattr(focus_icons, 'atomic_write', full)
+    with pytest.raises(StorageFailure):
+        store.update([('Python', 'rust')])
+    monkeypatch.setattr(focus_icons, 'locked_root', full)
+    assert store.load() == {}
