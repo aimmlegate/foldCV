@@ -25,9 +25,9 @@ from resume_api.cli.profiles import claude  # noqa: E402
 from resume_api.lifecycle import OperationFiles, SpikeError  # noqa: E402
 
 
-DATA = Path.home() / "Library/Application Support/FoldCV"
-PROFILE_ROOT = DATA / f"cli-profile-{claude.KIND}"
-OPERATIONS = DATA / "claude-mp00-operations"
+APP_DATA = Path.home() / "Library/Application Support/FoldCV"
+# Set from --data-root, never the app's store.
+PROFILE_ROOT = OPERATIONS = None
 EVIDENCE = ROOT / "docs/gui/handoffs/MULTI-PROVIDER/mp00"
 LEDGER = ROOT / "docs/gui/handoffs/MULTI-PROVIDER/native-attempts.json"
 LIVE_MODEL = "claude-sonnet-5-5"
@@ -36,6 +36,14 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["answer"
           "properties": {"answer": {"type": "string"}, "count": {"type": "integer"},
                          "items": {"type": "array", "items": {"type": "string"}}}}
 EXPECTED = {"answer": "ready", "count": 3, "items": ["alpha", "beta", "gamma"]}
+
+
+def separate_data_root(path: Path) -> Path:
+    """The tools wipe the profile under this root, which a running app must not share."""
+    root = path.resolve()
+    if root == APP_DATA.resolve():
+        raise SystemExit("--data-root must be a separate folder: these tools wipe the Claude profile under it")
+    return root
 
 
 def now() -> str:
@@ -311,6 +319,7 @@ def live(args) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executable")
+    parser.add_argument("--data-root", type=Path, required=True, help="a folder apart from the app's data root")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect")
     state = commands.add_parser("status")
@@ -324,6 +333,9 @@ def main() -> None:
     off.add_argument("--timeout", type=float, default=60)
     commands.add_parser("live")
     args = parser.parse_args()
+    global PROFILE_ROOT, OPERATIONS
+    root = separate_data_root(args.data_root)
+    PROFILE_ROOT, OPERATIONS = root / f"cli-profile-{claude.KIND}", root / "claude-mp00-operations"
     {"inspect": inspect, "status": status, "login": login, "offline": offline, "live": live}[args.command](args)
 
 
