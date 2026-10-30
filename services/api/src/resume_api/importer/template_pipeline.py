@@ -21,10 +21,11 @@ from packages.resume_core.template_identity import (capture_span, empty_value, e
     offered_evidence, source_slice)
 from packages.resume_core.template_entries import (closed_state, entry_part, entry_records, grouped, line_options,
     ordered_entries, outline_part, parse_outline, parse_outline_review, reorder_records, splits_entries)
-from packages.resume_core.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline, TemplateImportFailure,
-    add_entry_tasks, add_outline_review, admit_operation, attempt_in, authorization, cancel_operation, capture_finalization,
-    capture_task_input, checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time, record_return,
-    reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, task_in)
+from packages.resume_core.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
+    TemplateImportFailure, add_entry_tasks, add_outline_review, admit_operation, attempt_in, authorization, cancel_operation,
+    capture_finalization, capture_task_input, checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time,
+    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
+    stopped_call, stops_import, task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
@@ -37,23 +38,19 @@ from ..providers.dynamic_result import dynamic_result
 from .template_sidecar import OperationSidecar
 
 
-# No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
-ACCOUNT_STOP = frozenset({'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'})
-
-
 class AccountStop(TemplateImportFailure):
     pass
-
-
-def stops_import(operation, attempt):
-    # An unavailable fallback model fails only its own repair (E07); the import model being refused stops everything.
-    return attempt.error_code in ACCOUNT_STOP and (attempt.error_code != 'MODEL_DENIED'
-        or attempt.model.model == operation.capture.primary.model)
 
 
 def account_stop(operation):
     """The account-wide failure that stopped this import, or None."""
     return next((attempt.error_code for attempt in operation.attempts if stops_import(operation, attempt)), None)
+
+
+def halted(operation, attempt, cancel):
+    """The block ends here without a result: a stop leaves it unfinished for a resume, and unknown cleanup fences it."""
+    return (cancel.is_set() or operation.state == 'cancelled' or attempt.cleanup.state != 'verified'
+        or attempt.outcome == 'cancelled')
 
 
 @dataclass(frozen=True)
@@ -625,7 +622,7 @@ class TemplatePipeline:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
-                and attempt.slot == slot and attempt.state != 'released'), None)
+                and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
             if slot != 'initial' and not feedback:
                 break
             if slot == 'fallback_repair' and operation.capture.fallback is None:
@@ -672,7 +669,7 @@ class TemplatePipeline:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             attempt = attempt_in(operation, attempt_id)
-            if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+            if halted(operation, attempt, cancel):
                 return
             await asyncio.to_thread(self.guard, project, operation)
             if attempt.outcome != 'completed' and attempt.proposal_record_id is None:
@@ -723,7 +720,8 @@ class TemplatePipeline:
                 # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                 previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
-                and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
+                and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
+                and value.state != 'released' and not stopped_call(operation, value)), None)
             try:
                 if review_attempt is None:
                     review_id = await self.call(project, operation_id, task_id,
@@ -731,6 +729,9 @@ class TemplatePipeline:
                         review_schema(review), deadline, cancel, review=review)
                 else:
                     review_id = review_attempt.id
+                operation = operation_in(await self.view(project), operation_id)
+                if halted(operation, attempt_in(operation, review_id), cancel):
+                    return
                 await asyncio.to_thread(self.recheck, project, operation_id)
                 kept_first = [False]
                 def accept(value, current, _workspace):
@@ -762,7 +763,8 @@ class TemplatePipeline:
                 await self.finish_admitted(project, operation_id, task_id, proposal)
                 return
             unresolved = list(decision.unresolved_target_ids)
-        await self.fallback(project, operation_id, task_id, unresolved)
+        if not cancel.is_set():
+            await self.fallback(project, operation_id, task_id, unresolved)
 
     async def finish_admitted(self, project, operation_id, task_id, proposal):
         workspace = await self.view(project)
@@ -788,7 +790,7 @@ class TemplatePipeline:
             # Resumed after its entries were added: they run on and the block closes when they all ended.
             return Spawned(task_id, tuple(child.id for child in children), True)
         existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id and attempt.slot == 'outline'
-            and attempt.state != 'released'), None)
+            and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
         if existing is None:
             if any(attempt.task_id == task_id and attempt.slot in GENERATION_SLOTS for attempt in operation.attempts):
                 return None
@@ -815,7 +817,7 @@ class TemplatePipeline:
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
         attempt = attempt_in(operation, attempt_id)
-        if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+        if halted(operation, attempt, cancel):
             # A fenced or cancelled import: the task ends here like any block's, without a result.
             return Spawned(task_id, (), False)
         if attempt.outcome != 'completed' or attempt.raw_return is None:
@@ -850,7 +852,7 @@ class TemplatePipeline:
         parent_id = task.parent_task_id
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
         existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
-            and attempt.slot == 'outline_review' and attempt.state != 'released'), None)
+            and attempt.slot == 'outline_review' and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
         unresolved, missing, remarks = [], [], []
         if existing is None:
             offered = offered_evidence(stored.value) or {}
@@ -868,9 +870,11 @@ class TemplatePipeline:
             attempt_id = existing.id
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
+        if cancel.is_set():
+            return None
         if attempt_id is not None:
             attempt = attempt_in(operation, attempt_id)
-            if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+            if halted(operation, attempt, cancel):
                 return None
             if attempt.outcome == 'completed' and attempt.raw_return is not None:
                 try:
