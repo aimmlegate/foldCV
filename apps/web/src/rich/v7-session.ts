@@ -12,9 +12,10 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type Tem
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
+import { serverRewriteStage, type RewriteStage } from "./rewrite-progress";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { changedBy, selectedTextBlocks, shownSelection, styledKind, type BlockStyle, type TextBlock } from "./selection";
 import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
@@ -77,6 +78,8 @@ export class TemplateEditorSession {
   private formatting = false;
   private closed = false;
   private retries = 0;
+  // A cancel can come while the request still waits for typing to save; it is then never sent.
+  private readonly cancelledRewrites = new Set<string>();
 
   private modeValue: EditorMode = "recovering";
   private retention: Promise<void> = Promise.resolve();
@@ -93,7 +96,7 @@ export class TemplateEditorSession {
   private setMode(mode: EditorMode): void { this.modeValue = mode; this.port.mode(mode); this.lock(!this.writable); }
 
   constructor(readonly connection: ProjectEditorConnection, private readonly port: TemplateSessionPort, private readonly debounce = 400,
-    private readonly store: PendingStore = pendingStore()) {
+    private readonly store: PendingStore = pendingStore(), private readonly rewriteInterval = 500) {
     const sessionId = this.sessionId;
     this.history = new SessionHistory(sessionId, new Map(), () => {}, () => !this.closed, `${sessionId}:${crypto.randomUUID()}`, "server");
     this.queue = new RichSaveQueue({ durable: connection.response, sessionId, ports: {
@@ -153,6 +156,8 @@ export class TemplateEditorSession {
     const current = await this.connection.read();
     // Input typed meanwhile meets the newer revision itself and is translated again there.
     if (this.queue.template.pending.length) return;
+    // An edit committed while this read was on its way: its reply is newer than the read.
+    if (current.workspace.projectRevision < this.queue.template.durable.workspace.projectRevision) return;
     this.queue.template.adoptDurable(current);
     await this.reproject();
   }
@@ -172,9 +177,11 @@ export class TemplateEditorSession {
   async resume(): Promise<void> { this.setMode("normal"); await this.refresh(); }
 
   private lock(locked: boolean): void {
-    if (this.editor) this.editor.isEditable = !locked && this.mode !== "read_only";
-    if (locked && this.timer) { clearTimeout(this.timer); this.timer = null; }
-    if (!locked && this.deferred.length && this.writable) {
+    // One server-first step ending does not open input while another still runs.
+    const held = locked || this.panelBusy || this.navigating;
+    if (this.editor) this.editor.isEditable = !held && this.mode !== "read_only";
+    if (held && this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (!held && this.deferred.length && this.writable) {
       const deferred = this.deferred;
       this.deferred = [];
       for (const { value, kind } of deferred) this.enqueue(value, kind);
@@ -380,22 +387,46 @@ export class TemplateEditorSession {
     return { container: at.container, start: at.start, end: at.end, prior: at.prior, text: at.prior.slice(at.start, at.end) };
   }
 
-  /** One generation for the selected range after typing drains; the document and history do not change. */
-  async rewritePreview(instruction: string, requestId: string = crypto.randomUUID()): Promise<TemplateRewrite> {
+  /** One generation for the selected range after typing drains; the document and history do not change. `stage` hears
+   * the save, the send and what the server then reports. */
+  async rewritePreview(instruction: string, requestId: string = crypto.randomUUID(), stage: (stage: RewriteStage) => void = () => {}): Promise<TemplateRewrite> {
     const source = this.rewriteSource();
     if (!source) throw new Error("V7_INPUT_UNSUPPORTED");
     if (this.closed || this.composing || this.panelBusy || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
-    await this.flush();
-    const template = this.queue.template;
-    const range = verifiedRange(source, { response: template.durable, locals: template.localBlocks });
-    if ("conflict" in range) throw new Error("V7_INPUT_CONFLICT");
-    const preview = await this.connection.rewritePreview(requestId, this.snapshot(), range, instruction);
-    if (preview.source !== source.text) throw new Error("INVALID_RESULT");
-    return { requestId, instruction, container: source.container, start: source.start, end: source.end, prior: source.prior,
-      source: preview.source, text: preview.text };
+    stage("saving");
+    try {
+      await this.flush();
+      if (this.cancelledRewrites.has(requestId)) throw new ProjectApiFailure("CANCELLED", 409);
+      const template = this.queue.template;
+      const range = verifiedRange(source, { response: template.durable, locals: template.localBlocks });
+      if ("conflict" in range) throw new Error("V7_INPUT_CONFLICT");
+      stage("starting");
+      const stop = this.followRewrite(requestId, stage);
+      const preview = await this.connection.rewritePreview(requestId, this.snapshot(), range, instruction).finally(stop);
+      if (preview.source !== source.text) throw new Error("INVALID_RESULT");
+      return { requestId, instruction, container: source.container, start: source.start, end: source.end, prior: source.prior,
+        source: preview.source, text: preview.text };
+    } finally { this.cancelledRewrites.delete(requestId); }
   }
 
-  cancelRewrite(requestId: string): Promise<boolean> { return this.connection.rewriteCancel(requestId); }
+  /** Reads the server's stage until the reply arrives; a failed read leaves the shown stage as it is. */
+  private followRewrite(requestId: string, stage: (stage: RewriteStage) => void): () => void {
+    let stopped = false, timer: ReturnType<typeof setTimeout> | null = null;
+    const read = async () => {
+      const value = await this.connection.rewriteStage(requestId).catch(() => null);
+      if (stopped) return;
+      const known = serverRewriteStage(value);
+      if (known) stage(known);
+      timer = setTimeout(() => { void read(); }, this.rewriteInterval);
+    };
+    void read();
+    return () => { stopped = true; if (timer) clearTimeout(timer); };
+  }
+
+  cancelRewrite(requestId: string): Promise<boolean> {
+    this.cancelledRewrites.add(requestId);
+    return this.connection.rewriteCancel(requestId);
+  }
 
   /** Apply exactly the shown text as one replacement and one Undo; only the changed middle is replaced, so the rest keeps
    * its marks and owners. A container edited since the preview conflicts instead of applying. */
@@ -413,16 +444,18 @@ export class TemplateEditorSession {
 
   private copy(view: EditorView, event: ClipboardEvent, cut: boolean): boolean {
     const editor = this.editor, data = event.clipboardData;
-    if (!editor || !data || this.closed) return false;
+    // A caret copies nothing, so the clipboard keeps what it holds.
+    if (!editor || !data || this.closed || view.state.selection.empty) return false;
     event.preventDefault();
     if (cut && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
       this.refuse("cut needs whole blocks or text inside one block"); return true;
     }
-    const { clipboardHTML, externalHTML, markdown } = selectedFragmentToHTML(view, editor);
+    const { clipboardHTML, externalHTML } = selectedFragmentToHTML(view, editor);
     data.clearData();
     data.setData("blocknote/html", clipboardHTML);
     data.setData("text/html", externalHTML);
-    data.setData("text/plain", markdown);
+    // The shown text, not BlockNote's Markdown: a paste elsewhere must not bring literal markers.
+    data.setData("text/plain", selectedText(view.state));
     const copied = this.copySelection(cut);
     if (copied) data.setData(clipboardType, JSON.stringify({ projectId: this.connection.project, token: copied.token }));
     return true;
@@ -436,7 +469,7 @@ export class TemplateEditorSession {
     const state = editor._tiptapEditor.state, source = copySource(state);
     if (!source) return null;
     const capture = this.capture(source);
-    const copied: Copied = { token: crypto.randomUUID(), text: state.doc.textBetween(state.selection.from, state.selection.to, "\n"), capture };
+    const copied: Copied = { token: crypto.randomUUID(), text: selectedText(state), capture };
     this.copied = copied;
     return { ...copied, done: cut ? this.cut(source, capture) : capture.then(() => {}) };
   }
@@ -495,9 +528,10 @@ export class TemplateEditorSession {
         source: { kind: "same_project", clipboardCaptureId: captured.id } }, prior: new Map([[containerKey(at.container), at.prior]]) }]);
       return;
     }
-    // Several paragraphs need a block-boundary representation Python does not offer yet.
-    if (text.includes("\n")) { this.refuse("multi-paragraph text paste"); return; }
-    if (text) editor._tiptapEditor.view.dispatch(state.tr.insertText(text));
+    // One copied line ends in a line end; several paragraphs need a block-boundary representation Python does not offer yet.
+    const line = text.replace(/\r?\n$/, "");
+    if (line.includes("\n")) { this.refuse("multi-paragraph text paste"); return; }
+    if (line) editor._tiptapEditor.view.dispatch(state.tr.insertText(line));
   }
 
   /** Moving the caret to another container ends the current typing action. */
@@ -548,10 +582,10 @@ export class TemplateEditorSession {
     return this.retention;
   }
 
-  private lost(items: readonly TemplateQueuedIntent[]): void {
+  private lost(items: readonly TemplateQueuedIntent[], code = "V7_INPUT_CONFLICT"): void {
     const text = items.map(item => item.intent.operation.kind === "replace_text" ? item.intent.operation.text
       : [...item.intent.prior.values()].join("\n")).filter(Boolean).join("\n");
-    this.port.warning(`${errorMessage("V7_INPUT_CONFLICT")}${text ? "\n" + text : ""}`);
+    this.port.warning(`${errorMessage(code)}${text ? "\n" + text : ""}`);
     // The editor still shows the dropped text; the saved state replaces it once nothing else is pending.
     if (!this.queue.template.pending.length) queueMicrotask(() => { void this.reproject(); });
   }
@@ -732,9 +766,10 @@ export class TemplateEditorSession {
     let settled = () => {};
     this.navigation = new Promise(resolve => { settled = resolve; });
     this.boundary();
-    this.navigating = true;
-    // The command locks input, and a contenteditable that turns read-only loses focus; give it back afterwards.
+    // Input stays locked to the end, and a contenteditable that turns read-only loses focus; give it back afterwards.
     const focused = this.editor?.isFocused() ?? false;
+    this.navigating = true;
+    this.lock(true);
     let reservation: HistoryReservation | null = null;
     try {
       await this.flush();
@@ -772,6 +807,7 @@ export class TemplateEditorSession {
     } finally {
       if (reservation) this.history.discard(reservation);
       this.navigating = false;
+      this.lock(!this.writable);
       settled();
       if (focused && this.editor?.isEditable) this.editor.focus();
     }
@@ -801,22 +837,27 @@ export class TemplateEditorSession {
     }
   }
 
-  /** After a block, re-express every container with pending input from canonical text to the editor text. */
+  /** After a block, re-express every container with pending input from canonical text to the editor text. What text
+   * cannot carry is not re-expressed: the saved state is shown and the notice names the affected text. */
   retry(keepEditorText: ReadonlySet<string> = new Set()): void {
     const editor = this.editor;
     if (!editor) return;
-    const template = this.queue.template, locals = template.localBlocks, blocks = responseBlocks(template.durable);
+    const template = this.queue.template, locals = template.localBlocks, blocks = responseBlocks(template.durable), pending = template.pending;
+    // As text, a refused split would delete what moved to its local block.
+    if (pending.some(item => !["replace_text", "set_marks"].includes(item.intent.operation.kind))) { this.giveUp(); return; }
     const corrections: V7Intent[] = [], unchanged = new Set<string>();
     for (const key of template.unsavedBase().keys()) {
       const container = parseContainer(key), canonicalId = locals.get(container.blockId) ?? container.blockId;
       const group = blocks.get(canonicalId)?.groups.find(value => value.kind === container.kind
         && (container.kind !== "cell" || value.key === container.cellId));
-      if (!group) { this.port.warning(errorMessage("V7_CORRECTION_NOT_ALLOWED")); return; }
+      if (!group) { this.giveUp(); return; }
       const value = correctionOperation(editor._tiptapEditor.state.doc, container, contentText(group.content));
       if (value === null) { unchanged.add(key); continue; }
-      if (!("operation" in value)) { this.refuse(value.reason); return; }
+      if (!("operation" in value)) { console.warn(`V7 correction refused: ${value.reason}`); this.giveUp(); return; }
       corrections.push({ localId: `intent-${crypto.randomUUID()}`, operation: value.operation, prior: value.prior });
     }
+    const marks = pending.filter(item => item.intent.operation.kind === "set_marks");
+    if (!corrections.length) { if (marks.length) this.giveUp(); else this.discard(); return; }
     this.boundary();
     const id = this.history.commit("structure", [], null);
     if (!id) return;
@@ -826,7 +867,25 @@ export class TemplateEditorSession {
     catch (error) { this.port.warning(errorMessage(error)); return; }
     this.action = id;
     this.boundary();
+    if (marks.length) this.lost(marks, "V7_CHANGE_NOT_SAVED");
     this.schedule();
+  }
+
+  /** The block notice's first choice: the editor's text replaces whatever the saved text has become. */
+  keepEditorText(): void { this.retry(new Set(this.queue.template.unsavedBase().keys())); }
+
+  /** The block notice's second choice: unsaved input goes and the saved state is shown. */
+  discard(): void { if (this.dropUnsaved()) void this.reproject(); }
+
+  private giveUp(): void {
+    const dropped = this.dropUnsaved();
+    if (dropped) this.lost(dropped, "V7_CHANGE_NOT_SAVED");
+  }
+
+  private dropUnsaved(): readonly TemplateQueuedIntent[] | null {
+    this.boundary();
+    try { return this.queue.template.discardUnsaved(); }
+    catch (error) { this.port.warning(errorMessage(error)); return null; }
   }
 
   close(): void {

@@ -272,8 +272,15 @@ export class TemplateIntentStrategy {
     if (this.scheduler.closed) return false;
     const noOp = !result.replayed && result.revision === entry.baseRevision;
     const created = createdLocals(entry.intent, result.createdBlocks);
-    if (!created && !result.replayed) this.stop("conflict", "created block has no single verified result");
-    for (const [local, canonicalId] of created ?? []) this.locals.set(local, canonicalId);
+    if (!created) {
+      if (!result.replayed) this.stop("conflict", "created block has no single verified result");
+      // A replay after a restart may not name the created block: the saved state settles this intent, and later input
+      // on that block is reported with its text instead of blocking the queue.
+      for (const item of this.entries) this.recoveryRequired.add(item.clientMutationId);
+      await this.reconcile(entry);
+      return true;
+    }
+    for (const [local, canonicalId] of created) this.locals.set(local, canonicalId);
     this.adopt(entry, result.response, result, noOp);
     return true;
   }

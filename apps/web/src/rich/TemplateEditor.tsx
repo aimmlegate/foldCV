@@ -11,17 +11,18 @@ import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
 import type { PaneOrder } from "../workbench/settings/interface";
+import { BlockedInputNotice } from "../workbench/editor/BlockedInputNotice";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
-import type { RewriteActivity } from "./rewrite-progress";
+import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
 import { markable } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
-import { templateSchema } from "./template-schema";
+import { disabledExtensions, templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
 import { focusFacts } from "./v7-focus";
 import { focusIconChoices } from "../projects/api";
@@ -59,6 +60,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
   const [factsVisible, setFactsVisible] = useState(false);
+  // The fact row a finding points at, until the panel has shown it.
+  const [factFocus, setFactFocus] = useState<{ recordId: string } | null>(null);
+  const factFocused = useCallback(() => setFactFocus(null), []);
   // Blocks an assistant Apply changed, marked for a moment so the user sees where the edit landed.
   const [changed, setChanged] = useState<{ blockIds: string[]; at: number } | null>(null);
   useEffect(() => {
@@ -73,6 +77,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // Selected-text rewrite: one preview at a time; nothing changes until Apply.
   const [rewriteOpen, setRewriteOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
+  const instructionNow = useRef(instruction), rewriteTarget = useRef("");
+  instructionNow.current = instruction;
   const [rewriteSource, setRewriteSource] = useState("");
   const [rewritePreview, setRewritePreview] = useState<TemplateRewrite | null>(null);
   const [rewriteText, setRewriteText] = useState("");
@@ -109,7 +115,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
     prosemirrorPlugins: [session.plugin, presentation, remarkPlugin] }), [session, presentation, remarkPlugin]);
   const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
-    disableExtensions: ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts"],
+    disableExtensions: disabledExtensions,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
     initialContent: projectTemplateDocument(project.document) }, []);
   useEffect(() => {
@@ -148,6 +154,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       if (anchor.blockId) return showBlock(anchor.blockId);
       if (!anchor.recordId || !records.has(anchor.recordId)) return false;
       setFactsVisible(true);
+      setFactFocus({ recordId: anchor.recordId });
       return true;
     } }), [session, editor]);
   async function recover() {
@@ -177,22 +184,25 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     setFormatting(true);
     void session.format(style).then(() => { if (editor.isEditable) editor.focus(); }).finally(() => setFormatting(false));
   }
+  const rewrites = useMemo(() => new RewriteRequests<TemplateRewrite>({
+    preview: (requestId, stage) => session.rewritePreview(instructionNow.current, requestId, stage),
+    cancel: requestId => session.cancelRewrite(requestId), activity: setRewriteActivity,
+    done: preview => { setRewritePreview(preview); setRewriteText(preview.text); setRewriteSource(preview.source); },
+    failed: setRewriteError, cancelFailed: error => setWarning(errorMessage(error)),
+  }), [session]);
   function openRewrite() {
     const source = session.rewriteSource();
     if (!source) { unsupported(); return; }
     const view = editor._tiptapEditor.view, coords = view.coordsAtPos(view.state.selection.from);
     setRewriteAnchor({ left: coords.left, top: coords.top, bottom: coords.bottom });
+    // A panel hidden during a request reopens on it; another selection replaces it.
+    const target = JSON.stringify([source.container, source.start, source.end]);
+    if (rewrites.running && target === rewriteTarget.current) { setRewriteOpen(true); return; }
+    rewriteTarget.current = target;
+    rewrites.supersede();
     setRewriteSource(source.text); setRewritePreview(null); setRewriteText(""); setRewriteError(""); setRewriteOpen(true);
   }
-  async function submitRewrite() {
-    const requestId = crypto.randomUUID();
-    setRewriteError(""); setRewriteActivity({ actionId: requestId, stage: "running", startedAt: Date.now(), finishedAt: null, detail: null });
-    try {
-      const preview = await session.rewritePreview(instruction, requestId);
-      setRewritePreview(preview); setRewriteText(preview.text); setRewriteSource(preview.source);
-    } catch (error) { setRewriteError(error instanceof Error ? error.message : "INVALID_RESULT"); }
-    finally { setRewriteActivity(null); }
-  }
+  function submitRewrite() { setRewriteError(""); void rewrites.submit(); }
   async function applyRewrite() {
     if (!rewritePreview) return;
     setRewriteActivity({ actionId: rewritePreview.requestId, stage: "applying", startedAt: Date.now(), finishedAt: null, detail: null });
@@ -245,9 +255,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
   return <div className="contents uir-editor-session">
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
-      submit={() => void submitRewrite()} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
+      submit={submitRewrite} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
       preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
-      anchor={rewriteAnchor} focusInstruction activity={rewriteActivity} cancel={id => { void session.cancelRewrite(id); }} />
+      anchor={rewriteAnchor} focusInstruction activity={rewriteActivity} cancel={id => { void rewrites.cancel(id); }} />
     {linkTarget && <LinkTargetDialog href={linkTarget.href} close={() => { setLinkTarget(null); editor.focus(); }}
       apply={href => void applyLinkTarget(linkTarget, href)} />}
     <WorkspaceViews view={workspaceView} change={changeWorkspaceView} hasSource={sources.length > 0} notices={null} />
@@ -259,10 +269,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </div>}
         {mode === "read_only" && <div className="notice warning" role="alert"><p>{errorMessage("EDITOR_REPLACED")}</p></div>}
         <EditorNotices warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}} />
-        {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
-          <p>{state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}</p>
-          <button type="button" onClick={() => session.retry()}>Сохранить мой текст</button>
-        </div>}
+        {(state.kind === "conflict" || state.kind === "rejected") && <BlockedInputNotice
+          text={state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}
+          keep={() => session.keepEditorText()} discard={() => session.discard()} />}
       </aside>
       {/* The layout host: the facts panel floats over the document. */}
       <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
@@ -280,7 +289,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
             focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
             technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
-            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
+            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
             anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
         </fieldset>
         <div className="paper-scroll" onKeyDownCapture={linkShortcut}>

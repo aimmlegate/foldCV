@@ -20,7 +20,7 @@ class ScriptedRewrite:
     def __init__(self):
         self.calls, self.held = [], {}
 
-    async def text(self, _project, request_id, instruction, source):
+    async def text(self, _project, request_id, instruction, source, _admitted):
         from packages.resume_core.project_repository import RepositoryFailure
         self.calls.append({'requestId': request_id, 'instruction': instruction, 'source': source})
         if instruction == 'hold':

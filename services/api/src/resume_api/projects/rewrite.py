@@ -22,9 +22,10 @@ def preview_source(service, project_id, payload):
 
 async def preview(service, project_id, payload):
     selected = await asyncio.to_thread(preview_source, service, project_id, payload)
-    task = service.tasks.start(project_id, 'rewrite', stage='generating', detail={'requestId': payload.request_id})
+    task = service.tasks.start(project_id, 'rewrite', stage='queued', detail={'requestId': payload.request_id})
     try:
-        text = await service.rewrite_text(project_id, payload.request_id, payload.instruction, selected)
+        text = await service.rewrite_text(project_id, payload.request_id, payload.instruction, selected,
+            lambda: service.tasks.update(task.id, stage='generating'))
     except BaseException as error:
         code = getattr(error, 'code', 'PROCESS_FAILED')
         service.tasks.finish(task.id, 'cancelled' if code == 'CANCELLED' else 'failed', error=code)

@@ -8,7 +8,9 @@ import { templateSchema } from "../src/rich/template-schema";
 import { textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
+import { RewriteRequests, type RewriteActivity, type RewriteStage } from "../src/rich/rewrite-progress";
 import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
+import { blockStart, response, saved, scripted, select as selectRange, settled, type, type Reply, type Wire } from "./support/scripted-project";
 
 function storage(): Storage {
   const values = new Map<string, string>();
@@ -172,4 +174,118 @@ test("E05: cancelling a running preview and a failed generation leave the docume
     assert.equal(JSON.stringify((await shown(session)).response.workspace.project), before);
     assert.equal(session.history.length, length);
   } finally { session.close(); await value.close(); }
+});
+
+function requests(cancel: (requestId: string) => Promise<boolean> = () => Promise.resolve(true)) {
+  const replies: { resolve: (text: string) => void; reject: (error: Error) => void }[] = [], stages: ((stage: RewriteStage) => void)[] = [];
+  const activity: (RewriteActivity | null)[] = [], done: string[] = [], failed: string[] = [], cancelled: string[] = [], cancelFailed: unknown[] = [];
+  const runs = new RewriteRequests<string>({
+    preview: (_id, stage) => { stages.push(stage); return new Promise((resolve, reject) => { replies.push({ resolve, reject }); }); },
+    cancel: id => { cancelled.push(id); return cancel(id); }, activity: value => activity.push(value), done: value => done.push(value),
+    failed: value => failed.push(value), cancelFailed: value => cancelFailed.push(value),
+  });
+  return { runs, replies, stages, activity, done, failed, cancelled, cancelFailed };
+}
+
+test("a reply of a superseded rewrite never fills the panel", async () => {
+  const { runs, replies, activity, done, failed, cancelled } = requests();
+  const first = runs.submit();
+  const id = activity[0]?.actionId;
+  assert.equal(activity[0]?.stage, "saving");
+  runs.supersede();
+  assert.equal(activity.at(-1), null);
+  assert.deepEqual(cancelled, [id]);
+  assert.equal(runs.running, false);
+  replies[0]?.resolve("old preview");
+  await first;
+  const second = runs.submit();
+  replies[1]?.reject(new Error("CANCELLED"));
+  await second;
+  assert.deepEqual(done, []);
+  assert.deepEqual(failed, ["CANCELLED"], "the current request still reports");
+});
+
+test("a current reply fills the panel and ends the activity", async () => {
+  const { runs, replies, activity, done } = requests();
+  const run = runs.submit();
+  replies[0]?.resolve("new text");
+  await run;
+  assert.deepEqual(done, ["new text"]);
+  assert.equal(activity.at(-1), null);
+});
+
+test("cancel shows its own stage, later stages do not replace it, and the reply ends it", async () => {
+  const { runs, replies, stages, activity, failed } = requests();
+  const run = runs.submit(), id = activity[0]?.actionId ?? "";
+  stages[0]?.("running");
+  await runs.cancel(id);
+  assert.equal(activity.at(-1)?.stage, "cancelling");
+  stages[0]?.("running");
+  assert.equal(activity.at(-1)?.stage, "cancelling");
+  replies[0]?.reject(new Error("CANCELLED"));
+  await run;
+  assert.deepEqual(failed, ["CANCELLED"]);
+  assert.equal(activity.at(-1), null);
+});
+
+test("a cancel that fails or is refused says so and the stage returns", async () => {
+  for (const cancel of [() => Promise.reject(new Error("REQUEST_FAILED")), () => Promise.resolve(false)]) {
+    const { runs, replies, stages, activity, cancelFailed } = requests(cancel);
+    const run = runs.submit(), id = activity[0]?.actionId ?? "";
+    stages[0]?.("queued");
+    await runs.cancel(id);
+    assert.equal(activity.at(-1)?.stage, "queued");
+    assert.equal(cancelFailed.length, 1);
+    replies[0]?.resolve("text");
+    await run;
+  }
+});
+
+type PreviewBody = { requestId: string; snapshot: unknown; range: unknown };
+function previewReply(request: Wire | null, source: string, text: string): Reply {
+  const body = request?.body as PreviewBody | undefined;
+  return { status: 200, body: { schemaVersion: 1, requestId: body?.requestId, snapshot: body?.snapshot, range: body?.range, source, text } };
+}
+const rewriteTask = (stage: string) => ({ status: 200, body: { schemaVersion: 1, tasks: [{ kind: "rewrite", state: "running", stage, detail: { requestId: "request-1" } },
+  { kind: "rewrite", state: "running", stage: "generating", detail: { requestId: "other" } }] } });
+
+test("a preview walks through the save, the send and the server's real stages", async () => {
+  const seen: string[] = [];
+  let generating = () => {}, reads = 0;
+  const running = new Promise<void>(resolve => { generating = resolve; });
+  const { session, editor } = await scripted(response([{ id: "a", text: "source" }], 1), async (path, request) => {
+    if (path.endsWith("/tasks")) return rewriteTask(++reads === 1 ? "queued" : "generating");
+    await running;
+    return previewReply(request, "source", "new");
+  });
+  try {
+    const a = blockStart(editor, "a");
+    selectRange(editor, a, a + 6);
+    const preview = await session.rewritePreview("Make clearer", "request-1", stage => { seen.push(stage); if (stage === "running") generating(); });
+    assert.equal(preview.text, "new");
+    assert.deepEqual(seen.slice(0, 4), ["saving", "starting", "queued", "running"]);
+  } finally { session.close(); }
+});
+
+test("a cancel during the save stops the preview before it is sent", async () => {
+  const paths: string[] = [];
+  let release = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const { session, editor } = await scripted(response([{ id: "a", text: "source" }, { id: "b", text: "other" }], 1), async (path, request) => {
+    paths.push(path);
+    if (path.endsWith("/rewrite/cancel")) return { status: 200, body: { cancelled: true } };
+    await held;
+    return saved(response([{ id: "a", text: "source" }, { id: "b", text: "otherZ" }], 2), request?.clientMutationId ?? "");
+  });
+  try {
+    type(editor, "Z", blockStart(editor, "b") + 5);
+    const a = blockStart(editor, "a");
+    selectRange(editor, a, a + 6);
+    const preview = session.rewritePreview("Make clearer", "request-1");
+    await settled();
+    assert.equal(await session.cancelRewrite("request-1"), true);
+    release();
+    await assert.rejects(preview, (error: Error) => error.message === "CANCELLED");
+    assert.ok(!paths.some(path => path.endsWith("/rewrite/preview")), "the model is never asked");
+  } finally { session.close(); }
 });

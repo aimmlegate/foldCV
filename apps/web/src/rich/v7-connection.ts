@@ -7,6 +7,7 @@ import type { EditResultV1 } from "../contracts/generated/edit_result_v1";
 import type { ProjectOpenResultV1 } from "../contracts/generated/project_open_result_v1";
 import type { HistoryStateV1 } from "../contracts/generated/history_state_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
+import type { TaskStatusV1 } from "../contracts/generated/task_status_v1";
 import { templateExportArtifact } from "../contracts/template-export";
 import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 
@@ -89,8 +90,10 @@ export class ProjectEditorConnection {
     return this.reopening;
   }
 
+  /** The saved state; a read that an edit overtook is older than the adopted reply and leaves it in place. */
   async read(): Promise<TemplateProjectResponseV1> {
-    this.response = await v2Request<TemplateProjectResponseV1>(this.path(""), "GET", undefined, this.fetcher);
+    const response = await v2Request<TemplateProjectResponseV1>(this.path(""), "GET", undefined, this.fetcher);
+    if (response.workspace.projectRevision >= this.response.workspace.projectRevision) this.response = response;
     return this.response;
   }
 
@@ -140,6 +143,12 @@ export class ProjectEditorConnection {
     const value = await this.editing(token => v2Request<{ cancelled: boolean }>(this.path("/rewrite/cancel"), "POST",
       { requestId, editorToken: token }, this.fetcher));
     return value.cancelled;
+  }
+
+  /** The server's stage of a running preview; null while it has no task. */
+  async rewriteStage(requestId: string): Promise<string | null> {
+    const value = await v2Request<{ tasks: TaskStatusV1[] }>(this.path("/tasks"), "GET", undefined, this.fetcher);
+    return value.tasks.find(task => task.kind === "rewrite" && task.state === "running" && task.detail["requestId"] === requestId)?.stage ?? null;
   }
 
   async rename(title: string): Promise<TemplateProjectResponseV1> {
