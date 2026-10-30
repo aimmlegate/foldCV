@@ -1,6 +1,6 @@
 """Human raw cells and shared ambiguous input become one guarded fact patch."""
 
-from .rich_fields import builtin_cell_values, working_field
+from .rich_fields import builtin_cell_values, set_text, working_field
 from .template_preparation_ids import allocate_id
 
 
@@ -28,9 +28,14 @@ def human_cell_steps(workspace, cell_ids, text, action_id, block_ids, allocator,
             value.state, value.origin, value.user_corrected = 'pending_manual' if ambiguous else 'human_raw', 'human', True
             value.manual_scope_id = scope_id
         else:
-            value.value, value.raw_text = None, '' if ambiguous else text
-            value.status, value.pending_raw_text = ('pending', text) if ambiguous else ('unresolved', None)
-            value.user_corrected = updated.user_corrected = True
+            # Typed text reads as a Facts edit reads it; only shared input waits for its split.
+            if ambiguous:
+                value.value, value.raw_text, value.status, value.pending_raw_text = None, '', 'pending', text
+                value.user_corrected = updated.user_corrected = True
+                if record.kind == 'technology' and key == 'display':
+                    set_text(updated, 'canonicalId', '')
+            else:
+                set_text(updated, key, text)
             old_scope = facts.builtin_manual_scopes.get(identifier)
             if old_scope != scope_id:
                 references.append({'kind': 'set_builtin_manual_scope', 'cellId': identifier,

@@ -228,8 +228,8 @@ def duration_text(months, locale):
 
 def focus_durations(facts, as_of, locale):
     """Technology record id to the time the jobs listing that technology span (D104: the user chose durations counted
-    from projects when the CV states none). Overlaps count once, an ongoing job runs to the formatting date, and a
-    period without a known start or end is left out; partial dates count the middle of their range."""
+    from projects when the CV states none). Overlaps count once, no job counts past the formatting date, an ongoing job
+    runs to it, and a period without a known start or end is left out; partial dates count the middle of their range."""
     jobs = {record.id: record for record in facts.records if record.kind in {'employment', 'subproject'}}
     groups, owners = {}, {}
     for record in facts.records:
@@ -250,7 +250,7 @@ def focus_durations(facts, as_of, locale):
             if period.present.status == 'known' and period.present.value is True:
                 end = (now, now)
             elif period.end.status == 'known' and period.end.value is not None:
-                end = month_bounds(period.end.value)
+                end = tuple(min(value, now) for value in month_bounds(period.end.value))
             else:
                 continue
             start = month_bounds(period.start.value)

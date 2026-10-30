@@ -6,7 +6,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
 import { panelCommandsV7 } from "../src/rich/v7-panel";
-import { focusOptions, searchIcons, wholeYears, yearsValue } from "../src/rich/v7-focus";
+import { focusFacts, focusOptions, searchIcons, wholeYears, yearsValue } from "../src/rich/v7-focus";
 import { parseFocusIconChoices } from "../src/projects/api";
 import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
@@ -243,4 +243,13 @@ test("a finding on a fact reaches its row through the panel's focus request", ()
   const source = readFileSync(new URL("../src/rich/TemplateEditor.tsx", import.meta.url), "utf8");
   assert.match(source, /setFactFocus\(\{ recordId: anchor\.recordId \}\)/u);
   assert.match(source, /focusRequest=\{factFocus\} onFocused=\{factFocused\}/u);
+});
+
+test("a full Focus offers no technology to add", () => {
+  const display = { rawText: "Go", value: "Go", status: "known" };
+  const project = { facts: { records: [{ id: "go", kind: "technology", jobId: null, display }] },
+    templatePackage: { assets: [] }, document: { regions: [] } } as unknown as Parameters<typeof focusFacts>[0];
+  const presentation = (full: boolean) => ({ editor: { blocks: {}, focusPanel: { records: [], ...(full ? { full } : {}) } } }) as unknown as Parameters<typeof focusFacts>[1];
+  assert.deepEqual(focusFacts(project, presentation(false)).options.map(option => option.recordId), ["go"]);
+  assert.deepEqual(focusFacts(project, presentation(true)).options, []);
 });

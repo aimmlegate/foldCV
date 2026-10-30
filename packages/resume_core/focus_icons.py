@@ -6,6 +6,7 @@ import re
 
 from .storage import StorageFailure, atomic_write, locked_root, private_file
 from .technologies import normalize_name
+from .templates.focus import remembered_catalog
 
 MAX_BYTES = 256 * 1024
 MAX_NAMES = 2000
@@ -33,7 +34,7 @@ class FocusIconStore:
             if len(raw) > MAX_BYTES:
                 return {}
             value = json.loads(raw)
-        except (OSError, StorageFailure, ValueError):
+        except (OSError, RecursionError, StorageFailure, ValueError):
             return {}
         names = value.get('names') if isinstance(value, dict) and value.get('schemaVersion') == 1 else None
         if not isinstance(names, dict):
@@ -44,12 +45,19 @@ class FocusIconStore:
         try:
             with locked_root(self.root, '.focus-icons.lock'):
                 return self._read()
-        except StorageFailure:
+        except (OSError, StorageFailure):
             return {}
 
     def update(self, changes):
-        """Each (name, icon) remembers the icon for the name, or forgets the name for None. Past the limit the oldest
-        choices go. Raises StorageFailure when the file cannot be written."""
+        """Each (name, icon) remembers the icon for the name, or forgets the name for None, with every remembered name
+        a row of that name would match. Past the limit the oldest choices go. Raises StorageFailure when the file cannot
+        be written."""
+        try:
+            return self._update(changes)
+        except OSError as error:
+            raise StorageFailure(str(error)) from error
+
+    def _update(self, changes):
         with locked_root(self.root, '.focus-icons.lock'):
             names = self._read()
             before = dict(names)
@@ -58,7 +66,10 @@ class FocusIconStore:
                 if not key or len(key) > MAX_NAME:
                     continue
                 names.pop(key, None)
-                if icon is not None and ICON.fullmatch(icon):
+                if icon is None:
+                    for other in [value for value in names if remembered_catalog({value: value}).find(key) is not None]:
+                        names.pop(other)
+                elif ICON.fullmatch(icon):
                     names[key] = icon
             while len(names) > MAX_NAMES:
                 names.pop(next(iter(names)))

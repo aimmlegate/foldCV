@@ -72,6 +72,14 @@ def focus_only(project):
     return frozenset(section.props.record_id for _items, section in rows) - shown
 
 
+def focus_full(project):
+    """Whether the Focus rows reached the most the template's view takes."""
+    view = focus_view(project.template_package)[0]
+    limit = view.content_schema.get('maxItems')
+    technologies = {record.id for record in project.facts.records if record.kind == 'technology'}
+    return limit is not None and len(focus_rows(project.document, view.id, technologies)) >= limit
+
+
 def _detail_content(package, view, index, instance, record, experience_key, computed, allocator, slot):
     """The experience line: the stated value bound to its field, else the time the technology's jobs span; None hides it."""
     node = view.view.nodes[index]
@@ -96,6 +104,8 @@ def _add(workspace, candidate, command, allocator, technologies, remembered):
     rows = focus_rows(candidate.document, view.id, technologies)
     if any(section.props.record_id == record.id for _items, section in rows):
         raise ValueError('FOCUS_DUPLICATE')
+    if focus_full(candidate):
+        raise ValueError('FOCUS_FULL')
     node = view.view.nodes[index]
     locale = package.definition.template.default_locale
     instance = allocator.allocate('template-instance', ['panel-focus-instance', record.id])
@@ -264,6 +274,39 @@ def show_experience(candidate, updated, allocator):
             else:
                 kept.content, kept.presentation = content, ref
             section.children.append(kept)
+
+
+def refresh_durations(workspace, candidate, facts, allocator):
+    """A computed Focus line follows the jobs (D105). The line is known by its text: a row without stated experience whose
+    line still reads what the jobs gave before takes what they give now. A line the user wrote stays, and a row they
+    cleared stays empty."""
+    try:
+        view, index, name_key, experience_key = focus_view(candidate.template_package)
+    except ValueError:
+        return
+    as_of, package = workspace.formatting_as_of, candidate.template_package
+    if as_of is None:
+        return
+    locale = package.definition.template.default_locale
+    old, new = focus_durations(workspace.project.facts, as_of, locale), focus_durations(facts, as_of, locale)
+    records = {record.id: record for record in facts.records if record.kind == 'technology'}
+    for _items, section in focus_rows(candidate.document, view.id, records):
+        identifier = section.props.record_id
+        name = next((at for at, block in enumerate(section.children) if _is_name(block, identifier, name_key)), None)
+        stated = working_field(records[identifier], experience_key) if experience_key else None
+        if old.get(identifier) == new.get(identifier) or name is None or stated is not None and stated.raw_text.strip():
+            continue
+        line = section.children[name + 1] if name + 1 < len(section.children) else None
+        if line is None and identifier not in old and identifier in new:
+            ref, content = _detail_content(package, view, index, section.children[name].presentation.template_instance_id,
+                records[identifier], None, new[identifier], allocator, ['computed', section.id])
+            section.children.append(TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block',
+                ['panel-focus-computed', section.id]), revision=1, props={}, children=[], provenance=[], presentation=ref, content=content))
+        elif line is not None and [getattr(span, 'text', None) for span in line.content] == [old.get(identifier)]:
+            if identifier in new:
+                line.content[0].text = new[identifier]
+            else:
+                section.children.remove(line)
 
 
 def prepare_focus(workspace, command, allocator, remembered=None):

@@ -83,7 +83,8 @@ export function focusFacts(project: Project, presentation: TemplateProjectRespon
   };
   project.document.regions.forEach(region => visit(region.blocks));
   const named = new Set(entries.map(entry => technologyKey(entry.display)));
-  return { entries, options: focusOptions(technologies.values(), lined, named), only: new Set(panel.records), icons: panel.icons === true };
+  return { entries, options: panel.full ? [] : focusOptions(technologies.values(), lined, named), only: new Set(panel.records),
+    icons: panel.icons === true };
 }
 
 /** One icon of the project's template, as the choices route lists it. */

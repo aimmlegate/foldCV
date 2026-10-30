@@ -87,7 +87,7 @@ class ProjectService:
             return
         try:
             self.icons.update(changes)
-        except StorageFailure:
+        except (OSError, StorageFailure):
             # The edit is saved either way; only the choice for later rows is lost.
             pass
 

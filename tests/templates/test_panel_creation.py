@@ -97,7 +97,7 @@ def test_new_employment_allocates_only_human_canonical_identity_and_preserves_al
             id_factory=lambda _prefix:pytest.fail('unmapped periods must not receive guessed identities'))
 
 
-@pytest.mark.parametrize(('start','month'),[('03.2024',None),('2024-03',3)])
+@pytest.mark.parametrize(('start','month'),[('весна 2024',None),('03.2024',3),('2024-03',3)])
 def test_new_period_uses_captured_defaults_and_keeps_existing_period_runs_unchanged(start,month):
     before,_=employment_workspace();section=owner(before);existing=period_block(section)
     existing.content[0].styles.bold=True
@@ -305,7 +305,7 @@ def test_multiple_period_nodes_require_the_explicit_captured_node_context():
         view=config['blocks'][0]['view']
         view['nodes'].append(deepcopy(next(node for node in view['nodes'] if node['type']=='period')))
     before=empty_configure(edit)
-    before=prepared(before,request(before,values={'employer':'Two period views'})).preview.workspace
+    before=prepared(before,request(before,values={'employer':'Two period views','start':'2020'})).preview.workspace
     section=owner(before)
     periods=[block for block in section.children if any(isinstance(span,FieldOccurrence)
         and span.field_key.startswith('period:') for span in block.content)]

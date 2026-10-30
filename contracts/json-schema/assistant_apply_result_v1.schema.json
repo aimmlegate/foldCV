@@ -2800,6 +2800,11 @@
       "additionalProperties": false,
       "description": "The facts panel can add, remove and move Focus rows, set their years and choose their icons.",
       "properties": {
+        "full": {
+          "default": false,
+          "title": "Full",
+          "type": "boolean"
+        },
         "icons": {
           "default": false,
           "title": "Icons",
@@ -2818,6 +2823,29 @@
         "records"
       ],
       "title": "EditorFocusPanel",
+      "type": "object"
+    },
+    "EditorJob": {
+      "additionalProperties": false,
+      "description": "One job in the facts panel.",
+      "properties": {
+        "addPeriod": {
+          "default": false,
+          "title": "Addperiod",
+          "type": "boolean"
+        },
+        "periods": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Periods",
+          "type": "array"
+        }
+      },
+      "required": [
+        "periods"
+      ],
+      "title": "EditorJob",
       "type": "object"
     },
     "EditorPlacement": {
@@ -2895,6 +2923,16 @@
           "title": "Icons",
           "type": "array"
         },
+        "jobs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/EditorJob"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Jobs",
+          "type": "object"
+        },
         "styles": {
           "additionalProperties": {
             "$ref": "#/$defs/EditorStyle"
@@ -2902,12 +2940,36 @@
           "title": "Styles",
           "type": "object"
         },
+        "technologyLines": {
+          "items": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Technologylines",
+          "type": "array"
+        },
         "technologyTargets": {
           "items": {
             "$ref": "#/$defs/EditorTechnologyTarget"
           },
           "title": "Technologytargets",
           "type": "array"
+        },
+        "unshownFields": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Unshownfields",
+          "type": "object"
         }
       },
       "required": [

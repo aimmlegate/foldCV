@@ -1,6 +1,8 @@
 """Focus icon choice through the routes (D122): a pick is remembered, Undo and Redo move the memory with it, the
 choices route lists the template's icons and serves their PNGs, and a row added later takes the remembered icon."""
 
+import errno
+
 import pytest
 
 from tests.projects.support import Editor, v2_app
@@ -40,3 +42,16 @@ async def test_a_pick_is_remembered_follows_undo_and_redo_and_an_added_row_takes
         assert refused['error']['code'] == 'FOCUS_ICON_UNKNOWN' and store.load() == {'sql': 'mysql'}
         editor.edit(command(editor, 'set_focus_icon', sql.id, 'reset', {'icon': ''}))
         assert chosen(editor.workspace(), sql.id) is None and store.load() == {}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_icon_memory_write_keeps_the_saved_pick(tmp_path, monkeypatch):
+    workspace, sources = await imported(tmp_path / 'import')
+    with v2_app(tmp_path / 'app', [(workspace, sources)]) as (client, _application):
+        editor = Editor(client, workspace.project_id)
+        sql = technology(editor.workspace(), 'SQL')
+        def full(*_args, **_kwargs):
+            raise OSError(errno.ENOSPC, 'no space')
+        monkeypatch.setattr('packages.resume_core.focus_icons.atomic_write', full)
+        editor.edit(command(editor, 'set_focus_icon', sql.id, 'pick', {'icon': 'mysql'}))
+        assert chosen(editor.workspace(), sql.id) == 'mysql'

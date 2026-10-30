@@ -3,7 +3,7 @@
 
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { currentMarker, needsCheck } from "./fact-fields";
+import { currentMarker, needsCheck, userCorrected } from "./fact-fields";
 import { allSpans, field, isFrame, ownSpans, subtree, type OutlineBlock, type OutlineDocument } from "./outline";
 
 type IssueInput = { state: string; message: string; targetIds: readonly string[]; blockIds: readonly string[] };
@@ -39,7 +39,8 @@ function doubtfulCells(facts: FactsInput | undefined): string[] {
           const periodId = field(period, "id"), present = field(field(period, "present"), "value") === true;
           if (typeof periodId !== "string") continue;
           const end = field(field(period, "end"), "rawText");
-          const endDoubtful = present && typeof end === "string" && end.trim() ? !currentMarker(end) : needsCheck(field(period, "end"));
+          const endDoubtful = present && typeof end === "string" && end.trim() ? !currentMarker(end) && !userCorrected(field(period, "end"))
+            : needsCheck(field(period, "end"));
           if (needsCheck(field(period, "start"))) result.push(cellId(id, `period:${periodId}:start`));
           if (endDoubtful) result.push(cellId(id, `period:${periodId}:end`));
           if (needsCheck(field(period, "present"))) result.push(cellId(id, `period:${periodId}:present`));
