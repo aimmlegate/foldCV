@@ -323,7 +323,58 @@ class ProjectRepository:
                 raise RepositoryFailure(error.code) from None
             except (StorageFailure, OSError, ValueError):
                 raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
+            self._reconcile()
             self.started = True
+
+    def _reconcile(self):
+        """Finish what a crash or a failed cleanup left. Never stops the start: the listing reports a damaged registry."""
+        failures = (RepositoryFailure, ProjectStoreFailure, StorageFailure, OSError, ValueError, RecursionError)
+        try:
+            pending = self._recover_folders()
+        except failures as error:
+            LOG.warning('project folders not reconciled: %s', type(error).__name__)
+            return
+        for project_id in pending:
+            try:
+                self.cleanup_deleted(project_id)
+            except failures as error:
+                LOG.warning('deleted project not cleaned: %s', type(error).__name__)
+
+    def _recover_folders(self):
+        """Bring back or remove folders the registry does not name; returns the deletions still to clean up."""
+        if not self.store.registry_path.exists():
+            return []
+        with locked_root(self.root, '.projects.lock'):
+            registry = self.store._registry()
+            known = {entry.project_id for entry in registry.entries}
+            recovered = False
+            for directory in sorted(self.store.projects.iterdir()):
+                if directory.name in known or SAFE_ID.fullmatch(directory.name) is None or directory.is_symlink() or not directory.is_dir():
+                    continue
+                try:
+                    recovered = self._recover_folder(directory, registry) or recovered
+                except (RepositoryFailure, ProjectStoreFailure, StorageFailure, OSError, ValueError) as error:
+                    LOG.warning('project folder left as it is: %s', type(error).__name__)
+            if recovered:
+                self.store._write_registry(registry)
+            return [entry.project_id for entry in registry.entries if entry.tombstoned and entry.cleanup_status in {'pending', 'failed'}]
+
+    def _recover_folder(self, directory, registry):
+        """A complete project whose registry write was lost is listed again; a partial create is removed; a folder this
+        service did not make stays."""
+        marker, target = directory / '.project-identity.json', directory / 'workspace.json'
+        if target.exists() or target.is_symlink():
+            if not marker.exists():
+                return False
+            workspace, _key = self._read_file(self.store._directory(directory.name), directory.name)
+            self.store._upsert(registry, workspace)
+            return True
+        if marker.exists():
+            self.store._directory(directory.name)
+        elif any(not path.name.startswith('.foldcv-write-') for path in directory.iterdir()):
+            return False
+        _remove_project_files(directory)
+        return False
 
     def _directory(self, project_id, create=False):
         try:
@@ -729,10 +780,14 @@ class ProjectRepository:
                 directory = self.store._directory(workspace.project_id, create=True)
                 if (directory / 'workspace.json').exists():
                     raise RepositoryFailure('PROJECT_EXISTS')
-                self._write_blobs(directory, [*history_blobs(workspace), *blobs])
-                atomic_write(directory / 'workspace.json', raw)
-                self.store._upsert(registry, workspace)
-                self.store._write_registry(registry)
+                try:
+                    self._write_blobs(directory, [*history_blobs(workspace), *blobs])
+                    atomic_write(directory / 'workspace.json', raw)
+                    self.store._upsert(registry, workspace)
+                    self.store._write_registry(registry)
+                except Exception:
+                    self._discard_created(directory)
+                    raise
         except RepositoryFailure:
             raise
         except ProjectStoreFailure as error:
@@ -742,6 +797,15 @@ class ProjectRepository:
         except OSError:
             raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
         return self.open(workspace.project_id)
+
+    def _discard_created(self, directory):
+        """Remove the folder of a failed create, unless its registry entry reached the disk after all. A failure here is
+        left to the next start."""
+        try:
+            if all(entry.project_id != directory.name for entry in self.store._registry().entries):
+                _remove_project_files(directory)
+        except (ProjectStoreFailure, StorageFailure, OSError, ValueError) as error:
+            LOG.warning('failed create not removed: %s', type(error).__name__)
 
     def _write_registry_entry(self, workspace):
         try:
@@ -831,6 +895,10 @@ class ProjectRepository:
         try:
             private_directory(folder)
             for path in folder.iterdir():
+                if path.name.startswith('.foldcv-write-'):
+                    # Writes run under this lock, so this one is left from a crash.
+                    path.unlink()
+                    continue
                 if re.fullmatch(r'[0-9a-f]{64}\.(?:png|jpg)', path.name) is None:
                     raise StorageFailure('UNSAFE_STORAGE')
                 if 'images/' + path.name not in keep:
@@ -841,44 +909,76 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
         return removed
 
+    def sweep_renders(self, project_id):
+        """Remove the DOCX files of older exports now; a failure is left to the sweep on close."""
+        session = self.open(project_id)
+        with session.lock:
+            try:
+                self._sweep_renders(session)
+            except RepositoryFailure:
+                LOG.warning('render sweep failed')
+
+    def _sweep_renders(self, session):
+        folder = session.directory / 'renders'
+        project = session.workspace.project
+        if project is None or not folder.exists():
+            return
+        keep = {blob_path(session.directory, 'renders', render.id).name for render in project.renders}
+        try:
+            private_directory(folder)
+            for path in folder.iterdir():
+                if path.name.startswith('.foldcv-write-'):
+                    path.unlink()
+                elif path.suffix == '.docx' and path.name not in keep:
+                    owned_file(path, DOCX_BYTES)
+                    path.unlink()
+        except (OSError, StorageFailure):
+            raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+
+
+BLOB_FOLDERS = {'sources': r'[0-9a-f]{64}\.bin', 'renders': r'[0-9a-f]{64}\.(?:docx|foldcv)',
+    'images': r'[0-9a-f]{64}\.(?:png|jpg)', 'history': r'[0-9a-f]{64}\.bin', 'template-assets': r'[0-9a-f]{64}\.bin',
+    'imports': r'[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?'}
+
 
 def _remove_project_files(directory):
+    """Remove what the project owns. Anything else stays, with the marker that lets a later pass finish, and the removal
+    ends in StorageFailure."""
     marker = directory / '.project-identity.json'
-    files, folders = [], []
+    files, folders, unknown = [], [], []
+
+    def owned(path, limit):
+        try:
+            owned_file(path, limit)
+            files.append(path)
+        except StorageFailure:
+            unknown.append(path)
+
     for path in directory.iterdir():
         if path.name in {'workspace.json', '.project-identity.json', 'history.jsonl'}:
-            owned_file(path, 2 * WORKSPACE_BYTES); files.append(path)
-        elif path.name in {'sources', 'renders', 'images', 'history', 'template-assets'}:
-            private_directory(path)
-            suffix = {'sources': 'bin', 'renders': '(?:docx|foldcv)', 'images': '(?:png|jpg)', 'history': 'bin',
-                'template-assets': 'bin'}[path.name]
-            for blob in path.iterdir():
-                if blob.name.startswith('.foldcv-write-'):
-                    files.append(blob)
-                    continue
-                if re.fullmatch(r'[0-9a-f]{64}\.' + suffix, blob.name) is None:
-                    raise StorageFailure('UNSAFE_STORAGE')
-                owned_file(blob, DOCX_BYTES); files.append(blob)
-            folders.append(path)
-        elif path.name == 'imports':
+            owned(path, 2 * WORKSPACE_BYTES)
+        elif path.name in BLOB_FOLDERS and path.is_dir() and not path.is_symlink():
             private_directory(path)
             for blob in path.iterdir():
                 if blob.name.startswith('.foldcv-write-'):
                     files.append(blob)
-                    continue
-                if re.fullmatch(r'[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?', blob.name) is None:
-                    raise StorageFailure('UNSAFE_STORAGE')
-                owned_file(blob, WORKSPACE_BYTES); files.append(blob)
+                elif re.fullmatch(BLOB_FOLDERS[path.name], blob.name) is None:
+                    unknown.append(blob)
+                else:
+                    owned(blob, WORKSPACE_BYTES)
             folders.append(path)
         elif path.name.startswith('.foldcv-write-'):
             files.append(path)
         else:
-            raise StorageFailure('UNSAFE_STORAGE')
+            unknown.append(path)
     for path in files:
         if path != marker:
             path.unlink()
     for path in folders:
-        path.rmdir()
+        if not any(path.iterdir()):
+            path.rmdir()
+    if unknown:
+        raise StorageFailure('UNSAFE_STORAGE')
     if marker.exists():
         marker.unlink()
     directory.rmdir()
