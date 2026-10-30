@@ -40,6 +40,8 @@ class Confined:
     breakaway: bool = False  # what it starts leaves the job, as the browser of a sign-in must
     memory: int | None = None  # committed bytes per process
     cpu_seconds: int | None = None  # user-mode CPU time per process
+    # Where it starts, if not in the operation folder: a browser a sign-in starts inherits it and keeps it open.
+    cwd: Path | None = None
 
     def __str__(self) -> str:
         return str(self.program)

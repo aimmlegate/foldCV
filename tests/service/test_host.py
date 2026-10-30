@@ -144,7 +144,8 @@ def test_a_sign_in_lets_the_browser_leave_the_job(tmp_path):
               "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
               f"open({str(marker)!r}, 'w').write(str(child.pid))\n")
     with OperationFiles(tmp_path / "operations").open() as files:
-        process = files.spawn(host.Confined(PYTHON, breakaway=True), ("-c", source), capture=False)
+        # The browser keeps the folder it started in; the operation's own folder must stay removable.
+        process = files.spawn(host.Confined(PYTHON, breakaway=True, cwd=tmp_path), ("-c", source), capture=False)
         process.wait(timeout=20)
         files.stop_worker()
     pid = int(marker.read_text())
@@ -173,3 +174,32 @@ def test_listeners_and_working_set_are_read(tmp_path):
         process = files.spawn(PYTHON, ("-c", "import time; time.sleep(5)"), capture=False)
         assert (host.resident_kb(process) or 0) > 1000
         files.stop_worker()
+
+
+def test_windows_sign_ins_start_outside_the_operation_folder(tmp_path, monkeypatch):
+    """A browser a sign-in starts inherits its folder and temp folder; the operation's own are removed after the run."""
+    from resume_api.cli.experimental_profile import ExperimentalCliProfile
+    from resume_api.cli.profiles.claude import ClaudeCliProfile
+
+    monkeypatch.setattr(host, "WINDOWS", True)
+    operation = tmp_path / "operation"
+    for name in ("", "tmp", "cache", "data", "state", "logs"):
+        (operation / name).mkdir(mode=0o700, exist_ok=True)
+    codex = ExperimentalCliProfile(tmp_path / "codex-profile", tmp_path / "codex.exe")
+    monkeypatch.setattr(ExperimentalCliProfile, "prepare", lambda _self: None)
+    program, _, environment = codex.launch(codex.executable, ("login",), operation)
+    assert program.breakaway and not program.children and program.cwd is None
+    assert Path(environment["TEMP"]).is_relative_to(codex.home) and environment["CODEX_HOME"] == str(codex.codex_home)
+    program, _, environment = codex.launch(codex.executable, ("login", "status"), operation)
+    assert not program.breakaway and environment["TEMP"] == str(operation.resolve() / "tmp")
+
+    claude = ClaudeCliProfile(tmp_path / "claude-profile", tmp_path / "claude.exe")
+    program, _, environment = claude.launch(claude.executable, ("auth", "login", "--claudeai"), operation)
+    assert program.breakaway and program.cwd == claude.root
+    assert Path(environment["TEMP"]).is_relative_to(claude.windows_home)
+    assert environment["USERPROFILE"] == str(claude.windows_home)
+    assert environment["CLAUDE_CODE_TMPDIR"] == str(operation.resolve() / "tmp")
+    program, arguments, _ = claude.launch(claude.executable, ("--version",), operation)
+    assert not program.breakaway and program.cwd is None and arguments == ("--version",)
+    with pytest.raises(Exception, match="CLI_PROFILE_UNSAFE"):
+        claude.launch(claude.executable, ("--version",), operation, network=False)

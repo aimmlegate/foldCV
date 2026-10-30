@@ -97,6 +97,8 @@ class OperationFiles:
             if host.WINDOWS:
                 from packages.resume_core import winjob
                 limits = executable if isinstance(executable, host.Confined) else host.Confined(executable)
+                if limits.cwd is not None:
+                    options["cwd"] = limits.cwd
                 process = winjob.spawn([str(limits.program), *arguments], limits, **options)
             else:
                 process = subprocess.Popen([str(executable), *arguments], start_new_session=True, **options)

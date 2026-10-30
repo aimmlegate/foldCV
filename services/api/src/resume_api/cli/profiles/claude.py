@@ -122,9 +122,9 @@ class ClaudeCliProfile:
         elif not Path("/usr/bin/sandbox-exec").is_file():
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
 
-    def environment(self, operation: Path) -> dict[str, str]:
+    def environment(self, operation: Path, *, temp: Path | None = None) -> dict[str, str]:
         if host.WINDOWS:
-            return {**host.windows_environment(operation / "tmp", self.windows_home),
+            return {**host.windows_environment(temp or operation / "tmp", self.windows_home),
                     "CLAUDE_CODE_TMPDIR": str(operation / "tmp"), "CLAUDE_CONFIG_DIR": str(self.config_dir),
                     **SWITCHES}
         user = os.environ.get("USER") or os.environ.get("LOGNAME")
@@ -180,8 +180,13 @@ class ClaudeCliProfile:
             if network is not True:
                 # A Job Object cannot take the network away; only the macOS sandbox runs these checks.
                 raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
-            return (host.Confined(executable, breakaway=args[:2] == ("auth", "login")), args,
-                    self.environment(owned))
+            if args[:2] != ("auth", "login"):
+                return host.Confined(executable), args, self.environment(owned)
+            # A browser the sign-in starts inherits the folder and temp folder, so neither may be the operation's.
+            temp = self.windows_home / "AppData" / "Local" / "Temp"
+            temp.mkdir(parents=True, exist_ok=True)
+            return (host.Confined(executable, breakaway=True, cwd=self.root), args,
+                    self.environment(owned, temp=temp))
         command = ("-p", self.policy(owned, args, network=network), os.path.realpath(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, self.environment(owned)
 

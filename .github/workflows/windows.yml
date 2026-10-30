@@ -24,6 +24,8 @@ jobs:
       run:
         shell: pwsh
     steps:
+      # The zip must carry the checkout's bytes: bundled templates and assets are checked by hash.
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -37,14 +39,12 @@ jobs:
           cache-dependency-path: |
             apps/web/package-lock.json
             apps/desktop/package-lock.json
+      # No venv: a Windows venv's python.exe only starts the real interpreter as its child, which the jobs refuse.
       - name: Python environment
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          python -m venv .venv
-          .venv\Scripts\python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+        run: python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
       - name: Windows tests
         run: >
-          .venv\Scripts\python -m pytest -q -p no:cacheprovider -rfE
+          python -m pytest -q -p no:cacheprovider -rfE
           tests/service/test_host.py tests/service/test_process_runner.py tests/service/test_desktop.py
           tests/service/test_lifecycle.py tests/service/test_extract_worker.py tests/repository
           tests/projects/test_export.py tests/projects/test_project_catalog.py
@@ -64,11 +64,11 @@ jobs:
       - name: Helper and zip
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          $helper = .venv\Scripts\python tools\desktop\build_windows_helper.py "$env:RUNNER_TEMP\helper-work" | Select-Object -Last 1
+          $helper = python tools\desktop\build_windows_helper.py "$env:RUNNER_TEMP\helper-work" | Select-Object -Last 1
           node apps\desktop\scripts\package-windows.mjs $helper output\windows
           Expand-Archive (Get-ChildItem output\windows\*.zip).FullName "$env:RUNNER_TEMP\app"
       - name: Helper smoke check with both CLIs
-        run: .venv\Scripts\python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\FoldCV Local\resources\helper" --cli
+        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\FoldCV Local\resources\helper" --cli
       - name: App start and close
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'

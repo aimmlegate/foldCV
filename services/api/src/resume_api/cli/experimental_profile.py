@@ -194,7 +194,12 @@ class ExperimentalCliProfile:
             _safe_directory(owned / name, create=False)
         if host.WINDOWS:
             # No sandbox-exec on Windows: the job forbids other programs, but file access stays unrestricted.
-            env = {**host.windows_environment(owned / "tmp", self.home), "CODEX_HOME": str(self.codex_home)}
+            temp = owned / "tmp"
+            if self.signs_in(args):
+                # A browser the sign-in starts keeps this temp folder; the operation's own one is removed after the run.
+                temp = self.home / "AppData" / "Local" / "Temp"
+                temp.mkdir(parents=True, exist_ok=True)
+            env = {**host.windows_environment(temp, self.home), "CODEX_HOME": str(self.codex_home)}
             return host.Confined(executable, children=self.children(args), breakaway=self.signs_in(args)), args, env
         env = {"PATH": os.defpath, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8",
                "HOME": str(self.home), "CODEX_HOME": str(self.codex_home),

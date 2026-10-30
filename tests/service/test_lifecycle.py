@@ -103,6 +103,7 @@ async def test_foreign_and_unsafe_markers_do_not_block_a_new_service(tmp_path):
     assert private.read_text() == "synthetic private data"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups; test_host.py covers the Windows job")
 def test_a_failed_operation_stops_the_worker_group_and_removes_its_directory(tmp_path):
     files = OperationFiles(tmp_path / "ops")
     script = tmp_path / "worker.py"
@@ -129,6 +130,7 @@ def test_a_failed_operation_stops_the_worker_group_and_removes_its_directory(tmp
 
 def test_an_unsupported_host_fails_clearly(monkeypatch):
     monkeypatch.setattr(lifecycle.sys, "platform", "linux")
+    monkeypatch.setattr(lifecycle.host, "WINDOWS", False)
     with pytest.raises(RuntimeError, match="macOS arm64 and Windows x64 only"):
         lifecycle.require_supported_host()
 
