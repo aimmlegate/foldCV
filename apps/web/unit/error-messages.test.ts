@@ -68,6 +68,13 @@ for (const raw of ["FUTURE_SAVE_FAILURE", "toString", "__proto__", "Cannot read 
   });
 }
 
+test("no message sends the user to the hidden «Лимиты» section (D110)", () => {
+  for (const [key, message] of Object.entries(catalog.messages)) assert.ok(!message.includes("Лимиты"), key);
+  for (const code of ["IMPORT_PROCESSING_EXHAUSTED", "PROJECT_TOO_LARGE", "JOB_STORAGE_FULL"]) assert.ok(!knownErrorMessage(code)?.includes("настройках"), code);
+  assert.match(knownErrorMessage("IMPORT_PROCESSING_EXHAUSTED") ?? "", /исходник короче/u);
+  assert.match(knownErrorMessage("PROJECT_TOO_LARGE") ?? "", /Уменьшите объём/u);
+});
+
 test("presentation preserves machine errors and existing human validation text", () => {
   const error = new ProjectApiFailure("PROJECT_SAVE_FAILED", 503);
   const message = errorMessage(error);
