@@ -119,6 +119,8 @@ def read_history_file(directory, digest):
     if not isinstance(digest, str) or re.fullmatch(r'[0-9a-f]{64}', digest) is None:
         raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
     path = blob_path(directory, 'history', digest)
+    if not path.exists() and not path.is_symlink():
+        raise ProjectStoreFailure('PROJECT_HISTORY_MISSING')
     owned_file(path, WORKSPACE_BYTES)
     raw = path.read_bytes()
     if hashlib.sha256(raw).hexdigest() != digest:
@@ -327,9 +329,14 @@ class ProjectRepository:
             raise RepositoryFailure(error.code) from None
         except StorageFailure:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+        except OSError:
+            raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
 
     def _registry_entry(self, project_id):
-        registry = self.store.registry()
+        try:
+            registry = self.store.registry()
+        except ProjectStoreFailure as error:
+            raise RepositoryFailure(error.code) from None
         return next((entry for entry in registry.entries if entry.project_id == project_id), None)
 
     def listing(self):

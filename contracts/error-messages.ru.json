@@ -827,6 +827,7 @@
     "PROJECT_DELETED": "deletedProject",
     "PROJECT_DELETE_FAILED": "project_delete_failed",
     "PROJECT_GENERATION_ACTIVE": "detail_project_generation_active",
+    "PROJECT_HISTORY_MISSING": "project_history_missing",
     "PROJECT_LOAD_FAILED": "project",
     "PROJECT_MISMATCH": "project_mismatch",
     "PROJECT_NOT_DELETED": "project_not_deleted",

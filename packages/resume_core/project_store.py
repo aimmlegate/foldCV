@@ -235,7 +235,7 @@ class ProjectStore:
         try:
             with locked_root(self.root, ".projects.lock"):
                 return self._registry()
-        except (StorageFailure, OSError, ValueError, ValidationError):
+        except (StorageFailure, OSError, ValueError, ValidationError, RecursionError):
             raise ProjectStoreFailure("PROJECT_LOAD_FAILED") from None
 
     def tombstone(self, id):

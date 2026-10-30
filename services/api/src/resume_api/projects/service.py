@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import logging
 import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
@@ -20,6 +21,7 @@ from packages.resume_core.templates.presentation import project_presentation, sn
 from .errors import ProjectFailure
 
 RESPONSES_KEPT = 4
+LOG = logging.getLogger(__name__)
 
 
 def response_for_workspace(workspace, *, generation=None):
@@ -131,11 +133,14 @@ class ProjectService:
     def open(self, project_id):
         """A fresh editor token (the previous page's token is replaced), the response, history and running tasks."""
         session = self.repository.open(project_id)
-        token = session.open_editor()
         try:
             self.catalog.update(project_id, opened=True)
         except ProjectStoreFailure as error:
-            raise RepositoryFailure(error.code) from None
+            if error.code != 'PROJECT_SAVE_FAILED':
+                raise RepositoryFailure(error.code) from None
+            # Only the recency is lost, and a page's token stays until the open can go ahead.
+            LOG.warning('last opened time not saved')
+        token = session.open_editor()
         with session.lock:
             workspace = session.workspace
             history = history_state(session)
