@@ -1,6 +1,8 @@
 """Settings template editor: read, check, save and reset the YAML of each template, and choose the default one."""
 
+import ast
 import json
+from pathlib import Path
 import shutil
 
 import pytest
@@ -8,6 +10,7 @@ import pytest
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore
 from resume_api.template_config import ID_CHANGED, REVISION_TAKEN, TemplateConfig
+from resume_api.template_reasons import FALLBACK, FAMILIES, PREFIXES, REASONS, reason_text
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import app_client, upload
 from tests.templates.test_template_store import GENERIC, SECOND, second_bundled
@@ -61,10 +64,10 @@ def test_save_is_the_current_version_of_its_template_and_reset_restores_the_bund
 
 
 @pytest.mark.parametrize(('text', 'path', 'fragment'), [
-    ('schema_version: 3\ntemplate: [\n', '/', 'invalid YAML'),
-    (BUNDLED_TEXT.replace('  default_locale: ru\n', '  default_locale: ru\n  colour: red\n', 1), '/template/colour', 'Extra inputs'),
-    (revised(BUNDLED_TEXT).replace('  name: Две колонки\n', '', 1), '/template/name', 'Field required'),
-    ('- just\n- a list\n', '/', 'object'),
+    ('schema_version: 3\ntemplate: [\n', '/', 'ошибка синтаксиса YAML'),
+    (BUNDLED_TEXT.replace('  default_locale: ru\n', '  default_locale: ru\n  colour: red\n', 1), '/template/colour', 'лишнее поле'),
+    (revised(BUNDLED_TEXT).replace('  name: Две колонки\n', '', 1), '/template/name', 'обязательное поле'),
+    ('- just\n- a list\n', '/', 'набором полей'),
 ])
 def test_invalid_text_reports_a_path_and_saves_nothing(tmp_path, text, path, fragment):
     config = TemplateConfig(tmp_path)
@@ -72,6 +75,46 @@ def test_invalid_text_reports_a_path_and_saves_nothing(tmp_path, text, path, fra
     assert result['valid'] is False and result['error']['path'] == path and fragment in result['error']['message']
     assert config.save(GENERIC, text) == (None, result)
     assert config.read(GENERIC)['edited'] is False
+
+
+def _compiler_reasons():
+    """Every reason the template code writes: (fixed text, whether a value follows it)."""
+    for path in Path(compile_template.__code__.co_filename).parent.glob('*.py'):
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+            name = getattr(node.func, 'id', getattr(node.func, 'attr', '')) if isinstance(node, ast.Call) else ''
+            if name in {'SchemaFailure', 'fail'} and len(node.args) >= 2:
+                reason = node.args[1]
+                if isinstance(reason, ast.Constant):
+                    yield reason.value, False
+                elif isinstance(reason, ast.BinOp):
+                    while isinstance(reason, ast.BinOp):
+                        reason = reason.left
+                    yield reason.value, True
+
+
+def test_every_compiler_reason_has_russian_text():
+    missing = [text for text, dynamic in _compiler_reasons()
+        if not (text in PREFIXES or text in FAMILIES if dynamic else text in REASONS)]
+    assert not missing
+    assert all(any('а' <= letter.lower() <= 'я' for letter in text)
+        for text in [*REASONS.values(), *PREFIXES.values(), *FAMILIES.values()])
+
+
+def test_a_reason_nobody_listed_stays_russian_and_no_class_name_reaches_the_editor():
+    assert reason_text('unknown dependency') == 'неизвестная зависимость'
+    assert reason_text('unknown reference: logo') == 'неизвестная ссылка: logo'
+    assert reason_text('Input should be a valid string') == 'значение не подходит к этому полю'
+    assert reason_text('something new') == reason_text('') == FALLBACK
+
+
+def test_an_error_without_text_shows_no_class_name(tmp_path, monkeypatch):
+    config = TemplateConfig(tmp_path)
+
+    def broken(*_args, **_kwargs):
+        raise ValueError()
+
+    monkeypatch.setattr('resume_api.template_config.compile_bytes', broken)
+    assert config.check(GENERIC, 'text')['error'] == {'path': '/', 'message': FALLBACK}
 
 
 def test_assets_come_from_the_current_package_and_paths_stay_inside_the_template(tmp_path):
