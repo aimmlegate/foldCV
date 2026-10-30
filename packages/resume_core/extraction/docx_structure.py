@@ -30,11 +30,15 @@ class ParagraphStyles:
         self.defaults = root.find(W + "docDefaults/" + W + "rPrDefault/" + W + "rPr") if root is not None else None
         self.default_paragraph = next((key for key, node in self.styles.items() if node.get(W + "type") == "paragraph"
                                        and node.get(W + "default") in {"1", "true"}), None)
+        self.paragraph, self.paragraph_style = None, None
 
     def hidden(self, run, paragraph):
+        # Finding a missing pPr reads every run, so a paragraph's style is resolved once, not once per run.
+        if paragraph is not self.paragraph:
+            self.paragraph = paragraph
+            self.paragraph_style = value(paragraph.find(W + "pPr"), W + "pStyle") or self.default_paragraph
         properties = [run.find(W + "rPr")]
-        for style_id in (value(run.find(W + "rPr"), W + "rStyle"),
-                         value(paragraph.find(W + "pPr"), W + "pStyle") or self.default_paragraph):
+        for style_id in (value(run.find(W + "rPr"), W + "rStyle"), self.paragraph_style):
             seen = set()
             while style_id in self.styles and style_id not in seen and len(seen) < 32:
                 seen.add(style_id)

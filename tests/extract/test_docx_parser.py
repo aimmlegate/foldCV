@@ -70,6 +70,20 @@ def test_the_default_paragraph_style_is_resolved_once_not_for_each_run():
     assert all(styles.hidden(paragraph_node[0], paragraph_node) for _ in range(5)) and Counted.reads == 0
 
 
+def test_a_paragraph_is_read_for_its_style_once_not_for_each_run():
+    class Counted(ET.Element):
+        reads = 0
+        def find(self, path, namespaces=None):
+            Counted.reads += 1
+            return super().find(path, namespaces)
+    styles, paragraph_node = ParagraphStyles(), Counted(parser.W + "p")
+    runs = [ET.SubElement(paragraph_node, parser.W + "r") for _ in range(5)]
+    assert not any(styles.hidden(run, paragraph_node) for run in runs) and Counted.reads == 1
+    other = Counted(parser.W + "p", {})
+    ET.SubElement(other, parser.W + "pPr").append(ET.Element(parser.W + "pStyle", {parser.W + "val": "Hidden"}))
+    assert styles.hidden(ET.Element(parser.W + "r"), other) is False and styles.paragraph_style == "Hidden"
+
+
 def test_body_level_content_controls_keep_their_text_in_reading_order():
     control = f'<w:sdt><w:sdtPr><w:alias w:val="Label"/></w:sdtPr><w:sdtContent>{paragraph("Опыт работы")}' \
         f'<w:sdt><w:sdtContent>{paragraph("Python")}</w:sdtContent></w:sdt>' \
