@@ -212,7 +212,9 @@ def test_a_reset_forgets_every_remembered_name_its_row_would_match(tmp_path):
 
 
 def test_a_deeply_nested_store_reads_as_empty(tmp_path):
-    (tmp_path / 'focus-icons.json').write_bytes(b'[' * 200000)
+    path = tmp_path / 'focus-icons.json'
+    path.write_bytes(b'[' * 200000)
+    path.chmod(0o600)
     assert FocusIconStore(tmp_path).load() == {}
 
 
