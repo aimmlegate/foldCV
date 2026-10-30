@@ -77,7 +77,7 @@ class ImportService:
         # When an import last took or returned the inference permit: a queued import is quiet only while this stays.
         self.queue_moved = None
         # project -> (permit, operation id): a permit whose import may still own a model process stays held until
-        # every attempt of that operation has verified cleanup.
+        # every attempt of that operation has verified cleanup; until then sign-in and CLI install wait.
         self.retained = {}
 
     def _require_pipeline(self):
@@ -138,8 +138,8 @@ class ImportService:
                         operation_id = match.id
                 except Exception:
                     pass
-            # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
-            # assistant turn waits instead of turning a block into a source fallback.
+            # One shared permit for the whole run: its parallel blocks run under it, beside other imports, rewrites
+            # and assistant turns (D121); a sign-in or CLI install waits for it instead of changing the CLI mid-run.
             held['permit'], held['operation'] = await self._permit(task, operation_id, started), operation_id
             held['token'] = JOB_PERMIT.set(held['permit'])
             self.queue_moved = self.wall()
@@ -167,12 +167,12 @@ class ImportService:
         if retained is not None:
             permit, owner = retained
             if owner == operation_id or not await asyncio.to_thread(self._verified, project_id, owner):
-                # The same import continues, or an earlier one may still own a process: nothing else may start.
+                # The same import continues, or an earlier one may still own a process: keep its permit.
                 return permit
             permit.release()
         if self.admission.busy():
-            # Another import or an assistant turn has the permit: the start reply returns now and this task waits in
-            # the queue, instead of the reply timing out while the task keeps waiting.
+            # A sign-in, CLI install or connection check has the exclusive permit: the start reply returns now and this
+            # task waits in the queue, instead of the reply timing out while the task keeps waiting.
             self.projects.tasks.update(task.id, stage='queued', detail={'operationId': operation_id,
                 'queuedAt': self.wall().isoformat()})
             started.set()
@@ -188,7 +188,7 @@ class ImportService:
         try:
             workspace = reader(project_id)
         except Exception:
-            # Unknown cleanup keeps the permit: no other inference may start beside a process that may live.
+            # Unknown cleanup keeps the permit: no sign-in or install may start beside a process that may live.
             return False
         owner = workspace.project or workspace.pre_draft
         operation = next((item for item in owner.template_operations if item.id == operation_id), None)
@@ -202,7 +202,7 @@ class ImportService:
 
     def release(self, project_id):
         """Free the permit a stopped import of this project kept. The project is being deleted, so no later run of it
-        can prove that cleanup, and every other import and assistant turn would wait for it forever."""
+        can prove that cleanup, and every sign-in and CLI install would wait for it forever."""
         retained = self.retained.pop(project_id, None)
         if retained is not None:
             retained[0].release()

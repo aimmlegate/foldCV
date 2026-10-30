@@ -109,3 +109,16 @@ def test_applying_a_corrected_preview_is_one_edit_of_the_selected_range(tmp_path
         content = applied['response']['workspace']['project']['document']['regions'][2]['blocks'][0]['content']
         assert ''.join(span['text'] for span in content) == 'Clearer 🚀 title'
         assert applied['history']['undo']['actionId'] == 'action-apply-1'
+
+
+def test_a_rewrite_finishes_while_an_import_holds_its_inference_permit(tmp_path):
+    from resume_api.inference_admission import INFERENCE
+    provider = Provider('Clear')
+    with v2_app(tmp_path, [papers()], content_provider=provider) as (client, _application):
+        editor = Editor(client, PROJECT)
+        # D121: a running import on either provider no longer queues the rewrite.
+        assert INFERENCE.acquire(blocking=False)
+        try:
+            assert preview(editor)['text'] == 'Clear'
+        finally:
+            INFERENCE.release()

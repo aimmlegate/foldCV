@@ -13,8 +13,6 @@ import { FocusYears, type FocusEntry } from "./FocusYears";
 import { FocusIconDialog } from "./FocusIconDialog";
 import type { FocusIconChoices } from "../../projects/api";
 import { OperationStatus } from "../ui/OperationStatus";
-import type { PlacedRemarks } from "../../rich/remarks";
-import { CheckFooter, RemarkSections, type CheckState } from "./RemarkSections";
 
 function summary(record: RecordValue): [string, string] {
   if (record.kind === "candidate") return [record.name.rawText || "Кандидат", [record.title.rawText, record.location.rawText].filter(Boolean).join("\n")];
@@ -26,7 +24,7 @@ function summary(record: RecordValue): [string, string] {
   return ["", ""];
 }
 export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, focusIcons = null, technologyTargets = [], submit,
-  pending, paused, hidden, close, focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
+  pending, paused, hidden, close, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
@@ -38,9 +36,8 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
   technologyTargets?: readonly TechnologyTarget[];
   hidden: boolean; close: () => void;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
-  /** Remarks by resume section, with the place each one names in the document. */
-  remarks?: PlacedRemarks; showBlock?: (blockId: string) => void;
-  check?: { state: CheckState; run: () => void };
+  /** Where each group's section is in the resume, by record kind; a group without one offers no jump. */
+  anchors?: ReadonlyMap<string, string>; showBlock?: (blockId: string) => void;
 }) {
   const panel = useRef<HTMLElement>(null);
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<string | null>(null);
@@ -83,7 +80,9 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
           {issue.page ? `, стр. ${issue.page}` : ""}</li>)}</ul>
         <p>Сверьте с исходником и исправьте вручную.</p></details>}
     </div>}
-    {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
+    {groups.map(kind => {
+      const anchor = anchors?.get(kind);
+      return <div className="fact-group-frame" key={kind}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
       {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={recordId => {
           const record = facts.records.find(value => value.id === recordId);
@@ -102,9 +101,11 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
         })}
       {panelSupport.add.has(kind) && <button className="text-button fact-add" disabled={busy}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
-    </details>)}
-    {remarks && <RemarkSections remarks={remarks} show={showBlock} />}
-    {check && <CheckFooter state={check.state} run={check.run} disabled={paused} />}
+    </details>
+      {/* Beside the summary, not inside it: a click inside a summary also folds the group. */}
+      {anchor && <button type="button" className="icon fact-group-jump" aria-label={`Показать в резюме: ${labels[kind]}`} title="Показать в резюме"
+        onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}</div>;
+    })}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}
     {iconEntry && focusIcons && <FocusIconDialog entry={iconEntry} load={focusIcons} submit={apply} close={() => setIconRow(null)} />}</>;
 }

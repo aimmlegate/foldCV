@@ -52,6 +52,16 @@ class AgentConnection:
     models: tuple[str, ...]
     epoch: str
     reason: str | None = None
+    reasoning: dict = field(default_factory=dict)
+
+    def effort(self, model, chosen):
+        """The chosen assistant effort, else the model's catalog default; None keeps the runtime default."""
+        metadata = self.reasoning.get(model)
+        return chosen or (metadata.default if metadata is not None else None)
+
+    def refuses(self, model, effort):
+        metadata = self.reasoning.get(model)
+        return effort is not None and metadata is not None and effort not in metadata.supported
 
 
 @dataclass
@@ -69,6 +79,7 @@ class Control:
     tools: object = None
     # Set when the project is deleted: the ending run writes no more assistant files.
     deleted: bool = False
+    effort: str | None = None
 
     @property
     def run_id(self):
@@ -78,6 +89,8 @@ class Control:
 class AssistantService:
     def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0):
         self.projects, self.runtime, self.connection = projects, runtime, connection
+        # The runtime of a model's provider (D119); without it every model runs on `runtime`.
+        self.runtime_for = lambda _model: self.runtime
         root = projects.repository.root
         self.store = AssistantStore(root)
         self.settings = AgentSettingsStore(root)
@@ -110,14 +123,16 @@ class AssistantService:
         settings = self.settings.load()
         model = settings.selected_agent_model
         reason = ('AGENT_DISABLED' if not settings.enabled else 'AGENT_CLEANUP_FAILED' if INFERENCE.blocked else
-            'AGENT_RUNTIME_UNSUPPORTED' if self.runtime is None else
+            'AGENT_RUNTIME_UNSUPPORTED' if self.runtime_for(model) is None else
             connection.reason or 'AGENT_CONNECTION_UNAVAILABLE' if not connection.ready else
             'AGENT_MODEL_REQUIRED' if model is None else
-            'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else None)
+            'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else
+            'AGENT_MODEL_INCOMPATIBLE' if connection.refuses(model, connection.effort(model, settings.reasoning_effort))
+            else None)
         models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified')
             for value in connection.models]
         return AssistantCapabilitiesV1(ready=reason is None, unavailable=AssistantErrorV1(code=reason) if reason else None,
-            models=models, webAvailable=self.runtime is not None, tools=list(TOOL_NAMES))
+            models=models, webAvailable=self.runtime_for(model) is not None, tools=list(TOOL_NAMES))
 
     # Conversations
 
@@ -174,7 +189,7 @@ class AssistantService:
             raise ProjectFailure('AGENT_CONNECTION_UNAVAILABLE', 409)
         if not request.message.strip():
             raise ProjectFailure('INVALID_REQUEST', 422)
-        existing, workspace, model = await asyncio.to_thread(self._admit, project_id, conversation_id, request)
+        existing, workspace, settings = await asyncio.to_thread(self._admit, project_id, conversation_id, request)
         if existing is not None:
             return self._current_run(existing)
         # No await from here to the reserved control, so two submits cannot both start a run.
@@ -189,7 +204,7 @@ class AssistantService:
         now = timestamp()
         run = AssistantRunV1(id=identity('run'), conversationId=conversation_id, projectId=project_id,
             clientRequestId=request.client_request_id, state='queued', allowEdits=request.allow_edits,
-            allowWeb=request.allow_web, model=model, baseRevision=workspace.project_revision,
+            allowWeb=request.allow_web, model=settings.selected_agent_model, baseRevision=workspace.project_revision,
             createdAt=now, finishedAt=None, error=None, usage=None)
         message = AgentMessage(id=identity('message'), role='user', text=request.message, runId=run.id, timestamp=now,
             sources=[], findings=[], truncated=False, error=None)
@@ -199,7 +214,8 @@ class AssistantService:
                 conversation.title = request.message.strip().splitlines()[0][:120]
             conversation.messages.append(message)
             conversation.runs.append(run)
-        control = self.controls[run.id] = Control(project_id, conversation_id, run, time.monotonic())
+        control = self.controls[run.id] = Control(project_id, conversation_id, run, time.monotonic(),
+            effort=self.connection().effort(run.model, settings.reasoning_effort))
         try:
             await asyncio.to_thread(self.store.update_conversation, project_id, conversation_id, record)
         except BaseException:
@@ -210,7 +226,7 @@ class AssistantService:
         return run
 
     def _admit(self, project_id, conversation_id, request):
-        """A submit's reads, in a worker thread: the run of an earlier send of this request, readiness, the project."""
+        """A submit's reads, in a worker thread: the run of an earlier send of this request, readiness, the project, settings."""
         stored = self.store.conversation(project_id, conversation_id)
         existing = next((run for run in stored.runs if run.client_request_id == request.client_request_id), None)
         if existing is not None:
@@ -218,7 +234,7 @@ class AssistantService:
         capability = self.capabilities()
         if not capability.ready:
             raise ProjectFailure(capability.unavailable.code, 409)
-        return None, self._require_project(project_id), self.settings.load().selected_agent_model
+        return None, self._require_project(project_id), self.settings.load()
 
     def _set_run(self, control, **changes):
         control.run = control.run.model_copy(update=changes)
@@ -295,8 +311,9 @@ class AssistantService:
         tools = None
         loop = asyncio.get_running_loop()
         pin = ExitStack()
+        runtime = self.runtime_for(control.run.model)
         try:
-            if self.runtime is None:
+            if runtime is None:
                 raise AgentFailure('AGENT_RUNTIME_UNSUPPORTED')
             pinned, history = await asyncio.to_thread(self._pin, pin, control)
             prompt = context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
@@ -309,8 +326,9 @@ class AssistantService:
             value = RuntimeInput(model=control.run.model, prompt=prompt, url=tools.url, token=tools.token,
                 tools=tuple(tools.names), allow_web=control.run.allow_web, before_start=lambda: self._running(control),
                 revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
-                developer_instructions=DEVELOPER_INSTRUCTIONS)
-            result = await self.runtime.run(value, control.cancel,
+                developer_instructions=DEVELOPER_INSTRUCTIONS,
+                **({'reasoning_effort': control.effort} if control.effort else {}))
+            result = await runtime.run(value, control.cancel,
                 lambda kind, payload: self.emit(control, kind, payload))
         except asyncio.CancelledError:
             result = RuntimeResult(state='cancelled', error='AGENT_CANCELLED')
@@ -364,7 +382,7 @@ class AssistantService:
             control.run = control.run.model_copy(update={'state': state, 'finished_at': timestamp()})
             self._wake(control)
             return
-        if state == 'completed' and result.tool_calls and getattr(self.runtime, 'native', False):
+        if state == 'completed' and result.tool_calls and getattr(self.runtime_for(control.run.model), 'native', False):
             self.verified.add((self.connection().epoch, control.run.model))
         text = (result.text or control.text).encode()[:limits.ASSISTANT_TEXT_BYTES].decode('utf-8', 'ignore')
         error = AssistantErrorV1(code=result.error) if result.error and state != 'completed' else None

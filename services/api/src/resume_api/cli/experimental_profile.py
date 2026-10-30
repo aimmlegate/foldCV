@@ -9,14 +9,14 @@ import os
 from pathlib import Path
 import stat
 
+from resume_api.cli import profile as codex
 from resume_api.cli.profile import overrides
+from resume_api.cli.qualification import QualificationError, require_publisher
 from . import distribution
 
 
-# The managed runtime release; the installed plugin CLI has its own pin (D092).
-VERSION = "codex-cli 0.162.0-alpha.17.2"
-PLUGIN_VERSION = "codex-cli 0.163.0-alpha.11.1"
-BINARY_SHA256 = "9394a943e3fce54f998ecc150eb0b7d6e22ce0da48e5063c59b4883e80aeaecd"
+# Only the runtime FoldCV downloaded keeps hash pins; a user-installed CLI is qualified by its
+# publisher signature and the version table (multi-provider plan section 5).
 BINARY = Path("/Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 SYSTEM_SKILLS = ("imagegen", "openai-docs", "skill-creator", "skill-installer")
 MARKER = ".foldcv-cli-experiment-v1"
@@ -50,12 +50,8 @@ class ExperimentalCliProfile:
     executable: Path = BINARY
 
     @property
-    def version(self) -> str:
-        return PLUGIN_VERSION if self.executable == BINARY else VERSION
-
-    @property
-    def binary_sha256(self) -> str:
-        return BINARY_SHA256 if self.executable == BINARY else distribution.CLI_SHA256
+    def managed(self) -> bool:
+        return self.executable == distribution.managed_executable(self.root.parent / "cli-runtime")
 
     @property
     def package_root(self) -> Path:
@@ -106,9 +102,15 @@ class ExperimentalCliProfile:
         if (not self.executable.is_file() or not os.access(self.executable, os.X_OK)
                 or any(part.is_symlink() for part in (self.executable, *self.executable.parents))):
             raise ExperimentalProfileError("CLI_UNSUPPORTED")
+        if not self.managed:
+            try:
+                require_publisher(self.executable, codex.TEAM_ID, codex.IDENTIFIER)
+            except QualificationError:
+                raise ExperimentalProfileError("CLI_UNSUPPORTED") from None
+            return
         with self.executable.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        if digest != self.binary_sha256:
+        if digest != distribution.CLI_SHA256:
             raise ExperimentalProfileError("CLI_UNSUPPORTED")
 
     def config(self, operation: Path) -> list[str]:
@@ -177,7 +179,7 @@ def installed_profile(root: Path) -> ExperimentalCliProfile:
         profile = ExperimentalCliProfile(root, executable)
         try:
             profile.check_binary()
-            check_host() if executable == BINARY else check_host(profile.package_root)
+            check_host() if executable == BINARY else check_host(profile.package_root, managed=profile.managed)
             return profile
         except (OSError, ExperimentalProfileError):
             continue

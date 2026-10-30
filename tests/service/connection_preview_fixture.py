@@ -56,7 +56,6 @@ async def main() -> None:
         origin = f"http://127.0.0.1:{port}"
         adapter = (HeldCleanupAdapter(cli) if args.case == "held_cleanup" else
                    ConnectionAdapter(base / "missing codex" if args.case == "missing_cli" else cli,
-                                     allow_fixture=True,
                                      node_executable=base / "missing node" if args.case == "launcher_unsupported" else None))
         app = create_app(origin=origin, secret="synthetic-preview-secret-0123456789",
                          temp_root=base / "operations", dist=dist,

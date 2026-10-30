@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
+from dataclasses import dataclass
 from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
@@ -20,13 +22,16 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
-from .host_models import (ConnectionPayload, EmptyRequest, ErrorEnvelope, ErrorPayload, QuotaPayload, SelectModelRequest,
+from .host_models import (ConnectionPayload, EnableProviderRequest, ErrorEnvelope, ErrorPayload, HostRequest,
+                          LoginCodeRequest, ProviderState, ProviderSummary, QuotaPayload, SelectModelRequest,
                           SelectReasoningRequest)
 from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import CliInstallation
+from .cli.profiles.claude import ClaudeProfileError
 from .providers.codex_cli import CodexCliProvider
+from .providers.registry import DESCRIPTORS, ProviderRegistry, discovered
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
 from packages.resume_core.rendering.template import ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, require_template
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
@@ -45,10 +50,26 @@ MAX_BODY = 1_048_576
 MAX_CONCURRENT = 2
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
+# "not_provided": the provider has no sanctioned usage read (decision 15); runs stay allowed.
+USABLE_QUOTA = frozenset({"available", "not_provided"})
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
-                            "host/select", "host/cancel-login", "host/install", "host/cancel-install"})
+                            "host/select", "host/cancel-login", "host/install", "host/cancel-install",
+                            "host/enable", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
+
+
+@dataclass
+class ProviderSlot:
+    """One provider's connection adapter, content provider, native profile, installer and assistant runtime; a slot
+    runs processes only while its provider is on (D119)."""
+    connection: object
+    provider: object | None = None
+    profile: object | None = None
+    installation: CliInstallation | None = None
+    runtime: object | None = None
+    # How a finished managed install rebinds the slot to the new executable.
+    rebind: Callable[[ProviderSlot, Path], ProviderSlot] | None = None
 
 
 def problem(code: str, status: int, stage: str = "request", retryable: bool = False) -> JSONResponse:
@@ -203,15 +224,21 @@ class LocalBoundary:
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_executable: Path | None = None,
                connection_adapter: ConnectionAdapter | None = None, experimental_profile: ExperimentalCliProfile | None = None,
                data_root: Path | None = None, content_provider=None, clock=None, agent_runtime=None,
-               template_import_call_cap: int | None = None, template_import_concurrency: int = 3):
+               template_import_call_cap: int | None = None, template_import_concurrency: int = 3,
+               provider_registry: ProviderRegistry | None = None, provider_slots: dict[str, ProviderSlot] | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
     if len(secret) < 32:
         raise ValueError("Startup secret is too short")
     if experimental_profile is not None and (content_provider is not None or agent_runtime is not None):
         raise ValueError("Experimental CLI cannot use injected generation runners")
+    registry = provider_registry or ProviderRegistry()
+    if any(kind == "codex_cli" or kind not in DESCRIPTORS for kind in provider_slots or {}):
+        raise ValueError("Extra provider slots name other known kinds")
     reap_owned(temp_root)
-    blocked_on_start = has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
+    blocked_on_start = (has_blocked_owned(temp_root) or recover_profile(experimental_profile, temp_root)
+                        or any(recover_profile(slot.profile, temp_root) for slot in (provider_slots or {}).values()
+                               if slot.profile is not None))
     operations: dict[asyncio.Task, OperationFiles] = {}
     cancellation_pending: set[asyncio.Task] = set()
     connection_work: dict[asyncio.Task, tuple[OperationFiles, threading.Event]] = {}
@@ -257,19 +284,83 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     provider = (CodexCliProvider(experimental_profile.executable, experimental_profile=experimental_profile)
                 if experimental_profile else None)
     installation = CliInstallation(experimental_profile.root.parent / "cli-runtime") if experimental_profile else None
-    connection_state = ConnectionPayload(state="unchecked")
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
 
-    def experimental_authorized(model=None) -> bool:
-        return (experimental_profile is not None and not unsafe_cleanup and not INFERENCE.blocked
-                and connection_state.state == "connected" and connection_state.metadataReady
-                and connection_state.quota.state == "available"
-                and (model or connection_state.selectedModel) in connection_state.models)
+    def bind_codex(slot, executable):
+        # The connection object stays: the assistant connection and the routes read it.
+        profile = ExperimentalCliProfile(slot.profile.root, executable)
+        slot.connection.executable = executable
+        slot.connection.experimental_profile = profile
+        return ProviderSlot(slot.connection, CodexCliProvider(executable, experimental_profile=profile), profile,
+                            slot.installation, CodexAgentRuntime(slot.connection, temp_root), bind_codex)
+
+    # D119: every listed provider keeps its own connection at the same time; a model choice runs on the provider whose
+    # catalog lists the model.
+    slots = {"codex_cli": ProviderSlot(connection, provider, experimental_profile, installation, rebind=bind_codex),
+             **(provider_slots or {})}
+    states = {kind: ProviderState(state="unchecked") for kind in slots}
+    # Bumped by sign-in, install and detach of that provider: a connection reply started before is dropped.
+    epochs = {kind: 0 for kind in slots}
+    connection_kinds: dict[asyncio.Task, str] = {}
+    preferences_store = PreferencesStore(rules_store.root)
+
+    def stored_preferences():
+        try:
+            return preferences_store.load() if preferences_store.path.exists() else None
+        except PreferencesFailure:
+            return None
+
+    stored = stored_preferences()
+    enabled = set(stored.enabled_providers if stored is not None else ("codex_cli",))
+    try:
+        apply_limits(preferences_store.load() if preferences_store.path.exists() else None)
+    except PreferencesFailure:
+        apply_limits(None)
+
+    def kinds():
+        return [item.kind for item in registry.listed() if item.kind in slots]
+
+    def on(kind):
+        return kind in enabled and kind in kinds()
+
+    def busy(kind):
+        return any(connection_kinds.get(task) == kind and not task.done() for task in connection_work)
+
+    def catalog():
+        """Each offered model with its provider, over every provider that is on and has its catalog. A name a provider
+        listed first stays with that one; names do not overlap (Claude's catalog is a fixed list)."""
+        owners = {}
+        for kind in kinds():
+            if on(kind) and states[kind].metadataReady:
+                for model in states[kind].models:
+                    owners.setdefault(model, kind)
+        return owners
+
+    def catalog_reasoning(owners=None):
+        owners = catalog() if owners is None else owners
+        return {model: states[kind].modelReasoning[model] for model, kind in owners.items()
+                if model in states[kind].modelReasoning}
+
+    def reasoning_of(model):
+        return catalog_reasoning().get(model)
+
+    def processing_model():
+        value = stored_preferences()
+        return value.selected_model if value is not None else None
+
+    def connected(kind):
+        state = states[kind]
+        return (on(kind) and not unsafe_cleanup and not INFERENCE.blocked and state.state == "connected"
+                and state.metadataReady and state.quota.state in USABLE_QUOTA)
+
+    def usable(kind):
+        # Structured generation also needs the provider's native profile; the assistant has its own runtime.
+        return connected(kind) and slots[kind].profile is not None
 
     def experimental_ready(model=None) -> bool:
-        return (experimental_authorized(model)
-                and not any(not task.done() for task in connection_work))
+        kind = catalog().get(model or processing_model())
+        return kind is not None and usable(kind) and not busy(kind)
 
     def lifecycle_code(error: SpikeError) -> str:
         nonlocal unsafe_cleanup
@@ -295,29 +386,38 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         finally:
             active -= 1
 
-    def selected_provider():
+    @asynccontextmanager
+    async def model_slot(cancel):
+        # A rewrite waits in the inference admission, not for one of the local workers uploads and exports need (D121).
+        async with gate:
+            if unsafe_cleanup:
+                raise SpikeError("PROCESS_CLEANUP_FAILED")
+            if cancel.is_set():
+                raise AdmissionCancelled()
+        yield
+
+    def provider_for(model):
+        """The provider that runs a catalog model now, with the model; None while that provider cannot run it."""
         if content_provider is not None and not unsafe_cleanup:
-            return content_provider, connection_state.selectedModel or "fixture"
-        if experimental_ready() and provider is not None:
-            return provider, connection_state.selectedModel
+            return content_provider, model
+        kind = catalog().get(model)
+        if kind is not None and experimental_ready(model) and slots[kind].provider is not None:
+            return slots[kind].provider, model
         return None
 
-    preferences_store = PreferencesStore(rules_store.root)
-    try:
-        apply_limits(preferences_store.load() if preferences_store.path.exists() else None)
-    except PreferencesFailure:
-        apply_limits(None)
+    def selected_provider():
+        model = processing_model()
+        if content_provider is not None and not unsafe_cleanup:
+            return content_provider, (model if model in catalog() else None) or "fixture"
+        return provider_for(model) if model is not None else None
+
     def chosen_provider(model):
         """The provider for a model chosen in preferences; None follows the processing model."""
         if model is None:
             return selected_provider()
-        if not connection_state.metadataReady or model not in connection_state.models:
+        if model not in catalog():
             raise ProjectFailure("MODEL_DENIED", 409)
-        if content_provider is not None and not unsafe_cleanup:
-            return content_provider, model
-        if experimental_ready(model) and provider is not None:
-            return provider, model
-        return None
+        return provider_for(model)
 
     def preferred_provider(field):
         try:
@@ -348,8 +448,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         **({"clock": clock} if clock is not None else {}))
     app.state.intake = intake
     rewrite = TemplateRewrite(lambda: preferred_provider("selected_rewrite_model"), preferences=preferences_store,
-        temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
-        reasoning=lambda model: connection_state.modelReasoning.get(model))
+        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of)
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
     mount_projects_v2(app, projects)
 
@@ -357,14 +456,17 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     from .assistant.routes import mount_assistant
 
     def agent_connection():
+        owners = catalog()
+        ready_kinds = {kind for kind in kinds() if connected(kind) and not busy(kind)}
+        listed = [kind for kind in kinds() if on(kind)]
         reason = ("AGENT_CLEANUP_FAILED" if unsafe_cleanup or INFERENCE.blocked else
-            "AGENT_AUTH_REQUIRED" if connection_state.state in {"login_required", "login_pending", "detached"} else
-            "AGENT_QUOTA" if connection_state.quota.state == "exhausted" else "AGENT_CONNECTION_UNAVAILABLE")
-        ready = (not unsafe_cleanup and not INFERENCE.blocked and connection_state.state == "connected"
-            and connection_state.metadataReady and connection_state.quota.state == "available"
-            and not connection_work)
-        return AgentConnection(ready, tuple(connection_state.models),
-            "connection_" + connection_namespace + "_" + str(connection_epoch), None if ready else reason)
+            "AGENT_AUTH_REQUIRED" if any(states[kind].state in {"login_required", "login_pending", "detached"} for kind in listed) else
+            "AGENT_QUOTA" if any(states[kind].quota.state == "exhausted" for kind in listed) else "AGENT_CONNECTION_UNAVAILABLE")
+        ready = bool(ready_kinds)
+        # A ready assistant offers the models of the providers that can run now; a model of another one is unavailable.
+        models = tuple(model for model, kind in owners.items() if not ready or kind in ready_kinds)
+        return AgentConnection(ready, models, "connection_" + connection_namespace + "_" + str(connection_epoch),
+            None if ready else reason, catalog_reasoning(owners))
 
     resolved_agent_runtime = agent_runtime
     if resolved_agent_runtime is None and experimental_profile is not None:
@@ -373,6 +475,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         except AgentFailure:
             resolved_agent_runtime = None
     assistant = AssistantService(projects, resolved_agent_runtime, agent_connection)
+    slots["codex_cli"].runtime = resolved_agent_runtime
+    # The assistant runs on the runtime of its model's provider; an injected test runtime serves every provider.
+    assistant.runtime_for = lambda model: (agent_runtime if agent_runtime is not None
+                                           else slots[catalog().get(model, "codex_cli")].runtime)
     projects.on_deleted = assistant.project_deleted
     app.state.assistant = assistant
     mount_assistant(app, assistant)
@@ -385,9 +491,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         selected = import_selected_provider()
         if selected is None:
             # A known exhausted plan is named as such; "connect a model" sent the user to Settings for nothing (D104).
-            raise ProjectFailure("QUOTA_EXHAUSTED" if connection_state.quota.state == "exhausted" else "CONNECTION_REQUIRED", 409)
+            stored = stored_preferences()
+            kind = catalog().get((stored.selected_import_model if stored else None) or processing_model())
+            # Without a chosen model, the plan is named when every provider that is on has used it up.
+            exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
+            raise ProjectFailure("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted"
+                                                                        for item in exhausted)
+                                 else "CONNECTION_REQUIRED", 409)
         provider, model = selected
-        reasoning = connection_state.modelReasoning.get(model)
+        reasoning = reasoning_of(model)
         if effort is not None and (reasoning is None or effort not in reasoning.supported):
             raise ProjectFailure("IMPORT_EFFORT_UNSUPPORTED", 409)
         effort = effort or (reasoning.default if reasoning is not None else None)
@@ -408,12 +520,15 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             raise ProjectFailure(error.code, 409) from None
         if model is None or model == primary.model:
             return None
-        reasoning = connection_state.modelReasoning.get(model)
+        reasoning = reasoning_of(model)
         effort = reasoning.default if reasoning is not None else None
-        if not connection_state.metadataReady or model not in connection_state.models or effort is None:
+        if model not in catalog() or effort is None:
             raise ProjectFailure("MODEL_DENIED", 409)
-        return ModelCapture(adapter=primary.adapter, model=model, effort=effort, capabilityProfile="closed-json-v1",
-            capabilityVersion="1", configurationHash=capture_digest({"adapter": primary.adapter, "model": model, "effort": effort}))
+        # The fallback may be another provider's model (D119); the capture names the adapter that runs it.
+        selected = provider_for(model)
+        adapter = getattr(selected[0], "template_adapter", "codex_cli") if selected else catalog()[model]
+        return ModelCapture(adapter=adapter, model=model, effort=effort, capabilityProfile="closed-json-v1",
+            capabilityVersion="1", configurationHash=capture_digest({"adapter": adapter, "model": model, "effort": effort}))
 
     def template_model_provider(model):
         # An import runs the model it captured while that model stays available, whatever Settings select later.
@@ -423,15 +538,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             selected = None
         if selected is not None and selected[1] == model:
             return selected
-        # Another captured model (the fallback, or the import model before a Settings change) runs while the catalog
-        # offers it; it is never replaced by a different one.
-        if not connection_state.metadataReady or model not in connection_state.models:
+        # Another captured model (the fallback, or the import model before a Settings change) runs on its own provider
+        # while that provider's catalog offers it; it is never replaced by a different one.
+        if model not in catalog():
             raise ProjectFailure("MODEL_DENIED", 409)
-        if content_provider is not None and not unsafe_cleanup:
-            return content_provider, model
-        if experimental_ready(model) and provider is not None:
-            return provider, model
-        return None
+        return provider_for(model)
 
     v2_pipeline = None
     if template_import_call_cap is not None:
@@ -517,6 +628,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 lifecycle_code(SpikeError(error.code))
         operations.pop(done, None)
         connection_work.pop(done, None)
+        connection_kinds.pop(done, None)
         cancellation_pending.discard(done)
         active -= 1
 
@@ -599,14 +711,39 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         except (RenderFailure, OSError):
             return problem("TEMPLATE_UNAVAILABLE", 503)
 
-    login_task: asyncio.Task | None = None
-    install_task: asyncio.Task | None = None
+    login_tasks: dict[str, asyncio.Task] = {}
+    install_tasks: dict[str, asyncio.Task] = {}
 
-    def connection_response() -> JSONResponse:
-        state = ConnectionPayload(**(connection_state.model_dump() | {"experimentalMode": experimental_profile is not None,
-                                                    "generationReady": experimental_ready(),
-                                                    "installation": installation.snapshot() if installation else None}))
-        return JSONResponse(state.model_dump(), headers={"Cache-Control": "no-store"})
+    def provider_summaries() -> list[ProviderSummary]:
+        summaries = []
+        for item in registry.listed():
+            if item.kind not in slots:
+                continue
+            slot, state = slots[item.kind], states[item.kind]
+            executable = getattr(slot.connection, "executable", None)
+            # The runtime FoldCV installed is pinned by hash, not by signature, so its file is enough here.
+            installed = (state.state not in {"cli_missing", "launcher_unsupported"} if on(item.kind)
+                         else executable is not None and executable.is_file() if getattr(slot.profile, "managed", False)
+                         else discovered(item, executable))
+            summaries.append(ProviderSummary(**state.model_dump(), kind=item.kind, display=item.display,
+                                             subscription=item.subscription, publisher=item.publisher,
+                                             loginCode=item.login_code, installed=installed, enabled=on(item.kind),
+                                             installation=slot.installation.snapshot() if slot.installation else None))
+        return summaries
+
+    def connection_response(kind=None) -> JSONResponse:
+        # The top level names one provider (the request's, else the first that is on) and combines the catalogs.
+        kind = kind or next((item for item in kinds() if on(item)), "codex_cli")
+        owners, model = catalog(), processing_model()
+        state, slot = states[kind], slots[kind]
+        payload = ConnectionPayload(provider=kind, providers=provider_summaries(), state=state.state, version=state.version,
+                                    versionStatus=state.versionStatus, plan=state.plan, quota=state.quota,
+                                    installation=slot.installation.snapshot() if slot.installation else None,
+                                    models=list(owners), modelReasoning=catalog_reasoning(owners),
+                                    selectedModel=model if model in owners else None, metadataReady=bool(owners),
+                                    generationReady=experimental_ready(),
+                                    experimentalMode=any(slots[item].profile is not None for item in kinds()))
+        return JSONResponse(payload.model_dump(), headers={"Cache-Control": "no-store"})
 
     @app.get("/v1/settings/connection")
     async def current_connection():
@@ -643,7 +780,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     @app.put("/v1/settings/import-model")
     async def save_import_model(payload: SaveImportModelPreference):
         async with gate:
-            if payload.model is not None and (not connection_state.metadataReady or payload.model not in connection_state.models):
+            if payload.model is not None and payload.model not in catalog():
                 return problem("MODEL_DENIED", 409, "settings")
             try:
                 rules_store.load()
@@ -655,7 +792,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     @app.put("/v1/settings/fallback-model")
     async def save_fallback_model(payload: SaveImportModelPreference):
         async with gate:
-            if payload.model is not None and (not connection_state.metadataReady or payload.model not in connection_state.models):
+            if payload.model is not None and payload.model not in catalog():
                 return problem("MODEL_DENIED", 409, "settings")
             try:
                 rules_store.load()
@@ -667,9 +804,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     @app.put("/v1/settings/rewrite-model")
     async def save_rewrite_model(payload: SaveImportModelPreference):
         async with gate:
-            if not connection_state.metadataReady or payload.model is not None and payload.model not in connection_state.models:
+            owners = catalog()
+            if not owners or payload.model is not None and payload.model not in owners:
                 return problem("MODEL_DENIED", 409, "settings")
-            metadata = connection_state.modelReasoning.get(payload.model or connection_state.selectedModel or "")
+            metadata = reasoning_of(payload.model or processing_model() or "")
             try:
                 rules_store.load()
                 value = preferences_store.select_rewrite_model(payload.model, set(metadata.supported if metadata else ()))
@@ -680,9 +818,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     @app.put("/v1/settings/rewrite-reasoning")
     async def save_rewrite_reasoning(payload: SelectReasoningRequest):
         async with gate:
-            metadata = connection_state.modelReasoning.get(payload.model)
+            metadata = reasoning_of(payload.model)
             # The store checks the model against the rewrite model, which follows the processing model when unset.
-            if (not connection_state.metadataReady or payload.model not in connection_state.models
+            if (payload.model not in catalog()
                     or payload.effort is not None and (metadata is None or payload.effort not in metadata.supported)):
                 return problem("MODEL_DENIED", 409, "settings")
             try:
@@ -691,250 +829,336 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             except PreferencesFailure as error:
                 return problem(error.code, 409, "settings")
 
-    async def connection_job(kind: str, work):
-        nonlocal active, connection_epoch, connection_state, login_task, install_task, experimental_profile, provider
+    async def connection_job(job: str, kind: str, work):
+        nonlocal active, connection_epoch
+        slot = slots[kind]
+        installation = slot.installation
         async with gate:
-            if unsafe_cleanup:
-                connection_state = ConnectionPayload(state="cleanup_blocked")
-                return connection_response()
-            if INFERENCE.blocked:
-                connection_state = ConnectionPayload(state="cleanup_blocked")
-                return connection_response()
+            if unsafe_cleanup or INFERENCE.blocked:
+                states[kind] = ProviderState(state="cleanup_blocked")
+                return connection_response(kind)
             if INFERENCE.locked():
-                return connection_response() if kind not in {"login", "install"} else problem("BUSY", 429, "host", True)
-            if kind == "login" and connection_state.state != "login_required":
+                return connection_response(kind) if job not in {"login", "install"} else problem("BUSY", 429, "host", True)
+            if job == "login" and states[kind].state != "login_required":
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
-            if kind == "install" and (installation is None or connection_state.state not in {
+            if job == "install" and (installation is None or states[kind].state not in {
                     "cli_missing", "unsupported_version", "launcher_unsupported"}):
                 return problem("INSTALL_NOT_AVAILABLE", 409, "host")
-            if cancellation_pending or active >= MAX_CONCURRENT or connection_work:
+            # One connection job per provider; the other provider's checks go on.
+            if cancellation_pending or active >= MAX_CONCURRENT or busy(kind):
                 return problem("BUSY", 429, "host", True)
-            if provider is not None:
-                provider.invalidate_preflight()
+            if slot.provider is not None:
+                slot.provider.invalidate_preflight()
             active += 1
-            epoch = connection_epoch
+            epoch = epochs[kind]
+            profile = slot.profile
             files = OperationFiles(temp_root)
             cancel = threading.Event()
-            if kind == "install":
+            if job == "install":
                 installation.cancel = cancel
                 installation.update(state="downloading", downloadedBytes=0, error=None)
 
             def execute():
-                if kind == "install":
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), files.open():
+                if job == "install":
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), files.open():
                         return work(files, cancel)
-                if experimental_profile is not None and not experimental_profile.executable.is_file():
+                if profile is not None and not profile.executable.is_file():
                     raise ConnectionFailure("CLI_MISSING")
                 try:
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15), native_profile(
-                            experimental_profile, cancel, deadline=time.monotonic() + 15, blocking=False,
+                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), native_profile(
+                            profile, cancel, deadline=time.monotonic() + 15, blocking=False,
                             operations_root=temp_root):
                         with files.open():
                             return work(files, cancel)
-                except ExperimentalProfileError as error:
+                except (ExperimentalProfileError, ClaudeProfileError) as error:
                     raise ConnectionFailure("UNSUPPORTED_VERSION" if str(error) == "CLI_UNSUPPORTED" else "METADATA_FAILED") from None
 
             task = asyncio.create_task(asyncio.to_thread(execute))
             operations[task] = files
             connection_work[task] = (files, cancel)
+            connection_kinds[task] = kind
             task.add_done_callback(operation_done)
-            if kind in {"login", "install"}:
+            if job in {"login", "install"}:
                 connection_epoch += 1
-                epoch = connection_epoch
+                epochs[kind] += 1
+                epoch = epochs[kind]
+                # An import may use both providers, so a new sign-in or CLI on either stops all model work.
                 assistant.stop_all()
                 # A running import holds the permit and makes this BUSY; one not yet admitted would call the model
                 # under the new sign-in or CLI.
                 projects.imports.stop_all()
-                if kind == "install":
-                    install_task = task
+                if job == "install":
+                    install_tasks[kind] = task
                 else:
-                    login_task = task
-                    connection_state = ConnectionPayload(state="login_pending", version=connection_state.version)
+                    login_tasks[kind] = task
+                    states[kind] = ProviderState(state="login_pending", version=states[kind].version)
         try:
             result = await asyncio.shield(task)
             async with gate:
-                if kind == "install":
-                    if isinstance(result, Path) and experimental_profile is not None:
-                        experimental_profile = ExperimentalCliProfile(experimental_profile.root, result)
-                        connection.executable = result
-                        connection.experimental_profile = experimental_profile
-                        provider = CodexCliProvider(result, experimental_profile=experimental_profile)
-                        assistant.runtime = CodexAgentRuntime(connection, temp_root)
-                        if epoch == connection_epoch:
-                            connection_state = ConnectionPayload(state="unchecked")
-                    return connection_response()
-                if epoch != connection_epoch:
-                    return connection_response()
-                if kind == "login":
-                    connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
-                    return connection_response()
+                if job == "install":
+                    current = slots[kind]
+                    if isinstance(result, Path) and current.profile is not None and current.rebind is not None:
+                        slots[kind] = current.rebind(current, result)
+                        if epoch == epochs[kind]:
+                            states[kind] = ProviderState(state="unchecked")
+                    return connection_response(kind)
+                if epoch != epochs[kind]:
+                    return connection_response(kind)
+                if job == "login":
+                    states[kind] = ProviderState(state="login_required", version=states[kind].version)
+                    return connection_response(kind)
                 assert isinstance(result, Metadata)
-                selected = connection_state.selectedModel if connection_state.selectedModel in result.models else None
-                if selected is None:
-                    try:
-                        if not rules_store.path.exists():rules_store.load()
-                        preferred = preferences_store.load().selected_model
-                        if preferred in result.models:selected = preferred
-                    except (PreferencesFailure, RulesFailure):
-                        pass
                 quota = QuotaPayload(state=result.quota.state, usedPercent=result.quota.used_percent,
                                      resetsAt=result.quota.resets_at)
-                state = ("unchecked" if kind == "discover" else "quota_exhausted" if quota.state == "exhausted"
+                state = ("unchecked" if job == "discover" else "quota_exhausted" if quota.state == "exhausted"
                          else "unknown_limits" if quota.state == "unknown" else "connected")
-                connection_state = ConnectionPayload(state=state, version=result.version, plan=result.plan,
-                                                     models=list(result.models), selectedModel=selected, quota=quota, modelReasoning=result.reasoning,
-                                                     metadataReady=kind != "discover")
-                return connection_response()
+                states[kind] = ProviderState(state=state, version=result.version, plan=result.plan,
+                                             versionStatus=result.version_status, models=list(result.models), quota=quota,
+                                             modelReasoning=result.reasoning, metadataReady=job != "discover")
+                return connection_response(kind)
         except (AdmissionTimeout, AdmissionCancelled):
-            if kind == "install":
+            if job == "install":
                 installation.update(state="cancelled" if cancel.is_set() else "failed",
                                     error="cancelled" if cancel.is_set() else "busy")
-            return connection_response()
+            return connection_response(kind)
         except AdmissionBlocked:
-            if kind == "install":
+            if job == "install":
                 installation.update(state="failed", error="install_failed")
             INFERENCE.block()
-            connection_state = ConnectionPayload(state="cleanup_blocked")
-            return connection_response()
+            states[kind] = ProviderState(state="cleanup_blocked")
+            return connection_response(kind)
         except ConnectionFailure as error:
             if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
                 lifecycle_code(SpikeError(error.code))
             async with gate:
                 if unsafe_cleanup:
-                    connection_state = ConnectionPayload(state="cleanup_blocked")
-                    return connection_response()
-                if epoch != connection_epoch:
-                    return connection_response()
+                    states[kind] = ProviderState(state="cleanup_blocked")
+                    return connection_response(kind)
+                if epoch != epochs[kind]:
+                    return connection_response(kind)
                 mapped = {"CLI_MISSING": "cli_missing", "CLI_LAUNCH_UNSUPPORTED": "launcher_unsupported",
                           "UNSUPPORTED_VERSION": "unsupported_version",
                           "LOGIN_REQUIRED": "login_required", "API_KEY_MODE": "api_key_mode",
                           "METADATA_FAILED": "metadata_failed"}
-                state = mapped.get(error.code, "login_failed" if kind == "login" else "metadata_failed")
-                connection_state = ConnectionPayload(state=state, version=error.version)
-                return connection_response()
+                state = mapped.get(error.code, "login_failed" if job == "login" else "metadata_failed")
+                states[kind] = ProviderState(state=state, version=error.version)
+                return connection_response(kind)
         except SpikeError as error:
-            if kind == "install":
+            if job == "install":
                 installation.update(state="failed", error="install_failed")
             lifecycle_code(error)
             async with gate:
                 if unsafe_cleanup:
-                    connection_state = ConnectionPayload(state="cleanup_blocked")
-                elif epoch == connection_epoch:
-                    connection_state = ConnectionPayload(state="metadata_failed")
-                return connection_response()
+                    states[kind] = ProviderState(state="cleanup_blocked")
+                elif epoch == epochs[kind]:
+                    states[kind] = ProviderState(state="metadata_failed")
+                return connection_response(kind)
         except asyncio.CancelledError:
             await stop_connection(task, files, cancel)
-            if kind == "install" and installation.snapshot()["state"] in {"downloading", "verifying", "extracting"}:
+            if job == "install" and installation.snapshot()["state"] in {"downloading", "verifying", "extracting"}:
                 installation.update(state="cancelled", error="cancelled")
             raise
         except Exception:
-            if kind == "install":
+            if job == "install":
                 installation.update(state="failed", error="install_failed")
             async with gate:
                 if unsafe_cleanup:
-                    connection_state = ConnectionPayload(state="cleanup_blocked")
-                elif epoch == connection_epoch:
-                    connection_state = ConnectionPayload(state="metadata_failed")
-                return connection_response()
+                    states[kind] = ProviderState(state="cleanup_blocked")
+                elif epoch == epochs[kind]:
+                    states[kind] = ProviderState(state="metadata_failed")
+                return connection_response(kind)
         finally:
-            if login_task is task:
-                login_task = None
-            if install_task is task:
-                install_task = None
+            if login_tasks.get(kind) is task:
+                del login_tasks[kind]
+                with login_code_lock:
+                    login_codes.pop(kind, None)
+            if install_tasks.get(kind) is task:
+                del install_tasks[kind]
 
-    async def discover(_payload: EmptyRequest):
-        return await connection_job("discover", lambda files, cancel: connection.inspect(files, cancel, full=False))
+    def target(payload: HostRequest):
+        """The provider a host request is for (None is Codex), with the refusal when it is not listed or is off."""
+        kind = payload.provider or "codex_cli"
+        if kind not in kinds():
+            return kind, problem("PROVIDER_UNAVAILABLE", 409, "host")
+        return kind, None if on(kind) else problem("PROVIDER_INACTIVE", 409, "host")
 
-    async def status(_payload: EmptyRequest):
-        return await connection_job("status", lambda files, cancel: connection.inspect(files, cancel))
+    async def discover(payload: HostRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        return await connection_job("discover", kind, lambda files, cancel, adapter=slots[kind].connection:
+                                    adapter.inspect(files, cancel, full=False))
 
-    async def models(_payload: EmptyRequest):
-        return await status(_payload)
+    async def status(payload: HostRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        return await connection_job("status", kind, lambda files, cancel, adapter=slots[kind].connection:
+                                    adapter.inspect(files, cancel))
 
-    async def login(_payload: EmptyRequest):
-        return await connection_job("login", connection.login)
+    async def models(payload: HostRequest):
+        return await status(payload)
 
-    async def install_cli(_payload: EmptyRequest):
+    login_codes: dict[str, list[str]] = {}
+    login_code_lock = threading.Lock()
+
+    async def login(payload: HostRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        with login_code_lock:
+            login_codes[kind] = []
+        adapter = slots[kind].connection
+        if DESCRIPTORS[kind].login_code:
+            def take_login_code() -> str | None:
+                with login_code_lock:
+                    codes = login_codes.get(kind)
+                    return codes.pop() if codes else None
+            return await connection_job("login", kind, lambda files, cancel: adapter.login(files, cancel, code=take_login_code))
+        return await connection_job("login", kind, adapter.login)
+
+    async def send_login_code(payload: LoginCodeRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        async with gate:
+            task = login_tasks.get(kind)
+            if (task is None or task.done() or states[kind].state != "login_pending"
+                    or not DESCRIPTORS[kind].login_code):
+                return problem("LOGIN_NOT_AVAILABLE", 409, "host")
+            with login_code_lock:
+                login_codes[kind] = [payload.code]
+            return connection_response(kind)
+
+    async def install_cli(payload: HostRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        installation = slots[kind].installation
         if installation is None:
             return problem("INSTALL_NOT_AVAILABLE", 409, "host")
-        return await connection_job("install", lambda files, _cancel: installation.install(files))
+        return await connection_job("install", kind, lambda files, _cancel: installation.install(files))
 
-    async def cancel_install(_payload: EmptyRequest):
+    async def cancel_install(payload: HostRequest):
         nonlocal connection_epoch
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        installation = slots[kind].installation
         async with gate:
-            current = install_task
+            current = install_tasks.get(kind)
             if current is None or current not in connection_work:
-                return connection_response()
+                return connection_response(kind)
             if installation.snapshot()["state"] == "ready":
-                return connection_response()
+                return connection_response(kind)
             connection_epoch += 1
+            epochs[kind] += 1
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)
         if installation.snapshot()["state"] in {"downloading", "verifying", "extracting"}:
             installation.update(state="cancelled", error="cancelled")
         if code is not None or unsafe_cleanup:
             return problem("PROCESS_CLEANUP_FAILED", 503, "host")
-        return connection_response()
+        return connection_response(kind)
 
     async def select(payload: SelectModelRequest):
-        nonlocal connection_state
+        # The processing model may be any provider's model; it runs on the provider that lists it.
+        kind, refused = target(payload)
+        if refused:
+            return refused
         async with gate:
-            if not connection_state.metadataReady or payload.model not in connection_state.models:
+            if payload.model not in catalog():
                 return problem("MODEL_DENIED", 409, "host")
             try:
                 rules_store.load()
                 preferences_store.select_model(payload.model)
             except (PreferencesFailure, RulesFailure) as error:
                 return problem(error.code, 409, "settings")
-            connection_state = connection_state.model_copy(update={"selectedModel": payload.model})
-            return connection_response()
+            return connection_response(kind)
 
-    async def detach(_payload: EmptyRequest):
-        nonlocal connection_epoch, connection_state
+    async def stop_provider(kind, state):
+        """A clean detach of one provider, never a CLI logout. Model work in flight stops whatever it runs on: an import
+        may use both providers."""
+        nonlocal connection_epoch
         async with gate:
-            if provider is not None:
-                provider.invalidate_preflight()
+            if slots[kind].provider is not None:
+                slots[kind].provider.invalidate_preflight()
             connection_epoch += 1
-            connection_state = ConnectionPayload(state="detached")
-            current = list(connection_work.items())
+            epochs[kind] += 1
+            states[kind] = ProviderState(state=state)
+            current = [(task, files, cancel) for task, (files, cancel) in connection_work.items()
+                       if connection_kinds.get(task) == kind]
             intake.request_shutdown()
             rewrite.request_shutdown()
             projects.imports.stop_all()
             assistant.stop_all()
-        codes = await asyncio.gather(*(stop_connection(task, files, cancel)
-                                       for task, (files, cancel) in current))
+        codes = await asyncio.gather(*(stop_connection(task, files, cancel) for task, files, cancel in current))
         try:
             await intake.shutdown()
             await rewrite.shutdown()
             # No import keeps calling the model under the account that signed out.
             await projects.imports.shutdown()
         except ProjectFailure:
-            unsafe_code = SpikeError("PROCESS_CLEANUP_FAILED")
-            lifecycle_code(unsafe_code)
+            lifecycle_code(SpikeError("PROCESS_CLEANUP_FAILED"))
         if any(code is not None for code in codes) or unsafe_cleanup:
-            connection_state = ConnectionPayload(state="cleanup_blocked")
-        return connection_response()
+            states[kind] = ProviderState(state="cleanup_blocked")
+        return connection_response(kind)
 
-    async def cancel_login(_payload: EmptyRequest):
-        nonlocal connection_epoch, connection_state
+    async def detach(payload: HostRequest):
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        return await stop_provider(kind, "detached")
+
+    async def cancel_login(payload: HostRequest):
+        nonlocal connection_epoch
+        kind, refused = target(payload)
+        if refused:
+            return refused
         async with gate:
-            current = login_task
+            current = login_tasks.get(kind)
             if current is None or current not in connection_work:
-                return connection_response()
-            if provider is not None:
-                provider.invalidate_preflight()
+                return connection_response(kind)
+            if slots[kind].provider is not None:
+                slots[kind].provider.invalidate_preflight()
             connection_epoch += 1
+            epochs[kind] += 1
             assistant.stop_all()
-            connection_state = ConnectionPayload(state="login_required", version=connection_state.version)
+            states[kind] = ProviderState(state="login_required", version=states[kind].version)
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)
         if code is not None or unsafe_cleanup:
-            connection_state = ConnectionPayload(state="cleanup_blocked")
-        return connection_response()
+            states[kind] = ProviderState(state="cleanup_blocked")
+        return connection_response(kind)
+
+    async def enable(payload: EnableProviderRequest):
+        kind = payload.provider
+        if kind not in kinds():
+            return problem("PROVIDER_UNAVAILABLE", 409, "host")
+        if payload.enabled == on(kind):
+            return connection_response(kind)
+        if not payload.enabled:
+            stopped = await stop_provider(kind, "unchecked")
+            if states[kind].state == "cleanup_blocked":
+                return stopped
+        async with gate:
+            try:
+                rules_store.load()
+                preferences_store.enable_provider(kind, payload.enabled)
+            except (PreferencesFailure, RulesFailure) as error:
+                return problem(error.code, 409, "settings")
+            if payload.enabled:
+                enabled.add(kind)
+            else:
+                enabled.discard(kind)
+            epochs[kind] += 1
+            states[kind] = ProviderState(state="unchecked")
+            return connection_response(kind)
 
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
-                          ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install)):
+                          ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install),
+                          ("enable", enable), ("login-code", send_login_code)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 
     @app.get("/{path:path}")

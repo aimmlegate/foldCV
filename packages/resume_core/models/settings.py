@@ -44,6 +44,10 @@ class RulesSettingsError(Wire):
     required_headings: list[Literal["## Preset: shorten", "## Preset: clarify"]]
 
 
+ProviderKind = Literal["codex_cli", "claude_cli"]
+DEFAULT_PROVIDER: ProviderKind = "codex_cli"
+
+
 class Preferences(Wire):
     schema_version: Literal[1]
     automatic_analysis: bool
@@ -57,6 +61,8 @@ class Preferences(Wire):
     rewrite_reasoning_effort: ReasoningEffort | None = None
     import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
     project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
+    # Providers that may run (D119); each model choice runs on the provider whose catalog lists it.
+    enabled_providers: list[ProviderKind] = Field(default_factory=lambda: [DEFAULT_PROVIDER], max_length=2)
 
 
 class SaveImportModelPreference(Wire):

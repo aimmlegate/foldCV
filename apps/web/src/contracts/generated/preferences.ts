@@ -1,4 +1,9 @@
 export type Automaticanalysis = boolean;
+/**
+ * @maxItems 2
+ */
+export type Enabledproviders =
+  [] | ["codex_cli" | "claude_cli"] | ["codex_cli" | "claude_cli", "codex_cli" | "claude_cli"];
 export type Importminutes = number;
 export type Projectmegabytes = number;
 export type Rewritereasoningeffort =
@@ -12,6 +17,7 @@ export type Theme = "light" | "dark" | "system";
 
 export interface Preferences {
   automaticAnalysis: Automaticanalysis;
+  enabledProviders?: Enabledproviders;
   importMinutes?: Importminutes;
   projectMegabytes?: Projectmegabytes;
   rewriteReasoningEffort?: Rewritereasoningeffort;

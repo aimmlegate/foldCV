@@ -1,6 +1,6 @@
 """The pinned code-mode host belongs only to the sandboxed assistant profile."""
 
-import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -9,6 +9,11 @@ import pytest
 
 from resume_api.agent import host_profile as agent
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.cli.qualification import QualificationError
+
+
+def manifest_bytes(version):
+    return json.dumps({"layoutVersion": 1, "version": version, "variant": "codex"}).encode()
 
 
 @pytest.fixture
@@ -17,15 +22,28 @@ def pinned_host(tmp_path, monkeypatch):
     manifest = tmp_path / "codex-package.json"
     host.write_bytes(b"synthetic-host")
     host.chmod(0o700)
-    manifest.write_bytes(b"synthetic-manifest")
+    manifest.write_bytes(manifest_bytes("0.163.0-alpha.11.1"))
     monkeypatch.setattr(agent, "CODE_MODE_HOST", host)
-    monkeypatch.setattr(agent, "HOST_SHA256", hashlib.sha256(host.read_bytes()).hexdigest())
     monkeypatch.setattr(agent, "PACKAGE_MANIFEST", manifest)
-    monkeypatch.setattr(agent, "MANIFEST_SHA256", hashlib.sha256(manifest.read_bytes()).hexdigest())
+
+    # Stands in for codesign: only the original bytes carry the publisher's signature.
+    def publisher(path, team_id, identifier):
+        if (path.read_bytes() != b"synthetic-host" or team_id != "2DC432GLL2"
+                or identifier != "codex-code-mode-host"):
+            raise QualificationError("CLI_UNSUPPORTED")
+        return path
+    monkeypatch.setattr(agent, "require_publisher", publisher)
     return host, manifest
 
 
-@pytest.mark.parametrize("damage", ["host", "manifest", "missing", "symlink", "mode"])
+@pytest.mark.parametrize("version", ["0.162.0-alpha.2", "0.163.0-alpha.11.1", "0.170.0"])
+def test_user_installed_host_qualifies_by_signature_not_version(pinned_host, version):
+    _host, manifest = pinned_host
+    manifest.write_bytes(manifest_bytes(version))
+    agent.check_host()
+
+
+@pytest.mark.parametrize("damage", ["host", "manifest", "old", "variant", "missing", "symlink", "mode"])
 def test_changed_or_unsafe_host_fails_before_launch(tmp_path, pinned_host, monkeypatch, damage):
     host, manifest = pinned_host
     agent.check_host()
@@ -33,6 +51,10 @@ def test_changed_or_unsafe_host_fails_before_launch(tmp_path, pinned_host, monke
         host.write_bytes(b"changed")
     elif damage == "manifest":
         manifest.write_bytes(b"changed")
+    elif damage == "old":
+        manifest.write_bytes(manifest_bytes("0.161.0"))
+    elif damage == "variant":
+        manifest.write_bytes(json.dumps({"version": "0.163.0", "variant": "other"}).encode())
     elif damage == "missing":
         host.unlink()
     elif damage == "symlink":
@@ -101,3 +123,14 @@ def test_sandbox_allows_host_only_for_agent_and_still_denies_shell(tmp_path):
     denied = run(policy, "/bin/sh", "-c", "printf FORBIDDEN_AGENT_SHELL")
     assert denied.returncode != 0
     assert "FORBIDDEN_AGENT_SHELL" not in denied.stdout
+
+
+@pytest.mark.parametrize("allow_web", [False, True])
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh"])
+def test_assistant_config_keeps_native_search_off_and_carries_the_effort(tmp_path, allow_web, effort):
+    values = agent.AgentProofProfile(tmp_path).config(tmp_path, url="http://127.0.0.1:1234/mcp", allow_web=allow_web,
+                                                      effort=effort)[1::2]
+    settings = dict(value.split("=", 1) for value in values)
+    assert settings["web_search"] == '"disabled"'
+    assert settings["model_reasoning_effort"] == json.dumps(effort)
+    assert ('"read_public_page"' in settings["mcp_servers"]) is allow_web

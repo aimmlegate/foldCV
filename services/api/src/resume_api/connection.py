@@ -17,7 +17,8 @@ from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex_cli import MODEL, strict_json
-from resume_api.cli.profile import VERSION, overrides
+from resume_api.cli.profile import REQUIRED_FLAGS, check_features, overrides, qualify
+from resume_api.cli.qualification import QualificationError, missing_flags
 
 
 MAX_MODELS = 100
@@ -45,6 +46,8 @@ class Metadata:
     plan: str | None
     quota: Quota
     reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
+    # "graceful": newer than the last tested version; shown as a notice (plan section 5).
+    version_status: str = "supported"
 
 
 def quota_from_result(raw: object) -> Quota:
@@ -85,12 +88,11 @@ def quota_from_result(raw: object) -> Quota:
 
 
 class ConnectionAdapter:
-    def __init__(self, executable: Path | None = None, *, allow_fixture: bool = False,
-                 node_executable: Path | None = None,
+    def __init__(self, executable: Path | None = None, *, node_executable: Path | None = None,
                  experimental_profile: ExperimentalCliProfile | None = None):
         selected = executable if executable is not None else shutil.which("codex")
         self.executable = Path(selected).absolute() if selected is not None else None
-        self.allow_fixture = allow_fixture
+        self.version_status = "supported"
         self.node_executable = node_executable
         self.experimental_profile = experimental_profile
 
@@ -145,10 +147,27 @@ class ConnectionAdapter:
             version = raw.decode("utf-8", "strict").strip()
         except UnicodeError:
             raise ConnectionFailure("UNSUPPORTED_VERSION") from None
-        expected = self.experimental_profile.version if self.experimental_profile is not None else VERSION
-        if len(version) > 80 or version != expected and not (self.allow_fixture and version == VERSION + "-fixture"):
-            raise ConnectionFailure("UNSUPPORTED_VERSION", version if len(version) <= 80 else None)
+        try:
+            self.version_status = qualify(version)
+        except QualificationError:
+            raise ConnectionFailure("UNSUPPORTED_VERSION", version if len(version) <= 80 else None) from None
         return version
+
+    def _config(self, files: OperationFiles) -> list[str]:
+        return self.experimental_profile.config(files.path) if self.experimental_profile is not None else overrides(files.path)
+
+    def check_profile(self, files: OperationFiles, cancel: threading.Event, deadline: float) -> None:
+        """Flags and effective features under the profile overrides, before sign-in or inference."""
+        if files.path is None:
+            raise ConnectionFailure("TEMP_FAILED")
+        help_raw, _ = self._run(files, ("exec", "--help"), cancel, deadline)
+        listing, _ = self._run(files, ("features", "list", *self._config(files)), cancel, deadline)
+        try:
+            if missing_flags(help_raw.decode("utf-8", "replace"), REQUIRED_FLAGS):
+                raise QualificationError("CLI_PROFILE_UNSAFE")
+            check_features(listing.decode("utf-8", "replace"))
+        except QualificationError:
+            raise ConnectionFailure("UNSUPPORTED_VERSION") from None
 
     def login_status(self, files: OperationFiles, cancel: threading.Event, deadline: float) -> None:
         stdout, stderr = self._run(files, ("login", "status"), cancel, deadline)
@@ -241,21 +260,20 @@ class ConnectionAdapter:
                 return b""
             raise ConnectionFailure("METADATA_FAILED")
 
-        config = (self.experimental_profile.config(files.path) if self.experimental_profile is not None
-                  else overrides(files.path))
-        self._run(files, ("app-server", "--strict-config", *config), cancel, deadline,
+        self._run(files, ("app-server", "--strict-config", *self._config(files)), cancel, deadline,
                   data=request(0, "initialize", {"clientInfo": {"name": "foldcv", "version": "0.1.0"}}),
                   on_line=accept, interactive=True)
         if stage != 4:
             raise ConnectionFailure("METADATA_FAILED")
-        return Metadata(version, models, plan, quota, reasoning)
+        return Metadata(version, models, plan, quota, reasoning, self.version_status)
 
     def inspect(self, files: OperationFiles, cancel: threading.Event, *, full: bool = True) -> Metadata:
         deadline = time.monotonic() + 15
         version = self.version(files, cancel, deadline)
         if not full:
-            return Metadata(version, (), None, Quota())
+            return Metadata(version, (), None, Quota(), version_status=self.version_status)
         try:
+            self.check_profile(files, cancel, deadline)
             self.login_status(files, cancel, deadline)
             return self.metadata(files, cancel, deadline, version)
         except ConnectionFailure as error:

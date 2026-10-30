@@ -147,34 +147,38 @@ def _release(descriptor):
 
 
 class _SharedHold:
-    def __init__(self, key, share):
-        self.key, self.share, self.count, self.descriptor, self.failed = key, share, 1, None, False
+    def __init__(self, key):
+        self.key, self.count, self.descriptor, self.failed = key, 1, None, False
         self.ready = threading.Event()
 
 
-# Calls under one share key (a running import's inference permit) hold the profile together (CT10): the first takes
-# the exclusive lock, later ones join it, and the last one out releases it. Other owners and processes still wait.
+# Model calls of this process hold the profile together (CT10, D121): the first takes the exclusive lock, later ones
+# join it, and the last one out runs the cleanup and releases it. Exclusive owners and other processes still wait.
 _HOLDS, _HOLDS_GUARD = {}, threading.Lock()
 
 
-def _leave(hold):
+def _leave(hold, cleanup=None):
     with _HOLDS_GUARD:
         hold.count -= 1
         last = hold.count == 0
         if last and _HOLDS.get(hold.key) is hold:
             del _HOLDS[hold.key]
     if last and hold.descriptor is not None:
-        _release(hold.descriptor)
+        try:
+            if cleanup is not None:
+                cleanup()
+        finally:
+            _release(hold.descriptor)
 
 
-def _join(profile, share, cancel, deadline, blocking):
-    key = (str(profile.root), id(share))
+def _join(profile, cancel, deadline, blocking):
+    key = str(profile.root)
     while True:
         with _HOLDS_GUARD:
             hold = _HOLDS.get(key)
-            first = hold is None or hold.share is not share
+            first = hold is None
             if first:
-                hold = _HOLDS[key] = _SharedHold(key, share)
+                hold = _HOLDS[key] = _SharedHold(key)
             else:
                 hold.count += 1
         if first:
@@ -212,24 +216,30 @@ def _owned(profile, operations_root):
 
 
 @contextmanager
-def native_profile(profile, cancel, *, deadline, blocking=True, operations_root=None, share=None):
+def native_profile(profile, cancel, *, deadline, blocking=True, operations_root=None, shared=False, cleanup=None):
+    """`shared` model calls join one hold of the profile; without it the caller owns the profile alone. `cleanup`
+    runs while the lock is still held, once no shared call is left."""
     if profile is None:
         yield
         return
-    if share is None:
+    if not shared:
         descriptor = _acquire(profile, cancel, deadline, blocking)
         try:
             with _owned(profile, operations_root):
                 yield
         finally:
-            _release(descriptor)
+            try:
+                if cleanup is not None:
+                    cleanup()
+            finally:
+                _release(descriptor)
         return
-    hold = _join(profile, share, cancel, deadline, blocking)
+    hold = _join(profile, cancel, deadline, blocking)
     try:
         with _owned(profile, operations_root):
             yield
     finally:
-        _leave(hold)
+        _leave(hold, cleanup)
 
 
 @contextmanager

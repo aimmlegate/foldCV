@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import re
+
+from resume_api.cli.qualification import Compatibility, QualificationError, Status, Version
 
 
 VERSION = "codex-cli 0.162.0-alpha.2"
@@ -26,6 +29,38 @@ DISABLED_FEATURES = (
     "daemon_auto_start", "in_app_local_automation", "tool_suggest",
     "unbounded_connection_retries",
 )
+
+
+# Section 5 of the multi-provider plan: publisher and a version table instead of exact pins.
+TEAM_ID = "2DC432GLL2"
+IDENTIFIER = "codex"
+HOST_IDENTIFIER = "codex-code-mode-host"
+COMPATIBILITY = Compatibility(floor="0.162.0-alpha.2", last_tested="0.163.0-alpha.11.1")
+# `features list` reports unified_exec on even with `--disable unified_exec` (0.163.0-alpha.11.1);
+# the exec grammar aborts on any tool item instead.
+REQUIRED_OFF = tuple(name for name in DISABLED_FEATURES if name != "unified_exec")
+_FEATURE = re.compile(r"([a-z0-9_.]+)\s+\S.*?\s+(true|false)\s*")
+
+
+def qualify(banner: str) -> Status:
+    """Status of a `codex-cli <semver>` banner; below the floor or broken is unsupported."""
+    if len(banner) > 80 or not banner.startswith("codex-cli "):
+        raise QualificationError("CLI_UNSUPPORTED")
+    status = COMPATIBILITY.status(Version.parse(banner.removeprefix("codex-cli ")))
+    if status in {"unsupported", "broken"}:
+        raise QualificationError("CLI_UNSUPPORTED")
+    return status
+
+
+def check_features(listing: str) -> None:
+    """`codex features list` under the profile overrides must report every required feature off."""
+    effective = {}
+    for line in listing.splitlines():
+        match = _FEATURE.fullmatch(line)
+        if match:
+            effective[match.group(1)] = match.group(2) == "true"
+    if not effective or any(effective.get(name) for name in REQUIRED_OFF):
+        raise QualificationError("CLI_PROFILE_UNSAFE")
 
 
 @dataclass(frozen=True)

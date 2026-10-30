@@ -56,11 +56,11 @@ def scripted(steps, runtime):
 
 
 @contextmanager
-def assistant_app(tmp_path, steps=None, projects=None, *, enabled=True):
+def assistant_app(tmp_path, steps=None, projects=None, *, enabled=True, adapter=None):
     runtime = ScriptedAgentRuntime(None)
     if steps:
         runtime.script = scripted(steps, runtime)
-    with v2_app(tmp_path, projects if projects is not None else [papers()], connection_adapter=MetadataAdapter(),
+    with v2_app(tmp_path, projects if projects is not None else [papers()], connection_adapter=adapter or MetadataAdapter(),
             agent_runtime=runtime) as (client, application):
         application.state.assistant.wait_seconds = 1.0
         runtime.application = application

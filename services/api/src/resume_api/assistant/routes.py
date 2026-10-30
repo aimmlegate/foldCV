@@ -51,7 +51,8 @@ def mount_assistant(app, service):
     @app.put('/v1/settings/assistant')
     async def save_settings(payload: AgentSettingsRequest):
         prior = await worker(service.settings.load)
-        saved = await worker(service.settings.save, payload, service.connection().models or None)
+        connection = service.connection()
+        saved = await worker(service.settings.save, payload, connection.models or None, connection.reasoning)
         if prior.enabled and not saved.enabled:
             service.stop_all()
         return settings_reply(saved)

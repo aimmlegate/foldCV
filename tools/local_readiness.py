@@ -109,7 +109,8 @@ def bounded_version(executable: Path) -> str | None:
 
 
 def check_cli(executable: Path | None = None) -> str:
-    from resume_api.cli.profile import VERSION
+    from resume_api.cli.profile import qualify
+    from resume_api.cli.qualification import QualificationError
 
     selected = executable or shutil.which("codex")
     if selected is None or not Path(selected).is_file():
@@ -117,8 +118,10 @@ def check_cli(executable: Path | None = None) -> str:
     version = bounded_version(Path(selected))
     if version is None:
         return "CLI version unavailable; manual editing and rendering are ready."
-    if version != VERSION:
-        return "CLI version is outside the pinned profile; manual editing and rendering are ready."
+    try:
+        qualify(version)
+    except QualificationError:
+        return "CLI version is outside the supported range; manual editing and rendering are ready."
 
     from resume_api.connection import ConnectionAdapter, ConnectionFailure
     from resume_api.launcher import trusted_temp_root
@@ -133,7 +136,7 @@ def check_cli(executable: Path | None = None) -> str:
             raise ReadinessError("CLI metadata process cleanup failed; inspect owned operations before launching.") from None
         messages = {
             "CLI_MISSING": "CLI absent; manual editing and rendering are ready.",
-            "UNSUPPORTED_VERSION": "CLI version is outside the pinned profile; manual editing and rendering are ready.",
+            "UNSUPPORTED_VERSION": "CLI version is outside the supported range; manual editing and rendering are ready.",
             "LOGIN_REQUIRED": "CLI native login is absent; manual editing and rendering are ready.",
             "API_KEY_MODE": "CLI is not in native ChatGPT login mode; manual editing and rendering are ready.",
         }

@@ -35,6 +35,16 @@ case = config["case"]
 if args == ["--version"]:
     print(config.get("version", "codex-cli 0.162.0-alpha.2-fixture"))
     sys.exit(0)
+if args == ["exec", "--help"]:
+    print("--ephemeral --ignore-user-config --ignore-rules" if case == "bad_help" else
+          "--ephemeral --ignore-user-config --ignore-rules --json --output-schema --skip-git-repo-check")
+    sys.exit(0)
+if args[:2] == ["features", "list"]:
+    assert "--strict-config" not in args and 'features.shell_tool=false' in args
+    print("shell_tool                               stable             " + ("true" if case == "unsafe_features" else "false"))
+    print("unified_exec                             stable             true")
+    print("code_mode                                under development  false")
+    sys.exit(0)
 if args == ["login", "status"]:
     if case in {"missing_login", "slow_login", "valid_login"}:
         print("Not logged in", file=sys.stderr); sys.exit(1)
@@ -101,7 +111,7 @@ def cli(tmp_path: Path):
 def inspect(cli, tmp_path: Path, case: str) -> tuple[Metadata | None, str | None]:
     path, configure = cli
     configure(case)
-    adapter = ConnectionAdapter(path, allow_fixture=True)
+    adapter = ConnectionAdapter(path)
     try:
         with OperationFiles(tmp_path / "operations").open() as files:
             value = adapter.inspect(files, threading.Event())
@@ -118,8 +128,8 @@ def test_metadata_and_quota_are_bounded_and_generation_never_starts(cli, tmp_pat
     assert error is None and result is not None
     assert result.models == ("gpt-6-luna",) and result.plan == "plus" and result.quota.state == expected
     audit = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [entry["args"][0] for entry in audit] == ["--version", "login", "app-server"]
-    assert all(entry["args"][0] != "exec" for entry in audit)
+    assert [entry["args"][0] for entry in audit] == ["--version", "exec", "features", "login", "app-server"]
+    assert all(entry["args"][0] != "exec" or entry["args"] == ["exec", "--help"] for entry in audit)
     assert not list((tmp_path / "operations").iterdir())
 
 
@@ -127,6 +137,7 @@ def test_metadata_and_quota_are_bounded_and_generation_never_starts(cli, tmp_pat
     ("missing_login", "LOGIN_REQUIRED"), ("api_key", "API_KEY_MODE"),
     ("bad_model", "METADATA_FAILED"), ("expired_login", "LOGIN_REQUIRED"),
     ("unauthorized_quota", "METADATA_FAILED"), ("failed_quota", "METADATA_FAILED"),
+    ("bad_help", "UNSUPPORTED_VERSION"), ("unsafe_features", "UNSUPPORTED_VERSION"),
 ])
 def test_distinct_auth_and_metadata_failures(cli, tmp_path, case, expected):
     result, error = inspect(cli, tmp_path, case)
@@ -139,7 +150,7 @@ def test_missing_and_wrong_version_fail_before_auth(cli, tmp_path):
     configure(version="codex-cli 0.0.1")
     with OperationFiles(tmp_path / "wrong").open() as files:
         with pytest.raises(ConnectionFailure, match="UNSUPPORTED_VERSION"):
-            ConnectionAdapter(path, allow_fixture=True).inspect(files, threading.Event())
+            ConnectionAdapter(path).inspect(files, threading.Event())
     audit = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert len(audit) == 1 and audit[0]["args"] == ["--version"]
     with OperationFiles(tmp_path / "missing").open() as files:
@@ -164,7 +175,7 @@ def test_path_discovered_node_cli_uses_validated_interpreter_with_clean_environm
     monkeypatch.setenv("NODE_OPTIONS", "--this-option-must-not-reach-child")
     monkeypatch.setenv("NODE_PATH", str(tmp_path / "untrusted"))
     with OperationFiles(tmp_path / "node-operations").open() as files:
-        result = ConnectionAdapter(allow_fixture=True).inspect(files, threading.Event(), full=False)
+        result = ConnectionAdapter().inspect(files, threading.Event(), full=False)
     observed = json.loads(audit.read_text())
     assert result.version == VERSION + "-fixture"
     assert observed["argv"] == ["--version"] and Path(observed["executable"]).resolve() == node
@@ -195,7 +206,7 @@ async def test_node_cli_without_valid_interpreter_has_actionable_state(tmp_path,
 async def test_quota_method_error_is_distinct_from_metadata_failure(cli, tmp_path, case, expected):
     path, configure = cli
     configure(case)
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         status = (await post(client, "status")).json()
@@ -227,7 +238,7 @@ async def post(client: httpx.AsyncClient, name: str, body: dict | None = None):
 @pytest.mark.asyncio
 async def test_protected_routes_select_detach_and_closed_generation(cli, tmp_path):
     path, _ = cli
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         assert (await post(client, "status")).status_code == 401
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
@@ -244,15 +255,15 @@ async def test_protected_routes_select_detach_and_closed_generation(cli, tmp_pat
         assert (await post(client, "login", {"argv": ["codex", "login"]})).status_code == 422
         assert (await post(client, "login")).status_code == 409
         assert (await client.get("/v1/settings/connection")).json()["generationReady"] is False
-    audit = (tmp_path / "audit.jsonl").read_text()
-    assert "logout" not in audit and '"exec"' not in audit
+    audit = [json.loads(line)["args"] for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert all("logout" not in args and (args[0] != "exec" or args == ["exec", "--help"]) for args in audit)
 
 
 @pytest.mark.asyncio
 async def test_explicit_login_and_detach_cancel_owned_process(cli, tmp_path):
     path, configure = cli
     configure("missing_login")
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "login_required"
@@ -276,7 +287,7 @@ async def test_explicit_login_and_detach_cancel_owned_process(cli, tmp_path):
 async def test_login_completes_only_after_click_and_refresh(cli, tmp_path):
     path, configure = cli
     configure("missing_login")
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "login_required"
@@ -293,7 +304,7 @@ async def test_login_completes_only_after_click_and_refresh(cli, tmp_path):
 async def test_detach_rejects_late_metadata_result(cli, tmp_path):
     path, configure = cli
     configure("slow_metadata")
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         pending = asyncio.create_task(post(client, "status"))
@@ -377,7 +388,7 @@ async def test_detach_timeout_reports_cleanup_block_and_late_failure_stays_block
 async def test_cancel_login_stops_only_owned_sign_in(cli, tmp_path):
     path, configure = cli
     configure("missing_login")
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "login_required"
@@ -404,7 +415,7 @@ async def test_cleanup_failure_blocks_connection_and_survives_restart(cli, tmp_p
             raise SpikeError("PROCESS_CLEANUP_FAILED")
 
     monkeypatch.setattr(OperationFiles, "stop_worker", fail_after_stop)
-    app = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    app = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "cleanup_blocked"
@@ -412,7 +423,7 @@ async def test_cleanup_failure_blocks_connection_and_survives_restart(cli, tmp_p
         assert (await post(client, "status")).json()["state"] == "cleanup_blocked"
         assert (tmp_path / "audit.jsonl").read_text().count("--version") == before
     monkeypatch.setattr(OperationFiles, "stop_worker", original)
-    restarted = make_app(tmp_path, ConnectionAdapter(path, allow_fixture=True))
+    restarted = make_app(tmp_path, ConnectionAdapter(path))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=restarted), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         assert (await post(client, "status")).json()["state"] == "cleanup_blocked"

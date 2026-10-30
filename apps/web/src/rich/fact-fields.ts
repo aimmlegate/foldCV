@@ -34,6 +34,10 @@ export function title(record: RecordValue): string {
   if (record.kind === "claim") return record.value.rawText || "Новый факт";
   return "Кандидат";
 }
+/** An end label of a current period, as «по настоящее время» or «н.в.». */
+export function currentMarker(text: string): boolean {
+  return /^(?:present|current|now|настоящее время|по настоящее время|н\.?\s*в\.?)$/iu.test(text.trim());
+}
 export function needsCheck(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(needsCheck);
   if (typeof value !== "object" || value === null) return false;
@@ -42,8 +46,7 @@ export function needsCheck(value: unknown): boolean {
     && "value" in value.present && value.present.value === true;
   if (current && "end" in value && typeof value.end === "object" && value.end !== null
     && "rawText" in value.end && typeof value.end.rawText === "string" && value.end.rawText.trim()) {
-    const marker = /^(?:present|current|now|настоящее время|по настоящее время|н\.?\s*в\.?)$/iu.test(value.end.rawText.trim());
-    if (!marker) return true;
+    if (!currentMarker(value.end.rawText)) return true;
     return Object.entries(value).some(([key, field]) => key !== "end" && needsCheck(field));
   }
   return Object.entries(value).some(([key, field]) =>

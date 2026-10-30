@@ -135,6 +135,9 @@
 .uir-timeline > details > button { background: none; border: 0; color: var(--accent); text-align: left; padding: 5px 0; font-size: 10px; }
 .uir-period-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .uir-assistant-options { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+/* D119: one card per provider; each keeps its own switch and connection. */
+.provider-card { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.provider-card .switch-line { margin: 0; }
 .demo-file-row > span { min-width: 0; overflow-wrap: anywhere; }
 .uir-chat-active-bar { display: flex; align-items: center; padding-right: 12px; }
 .uir-chat-active-bar .chat-launcher { min-width: 0; }

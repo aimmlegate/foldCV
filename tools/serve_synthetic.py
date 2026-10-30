@@ -15,6 +15,7 @@ from pathlib import Path
 import secrets
 import socket
 import sys
+import time
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,7 +29,8 @@ from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.storage import atomic_write
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
-from resume_api.app import create_app
+from resume_api.app import ProviderSlot, create_app
+from resume_api.cli.installation import ClaudeInstallation
 from resume_api.connection import Metadata, Quota
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -53,6 +55,83 @@ class ScriptedConnection:
 
     def detach(self, *_args, **_kwargs):
         self.calls.append('scripted_detach')
+
+
+class ScriptedClaude(ScriptedConnection):
+    """The unlisted Claude provider in preview: signed out until a code is pasted, then two catalog models and no
+    usage read (decision 15)."""
+    executable = None
+
+    def __init__(self, installation=None):
+        super().__init__()
+        self.signed_in = False
+        # Set with --claude-missing: no CLI until the scripted install puts one there.
+        self.installation = installation
+
+    def login(self, _files, cancel, code=None):
+        self.calls.append('scripted_login')
+        while not cancel.wait(0.05):
+            if code is not None and code():
+                self.signed_in = True
+                return
+
+    def inspect(self, _files, _cancel, *, full=True):
+        self.calls.append('inspect_claude')
+        from resume_api.connection import ConnectionFailure
+        if self.installation is not None and not self.installation.executable.is_file():
+            raise ConnectionFailure('CLI_MISSING')
+        if full and not self.signed_in:
+            raise ConnectionFailure('LOGIN_REQUIRED', '2.1.308 (Claude Code)')
+        models = ('claude-sonnet-5-5', 'claude-opus-5-5')
+        return Metadata('2.1.308 (Claude Code)', models, 'max', Quota('not_provided'),
+            reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
+
+
+class ScriptedProfile:
+    """A private directory for the scripted Claude slot's profile lock; it marks the slot as native mode."""
+
+    def __init__(self, root, executable=Path(sys.executable)):
+        self.root, self.executable = root, executable
+
+    def prepare(self):
+        self.root.mkdir(mode=0o700, exist_ok=True)
+
+
+class ScriptedInstallation(ClaudeInstallation):
+    """The managed Claude install with its real staging and checks; the download is a local stub paced for the screen."""
+    STUB = b'#!/bin/sh\nexit 1\n' * 65536
+
+    @property
+    def size(self):
+        return len(self.STUB)
+
+    @property
+    def sha256(self):
+        return hashlib.sha256(self.STUB).hexdigest()
+
+    def download(self, _files, target):
+        step = len(self.STUB) // 20
+        with target.open('wb') as output:
+            for start in range(0, len(self.STUB), step):
+                self.check_cancel()
+                time.sleep(0.2)
+                output.write(self.STUB[start:start + step])
+                output.flush()
+                self.update(downloadedBytes=target.stat().st_size)
+
+
+def scripted_claude_slot(root, missing, runtime):
+    """The assistant runs the same scripted runtime with Claude active."""
+    if not missing:
+        return ProviderSlot(ScriptedClaude(), profile=ScriptedProfile(root / 'claude-profile'), runtime=runtime)
+    installation = ScriptedInstallation(root / 'claude-runtime')
+
+    def rebind(slot, executable):
+        return ProviderSlot(slot.connection, None, ScriptedProfile(slot.profile.root, executable), installation,
+                            runtime, rebind=rebind)
+    return ProviderSlot(ScriptedClaude(installation), None,
+                        ScriptedProfile(root / 'claude-profile', installation.executable), installation, runtime,
+                        rebind=rebind)
 
 
 class ScriptedContent:
@@ -255,7 +334,8 @@ async def main(args):
             app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
                 experimental_profile=None, connection_adapter=connection, content_provider=content,
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
-                template_import_call_cap=args.template_call_cap)
+                template_import_call_cap=args.template_call_cap,
+                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)})
         app.app.state.assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None and not args.reopen:
@@ -316,6 +396,8 @@ if __name__ == '__main__':
     parser.add_argument('--template', choices=['generic-two-column', 'generic-one-column'], default=None)
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
+    # Claude starts without a CLI and Settings installs a stub through the managed installer.
+    parser.add_argument('--claude-missing', action='store_true')
     # Seconds each scripted template call waits before its reply, to watch a running import in the preview.
     parser.add_argument('--template-delay', type=float, default=0.0)
     # Native assistant runs on the user's Codex sign-in, charged to the SR08 ledger (at most LIVE_LIMIT starts).

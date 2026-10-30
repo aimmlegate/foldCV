@@ -5,6 +5,28 @@
       "title": "Enabled",
       "type": "boolean"
     },
+    "reasoningEffort": {
+      "anyOf": [
+        {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reasoningeffort"
+    },
     "revision": {
       "minimum": 1,
       "title": "Revision",

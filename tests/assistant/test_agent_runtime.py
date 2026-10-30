@@ -72,7 +72,8 @@ async def test_active_stop_writes_interrupt_without_waiting_for_another_output_e
 @pytest.mark.asyncio
 async def test_queued_stop_spends_no_start_and_never_creates_an_operation(tmp_path):
     admission = InferenceAdmission()
-    admission.acquire()
+    # A sign-in holds the exclusive permit; model work waits behind it.
+    admission.acquire(exclusive=True)
     started, cancel = [], threading.Event()
     value = input_value(before_start=lambda: started.append(True))
     driver = runtime(tmp_path, value, script(value), admission=admission)
@@ -189,20 +190,32 @@ async def test_startup_and_active_deadlines_have_distinct_typed_outcomes(tmp_pat
     assert result.error == "AGENT_DEADLINE" and result.native_started
 
 
-def test_untrusted_configuration_and_web_off_fail_before_side_effects():
+def test_untrusted_configuration_fails_before_side_effects():
     value = input_value()
     session = NativeSession(value, threading.Event(), lambda *_: None)
     config = config_result(value)
     config["layers"][0]["config"] = {"mcp_servers": {"foreign": {}}}
     with pytest.raises(AgentFailure, match="AGENT_RUNTIME_UNSUPPORTED"):
         session.validate_config(config)
-    with pytest.raises(AgentFailure, match="AGENT_WEB_DISABLED"):
+
+
+@pytest.mark.parametrize("allow_web", [False, True])
+def test_native_web_search_is_off_and_denied_with_or_without_internet(allow_web):
+    tools = ("read_resume", "check_resume", "read_public_page") if allow_web else ("read_resume", "check_resume")
+    value = input_value(allow_web=allow_web, tools=tools)
+    session = NativeSession(value, threading.Event(), lambda *_: None)
+    session.validate_config(config_result(value))
+    live = config_result(value)
+    live["config"]["web_search"] = "live"
+    with pytest.raises(AgentFailure, match="AGENT_RUNTIME_UNSUPPORTED"):
+        session.validate_config(live)
+    with pytest.raises(AgentFailure, match="AGENT_TOOL_DENIED"):
         session.item("item/started", {"id": "web_1", "type": "webSearch"})
 
 
 def test_shared_permit_cancels_a_waiter_without_releasing_its_current_owner():
     permit = InferenceAdmission()
-    permit.acquire()
+    permit.acquire(exclusive=True)
     cancel = threading.Event()
     cancel.set()
     with pytest.raises(AdmissionCancelled):
