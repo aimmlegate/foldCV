@@ -5,6 +5,7 @@ import json
 import pytest
 
 from packages.resume_core import agent_limits as limits
+from packages.resume_core.models.agent import AgentWebSource
 from packages.resume_core.models.template_render import TemplateRendererIdentity
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from resume_api.agent.web import PublicFetcher
@@ -30,6 +31,31 @@ async def test_fetch_and_call_budgets_are_exact_and_cumulative():
         assert reply(await session.call("check_resume", lambda: {"issues": []}))["error"]["code"] == "AGENT_TOOL_LIMIT"
         session.control.cancel.set()
         assert reply(await session.call("check_resume", lambda: {"issues": []}))["error"]["code"] == "AGENT_CANCELLED"
+    finally:
+        await session.close()
+
+
+class LimitFetcher(Fetcher):
+    """A page at the serialized limit with the fetch's placeholder run id; control characters take six bytes each."""
+
+    async def fetch(self, request, cancel):
+        source = await super().fetch(request, cancel)
+        room = limits.SOURCE_BYTES - len(source.model_dump_json(by_alias=True).encode()) + len(source.text.encode())
+        return AgentWebSource.model_validate({**source.model_dump(mode='json', by_alias=True), 'text': '\x01' * (room // 6)
+            + 'x' * (room % 6)})
+
+
+@pytest.mark.asyncio
+async def test_a_source_at_the_size_limit_stays_readable_after_the_run_id_is_bound():
+    session = tool_session(allow_web=True, fetcher=LimitFetcher())
+    session.control.run_id = 'run_' + 'a' * 24
+    try:
+        fetched = reply(await session.call("read_public_page", lambda: session.fetch("https://public.example")))
+        saved = session.service.sources[0]
+        assert fetched['source']['runId'] == saved.run_id == session.control.run_id and fetched['source']['truncated']
+        assert len(saved.model_dump_json(by_alias=True).encode()) <= limits.SOURCE_BYTES
+        assert AgentWebSource.model_validate_json(saved.model_dump_json(by_alias=True)).text == saved.text
+        assert len(saved.text) > 10000
     finally:
         await session.close()
 

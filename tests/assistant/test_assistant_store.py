@@ -5,6 +5,7 @@ import pytest
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.assistant_store import FILE_BYTES, AgentFailure, AssistantStore
 from packages.resume_core.models.agent import AgentMessage, AgentWebSource
+from packages.resume_core.models.assistant import AssistantRunV1
 
 PROJECT = "template-project"
 
@@ -35,6 +36,25 @@ def test_a_failed_atomic_write_keeps_the_previous_file_and_reports_the_failure(t
     assert path.read_bytes() == original and store.conversation(PROJECT, conversation.id).messages == []
 
 
+def test_one_unreadable_conversation_stays_on_disk_and_leaves_the_others_usable(tmp_path):
+    store = AssistantStore(tmp_path)
+    good = store.create_conversation(PROJECT, "Good")
+    bad = store.create_conversation(PROJECT, "Bad")
+    run = AssistantRunV1(id="run_good", conversationId=good.id, projectId=PROJECT, clientRequestId="request", state="completed",
+        allowEdits=False, allowWeb=False, model="model", baseRevision=1, createdAt="2026-10-15T12:00:00+00:00", finishedAt=None,
+        error=None, usage=None)
+    store.update_conversation(PROJECT, good.id, lambda value: value.runs.append(run))
+    path = store.directory(PROJECT, "conversations", bad.id + ".json")
+    path.write_bytes(b"{}")
+    assert [item.id for item in store.conversations(PROJECT)] == [good.id]
+    assert store.find_run(PROJECT, "run_good")[1].id == "run_good"
+    created = store.create_conversation(PROJECT, "New")
+    assert {item.id for item in store.conversations(PROJECT)} == {good.id, created.id}
+    assert path.read_bytes() == b"{}"
+    with pytest.raises(AgentFailure, match="AGENT_STORE_UNAVAILABLE"):
+        store.conversation(PROJECT, bad.id)
+
+
 def test_damaged_linked_foreign_and_unsafe_files_are_refused_and_left_unchanged(tmp_path):
     store = AssistantStore(tmp_path)
     conversation = store.create_conversation(PROJECT)
@@ -48,8 +68,9 @@ def test_damaged_linked_foreign_and_unsafe_files_are_refused_and_left_unchanged(
     outside = tmp_path / "outside"
     outside.write_text("synthetic private bytes")
     path.symlink_to(outside)
+    assert store.conversations(PROJECT) == []
     with pytest.raises(AgentFailure, match="AGENT_STORE_UNAVAILABLE"):
-        store.conversations(PROJECT)
+        store.conversation(PROJECT, conversation.id)
     assert outside.read_text() == "synthetic private bytes"
     other = store.create_conversation("other-project")
     with pytest.raises(AgentFailure, match="AGENT_NOT_FOUND"):

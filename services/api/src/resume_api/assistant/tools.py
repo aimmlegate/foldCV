@@ -23,6 +23,7 @@ from packages.resume_core.rich_fields import inline_groups
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
 
 from resume_api.agent.mcp import PrivateMcp
+from resume_api.agent.web import bind_run
 from resume_api.projects.errors import ProjectFailure
 
 from . import context
@@ -208,7 +209,7 @@ class ToolSession(PrivateMcp):
             raise AgentFailure('AGENT_SOURCE_LIMIT')
         self.fetches += 1
         source = await self.service.fetcher.fetch(AgentFetchRequest(url=url), self.fetch_cancel)
-        source.run_id = self.control.run_id
+        source = bind_run(source, self.control.run_id)
         excerpt, clipped = context.clip(source.text, 12000)
         value = source.model_dump(mode='json', by_alias=True)
         value.pop('text')
