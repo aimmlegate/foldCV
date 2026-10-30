@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ConnectionWorkflow, connectionSummary, modelGroups, validConnection, type ConnectionSnapshot } from "../src/connection/workflow";
+import { errorMessage } from "../src/errors/messages";
 
 type Entry = Record<string, unknown> & { kind: string; enabled: boolean; metadataReady: boolean; models: string[] };
 const codex: Entry = { kind: "codex_cli", display: "Codex", subscription: "ChatGPT", publisher: "OpenAI", loginCode: false, installed: true,
@@ -25,6 +26,8 @@ function response(body: object): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+const refusal = (code: string, status: number) => new Response(JSON.stringify({ error: { code, retryable: false, stage: "host" } }),
+  { status, headers: { "Content-Type": "application/json" } });
 const ready = reply([codex]);
 
 test("connection response rejects arbitrary models, quotas and production readiness", () => {
@@ -128,13 +131,117 @@ test("a sign-in code is sent only while that provider signs in and only in the c
     return Promise.resolve(response(pending));
   };
   const workflow = new ConnectionWorkflow(() => {}, request);
-  assert.equal(await workflow.sendLoginCode("claude_cli", "abc"), false, "nothing is pending before the first reply");
+  try {
+    assert.equal(await workflow.sendLoginCode("claude_cli", "abc"), false, "nothing is pending before the first reply");
+    await workflow.peek(false);
+    assert.equal(await workflow.sendLoginCode("codex_cli", "abc"), false);
+    assert.equal(await workflow.sendLoginCode("claude_cli", "two words"), false);
+    assert.equal(await workflow.sendLoginCode("claude_cli", "  code-1#state  "), true);
+    assert.deepEqual(calls.at(-1), { path: "/v1/host/login-code", body: { provider: "claude_cli", code: "code-1#state" } });
+    assert.equal(calls.filter(call => call.path.endsWith("/login-code")).length, 1);
+  } finally { workflow.close(); }
+});
+
+const signedOut = (state = "login_required") => reply([{ ...codex, ...off, state }], "codex_cli", { experimentalMode: true });
+
+test("a refused sign-in returns the card to its button and keeps the service's code", async () => {
+  const calls: string[] = [];
+  const workflow = new ConnectionWorkflow(() => {}, input => {
+    const path = String(input);
+    calls.push(path);
+    return Promise.resolve(path.endsWith("/login") ? refusal("BUSY", 429) : response(signedOut()));
+  });
   await workflow.peek(false);
-  assert.equal(await workflow.sendLoginCode("codex_cli", "abc"), false);
-  assert.equal(await workflow.sendLoginCode("claude_cli", "two words"), false);
-  assert.equal(await workflow.sendLoginCode("claude_cli", "  code-1#state  "), true);
-  assert.deepEqual(calls.at(-1), { path: "/v1/host/login-code", body: { provider: "claude_cli", code: "code-1#state" } });
-  assert.equal(calls.filter(call => call.path.endsWith("/login-code")).length, 1);
+  await workflow.login("codex_cli");
+  assert.equal(workflow.entry("codex_cli")?.state, "login_required");
+  assert.equal(workflow.view.activity.codex_cli?.error, "BUSY");
+  assert.equal(errorMessage(workflow.view.activity.codex_cli?.error), errorMessage("BUSY"));
+  assert.match(errorMessage(workflow.view.activity.codex_cli?.error), /другое действие/u);
+  assert.deepEqual(calls, ["/v1/settings/connection", "/v1/host/login", "/v1/settings/connection"]);
+});
+
+test("a sign-in whose reply was lost shows as running again after the read", async () => {
+  let reads = 0;
+  const workflow = new ConnectionWorkflow(() => {}, input => {
+    if (String(input).endsWith("/login")) return Promise.reject(new TypeError("fetch failed"));
+    return Promise.resolve(response(signedOut(++reads > 1 ? "login_pending" : "login_required")));
+  });
+  try {
+    await workflow.peek(false);
+    await workflow.login("codex_cli");
+    assert.equal(workflow.entry("codex_cli")?.state, "login_pending");
+  } finally { workflow.close(); }
+});
+
+test("a sign-in found by a read is followed until it ends", async () => {
+  let reads = 0, finished: (() => void) | undefined;
+  const ended = new Promise<void>(resolve => { finished = resolve; });
+  const workflow = new ConnectionWorkflow(view => { if (view.snapshot.providers[0]?.state === "connected") finished?.(); }, () => {
+    reads += 1;
+    return Promise.resolve(response(reads < 3 ? signedOut("login_pending") : reply([codex])));
+  }, 1);
+  try {
+    await workflow.peek(false);
+    assert.equal(workflow.entry("codex_cli")?.state, "login_pending");
+    await ended;
+    const seen = reads;
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(reads, seen, "the reads stop with the sign-in");
+  } finally { workflow.close(); }
+});
+
+test("a failed read of the state is reported and can be repeated", async () => {
+  for (const failure of [() => Promise.reject(new TypeError("fetch failed")), () => Promise.resolve(response({ ...ready, plan: "team-premium" }))]) {
+    let down = true;
+    const views: boolean[] = [];
+    const workflow = new ConnectionWorkflow(view => views.push(view.readFailed), () => down ? failure() : Promise.resolve(response(ready)));
+    await workflow.peek();
+    assert.equal(workflow.view.readFailed, true);
+    assert.equal(workflow.view.snapshot.provider, null);
+    down = false;
+    await workflow.peek();
+    assert.equal(workflow.view.readFailed, false);
+    assert.equal(workflow.view.snapshot.provider, "codex_cli");
+    assert.equal(views.at(-1), false);
+  }
+});
+
+test("refusals of every host request keep their code; a lost reply keeps the client's text", async () => {
+  const replies: Record<string, Response> = {};
+  const workflow = new ConnectionWorkflow(() => {}, input => {
+    const path = String(input), refused = replies[path];
+    return refused ? Promise.resolve(refused) : Promise.resolve(response(reply([{ ...codex, ...off, state: "cli_missing", installation }], "codex_cli", { experimentalMode: true })));
+  });
+  await workflow.peek(false);
+  replies["/v1/host/install"] = refusal("INSTALL_NOT_AVAILABLE", 409);
+  await workflow.install("codex_cli");
+  assert.equal(workflow.view.activity.codex_cli?.error, "INSTALL_NOT_AVAILABLE");
+  replies["/v1/host/enable"] = refusal("PROVIDER_INACTIVE", 409);
+  await workflow.enable("codex_cli", false);
+  assert.equal(workflow.view.activity.codex_cli?.error, "PROVIDER_INACTIVE");
+  replies["/v1/host/detach"] = refusal("BUSY", 429);
+  await workflow.detach("codex_cli");
+  assert.equal(workflow.view.activity.codex_cli?.error, "BUSY");
+  replies["/v1/host/status"] = new Response("<html>", { status: 502 });
+  await workflow.refresh("codex_cli");
+  assert.equal(workflow.view.activity.codex_cli?.error, "REQUEST_FAILED");
+  workflow.close();
+});
+
+test("saving a processing model reports its own provider only, not another one's old error", async () => {
+  const workflow = new ConnectionWorkflow(() => {}, (input, init) => {
+    const path = String(input), body = init?.body ? JSON.parse(String(init.body)) as { provider?: string } : {};
+    if (path.endsWith("/status") && body.provider === "claude_cli") return Promise.resolve(refusal("BUSY", 429));
+    if (path.endsWith("/select")) return Promise.resolve(body.provider === "codex_cli"
+      ? response(reply([codex, claude], "codex_cli", { selectedModel: "gpt-6-luna" })) : refusal("MODEL_DENIED", 409));
+    return Promise.resolve(response(reply([codex, claude])));
+  });
+  await workflow.peek(false);
+  await workflow.refresh("claude_cli");
+  assert.equal(workflow.view.error, "BUSY");
+  assert.equal(await workflow.select("gpt-6-luna"), true);
+  assert.equal(await workflow.select("claude-sonnet-5-5"), false);
+  assert.equal(await workflow.select("unknown-model"), false);
 });
 
 test("detach discards a late metadata result of the same provider", async () => {

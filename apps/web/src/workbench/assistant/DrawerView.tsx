@@ -8,6 +8,7 @@ import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
 import { ProposalPreview } from "../../assistant/proposal";
 import type { Proposal } from "../../assistant/api";
 import type { AssistantFinding } from "../../assistant/controller";
+import { stopBusy } from "../../assistant/presentation";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
@@ -30,20 +31,20 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
   }, [collapsed]);
   return <section id="agent-chat-host" aria-label="Помощник" className={collapsed ? undefined : `chat-open${expanded ? " chat-expanded" : ""}`}>
     {collapsed ? <div className={active ? "uir-chat-active-bar" : undefined}><button className="chat-launcher" aria-expanded={false} aria-controls="assistant-content" onClick={toggle}><span><Icon name="chat" />Помощник</span>{active && <small><Spinner /><span className="agent-compact-label" role="status">{currentActivity(view, active)}</span>{view.run && <Elapsed key={view.run.id} startedAt={view.run.createdAt} />}</small>}<Icon name="chevron" /></button>
-      {active && <button className="chat-icon" aria-label="Остановить" title="Остановить" disabled={view.run?.state === "cancelling" || view.loading === "Останавливаем"} onClick={props.stop}>{view.run?.state === "cancelling" || view.loading === "Останавливаем" ? <Spinner /> : <Icon name="stop" />}</button>}</div> : <div className="agent-chat-panel" id="assistant-content">
+      {active && <button className="chat-icon" aria-label="Остановить" title="Остановить" disabled={stopBusy(view)} onClick={props.stop}>{stopBusy(view) ? <Spinner /> : <Icon name="stop" />}</button>}</div> : <div className="agent-chat-panel" id="assistant-content">
       <header className="chat-header"><div className="chat-title"><Icon name="chat" /><h2>Помощник</h2><span className="chat-access">{view.flags.allowEdits ? "Правки разрешены" : "Только чтение"}</span></div><div className="chat-header-actions">
-        <button className="chat-icon" title="Новый диалог" aria-label="Новый диалог" disabled={view.submitting} onClick={props.fresh}><Icon name="plus" /></button>
+        <button className="chat-icon" title="Новый диалог" aria-label="Новый диалог" disabled={view.submitting || view.pendingSend} onClick={props.fresh}><Icon name="plus" /></button>
         <button ref={trigger} className="chat-icon" title="Диалоги" aria-label="Диалоги" aria-expanded={threads} aria-controls="chat-threads" onClick={() => setThreads(value => !value)}><Icon name="list" /></button>
         <button className="chat-icon" title={expanded ? "Уменьшить панель" : "Развернуть панель"} aria-label={expanded ? "Уменьшить панель" : "Развернуть панель"} onClick={expand}><Icon name="expand" /></button>
         <button className="chat-icon" title="Свернуть помощника" aria-label="Свернуть помощника" onClick={() => { setThreads(false); toggle(); }}><Icon name="close" /></button></div></header>
       {threads && <div className="chat-thread-menu" id="chat-threads" ref={menu} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setThreads(false); trigger.current?.focus(); } }}><span>Диалоги</span>
-        <button disabled={view.submitting} onClick={() => { props.fresh(); setThreads(false); }}><Icon name="plus" /><span>Новый диалог</span></button>
-        {view.conversations.map(item => <button key={item.id} disabled={view.submitting} aria-current={view.conversationId === item.id ? "true" : undefined}
+        <button disabled={view.submitting || view.pendingSend} onClick={() => { props.fresh(); setThreads(false); }}><Icon name="plus" /><span>Новый диалог</span></button>
+        {view.conversations.map(item => <button key={item.id} disabled={view.submitting || view.pendingSend} aria-current={view.conversationId === item.id ? "true" : undefined}
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}</div>}
       <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
         <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
         <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
-        {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null} applying={view.proposalBusy === value.id}
+        {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null} applying={view.proposalBusy === value.id && view.proposalAction === "apply"}
           stale={view.staleProposals.includes(value.id)} allowEdits={view.flags.allowEdits}
           apply={() => props.applyProposal(value)} discard={() => props.discardProposal(value)} />)}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}

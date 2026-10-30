@@ -37,7 +37,7 @@ export function proposal(changes: Partial<Proposal> = {}): Proposal {
 export function view(changes: Partial<AssistantView> = {}): AssistantView {
   return { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: false }, conversations: [], conversationId: "conversation-1",
     messages: [], sources: [], findings: [], files: [], run: run(), activity: [], partial: "", partialTruncated: false, proposals: [],
-    proposalBusy: null, staleProposals: [], draft: "", submitting: false, pendingSend: false, error: null, ...changes };
+    proposalBusy: null, proposalAction: null, staleProposals: [], draft: "", submitting: false, pendingSend: false, error: null, ...changes };
 }
 
 /** A scripted assistant server: conversations, a run whose events come from `script`, and proposals. */
@@ -50,7 +50,7 @@ export function fakeApi(script: AgentEvent[][] = [], final: Run = run("completed
   const api: Port = {
     projectId: PROJECT,
     settings: () => Promise.resolve(settings),
-    saveSettings: value => Promise.resolve({ ...settings, revision: settings.revision + 1, enabled: value.enabled, selectedAgentModel: value.selectedAgentModel }),
+    saveSettings: value => Promise.resolve({ ...settings, revision: settings.revision + 1, enabled: value.enabled, selectedAgentModel: value.selectedAgentModel, reasoningEffort: value.reasoningEffort ?? null }),
     capabilities: () => Promise.resolve(capabilities),
     conversations: () => Promise.resolve({ items: [{ id: "conversation-1", title: "Проверь резюме", createdAt: "2026-10-27T12:00:00+00:00",
       updatedAt: "2026-10-27T12:00:00+00:00" }] }),

@@ -3,7 +3,7 @@ import { ConnectionWorkflow } from "../connection/workflow";
 import type { TemplateEditorHandle } from "../rich/TemplateEditor";
 import { AgentApiFailure, AssistantApi } from "./api";
 import { AssistantController, type AssistantSelection, type AssistantView } from "./controller";
-import { drawerSize, errorText } from "./presentation";
+import { drawerSize, errorText, rereadsCapabilities, shownFailure } from "./presentation";
 import { DrawerView } from "../workbench/assistant/DrawerView";
 
 export type AssistantHandle = { stop: () => Promise<void> };
@@ -49,13 +49,13 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     return () => { connection.close(); current.close(); if (controller.current === current) controller.current = null; };
   }, [projectId, editor]);
   useEffect(() => { if (!settingsOpen) report(controller.current?.refresh()); }, [settingsOpen]);
-  // At service start the connection check is still running when the panel opens; re-read until it settles.
-  const waitingForConnection = view?.capabilities?.unavailable?.code === "AGENT_CONNECTION_UNAVAILABLE";
+  // A connection check can still be running when the panel shows a refusal; re-read until it settles.
+  const refused = rereadsCapabilities(view);
   useEffect(() => {
-    if (!waitingForConnection) return;
+    if (!refused) return;
     const timer = setInterval(() => { report(controller.current?.refreshCapabilities()); }, 2000);
     return () => clearInterval(timer);
-  }, [waitingForConnection]);
+  }, [refused]);
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -79,12 +79,12 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     // The run reads the saved project, so typing is saved first.
     report(current.send(async () => { await mounted.flush(); return scope; }));
   }
-  const active = controller.current?.active ?? false;
+  const active = controller.current?.active ?? false, failed = shownFailure(failure, view?.run ?? null);
   return view?.settings?.enabled ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500}
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
     log={log} captured={captured ? blocksText(captured.blockIds.length) : null}
     applying={view.proposalBusy !== null}
-    failure={failure ? errorText(failure) : view.error ? errorText(view.error) : null} fence={null}
+    failure={failed ? errorText(failed) : view.error ? errorText(view.error) : null} fence={null}
     draft={value => controller.current?.draft(value)} flags={(allowEdits, allowWeb) => controller.current?.flags({ allowEdits, allowWeb })}
     model={model => report(controller.current?.chooseModel(model))} send={send} stop={() => report(controller.current?.stop())} clear={() => setCaptured(null)} settings={settings}
     select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}

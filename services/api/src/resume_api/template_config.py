@@ -13,6 +13,8 @@ from packages.resume_core.templates.loading import CONFIG_BYTES
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import TemplateStore, bundled_folder
 
+from .template_reasons import reason_text
+
 REVISION_TAKEN = "эта версия уже сохранена с другим содержимым; измените template.revision"
 ID_CHANGED = "template.id менять нельзя, укажите «{}»"
 
@@ -60,9 +62,10 @@ class TemplateConfig:
         try:
             package = compile_bytes(text.encode('utf-8'), bundled_folder(template_id), original_format='yaml', assets=captured)
         except SchemaFailure as error:
-            return None, {'path': error.path, 'message': error.reason}
+            return None, {'path': error.path, 'message': reason_text(error.reason)}
         except (ValueError, UnicodeError) as error:
-            return None, {'path': '/', 'message': str(error).splitlines()[0] if str(error) else type(error).__name__}
+            first = str(error).splitlines()[0] if str(error) else ''
+            return None, {'path': '/', 'message': reason_text(first)}
         if package.id != template_id:
             return None, {'path': '/template/id', 'message': ID_CHANGED.format(template_id)}
         # The bundled revision names the bundled bytes even before the store records them.

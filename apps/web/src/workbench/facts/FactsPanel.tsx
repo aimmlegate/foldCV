@@ -60,6 +60,10 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     });
     return () => cancelAnimationFrame(frame);
   }, [focusRequest, hidden, onFocused]);
+  const editTechnology = (recordId: string) => {
+    const record = facts.records.find(value => value.id === recordId);
+    if (record) setTarget({ kind: "technology", record });
+  };
   async function apply(command: PanelCommand) {
     setError(null);
     try { await submit(command); }
@@ -84,11 +88,8 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       const anchor = anchors?.get(kind);
       return <div className="fact-group-frame" key={kind}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
-      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={recordId => {
-          const record = facts.records.find(value => value.id === recordId);
-          if (record) setTarget({ kind: "technology", record });
-        }} pickIcon={focusIcons ? setIconRow : null} />
-        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} focusRecordId={focusRequest?.recordId}
+      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null} />
+        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
           targets={technologyTargets.filter(target => target.jobId === null)} excluded={focusOnly} /></>
         : facts.records.filter(record => record.kind === kind).map(record => {
           const [name, sub] = summary(record);
@@ -96,7 +97,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
             <button className="fact-edit" disabled={busy} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
               {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
             {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={busy} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
-          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} focusRecordId={focusRequest?.recordId}
+          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
             targets={technologyTargets.filter(target => target.jobId === record.id)} excluded={focusOnly} />}</div>;
         })}
       {panelSupport.add.has(kind) && <button className="text-button fact-add" disabled={busy}

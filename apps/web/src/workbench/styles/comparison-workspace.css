@@ -30,6 +30,8 @@
 .workspace-pane-title > span { display: block; font-size: 10px; color: var(--muted); }
 .workspace-pane-heading select { max-width: 120px; min-height: 30px; padding: 5px 10px; font-size: 12px; }
 .workspace-pane-heading > .icon { flex-shrink: 0; width: 28px; height: 28px; }
+/* The readability rule's initial scale. */
+.comparison-workspace { --document-zoom: 1.25; }
 .comparison-workspace .document-workspace { position: relative; overflow: hidden; }
 .comparison-workspace .document-workspace .resume-paper { zoom: var(--document-zoom, 1); }
 .comparison-workspace .paper-scroll { padding: 24px; background: var(--desk); }

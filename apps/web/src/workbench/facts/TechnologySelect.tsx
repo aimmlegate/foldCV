@@ -5,14 +5,15 @@ import type { PanelCommand, TechnologyTarget } from "../../rich/v7-panel";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
-import { FactDialog } from "./FactDialog";
 import { Spinner } from "../ui/OperationStatus";
 import { documentTechnologies } from "../../rich/technology-order";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 
-export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, focusRecordId, targets, excluded }: {
+export function TechnologySelect({ facts, document: resumeDocument, jobId, label, pending, paused, submit, edit, focusRecordId, targets, excluded }: {
   facts: WorkingFacts; document: OrderDocument; jobId: string | null; label: string; pending: readonly PanelCommand[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
+  /** The panel opens the chip's dialog outside itself: Escape in a dialog inside it would also close the panel. */
+  edit: (recordId: string) => void;
   focusRecordId?: string | undefined;
   /** The lines Python can add to; with several, the user picks the group. */
   targets: readonly TechnologyTarget[];
@@ -21,13 +22,11 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
 }) {
   const id = useId(), root = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [active, setActive] = useState(0);
-  const [editing, setEditing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false), [group, setGroup] = useState(""), [refocus, setRefocus] = useState(false);
   const line = targets.some(target => target.blockId === group) ? group : targets[0]?.blockId;
   const records = documentTechnologies(facts, resumeDocument, jobId).filter(record => !excluded?.has(record.id));
   const focused = records.some(record => record.id === focusRecordId);
   useEffect(() => { if (focused) setExpanded(true); }, [focused]);
-  const editedRecord = records.find(record => record.id === editing);
   const scoped = pending.filter(command => command.operation === "clear_technologies" ? (command.jobId ?? null) === jobId
     : command.operation === "add" ? command.recordKind === "technology" && (command.jobId ?? null) === jobId
       : records.some(record => record.id === command.recordId));
@@ -65,7 +64,7 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
           <button type="button" className="technology-drag" aria-label={`Порядок: ${record.display.rawText}`} title="Перетащите или Alt+↑/↓"
             disabled={paused || pending.length > 0} {...drag.handle(record.id)}><span aria-hidden="true">⠿</span></button>
           <button type="button" className="technology-edit" aria-label={`Изменить: ${record.display.rawText}`} disabled={paused}
-            onClick={event => { event.stopPropagation(); setOpen(false); setEditing(record.id); }}>
+            onClick={event => { event.stopPropagation(); setOpen(false); edit(record.id); }}>
             <span>{record.display.rawText}</span>{record.experience?.rawText && <small>{record.experience.rawText}</small>}
           </button>
           <button type="button" aria-label={`Убрать: ${record.display.rawText}`} disabled={paused}
@@ -108,6 +107,5 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
     </div></>}
     {(open || !targets.length) && (records.length > 0 || adding.length > 0) && <button type="button" className="text-button" aria-label={`Убрать все технологии: ${label}`} disabled={paused}
       onClick={() => { apply({ operation: "clear_technologies", recordKind: "technology", jobId, recordId: null, periodId: null, values: {} }); }}>Убрать все технологии</button>}
-    {editedRecord && <FactDialog target={{ kind: "technology", record: editedRecord }} close={() => { setEditing(null); }} submit={submit} />}
   </div>;
 }
