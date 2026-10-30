@@ -3,6 +3,7 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
+import { renderToStaticMarkup } from "react-dom/server";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { knownErrorMessage } from "../src/errors/messages";
 import { ProjectApiFailure } from "../src/rich/v7-connection";
@@ -248,6 +249,135 @@ test("an outside canonical advance (export record) is adopted; later saves and d
     assert.equal(session.mode, "detached");
   } finally { session.close(); await value.close(); }
 });
+
+/** One reply edits block a and also moves block b, as a second occurrence of one fact does; input on b then conflicts. */
+async function conflicted() {
+  let revision = 1;
+  const sent: Wire[] = [];
+  const opened = await scripted(response([{ id: "a", text: "aaa" }, { id: "b", text: "bbb" }], 1), (_path, request) => {
+    if (!request) return refused("REQUEST_FAILED", 500);
+    sent.push(request);
+    revision++;
+    return saved(response(sent.length === 1 ? [{ id: "a", text: "aaaX" }, { id: "b", text: "moved" }] : [{ id: "a", text: "aaaX" }, { id: "b", text: "bbbY" }], revision), request.clientMutationId);
+  });
+  type(opened.editor, "X", blockStart(opened.editor, "a") + 3);
+  type(opened.editor, "Y", blockStart(opened.editor, "b") + 3);
+  await assert.rejects(opened.session.flush(), /V7_INPUT_CONFLICT/);
+  assert.equal(opened.session.queue.template.state.kind, "conflict");
+  return { ...opened, sent };
+}
+
+test("keeping my text ends a text conflict: the editor's text is saved and leaving works again", async () => {
+  const { session, editor, sent } = await conflicted();
+  try {
+    session.keepEditorText();
+    assert.equal(session.queue.template.state.kind, "ready");
+    await session.flush();
+    await settled();
+    assert.equal(sent.at(-1)?.operation.kind, "replace_text");
+    assert.deepEqual(paragraphs(editor), ["a=aaaX", "b=bbbY"]);
+    await session.navigateAway();
+    assert.equal(session.mode, "detached");
+  } finally { session.close(); }
+});
+
+test("discarding ends a text conflict: the saved text is shown and leaving works again", async () => {
+  const { session, editor, sent } = await conflicted();
+  try {
+    session.discard();
+    assert.equal(session.queue.template.state.kind, "ready");
+    assert.deepEqual(paragraphs(editor), ["a=aaaX", "b=moved"]);
+    assert.equal(session.queue.template.pending.length, 0);
+    await session.navigateAway();
+    assert.equal(session.mode, "detached");
+    assert.equal(sent.length, 1, "nothing more was sent");
+  } finally { session.close(); }
+});
+
+test("the block notice offers both choices and each button calls its own action", () => {
+  const notice = BlockedInputNotice({ text: "Текст", keep: () => {}, discard: () => {} });
+  const html = renderToStaticMarkup(notice);
+  assert.ok(html.includes("Сохранить мой текст") && html.includes("Вернуть сохранённый текст"));
+  assert.ok(html.includes("Текст"));
+});
+
+test("retry after a refused split shows the saved text and names it instead of deleting the right half", async () => {
+  const sent: Wire[] = [];
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "left right" }], 1), (_path, request) => {
+    if (request) sent.push(request);
+    return refused("PROJECT_TOO_LARGE", 413);
+  });
+  try {
+    select(editor, blockStart(editor, "a") + 5);
+    session.enter();
+    assert.ok(paragraphs(editor).some(value => value.endsWith("=right")));
+    await assert.rejects(session.flush());
+    session.keepEditorText();
+    await settled();
+    assert.equal(session.queue.template.state.kind, "ready");
+    assert.deepEqual(paragraphs(editor), ["a=left right"]);
+    assert.deepEqual(sent.map(value => value.operation.kind), ["split_block"], "no text difference is sent");
+    assert.ok(warnings.at(-1)?.startsWith(errorMessage("V7_CHANGE_NOT_SAVED")) && warnings.at(-1)?.includes("left right"));
+    await session.navigateAway();
+  } finally { session.close(); }
+});
+
+test("retry after a refused merge shows both saved blocks and names their text", async () => {
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "one" }, { id: "b", text: "two" }], 1), () => refused("V7_INPUT_REJECTED"));
+  try {
+    select(editor, blockStart(editor, "b"));
+    assert.equal(session.join("backward"), true);
+    assert.deepEqual(paragraphs(editor), ["a=onetwo"]);
+    await assert.rejects(session.flush());
+    session.keepEditorText();
+    await settled();
+    assert.equal(session.queue.template.state.kind, "ready");
+    assert.deepEqual(paragraphs(editor), ["a=one", "b=two"]);
+    assert.ok(warnings.at(-1)?.includes("one") && warnings.at(-1)?.includes("two"));
+  } finally { session.close(); }
+});
+
+test("retry after refused marks shows the saved style and says the change was not saved", async () => {
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "plain" }], 1), () => refused("V7_INPUT_REJECTED"));
+  const bold = () => { let found = false; doc(editor).descendants(node => { if (node.marks.some(mark => mark.type.name === "bold")) found = true; }); return found; };
+  try {
+    const a = blockStart(editor, "a");
+    select(editor, a, a + 5);
+    editor.toggleStyles({ bold: true });
+    assert.ok(bold());
+    await assert.rejects(session.flush());
+    session.keepEditorText();
+    await settled();
+    assert.equal(session.queue.template.state.kind, "ready");
+    assert.equal(bold(), false, "the unsaved style left the editor");
+    assert.ok(warnings.at(-1)?.startsWith(errorMessage("V7_CHANGE_NOT_SAVED")) && warnings.at(-1)?.includes("plain"));
+  } finally { session.close(); }
+});
+
+test("retry saves corrected text and still reports the marks beside it", async () => {
+  const sent: Wire[] = [];
+  let refusing = true;
+  const { session, editor, warnings } = await scripted(response([{ id: "a", text: "plain" }, { id: "b", text: "other" }], 1), (_path, request) => {
+    if (!request) return refused("REQUEST_FAILED", 500);
+    sent.push(request);
+    if (refusing) { refusing = false; return refused("V7_INPUT_REJECTED"); }
+    return saved(response([{ id: "a", text: "plain" }, { id: "b", text: "otherZ" }], 2), request.clientMutationId);
+  });
+  try {
+    const a = blockStart(editor, "a");
+    select(editor, a, a + 5);
+    editor.toggleStyles({ bold: true });
+    type(editor, "Z", blockStart(editor, "b") + 5);
+    await assert.rejects(session.flush());
+    session.keepEditorText();
+    assert.ok(warnings.at(-1)?.startsWith(errorMessage("V7_CHANGE_NOT_SAVED")));
+    await session.flush();
+    await settled();
+    assert.deepEqual(sent.map(value => value.operation.kind), ["set_marks", "replace_text"]);
+    assert.deepEqual(paragraphs(editor), ["a=plain", "b=otherZ"]);
+  } finally { session.close(); }
+});
+
 test("a late read in refresh does not take a newer edit back", async () => {
   let release = () => {}, reading = false;
   const late = response([{ id: "a", text: "aaa" }], 1);

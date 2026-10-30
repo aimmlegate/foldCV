@@ -550,10 +550,10 @@ export class TemplateEditorSession {
     return this.retention;
   }
 
-  private lost(items: readonly TemplateQueuedIntent[]): void {
+  private lost(items: readonly TemplateQueuedIntent[], code = "V7_INPUT_CONFLICT"): void {
     const text = items.map(item => item.intent.operation.kind === "replace_text" ? item.intent.operation.text
       : [...item.intent.prior.values()].join("\n")).filter(Boolean).join("\n");
-    this.port.warning(`${errorMessage("V7_INPUT_CONFLICT")}${text ? "\n" + text : ""}`);
+    this.port.warning(`${errorMessage(code)}${text ? "\n" + text : ""}`);
     // The editor still shows the dropped text; the saved state replaces it once nothing else is pending.
     if (!this.queue.template.pending.length) queueMicrotask(() => { void this.reproject(); });
   }
@@ -803,22 +803,27 @@ export class TemplateEditorSession {
     }
   }
 
-  /** After a block, re-express every container with pending input from canonical text to the editor text. */
+  /** After a block, re-express every container with pending input from canonical text to the editor text. What text
+   * cannot carry is not re-expressed: the saved state is shown and the notice names the affected text. */
   retry(keepEditorText: ReadonlySet<string> = new Set()): void {
     const editor = this.editor;
     if (!editor) return;
-    const template = this.queue.template, locals = template.localBlocks, blocks = responseBlocks(template.durable);
+    const template = this.queue.template, locals = template.localBlocks, blocks = responseBlocks(template.durable), pending = template.pending;
+    // As text, a refused split would delete what moved to its local block.
+    if (pending.some(item => !["replace_text", "set_marks"].includes(item.intent.operation.kind))) { this.giveUp(); return; }
     const corrections: V7Intent[] = [], unchanged = new Set<string>();
     for (const key of template.unsavedBase().keys()) {
       const container = parseContainer(key), canonicalId = locals.get(container.blockId) ?? container.blockId;
       const group = blocks.get(canonicalId)?.groups.find(value => value.kind === container.kind
         && (container.kind !== "cell" || value.key === container.cellId));
-      if (!group) { this.port.warning(errorMessage("V7_CORRECTION_NOT_ALLOWED")); return; }
+      if (!group) { this.giveUp(); return; }
       const value = correctionOperation(editor._tiptapEditor.state.doc, container, contentText(group.content));
       if (value === null) { unchanged.add(key); continue; }
-      if (!("operation" in value)) { this.refuse(value.reason); return; }
+      if (!("operation" in value)) { console.warn(`V7 correction refused: ${value.reason}`); this.giveUp(); return; }
       corrections.push({ localId: `intent-${crypto.randomUUID()}`, operation: value.operation, prior: value.prior });
     }
+    const marks = pending.filter(item => item.intent.operation.kind === "set_marks");
+    if (!corrections.length) { if (marks.length) this.giveUp(); else this.discard(); return; }
     this.boundary();
     const id = this.history.commit("structure", [], null);
     if (!id) return;
@@ -828,7 +833,25 @@ export class TemplateEditorSession {
     catch (error) { this.port.warning(errorMessage(error)); return; }
     this.action = id;
     this.boundary();
+    if (marks.length) this.lost(marks, "V7_CHANGE_NOT_SAVED");
     this.schedule();
+  }
+
+  /** The block notice's first choice: the editor's text replaces whatever the saved text has become. */
+  keepEditorText(): void { this.retry(new Set(this.queue.template.unsavedBase().keys())); }
+
+  /** The block notice's second choice: unsaved input goes and the saved state is shown. */
+  discard(): void { if (this.dropUnsaved()) void this.reproject(); }
+
+  private giveUp(): void {
+    const dropped = this.dropUnsaved();
+    if (dropped) this.lost(dropped, "V7_CHANGE_NOT_SAVED");
+  }
+
+  private dropUnsaved(): readonly TemplateQueuedIntent[] | null {
+    this.boundary();
+    try { return this.queue.template.discardUnsaved(); }
+    catch (error) { this.port.warning(errorMessage(error)); return null; }
   }
 
   close(): void {

@@ -11,6 +11,7 @@ import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
 import type { PaneOrder } from "../workbench/settings/interface";
+import { BlockedInputNotice } from "../workbench/editor/BlockedInputNotice";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
@@ -259,10 +260,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </div>}
         {mode === "read_only" && <div className="notice warning" role="alert"><p>{errorMessage("EDITOR_REPLACED")}</p></div>}
         <EditorNotices warning={warning} clearWarning={() => setWarning("")} onOpen={() => {}} />
-        {(state.kind === "conflict" || state.kind === "rejected") && <div className="notice warning" role="alert">
-          <p>{state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}</p>
-          <button type="button" onClick={() => session.retry()}>Сохранить мой текст</button>
-        </div>}
+        {(state.kind === "conflict" || state.kind === "rejected") && <BlockedInputNotice
+          text={state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}
+          keep={() => session.keepEditorText()} discard={() => session.discard()} />}
       </aside>
       {/* The layout host: the facts panel floats over the document. */}
       <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
