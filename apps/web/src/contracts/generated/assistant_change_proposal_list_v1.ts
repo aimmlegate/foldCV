@@ -231,13 +231,14 @@ export type Value = string;
 export type Jobid = string | null;
 export type Kind3 = "candidate" | "employment" | "technology" | "education" | "language" | "claim" | "period";
 export type Op7 = "create_fact";
+export type Targetid = string | null;
 export type Op8 = "delete_fact";
 export type Recordid1 = string;
 export type Direction = "undo" | "redo";
 export type Op9 = "history";
 export type Action = "rename" | "formatting_date" | "archive" | "restore" | "delete";
 export type Op10 = "action";
-export type Targetid = string | null;
+export type Targetid1 = string | null;
 export type Value1 = string | null;
 /**
  * @maxItems 100
@@ -360,6 +361,7 @@ export interface CreateFactOp {
   jobId?: Jobid;
   kind: Kind3;
   op: Op7;
+  targetId?: Targetid;
   values?: Values;
 }
 export interface Values {
@@ -376,7 +378,7 @@ export interface HistoryOp {
 export interface ActionOp {
   action: Action;
   op: Op10;
-  targetId?: Targetid;
+  targetId?: Targetid1;
   value?: Value1;
 }
 export interface PreviewEntryV1 {

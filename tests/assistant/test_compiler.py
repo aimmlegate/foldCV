@@ -4,7 +4,7 @@ import hashlib
 
 import pytest
 
-from packages.resume_core.assistant_compiler import CompileFailure, compile_ops, target_text
+from packages.resume_core.assistant_compiler import CompileFailure, compile_ops
 from packages.resume_core.models.assistant import ProposeChangesV1
 from packages.resume_core.project_journal import snapshot
 from packages.resume_core.project_repository import ProjectRepository
@@ -122,13 +122,6 @@ def test_target_id_is_for_a_technology():
         compile_ops(workspace, ops({'op': 'create_fact', 'kind': 'employment', 'targetId': 'line', 'values': {'employer': 'A'}}),
             action_id=ACTION, occupied=set(), response_for=response_for_workspace)
     assert refused.value.code == 'ASSISTANT_OP_INVALID'
-
-
-def test_the_preview_of_a_record_shows_its_text_not_a_null_or_a_date_object():
-    workspace, _sources = GOLDEN['scoped']
-    record = next(value for value in workspace.project.facts.records if value.kind == 'employment')
-    assert target_text(workspace, record.id).startswith(f'employer: {record.employer.raw_text}')
-    assert 'None' not in target_text(workspace, record.id)
 
 
 def test_other_fact_kinds_have_no_creation_path_on_v7():

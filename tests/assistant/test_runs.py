@@ -61,6 +61,12 @@ def test_events_arrive_in_order_and_the_answer_is_kept(tmp_path):
         assert [event['sequence'] for event in later['events']] == [2, 5]
 
 
+def test_the_model_list_names_the_provider_of_each_model(tmp_path):
+    with assistant_app(tmp_path) as (client, _application, _runtime):
+        models = client.get(base() + '/capabilities').json()['models']
+        assert models and {item['provider'] for item in models} == {'Codex'}
+
+
 def test_a_blank_message_is_refused_as_invalid_input(tmp_path):
     with assistant_app(tmp_path) as (client, _app, _runtime):
         cid = conversation(client)

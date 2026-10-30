@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.assistant_compiler import CompileFailure, compile_ops, preview
+from packages.resume_core.assistant_compiler import CompileFailure, compile_ops, preview, target_text
 from packages.resume_core.models.assistant import ProposeChangesV1
 from packages.resume_core.template_panel_records import technology_targets
 from resume_api.projects.service import response_for_workspace
@@ -67,6 +67,13 @@ def test_a_builtin_field_without_an_occurrence_saves_as_in_the_panel(before, kin
     changed = next(item for item in after.project.facts.records if item.id == target.id)
     assert changed == next(item for item in panel.project.facts.records if item.id == target.id)
     assert blocks(after) == blocks(panel)
+
+
+def test_the_text_of_a_record_shows_a_date_as_written_and_skips_empty_fields(before):
+    target = record(before, 'education')
+    after = chat(before, {'op': 'update_fact', 'recordId': target.id, 'field': 'completion', 'value': '2019-06'})
+    assert 'completion: 2019-06' in target_text(after, target.id)
+    assert 'None' not in target_text(after, target.id) and '{' not in target_text(after, target.id)
 
 
 def test_a_job_technology_joins_the_jobs_line_and_the_preview_names_it(before):

@@ -5,7 +5,9 @@ import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { commandCompletion, commandSuggestions } from "../../assistant/commands";
 import { CommandMenu } from "./CommandMenu";
-import { modelChoices } from "./model-choices";
+import { choiceGroups, modelChoices, type ModelChoice } from "./model-choices";
+
+const modelOption = (item: ModelChoice) => <option key={item.model} value={item.model}>{item.model}{item.state === "unavailable" ? " · недоступна" : item.state === "incompatible" ? " · не подходит" : ""}</option>;
 
 export type ComposerProps = {
   view: AssistantView; captured: string | null; active: boolean; applying: boolean; title: string;
@@ -46,7 +48,8 @@ export function Composer({ view, captured, active, applying, title, draft, flags
       } }} />
       <div className="chat-composer-controls"><div className="chat-controls-left"><label className="chat-model-label"><span className="visually-hidden">Модель помощника</span>
         <select id="chat-model" aria-label="Модель помощника" value={selected} disabled={!view.settings || view.submitting} onChange={event => model(event.target.value || null)}>
-          <option value="">Выберите модель</option>{choices.map(item => <option key={item.model} value={item.model}>{item.model}{item.state === "unavailable" ? " · недоступна" : item.state === "incompatible" ? " · не подходит" : ""}</option>)}
+          <option value="">Выберите модель</option>{choiceGroups(choices).map(group => group.label
+            ? <optgroup key={group.label} label={group.label}>{group.choices.map(modelOption)}</optgroup> : group.choices.map(modelOption))}
         </select></label>
         <label className="chat-mode"><input type="checkbox" checked={view.flags.allowEdits} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(event.target.checked, view.flags.allowWeb)} />Разрешить правки</label>

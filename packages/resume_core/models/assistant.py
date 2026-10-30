@@ -281,6 +281,8 @@ class PublishFindingsV1(Wire):
 class ModelChoiceV1(Wire):
     model: str = Field(max_length=80)
     state: Literal['unverified', 'verified', 'incompatible']
+    # The provider's display name; the model list groups by it, as Settings does (D119).
+    provider: str | None = Field(default=None, max_length=40)
 
 
 class AssistantCapabilitiesV1(Wire):

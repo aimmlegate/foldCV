@@ -465,8 +465,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         ready = bool(ready_kinds)
         # A ready assistant offers the models of the providers that can run now; a model of another one is unavailable.
         models = tuple(model for model, kind in owners.items() if not ready or kind in ready_kinds)
+        displays = {item.kind: item.display for item in registry.listed()}
         return AgentConnection(ready, models, "connection_" + connection_namespace + "_" + str(connection_epoch),
-            None if ready else reason, catalog_reasoning(owners))
+            None if ready else reason, catalog_reasoning(owners), {model: displays[kind] for model, kind in owners.items()})
 
     resolved_agent_runtime = agent_runtime
     if resolved_agent_runtime is None and experimental_profile is not None:
