@@ -240,7 +240,7 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             lines = {digest(span) for span in task.entry.spans} if task.entry is not None else set()
             preferred = {ref: option for ref, option in table.items() if digest(option.span) in lines} or None
             completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped,
-                preferred=preferred)
+                preferred=preferred, previous=attempt.request_value.get('previousReply'))
             proposal.dropped_values = [DroppedValue.model_validate(value) for value in dropped or []]
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}

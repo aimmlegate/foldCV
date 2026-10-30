@@ -1,5 +1,7 @@
 """Keep exact source display text while retaining reviewed interpretations separately."""
 
+from .models.template_import import EvidenceOption
+from .template_completion import stating, stating_words
 from .template_import import digest
 from .templates.compiler import canonical
 
@@ -12,6 +14,23 @@ def display_text(raw):
     if isinstance(raw, dict) and isinstance(raw.get('raw'), str) and raw['raw'].strip():
         return raw['raw']
     return canonical(raw).decode()
+
+
+def own_evidence(raw, evidence, units, captured):
+    """The cited spans that are this value's own. A derived citation lists every line that states the value and a
+    list-level entry every line of its list; shown whole, each value would repeat the lines of the others."""
+    if len(evidence) < 2:
+        return evidence
+    table = {}
+    for index, span in enumerate(evidence):
+        unit = units.get((span.source_id, span.source_revision, span.unit_id, span.unit_revision))
+        if unit is None or span.start < unit.start or span.end > unit.end:
+            return evidence
+        text = captured[digest(unit)][span.start - unit.start:span.end - unit.start]
+        table[str(index)] = EvidenceOption(ref=str(index), span=span, text=text)
+    value = raw.strip()
+    exact = [ref for ref, option in table.items() if option.text.strip() == value]
+    return [table[ref].span for ref in exact[:1] or stating(value, table)[:1] or stating_words(value, table)] or evidence
 
 
 def display_raw_input(review, field, raw):
@@ -29,7 +48,7 @@ def display_raw_input(review, field, raw):
             if current is None or span.start <= current.start and span.end >= current.end:
                 units[key] = span
         grouped = {}
-        for span in field.evidence:
+        for span in own_evidence(raw, field.evidence, units, captured):
             key = (span.source_id, span.source_revision, span.unit_id, span.unit_revision)
             grouped.setdefault(key, []).append((span.start, span.end))
         texts = []

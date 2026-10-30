@@ -116,15 +116,20 @@ CACHED_READS = 4
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
 # follows the category sentence.
 # I4: a repair that still states values no source line states keeps the block; the removed values are named once.
-UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}. Остальное в блоке принято.'
+UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}.'
+
+
+def unbound_text(proposal):
+    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
+    return UNBOUND_MESSAGE.format(values=values)
 
 
 def unbound_issues(id_factory, task_id, proposal, fingerprint):
     if not proposal.dropped_values:
         return []
-    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
     return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id], blockIds=[],
-        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND', message=UNBOUND_MESSAGE.format(values=values),
+        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND',
+        message=unbound_text(proposal) + ' Остальное в блоке принято.',
         importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
         retiredByAction=None)]
 
@@ -165,14 +170,22 @@ def better_repair(operation, package, first_receipt, receipt, review, proposal):
     rewrite = block.rewrite.fields if operation.capture.allow_text_rewrite else []
     allocations = item_identities(operation)
     # What each review admitted; admitted_cell_ids leaves out cells an earlier admission already holds unchanged.
-    first_review = next(value.value for value in operation.review_inputs if value.attempt_id == first_receipt.attempt_id)
-    before = shown_values(first, set(decide_review(first_review, first_receipt, first).admitted_cell_ids), allocations, rewrite)
+    # A second repair stands against all of it, the latest value per cell: the last admission may not name every item.
+    shown = {}
+    for applied in operation.proposals:
+        if applied.applied_receipt_id is None or attempt_in(operation, applied.attempt_id).task_id != task.id:
+            continue
+        its_receipt = next(value for value in operation.receipts if value.id == applied.applied_receipt_id)
+        its_review = next(value.value for value in operation.review_inputs if value.attempt_id == its_receipt.attempt_id)
+        cells = set(decide_review(its_review, its_receipt, applied).admitted_cell_ids)
+        shown.update({(value.item_handle, value.field_key): value for value in shown_values(applied, cells, allocations, rewrite)})
+    before = list(shown.values())
     admitted = decide_review(review, receipt, proposal).admitted_cell_ids
     # The view reads every active record, so items the repair does not send keep their admitted values.
     touched = {field.item_handle for field in proposal.resolved_fields}
     after = [value for value in before if value.item_handle not in touched]
     return repair_wins(before, failed_targets(first_receipt),
-        after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt))
+        after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt), touched)
 
 
 def previous_reply(proposal, offered, references):
@@ -1082,8 +1095,14 @@ class TemplatePipeline:
             rejected = {result.target_id for result in failures}
             proposal = next((value for value in reversed(operation.proposals) if value.applied_receipt_id == receipt.id), None)
             allocated = {value.item_handle: value for value in item_identities(operation)}
+            # A failed owner relation withholds its subject and what that subject owns, and may cite other lines than theirs.
+            owners = [value for value in proposal.resolved_relations if value.kind in {'owned_by', 'extension_of'}] if proposal else []
+            denied = {value.subject_id for value in owners if value.id in rejected}
+            while grown := {value.subject_id for value in owners if value.target_id in denied} - denied:
+                denied |= grown
             affected = [span for field in proposal.resolved_fields
-                if allocated[field.item_handle].cell_ids[field.field_key] in rejected for span in field.evidence] if proposal else []
+                if allocated[field.item_handle].cell_ids[field.field_key] in rejected
+                    or allocated[field.item_handle].record_id in denied for span in field.evidence] if proposal else []
             if proposal is not None:
                 from packages.resume_core.template_proposals import relation_evidence
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
@@ -1113,6 +1132,8 @@ class TemplatePipeline:
             message = 'Проверка не завершилась. Принятые данные в блоке сохранены.'
         else:
             message = fallback_message(first, len(failures), shown=not kept and len(spans) > len(leftover))
+        if applied is not None and applied.dropped_values:
+            message += ' ' + unbound_text(applied)
         # A rejected cell is absent from the document. The scope target keeps the notice on this block's view.
         targets = list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id]
         if kept and not any(target.startswith('scope-') for target in targets):
