@@ -60,6 +60,10 @@ async def child(root: Path):
 def launcher(root: Path):
     from resume_api import launcher as module
     module.trusted_temp_root = lambda: root / "operations"
+    # The launcher needs a frontend build; this check is not about the real one.
+    module.ROOT = root
+    (root / "apps/web/dist").mkdir(parents=True)
+    (root / "apps/web/dist/index.html").write_text("<title>FoldCV</title>", encoding="utf-8")
     sys.argv = ["launcher", "--no-open"]
     module.main()
 

@@ -33,6 +33,9 @@ npm run contracts:check
   tests; pass paths for a focused run.
 - The slow conversions need the pinned LibreOffice (`tools/install-local-renderer.sh`, macOS
   arm64, installs into `.tools/`).
+- The default run needs neither `.tools/` nor `apps/web/dist`, and passes on any host: the
+  readiness tests stub the host, frontend and renderer. `tools/run-local.py --check` checks
+  the real machine.
 - `test:state` runs `node --test` with `tsx` over `apps/web/unit/*.test.ts` with the default
   reporter and coverage for `src/assistant` and `src/rich`.
 - Every client change runs `typecheck`, `lint`, `build` and `test:state`; every contract change

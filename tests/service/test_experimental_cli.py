@@ -6,7 +6,6 @@ import asyncio
 import os
 from pathlib import Path
 import stat
-import subprocess
 import sys
 import threading
 
@@ -24,6 +23,7 @@ from resume_api.connection import Metadata, Quota
 from resume_api.providers.codex_cli import CodexCliProvider
 from resume_api.providers.content import ContentResult, ReportedUsage
 from tests.service.app_fixtures import add_project
+from tests.support.foundation import run_local
 
 
 ORIGIN = "http://127.0.0.1:39279"
@@ -135,14 +135,12 @@ def test_profile_policy_is_owned_and_env_isolated(tmp_path: Path, monkeypatch):
 
 
 def test_experimental_entrypoint_stops_on_unsafe_profile_before_server(tmp_path: Path):
-    repo = Path(__file__).resolve().parents[2]
     env = dict(os.environ)
     env.pop("FOLDCV_CODEX_EXECUTABLE", None)
     # A temporary home keeps the entrypoint away from the real FoldCV profile.
     env["HOME"] = str(tmp_path / "home")
     env["CODEX_HOME"] = str(tmp_path / "home/Library/Application Support/FoldCV/cli-experiment")
-    result = subprocess.run([sys.executable, "tools/run-local.py", "--experimental-cli", "--no-open"],
-                            cwd=repo, env=env, capture_output=True, text=True, timeout=10)
+    result = run_local("--experimental-cli", "--no-open", ready=True, env=env)
     assert result.returncode != 0
     assert "CLI_PROFILE_UNSAFE" in result.stderr
     assert "http://" not in result.stdout and "Traceback" not in result.stderr
