@@ -19,7 +19,7 @@ from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
 from .exports import pinned
-from .fold import sidecar_store
+from .fold import ahead, sidecar_store
 from .import_progress import import_progress
 
 LOG = logging.getLogger(__name__)
@@ -278,8 +278,11 @@ class ImportService:
             base, operation, facts = stored
             raw = (session.directory / 'workspace.json').read_bytes()
             workspace = decode_project(session.directory, raw, history=True)
-            if base != workspace.project_revision:
+            if base > workspace.project_revision or base < workspace.project_revision and ahead(session, operation):
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
+            if base < workspace.project_revision:
+                # A commit folded it and stopped before removing the file; the next commit removes it (plan 2.7).
+                return None
             copied = workspace.model_copy(deep=True)
             owner = copied.project or copied.pre_draft
             if owner is None or not any(item.id == operation.id for item in owner.template_operations):
