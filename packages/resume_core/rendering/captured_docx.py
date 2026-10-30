@@ -187,7 +187,7 @@ class CapturedWriter:
                 catalog = icon_catalog(request.package) if catalog is None else catalog
             except ValueError:
                 raise RenderFailure('ASSET_MISMATCH') from None
-            found = row_icon(request.package, request.facts, row, catalog)
+            found = row_icon(request.package, request.facts, row, catalog, block.props.icon)
             icon = found[0] if found else None
             if found and icon not in self.icons:
                 self.icons[icon] = decode_png(found[1], 'icon')

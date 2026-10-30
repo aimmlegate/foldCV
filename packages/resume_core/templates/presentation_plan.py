@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 from ..rendering.captured_styles import authored_spans
 from .compiler import canonical, sha256
-from .focus import icon_catalog, row_icon
+from .focus import catalog_for, row_icon
 from .models import remember_asset
 
 
@@ -58,7 +58,7 @@ def resolver(package):
     from ..rendering.captured_fonts import CapturedFontResolver
     found = _RESOLVERS.get(package.package_hash)
     if found is None:
-        found = _RESOLVERS[package.package_hash] = (CapturedFontResolver(package), {}, [None])
+        found = _RESOLVERS[package.package_hash] = (CapturedFontResolver(package), {})
         while len(_RESOLVERS) > 4:
             _RESOLVERS.pop(next(iter(_RESOLVERS)))
     return found
@@ -104,7 +104,7 @@ def editor_plan(project):
     places the facts panel can add a technology and whether it can change Focus rows."""
     package = project.template_package
     recipe = package.recipe
-    fonts, styles, cached = resolver(package)
+    fonts, styles = resolver(package)
     blocks, files = {}, {}
     def keyed(ref):
         key = style_key(ref)
@@ -118,9 +118,7 @@ def editor_plan(project):
             entry['band'] = True
         row = focus_row(block, recipe)
         if row:
-            if cached[0] is None:
-                cached[0] = icon_catalog(package)
-            icon = row_icon(package, project.facts, row, cached[0])
+            icon = row_icon(package, project.facts, row, catalog_for(package), block.props.icon)
             entry['focus'] = {'blocks': [child.id for child in row], 'icon': icon[0] if icon else None}
             if icon:
                 files[icon[0]] = icon[1]
@@ -173,4 +171,11 @@ def editor_plan(project):
     only = focus_only(project)
     if only is not None:
         plan['focusPanel'] = {'records': sorted(only)}
+        # A row's icon can be chosen from the template's icons (D122); a template without them offers no choice.
+        try:
+            icons = bool(catalog_for(package).files)
+        except ValueError:
+            icons = False
+        if icons:
+            plan['focusPanel']['icons'] = True
     return plan

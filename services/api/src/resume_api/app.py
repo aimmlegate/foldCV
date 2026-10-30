@@ -341,7 +341,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     # Every project write goes through the repository (D109).
     project_repository = ProjectRepository(rules_store.root)
     register_import_fold(project_repository)
-    projects = ProjectService(project_repository)
+    from packages.resume_core.focus_icons import FocusIconStore
+    projects = ProjectService(project_repository, icons=FocusIconStore(rules_store.root))
     app.state.projects = projects
     intake = TemplateIntake(project_repository, temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
         **({"clock": clock} if clock is not None else {}))
@@ -439,9 +440,12 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         from .importer.template_pipeline import TemplatePipeline
         from .importer.template_transport import ProviderTemplateTransport
         # Registered deterministic operations over admitted facts; unimplemented kinds stay refused.
+        # The Focus icons the user chose are read when the document is assembled (D122).
         v2_pipeline = TemplatePipeline(ProviderTemplateTransport(import_selected_provider, temp_root,
             model_provider=template_model_provider), repository=project_repository, authority=intake.validate,
-            assemble=assemble_template, derive=derive_task, wall=lambda: project_repository.clock())
+            assemble=lambda workspace, operation: assemble_template(workspace, operation,
+                remembered=projects.remembered_icons()),
+            derive=derive_task, wall=lambda: project_repository.clock())
     intake.configure(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
         fallback=template_fallback_model if template_import_call_cap is not None else None,

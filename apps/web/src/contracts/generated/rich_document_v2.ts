@@ -73,6 +73,7 @@ export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | Bo
 export type Id = string;
 export type Alignment1 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Icon = string | null;
 export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid2 = string | null;
@@ -591,6 +592,7 @@ export interface ManualScopeSpan {
 export interface SectionProps {
   alignment?: Alignment1;
   backgroundColor?: Backgroundcolor1;
+  icon?: Icon;
   manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid2;

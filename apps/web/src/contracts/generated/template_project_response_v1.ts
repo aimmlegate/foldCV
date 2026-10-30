@@ -26,9 +26,10 @@ export type Blocks2 = [string, ...string[]];
 export type Icon = string | null;
 export type Links = string[];
 export type Style = string;
+export type Icons = boolean;
 export type Records = string[];
 export type Fonts = string[];
-export type Icons = string[];
+export type Icons1 = string[];
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
 export type Bold1 = string | null;
@@ -1066,6 +1067,7 @@ export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | Bo
 export type Id54 = string;
 export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
+export type Icon1 = string | null;
 export type Manualorder = boolean;
 export type Presentation = "standard" | "focus";
 export type Recordid6 = string | null;
@@ -2037,7 +2039,7 @@ export interface EditorPlanV1 {
   focusPanel?: EditorFocusPanel | null;
   fonts: Fonts;
   iconFiles?: Iconfiles;
-  icons: Icons;
+  icons: Icons1;
   styles: Styles;
   technologyTargets?: Technologytargets;
 }
@@ -2063,9 +2065,10 @@ export interface Inline {
   [k: string]: string;
 }
 /**
- * The facts panel can add, remove and move Focus rows and set their years.
+ * The facts panel can add, remove and move Focus rows, set their years and choose their icons.
  */
 export interface EditorFocusPanel {
+  icons?: Icons;
   records: Records;
 }
 export interface Iconfiles {
@@ -3727,6 +3730,7 @@ export interface ManualScopeSpan {
 export interface SectionProps {
   alignment?: Alignment2;
   backgroundColor?: Backgroundcolor1;
+  icon?: Icon1;
   manualOrder?: Manualorder;
   presentation?: Presentation;
   recordId: Recordid6;

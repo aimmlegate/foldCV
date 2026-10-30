@@ -126,7 +126,8 @@ export type Operation =
   | "add_to_focus"
   | "remove_from_focus"
   | "move_technology"
-  | "move_focus";
+  | "move_focus"
+  | "set_focus_icon";
 export type Periodid = string | null;
 export type Recordid1 = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;

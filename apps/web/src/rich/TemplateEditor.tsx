@@ -2,7 +2,7 @@ import { createExtension } from "@blocknote/core";
 import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { ProjectApiFailure, type ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
@@ -24,6 +24,7 @@ import { tableIdentityAttributes } from "./table-identity";
 import { templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
 import { focusFacts } from "./v7-focus";
+import { focusIconChoices } from "../projects/api";
 import { checkCount, checkRemarks, importRemarks, placeRemarks } from "./remarks";
 import type { ProjectCheckResultV1 } from "../contracts/generated/project_check_result_v1";
 import type { CheckState } from "../workbench/facts/RemarkSections";
@@ -234,7 +235,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
   // Selection changes re-render the editor; the outline is read again only when the shown state or the check changes.
   const focus = useMemo(() => shown.workspace.project ? focusFacts(shown.workspace.project, shown.presentation)
-    : { entries: [], options: [], only: new Set<string>() }, [shown]);
+    : { entries: [], options: [], only: new Set<string>(), icons: false }, [shown]);
+  const projectId = initial.workspace.projectId;
+  const loadIcons = useCallback(() => focusIconChoices(projectId), [projectId]);
   const remarks = useMemo(() => placeRemarks(documentShown, [...importRemarks(shown.workspace.project?.importIssues ?? []),
     ...checked ? checkRemarks(checked) : []]), [documentShown, shown, checked]);
   const check: CheckState = checkState.kind !== "idle" ? checkState : checked ? { kind: "done", count: checkCount(checked),
@@ -274,7 +277,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-            focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only}
+            focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
             technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
             hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
             remarks={remarks} showBlock={blockId => { showBlock(blockId); }} check={{ state: check, run: () => void runCheck() }} />

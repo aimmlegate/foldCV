@@ -29,6 +29,13 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
     if (command.operation === "move_focus" && command.beforeRecordId) focus.beforeRecordId = command.beforeRecordId;
     return [focus];
   }
+  if (command.operation === "set_focus_icon") {
+    // One of the template's icons, or "" for the template's own choice (D122).
+    const icon = values?.["icon"];
+    if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || icon === undefined
+      || Object.keys(values ?? {}).length !== 1) return null;
+    return [{ operation: "set_focus_icon", recordId: command.recordId, values: { icon } }];
+  }
   if (command.operation === "move_technology") {
     if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;
     const move: PanelCommandV7 = { operation: "move_technology", recordId: command.recordId };

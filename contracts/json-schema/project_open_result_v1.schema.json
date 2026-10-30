@@ -2317,8 +2317,13 @@
     },
     "EditorFocusPanel": {
       "additionalProperties": false,
-      "description": "The facts panel can add, remove and move Focus rows and set their years.",
+      "description": "The facts panel can add, remove and move Focus rows, set their years and choose their icons.",
       "properties": {
+        "icons": {
+          "default": false,
+          "title": "Icons",
+          "type": "boolean"
+        },
         "records": {
           "items": {
             "minLength": 1,
@@ -11183,6 +11188,20 @@
           "pattern": "^(default|#[a-fA-F0-9]{6})$",
           "title": "Backgroundcolor",
           "type": "string"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
         },
         "manualOrder": {
           "default": false,

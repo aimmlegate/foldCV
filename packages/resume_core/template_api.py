@@ -62,9 +62,11 @@ class EditorTechnologyTarget(Wire):
 
 
 class EditorFocusPanel(Wire):
-    """The facts panel can add, remove and move Focus rows and set their years."""
+    """The facts panel can add, remove and move Focus rows, set their years and choose their icons."""
     # Records only Focus rows show; the panel's technology lists leave them out.
     records: list[Id]
+    # A row's icon can be chosen from the template's icons (D122).
+    icons: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class EditorPlanV1(Wire):

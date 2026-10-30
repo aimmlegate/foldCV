@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from packages.resume_core.models.projects import EditResultV1, digest_request
-from packages.resume_core.models.template_authoring import PasteBlocks, PasteInline
+from packages.resume_core.models.template_authoring import BuiltinPanel, PasteBlocks, PasteInline
 from packages.resume_core.rich_mutations import RichMutationFailure
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.template_preparation_panel import PANEL_REFUSALS
@@ -44,6 +44,10 @@ def _edit_locked(service, project_id, request, session):
     operation = preparation.operations[0]
     if preparation.snapshot.project_id != project_id:
         raise ProjectFailure('V7_INPUT_REJECTED', 422)
+    panel = operation.command.operation if isinstance(operation, BuiltinPanel) else None
+    # A row added from the facts panel takes the icon the user chose before for its name (D122).
+    remembered = service.remembered_icons() if panel == 'add_to_focus' else None
+    states = []
 
     def build(committed):
         response = service.response(project_id, committed)
@@ -51,7 +55,8 @@ def _edit_locked(service, project_id, request, session):
         if isinstance(operation, (PasteInline, PasteBlocks)) and operation.source.kind == 'same_project':
             clipboard = for_paste(session, committed, operation.source.clipboard_capture_id)
         try:
-            prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids)
+            prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids,
+                remembered=remembered)
         except (ValueError, RichMutationFailure) as error:
             # A panel refusal keeps its code, so the panel can say why; other input is rejected as a whole.
             code = str(error) if isinstance(error, ValueError) and str(error) in PANEL_REFUSALS else 'V7_INPUT_REJECTED'
@@ -59,12 +64,15 @@ def _edit_locked(service, project_id, request, session):
         if prepared.mutation is None:
             return None
         after = prepared.preview.workspace
+        states[:] = [committed, after]
         created, changed = block_changes(committed, after, operation.op_id)
         return after, {'created_ids': prepared.created_ids, 'created_blocks': created, 'changed_block_ids': changed}
 
     outcome = repository.mutate(project_id, base_revision=request.base_revision,
         client_mutation_id=preparation.client_mutation_id, request_sha256=digest_request(preparation),
         action_id=preparation.capture.action_id, kind='edit', build=build)
+    if panel == 'set_focus_icon' and states and not outcome.replayed:
+        service.remember_icons(*states)
     return result(service, session, outcome, preparation.client_mutation_id)
 
 
@@ -78,9 +86,12 @@ def _history_locked(service, project_id, request, session):
     repository = service.repository
     session.require_editor(request.editor_token)
     service.require_writable(project_id)
+    before = session.workspace
     outcome = repository.history(project_id, direction=request.direction, base_revision=request.base_revision,
         client_mutation_id=request.client_mutation_id, request_sha256=digest_request(request.model_dump(mode='json',
             by_alias=True, exclude={'editor_token'})), expected_action_id=request.expected_action_id)
+    if not outcome.replayed and session.workspace is not before:
+        service.remember_icons(before, session.workspace)
     return result(service, session, outcome, request.client_mutation_id)
 
 

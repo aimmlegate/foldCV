@@ -13,6 +13,8 @@ from packages.resume_core.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_api import TemplateProjectResponseV1, verify_response, verifying
+from packages.resume_core.template_panel_focus import icon_changes
+from packages.resume_core.templates.focus import remembered_catalog
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
 
 from .errors import ProjectFailure
@@ -34,10 +36,12 @@ def history_state(session):
 
 
 class ProjectService:
-    def __init__(self, repository, *, tasks=None, catalog=None):
+    def __init__(self, repository, *, tasks=None, catalog=None, icons=None):
         self.repository = repository
         self.tasks = tasks or TaskRegistry()
         self.catalog = catalog or ProjectCatalog(repository.store)
+        # The Focus icons the user chose (D122, a FocusIconStore); None keeps none.
+        self.icons = icons
         self.lock = threading.Lock()
         # Built once per committed workspace object, for the latest few projects; a hit is verified again under
         # FOLDCV_VERIFY (D108).
@@ -68,6 +72,22 @@ class ProjectService:
                 self.responses.popitem(last=False)
             self.identities[project_id] = (response.identity.title, response.identity.subtitle)
         return response
+
+    def remembered_icons(self):
+        """The Focus icons the user chose before, as rows added later look them up; None when none are kept."""
+        names = self.icons.load() if self.icons is not None else {}
+        return remembered_catalog(names) if names else None
+
+    def remember_icons(self, before, after):
+        """Later rows take the icon the user picked, took back with Undo or Redo, or reset (D122)."""
+        changes = icon_changes(before.project, after.project) if self.icons is not None else []
+        if not changes:
+            return
+        try:
+            self.icons.update(changes)
+        except StorageFailure:
+            # The edit is saved either way; only the choice for later rows is lost.
+            pass
 
     def require_writable(self, project_id):
         if self.catalog.get(project_id).read_only:

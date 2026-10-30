@@ -14,7 +14,7 @@ export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url
   presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string> };
 
 /** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
-function assetUrl(asset: Pick<Asset, "sha256">): string {
+export function assetUrl(asset: Pick<Asset, "sha256">): string {
   return `/v1/rich/template-assets/${asset.sha256}`;
 }
 

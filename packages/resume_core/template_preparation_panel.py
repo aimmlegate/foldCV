@@ -14,7 +14,7 @@ from .templates.materialize_nodes import literal, locale_text, reference
 # Panel refusals the user can act on; the edit route answers with these codes instead of a generic rejection.
 PANEL_REFUSALS = frozenset({'PANEL_ACTION_UNSUPPORTED', 'PANEL_LINE_SHARED', 'PANEL_OWNER_INVALID', 'TECHNOLOGY_DUPLICATE',
     'TECHNOLOGY_NAME_REQUIRED', 'TECHNOLOGY_GROUP_REQUIRED', 'TECHNOLOGY_LINE_MISSING', 'TECHNOLOGY_MOVE_INVALID',
-    'TECHNOLOGY_TARGET_MISSING', 'FOCUS_DUPLICATE', 'FOCUS_SCOPE_INVALID', 'FOCUS_VIEW_MISSING'})
+    'TECHNOLOGY_TARGET_MISSING', 'FOCUS_DUPLICATE', 'FOCUS_SCOPE_INVALID', 'FOCUS_VIEW_MISSING', 'FOCUS_ICON_UNKNOWN'})
 
 
 def sibling_lists(document):
@@ -333,7 +333,7 @@ def _employment_change(workspace, command, allocator, action_id):
     return candidate, steps
 
 
-def prepare_panel_edit(response, request, *, occupied=None):
+def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
     validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
@@ -353,7 +353,7 @@ def prepare_panel_edit(response, request, *, occupied=None):
         records = {value.id: value.kind for value in workspace.project.facts.records}
         kind = records.get(command.record_id) if command.record_id is not None else command.record_kind
         if command.operation in FOCUS_OPERATIONS:
-            prepared = prepare_focus(workspace, command, allocator)
+            prepared = prepare_focus(workspace, command, allocator, remembered)
         elif command.operation == 'add' and command.record_kind == 'technology':
             prepared = add_technology(workspace.project, operation, allocator)
         elif command.operation in {'edit', 'remove', 'clear_technologies'} and kind not in {None, 'employment'}:

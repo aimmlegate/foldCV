@@ -5,7 +5,8 @@ import { TextSelection } from "@tiptap/pm/state";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
 import { panelCommandsV7 } from "../src/rich/v7-panel";
-import { focusOptions, wholeYears, yearsValue } from "../src/rich/v7-focus";
+import { focusOptions, searchIcons, wholeYears, yearsValue } from "../src/rich/v7-focus";
+import { parseFocusIconChoices } from "../src/projects/api";
 import { ProjectApiFailure } from "../src/rich/v7-connection";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
@@ -52,6 +53,45 @@ test("only what Python saves is forwarded: technology add, removal and clearing,
     { operation: "add", recordKind: "technology", values: { display: "Go", experience: "3" } }, { operation: "edit", recordId: "person", values: {} },
     { operation: "edit", recordId: "school", jobId: "job", values: { institution: "School" } }] as const)
     assert.equal(panelCommandsV7(command, kinds), null, JSON.stringify(command));
+});
+
+test("a Focus icon choice is forwarded with the icon alone; an empty icon returns to the template's choice", () => {
+  assert.deepEqual(panelCommandsV7({ operation: "set_focus_icon", recordId: "tech", values: { icon: "mysql" } }, kinds),
+    [{ operation: "set_focus_icon", recordId: "tech", values: { icon: "mysql" } }]);
+  assert.deepEqual(panelCommandsV7({ operation: "set_focus_icon", recordId: "tech", values: { icon: "" } }, kinds),
+    [{ operation: "set_focus_icon", recordId: "tech", values: { icon: "" } }]);
+  for (const command of [{ operation: "set_focus_icon", recordId: "tech" }, { operation: "set_focus_icon", recordId: "tech",
+    values: { icon: "mysql", experience: "3" } }, { operation: "set_focus_icon", recordId: "job", values: { icon: "mysql" } },
+    { operation: "set_focus_icon", recordId: "tech", jobId: "job", values: { icon: "mysql" } }] as const)
+    assert.equal(panelCommandsV7(command, kinds), null, JSON.stringify(command));
+});
+
+test("the icon search ranks a whole name, its start, a word's start, then any part, and never lists every icon", () => {
+  const icon = (id: string, ...names: string[]) => ({ id, names, sha256: "a".repeat(64) });
+  const icons = [icon("mssql", "microsoft sql server", "msql", "mssql"), icon("mysql", "mysql"), icon("postgresql", "postgres", "postgresql"),
+    icon("sqlite", "sqlite"), icon("csharp", "c#", "csharp"), icon("cplusplus", "c++", "cplusplus")];
+  assert.deepEqual(searchIcons(icons, " "), []);
+  assert.deepEqual(searchIcons(icons, "SQL").map(value => [value.id, value.label]),
+    [["sqlite", "sqlite"], ["mssql", "microsoft sql server"], ["mysql", "mysql"], ["postgresql", "postgresql"]]);
+  assert.deepEqual(searchIcons(icons, "Postgres").map(value => value.label), ["postgres"]);
+  // Punctuation is ignored except # and +, which tell C# from C++.
+  assert.deepEqual(searchIcons(icons, "C#").map(value => value.id), ["csharp"]);
+  assert.deepEqual(searchIcons(icons, "c++").map(value => value.id), ["cplusplus"]);
+  assert.deepEqual(searchIcons(icons, "sql-server").map(value => value.id), ["mssql"]);
+  assert.equal(searchIcons(icons, "s", 2).length, 2);
+});
+
+test("icon choices from Python are checked before the search uses them", () => {
+  const value = { schemaVersion: 1, icons: [{ id: "mysql", names: ["mysql"], sha256: "b".repeat(64) }],
+    rows: { tech: { automatic: { id: "initial-1", sha256: "c".repeat(64) }, remembered: "mysql" }, other: { automatic: null, remembered: null } } };
+  const parsed = parseFocusIconChoices(value);
+  assert.deepEqual(parsed.icons, value.icons);
+  assert.deepEqual(parsed.rows.get("tech"), value.rows.tech);
+  assert.deepEqual(parsed.rows.get("other"), { automatic: null, remembered: null });
+  for (const broken of [{ ...value, schemaVersion: 2 }, { ...value, icons: [{ id: "mysql", names: ["mysql"], sha256: "short" }] },
+    { ...value, rows: { tech: { automatic: null, remembered: 3 } } }, { ...value, rows: { tech: { automatic: "mysql", remembered: null } } },
+    { ...value, rows: [] }])
+    assert.throws(() => parseFocusIconChoices(broken), ProjectApiFailure, JSON.stringify(broken));
 });
 
 test("stated experience gives whole years only when it states them", () => {

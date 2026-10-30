@@ -241,7 +241,8 @@ def test_clearing_the_general_list_keeps_focus_and_each_group_takes_technologies
 
 def test_a_technology_in_focus_and_in_a_group_is_renamed_and_added_back_on_its_own(before):
     grouped, focus = shown_in(before, 'programming'), shown_in(before, 'focus')
-    assert editor_plan(before.project)['focusPanel'] == {'records': [focus]}
+    # The Generic pack's icons can be chosen for a row (D122).
+    assert editor_plan(before.project)['focusPanel'] == {'records': [focus], 'icons': True}
     after, _result = applied(before, request(before, 'edit', record_id=grouped, values={'display': 'PYTHON'}))
     assert lines(after, 'programming') == ['PYTHON, Perl'] and lines(after, 'focus') == ['Python', '3 years']
     after, _result = applied(before, request(before, 'edit', record_id=focus, values={'display': 'python'}))

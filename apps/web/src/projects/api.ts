@@ -3,6 +3,7 @@ import type { TemplateProjectResponseV1 } from "../contracts/generated/template_
 import type { TaskStatusV1 } from "../contracts/generated/task_status_v1";
 import type { ReasoningEffort } from "../connection/reasoning";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
+import type { FocusIcon } from "../rich/v7-focus";
 
 export type ProjectTask = TaskStatusV1;
 
@@ -101,6 +102,40 @@ export async function lastImportOperation(projectId: string, fetcher?: Fetcher):
 
 function invalid(): never {
   throw new ProjectApiFailure("INVALID_RESULT");
+}
+
+/** A Focus row's icons besides the ones listed: the template's own choice and the one remembered for its name. */
+export type FocusIconRow = { automatic: { id: string; sha256: string } | null; remembered: string | null };
+/** The icons of a project's template for the facts panel's search, and each Focus row's own and remembered icon. */
+export type FocusIconChoices = { icons: FocusIcon[]; rows: ReadonlyMap<string, FocusIconRow> };
+
+const hash = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+function focusIcon(value: unknown): FocusIcon {
+  if (typeof value !== "object" || value === null) invalid();
+  const { id, names, sha256 } = value as Record<string, unknown>;
+  if (typeof id !== "string" || !hash(sha256) || !Array.isArray(names) || !names.every(name => typeof name === "string")) invalid();
+  return { id, names: names as string[], sha256 };
+}
+function focusIconRow(value: unknown): FocusIconRow {
+  if (typeof value !== "object" || value === null) invalid();
+  const { automatic, remembered } = value as Record<string, unknown>;
+  if (remembered !== null && typeof remembered !== "string") invalid();
+  if (automatic === null) return { automatic: null, remembered };
+  if (typeof automatic !== "object") invalid();
+  const { id, sha256 } = automatic as Record<string, unknown>;
+  if (typeof id !== "string" || !hash(sha256)) invalid();
+  return { automatic: { id, sha256 }, remembered };
+}
+export function parseFocusIconChoices(value: unknown): FocusIconChoices {
+  const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const { schemaVersion, icons, rows } = record;
+  if (schemaVersion !== 1 || !Array.isArray(icons) || typeof rows !== "object" || rows === null || Array.isArray(rows)) invalid();
+  return { icons: icons.map(focusIcon), rows: new Map(Object.entries(rows).map(([id, row]) => [id, focusIconRow(row)])) };
+}
+
+/** GET the choices for the icon search (D122); their PNGs are served by hash like the document's icons. */
+export async function focusIconChoices(projectId: string, fetcher?: Fetcher): Promise<FocusIconChoices> {
+  return parseFocusIconChoices(await v2Request<unknown>(projectPath(projectId, "/focus-icons"), "GET", undefined, fetcher));
 }
 function templateEntry(value: unknown): TemplateEntry {
   if (typeof value !== "object" || value === null) invalid();

@@ -10,6 +10,8 @@ import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { dateText } from "./dates";
 import { FocusYears, type FocusEntry } from "./FocusYears";
+import { FocusIconDialog } from "./FocusIconDialog";
+import type { FocusIconChoices } from "../../projects/api";
 import { OperationStatus } from "../ui/OperationStatus";
 import type { PlacedRemarks } from "../../rich/remarks";
 import { CheckFooter, RemarkSections, type CheckState } from "./RemarkSections";
@@ -23,11 +25,13 @@ function summary(record: RecordValue): [string, string] {
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
-export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, technologyTargets = [], submit, pending, paused, hidden,
-  close, focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
+export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, focusIcons = null, technologyTargets = [], submit,
+  pending, paused, hidden, close, focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
+  /** Loads the template's icons for a Focus row's icon search; null when the template has none to choose from. */
+  focusIcons?: (() => Promise<FocusIconChoices>) | null;
   /** Records only Focus rows show; the technology lists leave them out. */
   focusOnly?: ReadonlySet<string>;
   /** Where Python can show a new technology; a list without one offers no adding. */
@@ -40,6 +44,9 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
 }) {
   const panel = useRef<HTMLElement>(null);
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<string | null>(null);
+  // The row whose icon is being chosen; the dialog closes when the row goes, as after an Undo.
+  const [iconRow, setIconRow] = useState<string | null>(null);
+  const iconEntry = focusIcons ? focusEntries.find(entry => entry.recordId === iconRow) : undefined;
   // One command at a time: the editor takes the next one only after Python's answer to this one is shown.
   const busy = paused || pending.length > 0;
   const groups: Kind[] = ["candidate", "employment", "technology", "education", "language"];
@@ -81,7 +88,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={recordId => {
           const record = facts.records.find(value => value.id === recordId);
           if (record) setTarget({ kind: "technology", record });
-        }} />
+        }} pickIcon={focusIcons ? setIconRow : null} />
         <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} focusRecordId={focusRequest?.recordId}
           targets={technologyTargets.filter(target => target.jobId === null)} excluded={focusOnly} /></>
         : facts.records.filter(record => record.kind === kind).map(record => {
@@ -98,5 +105,6 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     </details>)}
     {remarks && <RemarkSections remarks={remarks} show={showBlock} />}
     {check && <CheckFooter state={check.state} run={check.run} disabled={paused} />}
-  </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}</>;
+  </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}
+    {iconEntry && focusIcons && <FocusIconDialog entry={iconEntry} load={focusIcons} submit={apply} close={() => setIconRow(null)} />}</>;
 }
