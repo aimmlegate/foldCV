@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowTextRewrite": {
+      "default": false,
+      "title": "Allowtextrewrite",
+      "type": "boolean"
+    },
+    "clientRequestId": {
+      "default": "import",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Clientrequestid",
+      "type": "string"
+    },
+    "effort": {
+      "anyOf": [
+        {
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effort"
+    },
+    "kind": {
+      "enum": [
+        "start",
+        "resume",
+        "cancel"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "operationId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Operationid"
+    },
+    "taskId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Taskid"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "ImportCommand",
+  "type": "object"
+}

@@ -22,14 +22,14 @@ from .errors import ProjectFailure
 
 
 class ExportCommand(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     schema_version: Literal[1] = Field(alias='schemaVersion')
     snapshot: TemplateSnapshotIdentity
     editor_token: str = Field(alias='editorToken', min_length=1)
 
 
 class ExportRetry(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     editor_token: str = Field(alias='editorToken', min_length=1)
 
 

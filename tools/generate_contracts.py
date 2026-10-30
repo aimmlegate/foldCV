@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path[:0] = [str(ROOT), str(ROOT / "services/api/src")]
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.models.agent import AGENT_CONTRACTS
 from packages.resume_core.models.assistant import ASSISTANT_CONTRACTS
@@ -27,6 +27,9 @@ from packages.resume_core.rich_panel import RichPanelRequest
 from packages.resume_core.template_api import TemplateProjectResponseV1
 from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
 from packages.resume_core.templates.shorthand import source_schema
+from resume_api.projects.archive import ArchiveDownload
+from resume_api.projects.exports import ExportCommand, ExportRetry
+from resume_api.projects.imports import ImportCommand
 
 OUT = ROOT / "contracts" / "json-schema"
 TYPES = ROOT / "apps" / "web" / "src" / "contracts" / "generated"
@@ -34,6 +37,10 @@ TYPES = ROOT / "apps" / "web" / "src" / "contracts" / "generated"
 # types or kept tests read through contracts/examples.
 CONTRACTS = {
     **PROJECT_CONTRACTS,
+    "import_command": ImportCommand,
+    "export_command": ExportCommand,
+    "export_retry": ExportRetry,
+    "archive_download": ArchiveDownload,
     "template_project_response_v1": TemplateProjectResponseV1,
     "template_edit_preparation_v1": TemplateEditPreparationV1,
     "template_clipboard_capture_v1": TemplateClipboardCaptureV1,

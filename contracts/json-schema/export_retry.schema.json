@@ -1,0 +1,15 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "editorToken": {
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    }
+  },
+  "required": [
+    "editorToken"
+  ],
+  "title": "ExportRetry",
+  "type": "object"
+}
