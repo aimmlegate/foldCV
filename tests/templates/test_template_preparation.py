@@ -3,14 +3,16 @@
 import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
+from packages.resume_core.models.template_document import FieldOccurrence, ManualScopeSpan, PresentedText
+from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_api import TemplateProjectResponseV1
+from packages.resume_core.template_inverse import inverse_template_mutation, semantic
 from packages.resume_core.template_preparation import prepare_text_edit
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
 from tests.templates.storage_fixtures import workspace
-from tests.templates.test_transactions import issue
+from tests.templates.test_transactions import authorization, issue
 
 
 def response(value):
@@ -278,3 +280,45 @@ def test_marks_of_shared_raw_text_preserve_exact_pending_scope():
     result = prepare_text_edit(response(saved), request).preview.workspace
     assert result.project.facts == saved.project.facts
     assert result.project.facts.manual_scopes[-1].raw_input == 'Exact replacement'
+
+
+def copied_field(before):
+    """A second occurrence of the first paper block's title field, as a block copy leaves it."""
+    source = before.project.document.regions[2].blocks[0]
+    copy = source.model_copy(deep=True)
+    copy.id = 'block-copy'
+    for span in copy.content:
+        if isinstance(span, FieldOccurrence):
+            span.binding_id, span.binding_root_id, span.occurrence_id = 'copy-fragment', 'copy-root', 'copy-root'
+    before.project.document.regions[2].blocks.insert(1, copy)
+    return WorkspaceV7.model_validate(before.model_dump(by_alias=True)), source, copy
+
+
+def test_a_direct_edit_of_one_occurrence_turns_its_copies_into_plain_text():
+    before, _ = workspace()
+    before, source, copy = copied_field(before)
+    result = prepare_text_edit(response(before), command(before))
+    blocks = {block.id: block for block in result.preview.workspace.project.document.blocks()}
+    assert ''.join(span.text for span in blocks[source.id].content).startswith('Human')
+    assert [span.type for span in blocks[copy.id].content if span.text] == ['text']
+    assert ''.join(span.text for span in blocks[copy.id].content) == ''.join(span.text for span in copy.content)
+    changed, _ = apply_rich_mutation(before, result.mutation)
+    assert changed == result.preview.workspace
+    inverse = inverse_template_mutation(before, changed, origin_action_id=result.mutation.action_id, mutation_id='undo-copy',
+        session_id='session', action_token=2)
+    restored, _ = apply_rich_mutation(changed, inverse, history_authorization=authorization(changed, inverse))
+    assert semantic(restored.project.document) == semantic(before.project.document)
+
+
+def test_a_copy_in_the_edited_block_goes_plain_with_the_edit():
+    before, _ = workspace()
+    source = before.project.document.regions[2].blocks[0]
+    span = next(value for value in source.content if isinstance(value, FieldOccurrence))
+    source.content.append(span.model_copy(update={'binding_id': 'copy-fragment', 'binding_root_id': 'copy-root',
+        'occurrence_id': 'copy-root'}, deep=True))
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    result = prepare_text_edit(response(before), command(before))
+    changed = next(block for block in result.preview.workspace.project.document.blocks() if block.id == source.id)
+    assert [part.type for part in changed.content] == ['fact_field', 'fact_field', 'text']
+    assert changed.content[-1].text == span.text
+    assert apply_rich_mutation(before, result.mutation)[0] == result.preview.workspace
