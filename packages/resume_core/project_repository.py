@@ -67,6 +67,15 @@ def rich_snapshot_bytes(workspace) -> bytes:
     return raw
 
 
+def budget_bytes(workspace, raw):
+    """What the Settings size counts of a project file. Publication moves a pre-draft's import records to history
+    files (D105), so they do not count before it either: a run must not fail at its last step on them."""
+    if workspace.project is not None or workspace.pre_draft is None:
+        return len(raw)
+    from .models.template_workspace import history_bytes
+    return len(raw) - sum(len(history_bytes(value)) for value in workspace.pre_draft.template_operations)
+
+
 def stored_owners(data):
     return [owner for owner in (data.get('project'), data.get('preDraft')) if isinstance(owner, dict)] if isinstance(data, dict) else []
 
@@ -608,7 +617,7 @@ class ProjectRepository:
             raw = rich_snapshot_bytes(after)
         except ProjectStoreFailure as error:
             raise RepositoryFailure(error.code) from None
-        if len(raw) > project_file_bytes():
+        if len(raw) > project_file_bytes() and budget_bytes(after, raw) > project_file_bytes():
             raise RepositoryFailure('PROJECT_TOO_LARGE')
         loaded = bool(after.project is not None and after.project.template_operations)
         try:
