@@ -345,6 +345,7 @@ async def test_an_old_job_without_a_company_stays_in_the_document(tmp_path):
     assert 'other_projects' not in shown and '2006 – 2008' in shown['projects']
 
 
+@pytest.mark.asyncio
 async def test_an_generic_repair_without_item_refs_keeps_one_record_per_job_and_technology(tmp_path):
     def wrap(script):
         def wrapped(request, value):
