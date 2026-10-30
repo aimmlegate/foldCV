@@ -4,12 +4,14 @@ import { register } from "node:module";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { capabilities, settings, view } from "./support/assistant";
 
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);
 const { Header } = await import("../src/workbench/layout/Header");
 const { DeleteDialog } = await import("../src/workbench/layout/History");
 const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
+const { Composer } = await import("../src/workbench/assistant/Composer");
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -55,4 +57,12 @@ test("a pre-draft without an operation asks for the rewrite and effort choice, w
   assert.match(asked, /Продолжить импорт/u);
   assert.ok(!/id="import-rewrite"[^>]*checked/u.test(asked) && !/checked=""[^>]*id="import-rewrite"/u.test(asked), "rewriting is not on by default");
   assert.ok(!form(false).includes("Переписывать текст"), "an operation already holds the choices");
+});
+
+test("the composer marks a saved model the service refused, in the reply the server really sends", () => {
+  const composer = (code: string) => renderToStaticMarkup(createElement(Composer, { view: view({ run: null, settings: { ...settings, selectedAgentModel: "saved" },
+    capabilities: { ...capabilities, ready: false, unavailable: { code, detail: [] } } }), captured: null, active: false, applying: false, title: "Resume",
+    draft: () => {}, flags: () => {}, model: () => {}, send: () => {}, stop: () => {}, clear: () => {}, settings: () => {} }));
+  assert.match(composer("AGENT_MODEL_UNAVAILABLE"), /saved · недоступна/u);
+  assert.ok(!composer("AGENT_CONNECTION_UNAVAILABLE").includes("недоступна"), "another refusal says nothing about the model");
 });

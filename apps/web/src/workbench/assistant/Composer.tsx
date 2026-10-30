@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { AssistantView } from "../../assistant/controller";
-import { canSend, errorText, submitKey } from "../../assistant/presentation";
+import { canSend, errorText, stopBusy, submitKey } from "../../assistant/presentation";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { commandCompletion, commandSuggestions } from "../../assistant/commands";
@@ -20,7 +20,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
   const selectedCommand = commandIndex < suggestions.length ? commandIndex : 0;
   const chooseCommand = (value: string) => { draft(value); setCommandIndex(0); input.current?.focus(); };
   const selected = view.settings?.selectedAgentModel ?? "", models = view.capabilities?.models ?? [];
-  const choices = modelChoices(selected, models, view.capabilities?.ready === true && view.loading == null);
+  const choices = modelChoices(selected, models, view.capabilities?.unavailable?.code === "AGENT_MODEL_UNAVAILABLE" && view.loading == null);
   return <form className="chat-composer" onSubmit={event => { event.preventDefault(); if (enabled) send(); }}>
     <div className="chat-context" aria-label="Контекст"><span className="chat-context-resume" title={title}><Icon name="file" />{title}</span>
       <button className={`chat-scope${captured ? " has-selection" : ""}`} type="button" disabled={!captured} onClick={clear}
@@ -52,7 +52,7 @@ export function Composer({ view, captured, active, applying, title, draft, flags
           onChange={event => flags(event.target.checked, view.flags.allowWeb)} />Разрешить правки</label>
         <label className="chat-mode chat-internet"><input type="checkbox" checked={view.flags.allowWeb} disabled={view.submitting || view.pendingSend}
           onChange={event => flags(view.flags.allowEdits, event.target.checked)} /><Icon name="globe" /><span>Интернет</span></label></div>
-        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем"}>{view.submitting || view.run?.state === "cancelling" || view.loading === "Останавливаем" ? <Spinner /> : <Icon name="stop" />}</button>}
+        {active && <button className="chat-send is-stop" type="button" title="Остановить" aria-label="Остановить" onClick={stop} disabled={view.submitting || stopBusy(view)}>{view.submitting || stopBusy(view) ? <Spinner /> : <Icon name="stop" />}</button>}
         {(!active || view.pendingSend) && <button className="chat-send" type="submit" disabled={!enabled} title={view.pendingSend ? "Повторить отправку" : "Отправить"}
           aria-label={view.pendingSend ? "Повторить отправку" : "Отправить"}><Icon name="arrow" /></button>}</div></div>
     {[...view.draft].length > 8000 && <p className="chat-error" role="alert">Сообщение длиннее 8000 символов.</p>}
