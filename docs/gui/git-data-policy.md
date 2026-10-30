@@ -36,5 +36,4 @@ prototype are not published. `.gitignore` excludes `docs/gui/*`, `reports/`,
 that list.
 
 These files exist only in the main checkout, so new clones and worktrees do not have
-them. Git does not protect ignored files. Checking out an older commit and returning
-deletes the files that commit tracked, and `git clean -x` deletes all of them.
+them. Git does not protect ignored files: `git clean -x` deletes them.
