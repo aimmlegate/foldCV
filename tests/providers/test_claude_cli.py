@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
+from resume_api.cli.process_runner import ProcessRunner
 from resume_api.cli.profiles import claude as rules
 from resume_api.connection import ConnectionFailure
 from resume_api.connection_claude import ClaudeConnectionAdapter
@@ -157,6 +158,44 @@ def test_failures_are_typed_without_a_second_dispatch(fake, case, code):
 def test_an_unknown_notice_is_named_in_the_log_without_its_content(fake, caplog):
     failure(fake, "unknown_notice", "INVALID_RESULT", 1)
     assert [record.getMessage() for record in caplog.records] == ["Claude stream event refused: system/new_notice"]
+
+
+class Open(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    summary: str
+
+
+def generate_open(fake, case="valid", **config):
+    cli, root, _directory, configure, _audit = fake
+    configure(case, **config)
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        return provider.generate(request(result=Open), files, threading.Event())
+
+
+def test_a_reply_above_half_the_budget_fits_though_the_stream_carries_it_twice(fake, monkeypatch):
+    limits = {}
+    run = ProcessRunner.run
+
+    def spy(self, *args, **options):
+        limits.update(options)
+        return run(self, *args, **options)
+
+    monkeypatch.setattr(ProcessRunner, "run", spy)
+    assert generate_open(fake, value={"summary": "x" * 140_000}).value.summary == "x" * 140_000
+    assert limits["max_line"] == 262_144 and limits["max_output"] == 8 * 262_144
+
+
+def test_a_repair_after_a_long_invalid_reply_counts_only_its_final_line(fake):
+    result = generate_open(fake, "repair", value={"summary": "x" * 100_000},
+                           invalid={"summary": "x" * 100_000, "extra": 1})
+    assert result.value.summary == "x" * 100_000 and result.logical_attempts == 2
+
+
+def test_a_reply_above_the_final_limit_is_still_too_large(fake):
+    with pytest.raises(ContentFailure) as raised:
+        generate_open(fake, value={"summary": "x" * 270_000})
+    assert raised.value.code == "OUTPUT_TOO_LARGE"
 
 
 def test_missing_structured_output_is_repaired_like_invalid_json(fake):

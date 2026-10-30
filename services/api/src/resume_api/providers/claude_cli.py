@@ -44,6 +44,9 @@ ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHA
 # `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while (MP05-2).
 NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
 FORBIDDEN = {"compact_boundary", "permission_denied"}
+# The stream repeats the reply (each tool call of a schema retry, then the result) and adds thinking. Only the final
+# line counts against the reply budget, as Codex's one final message does; this keeps the whole stream bounded.
+STREAM_MULTIPLE = 8
 LOG = logging.getLogger(__name__)
 
 
@@ -79,6 +82,7 @@ class ClaudeEvents:
         self.tool_ids: set[str] = set()
         self.error: str | None = None
         self.output = False
+        self.final_bytes = 0
 
     @property
     def renewal(self) -> bool:
@@ -112,6 +116,7 @@ class ClaudeEvents:
         elif kind == "user":
             self._user(event)
         elif kind == "result":
+            self.final_bytes = len(raw)
             self._result(event)
         else:
             raise _unknown(kind)
@@ -455,8 +460,9 @@ class ClaudeCliProvider:
                     raise ContentFailure("BUDGET_EXCEEDED")
                 if consumed_output >= policy.max_total_output_bytes:
                     raise ContentFailure("BUDGET_EXCEEDED")
+                remaining = policy.max_total_output_bytes - consumed_output
                 events = ClaudeEvents(model=policy.model, version=probe.version, structured=not plain,
-                                      max_bytes=policy.max_total_output_bytes - consumed_output)
+                                      max_bytes=remaining)
                 attempts += 1
                 try:
                     try:
@@ -483,10 +489,9 @@ class ClaudeCliProvider:
 
                         with measure("cli_process"):
                             try:
-                                output, errors = self._run(files, args, deadline, cancel, data=prompt,
-                                                           on_line=accept, on_spawn=spawned,
-                                                           max_line=policy.max_total_output_bytes - consumed_output,
-                                                           max_output=policy.max_total_output_bytes - consumed_output)
+                                _, errors = self._run(files, args, deadline, cancel, data=prompt,
+                                                      on_line=accept, on_spawn=spawned, max_line=remaining,
+                                                      max_output=STREAM_MULTIPLE * remaining)
                             except ProcessExit as error:
                                 if events.complete or not events.started:
                                     raise ContentFailure(startup_failure(error.stderr)
@@ -495,7 +500,7 @@ class ClaudeCliProvider:
                     finally:
                         usages.append(events.usage)
                         raw_return = events.text
-                    consumed_output += len(output) + len(errors)
+                    consumed_output += events.final_bytes + len(errors)
                     observed("completed" if events.complete else "incomplete")
                     with measure("decode"):
                         value = events.result(request.result_type, output_schema,
