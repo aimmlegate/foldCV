@@ -159,7 +159,7 @@ async def test_deleting_a_project_stops_its_rewrite_preview_through_the_rewrite_
     fixture = RuntimeFixture(tmp_path)
     projects = services(fixture)
     cancels = {}
-    async def rewrite_text(project_id, request_id, _instruction, _source):
+    async def rewrite_text(project_id, request_id, _instruction, _source, _admitted):
         stop = cancels[(project_id, request_id)] = threading.Event()
         await asyncio.to_thread(stop.wait, 10)
         raise ProjectFailure('CANCELLED', 409)
