@@ -395,7 +395,7 @@ def test_the_short_form_declares_per_entry_and_the_bundled_projects_blocks_use_i
     for path in BUNDLED_TEMPLATES.values():
         package = compile_template(path)
         assert [item.id for item in package.definition.blocks if item.per_entry] == ['projects']
-    assert compile_template(BUNDLED_TEMPLATES['generic-two-column']).revision == '2.8.0'
+    assert compile_template(BUNDLED_TEMPLATES['generic-two-column']).revision == '1.0.0'
     assert compile_template(BUNDLED_TEMPLATES['generic-one-column']).revision == '1.1.0'
 
 

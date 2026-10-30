@@ -224,9 +224,6 @@ def render(data, target):
                 for flowable, top, height in column[page]:
                     flowable.wrap(width, height)
                     flowable.drawOn(c, x, PAGE_H - top - height)
-        c.setFont("Light", 12)
-        c.setFillColorRGB(0, 0, 0)
-        c.drawCentredString(275.65, 42, "mail@example.com")
         c.showPage()
     c.save()
     return count

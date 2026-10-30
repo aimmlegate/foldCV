@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = ROOT / "templates/generic/manifest.json"
 SOFFICE = ROOT / ".tools/LibreOffice.app/Contents/MacOS/soffice"
 APP_FONTS = ROOT / ".tools/LibreOffice.app/Contents/Resources/fonts/truetype"
-PACKAGE_SHA256 = "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8b9"
+PACKAGE_SHA256 = "af3f212612f59650e1e9ea4c7cc32d2edfbbaa77c71cf3c34cc87ce06957d1f8"
 
 
 class RenderFailure(Exception):

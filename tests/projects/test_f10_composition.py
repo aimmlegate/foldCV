@@ -1,11 +1,10 @@
-"""Scripted Generic F10 through the v2 import route matches the composition of a direct coordinator run (plan S12).
+"""Scripted two-column F10 through the v2 import route matches the composition of a direct coordinator run (plan S12).
 
 Revisions, timestamps and mutation-replay rows are the repository's commit record. Fact text, source text and the
 composition report of everything else must match. A semantic difference stops the slice; the golden is not updated.
 """
 
 from itertools import count
-from pathlib import Path
 import re
 
 import pytest
@@ -13,6 +12,7 @@ import pytest
 from packages.resume_core.project_repository import decode_project
 from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.projects.support import ORIGIN, v2_app
+from tools.save_bench.composition import analyze
 
 HEX = re.compile(r'^[0-9a-f]{64}$')
 TEXT_KEYS = {'text', 'rawInput'}
@@ -89,7 +89,6 @@ def differing(left, right, path=''):
 @pytest.mark.slow
 @pytest.mark.asyncio
 async def test_f10_through_the_repository_matches_the_scripted_composition(tmp_path):
-    import importlib.util
     def ids():
         serial = count(1)
         return lambda prefix: prefix + '-' + str(next(serial))
@@ -121,12 +120,8 @@ async def test_f10_through_the_repository_matches_the_scripted_composition(tmp_p
         directory = service.repository.open(fixture.project).directory
         saved = decode_project(directory, (directory / 'workspace.json').read_bytes(), history=True)
 
-    spec = importlib.util.spec_from_file_location(
-        'foldcv_composition', Path(__file__).resolve().parents[2] / 'docs/gui/research/save-pipeline-bench/composition.py')
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
     old, new = dumped(baseline), dumped(saved)
     assert collect_text(old['project']['sources']) == collect_text(new['project']['sources'])
     assert collect_text(old['project']) == collect_text(new['project'])
-    report_gap = differing(module.analyze(normalize(old)), module.analyze(normalize(new)))
+    report_gap = differing(analyze(normalize(old)), analyze(normalize(new)))
     assert not report_gap, '\n'.join(report_gap[:40])

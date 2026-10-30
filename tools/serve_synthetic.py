@@ -198,7 +198,7 @@ async def views_workspace(root):
 
 
 async def generic_workspace(root, name, template=None):
-    """A published scripted import of one synthetic fixture with a bundled template, the Generic one by default."""
+    """A published scripted import of one synthetic fixture with a bundled template, the two-column one by default."""
     from packages.resume_core.templates.compiler import compile_template
     from packages.resume_core.templates.store import BUNDLED_TEMPLATES
     from tests.templates.generic_fixtures import generic_import
@@ -290,6 +290,7 @@ class LiveBudget:
         if self.used() >= self.limit:
             return RuntimeResult(state='failed', error='AGENT_QUOTA')
         # Charged before the start, so an unknown outcome still counts.
+        self.ledger.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger.open('a') as handle:
             handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model,
                 'message': json.loads(value.prompt.split('\n', 1)[1])['message'][:200]}, ensure_ascii=False) + '\n')

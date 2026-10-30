@@ -1,4 +1,4 @@
-"""S4: the bundled Generic template imports end to end with scripted providers (B01–B08 on F01–F07 and F10)."""
+"""S4: the bundled two-column template imports end to end with scripted providers (B01–B08 on F01–F07 and F10)."""
 
 import pytest
 

@@ -1,7 +1,7 @@
 # Template assets
 
-The logo and eight technology icons were extracted from the user-provided
-Generic resume reference. No candidate text or portrait is included in the assets.
+The eight technology icons were extracted from a user-provided resume reference.
+The logo is the FoldCV wordmark. No candidate text or portrait is included in the assets.
 
 Fonts: Adobe Source Sans Pro, release `2.045R-ro/1.095R-it`.
 Source: https://github.com/adobe-fonts/source-sans/tree/2.045R-ro/1.095R-it

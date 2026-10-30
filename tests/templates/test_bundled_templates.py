@@ -1,11 +1,11 @@
-"""Bundled templates: the Generic package keeps its exact hash in the shared folder; the generic one-column template
-imports, edits and exports in one column with plain headings and job technology chips, without Generic branding, Focus
-or a logo."""
+"""Bundled templates: the two-column package keeps its exact hash in the shared folder; the one-column template
+imports, edits and exports in one column with plain headings and job technology chips, without Focus or a logo."""
 
 import asyncio
 from functools import cache
 import io
 import re
+import shutil
 import zipfile
 
 import pytest
@@ -14,14 +14,14 @@ from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.presentation import project_presentation
-from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES
+from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, shipped_templates
 from tests.templates.generic_fixtures import generic_import, f10
 from tests.templates.test_captured_docx import NS, emitted, xml
 from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-GENERIC_HASH = 'fea18743c236eaad5fab0ee004b0dd93eb298e74b67a8a0e3fed56840ac1e697'
+TWO_COLUMN_HASH = '1d1c2166d593376052371eb23077e0d7c488fe802d81959019560932117ddaab'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 
 
@@ -30,24 +30,48 @@ def generic():
     return compile_template(GENERIC)
 
 
-def test_the_generic_package_keeps_its_exact_hash_in_the_shared_folder():
+def test_the_two_column_package_keeps_its_exact_hash_in_the_shared_folder():
     # Captured projects and the template store name this hash; moving the files must not change a byte of it.
     assert next(iter(BUNDLED_TEMPLATES)) == 'generic-two-column' and BUNDLED_TEMPLATE == BUNDLED_TEMPLATES['generic-two-column']
-    assert compile_template(BUNDLED_TEMPLATE).package_hash == GENERIC_HASH
+    assert compile_template(BUNDLED_TEMPLATE).package_hash == TWO_COLUMN_HASH
 
 
-def test_the_generic_template_has_one_column_and_no_generic_branding_focus_logo_or_icons():
-    assert b'generic' not in GENERIC.read_bytes().lower()
+def test_the_two_column_template_uses_the_foldcv_logo_and_no_footer_text():
+    package = compile_template(BUNDLED_TEMPLATE)
+    logo = next(asset for asset in package.assets if asset.role == 'logo')
+    assert (logo.id, logo.path) == ('logo', 'assets/foldcv.png') and package.recipe.style.header.logo.asset == 'logo'
+    assert package.recipe.style.footer.text == '' and package.definition.template.name == 'Две колонки'
+
+
+def test_a_clean_clone_ships_only_the_public_templates(tmp_path, monkeypatch):
+    monkeypatch.delenv('FOLDCV_PUBLIC_TEMPLATES')
+    assert list(shipped_templates(tmp_path / 'missing')) == ['generic-two-column', 'generic-one-column']
+
+
+def test_a_local_template_comes_first_and_compiles_from_its_own_folder(tmp_path, monkeypatch):
+    monkeypatch.delenv('FOLDCV_PUBLIC_TEMPLATES')
+    shutil.copytree(BUNDLED_TEMPLATE.parent / 'assets', tmp_path / 'assets')
+    local = tmp_path / 'private-cv.yaml'
+    local.write_bytes(BUNDLED_TEMPLATE.read_bytes().replace(b'id: generic-two-column', b'id: private-cv'))
+    shipped = shipped_templates(tmp_path)
+    assert list(shipped) == ['private-cv', 'generic-two-column', 'generic-one-column'] and shipped['private-cv'] == local
+    assert compile_template(local).id == 'private-cv'
+    # Tests see what a clean clone ships, whatever the local folder holds.
+    monkeypatch.setenv('FOLDCV_PUBLIC_TEMPLATES', '1')
+    assert list(shipped_templates(tmp_path)) == ['generic-two-column', 'generic-one-column']
+
+
+def test_the_one_column_template_has_no_focus_logo_or_icons():
     package = generic()
     assert [region.id for region in package.recipe.layout.regions] == ['header', 'main']
     style = package.recipe.style
     assert style.header.logo is None and style.footer.text == '' and style.focus.icon_catalog is None
     assert not any(node.type == 'focus_entry' for view in package.recipe.views.values() for node in view.nodes)
     assert {view.heading for view in package.recipe.views.values()} == {'none', 'plain'}
-    # The fonts are the same bytes as the Generic package's; its logo, icon pack and Devicon license are left out.
-    generic = {asset.path: asset.sha256 for asset in compile_template(BUNDLED_TEMPLATE).assets}
-    assert all(generic[asset.path] == asset.sha256 for asset in package.assets)
-    assert not {asset.id for asset in package.assets} & {'generic', 'technology-icons', 'devicon-license'}
+    # The fonts are the same bytes as the two-column package's; its logo, icon pack and Devicon license are left out.
+    two_column = {asset.path: asset.sha256 for asset in compile_template(BUNDLED_TEMPLATE).assets}
+    assert all(two_column[asset.path] == asset.sha256 for asset in package.assets)
+    assert not {asset.id for asset in package.assets} & {'logo', 'technology-icons', 'devicon-license'}
 
 
 @pytest.fixture(scope='module')
@@ -102,7 +126,6 @@ def test_the_docx_is_one_column_at_full_width_without_bands_logo_or_footer_text(
     assert body.xpath('//w:rPr/w:shd/@w:fill', namespaces=NS) == ['EFEFEF'] * 3
     assert not [name for name in names if name.startswith('word/media/')]
     assert not any(b'<w:t' in value for name, value in parts.items() if re.fullmatch(r'word/footer\d*\.xml', name))
-    assert not any(b'generic' in value.lower() for value in parts.values())
     text = emitted(body)
     assert 'ФОКУС' not in text and text.index('О СЕБЕ') < text.index('ПРОЕКТЫ') < text.index('ОБРАЗОВАНИЕ') < text.index('OPEN SOURCE')
     # A block moved into the sidebar of a one-column resume still exports, before the main column.

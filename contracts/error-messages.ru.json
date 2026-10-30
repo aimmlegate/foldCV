@@ -1212,6 +1212,7 @@
     "XDG_STATE_HOME": "State environment setting",
     "COPY_OK": "Successful clipboard marker",
     "FOLDCV_VERIFY": "Test verification environment setting",
+    "FOLDCV_PUBLIC_TEMPLATES": "Test environment setting that hides local templates",
     "ANTHROPIC_API_KEY": "Credential environment variable kept from the CLI",
     "ANTHROPIC_AUTH_TOKEN": "Credential environment variable kept from the CLI",
     "ANTHROPIC_BASE_URL": "Credential environment variable kept from the CLI",

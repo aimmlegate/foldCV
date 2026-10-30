@@ -5,16 +5,16 @@
   "text_entries": 277,
   "svg_symbols": 26,
   "files": {
-    "design/future-editor/visual/README.md": "74dc9fc1302bcc51a21b4036434c2068ed8e1bbc40b3e30233eaa941411929ab",
+    "design/future-editor/visual/README.md": "60400baf2439a5be5b8cd5220156ea65570142f0c217425d12aa67d180446ac1",
     "design/future-editor/visual/build.mjs": "f3ac9518e638a4d2b3efd7d680bde2cb57f32594e9ee521a930e01ef1618d5be",
     "design/future-editor/visual/chat.css": "09f7086669af16171ddd5c76fc52ba6c8f6f4ac66c7f6a7cb795d98772f4b457",
     "design/future-editor/visual/copy.ru.json": "8bedf0fbb614d6eeefe0891ca1fca8a80d66fee2301dfc3f9afab4d5287f9a5e",
     "design/future-editor/visual/icons.svg": "1f416443f17401adf3e3b870598d5ca7caf774978c31000f1315792f03c8c2d1",
     "design/future-editor/visual/index.css": "98855b51bfe531598f1a61ed1ed69685a0ed98a64fa4b57abf8ba0447c767c6d",
-    "design/future-editor/visual/index.js": "c27876fbfb87db309db2408e3b3729c66e93597db6952936d18290dc3e92c4cd",
+    "design/future-editor/visual/index.js": "0bb3ac12551219c120b3e9158b205149e30188587999afbe25312fefcc553a43",
     "design/future-editor/visual/interface.css": "9744214d5642d2517bf8eed0757b4de0af946a3e429907eead4dc0af813a6f08",
     "design/future-editor/visual/shell.html": "f988d12d5d31ebc72276bc4d30a81d567e68ffe3da64003980e3f06619f45b17",
-    "design/future-editor/visual/templates.json": "c7f39bc0635fd42f55ae37aa88381e7e035f3d75a1c5b3bf920da1d9d71db930",
+    "design/future-editor/visual/templates.json": "574f3e526f540b81470ed7eb3d03979b778d762071238a10232bc97f016c8917",
     "design/future-editor/visual/tokens.css": "d2bc2f947d9c0a748ef5587bc7202dd2fabf996a9e7c8797cf801b61d387bab3"
   }
 }

@@ -160,7 +160,7 @@
     "referenceTextOnlyEntries": 2
   },
   "footer": {
-    "text": "mail@example.com",
+    "text": "",
     "role": "installed_template_brand_contact",
     "centerX": 275.65,
     "baselineY": 800,

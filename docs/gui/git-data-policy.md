@@ -26,3 +26,16 @@ Keep originals in private local storage. Published history replacement needs
 explicit approval and an exact force-with-lease against the previously verified
 remote tip. Host caches and old clones require separate handling; a successful
 history rewrite alone does not prove those copies are erased.
+
+## Local-only project files
+
+Plans, handoffs, prompts, review records, research notes, reports and the design
+prototype are not published. `.gitignore` excludes `docs/gui/*`, `reports/`,
+`research_notes/` and `design/future-editor/*`, and lists the published documents and
+`design/future-editor/visual/` as exceptions. To publish a new document, add it to
+that list. Private templates and company branding stay in the ignored
+`templates/local/`; the published templates stay generic.
+
+These files exist only in the main checkout, so new clones and worktrees do not have
+them. To build with private templates in a worktree, copy `templates/local` from the main
+checkout. Git does not protect ignored files: `git clean -x` deletes them.

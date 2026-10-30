@@ -15,12 +15,18 @@ apps/web/test-results/
 apps/web/playwright-report/
 .coverage
 .private/
-# Keep resume QA artifacts local.
-docs/gui/handoffs/**/gui-fixture/
-docs/gui/handoffs/**/*.docx
-docs/gui/handoffs/**/*.foldcv
-docs/gui/handoffs/**/*.pdf
-docs/gui/handoffs/**/*.zip
-docs/gui/handoffs/**/*.png
-!docs/gui/handoffs/**/before/assets/**/*.png
-!docs/gui/handoffs/**/after/assets/**/*.png
+# Plans, handoffs, reviews and research stay local. Publish a document by listing it here.
+/docs/gui/*
+!/docs/gui/architecture.md
+!/docs/gui/contracts.md
+!/docs/gui/git-data-policy.md
+!/docs/gui/local-dependency-notices.md
+!/docs/gui/local-setup.md
+!/docs/gui/local-version-manifest.json
+!/docs/gui/testing.md
+/reports/
+/research_notes/
+/design/future-editor/*
+!/design/future-editor/visual/
+/.cursor/rules/development-orchestration.mdc
+/templates/local

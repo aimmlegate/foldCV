@@ -3,7 +3,7 @@
 > D082/D083 import path: fixed left resume history, explicit new-resume processing,
 > advisory model assessment, then fact extraction and the original text in the
 > editor. No initial prose rewrite. Settings use a separate screen with left
-> section navigation. See [the current scope](handoffs/FLOW-UI.md).
+> section navigation.
 
 > D039: MVP exports DOCX only through the existing Python writer. PDF export and
 > paginated preview are deferred; the new flow must work without LibreOffice.
@@ -63,6 +63,7 @@ services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
 contracts/{json-schema,examples,error-messages.ru.json}
 templates/{generic,bundled,foldcv-reference}/   bundled: generic-two-column.yaml, generic-one-column.yaml, shared assets/
+templates/local/   ignored; private templates of a local build, each folder with its own assets/
 tests/  (layout in testing.md)
 tools/
 ```
@@ -80,9 +81,8 @@ harness and forbidden provider before feature work; see [testing.md](testing.md)
 ## Storage and transport
 
 Each open project lives in memory; an edit is one request and one file write; undo
-has its own journal (D109, [plan](simplification-plan.md), slice records in
-[handoffs/SIMPLIFY/](handoffs/SIMPLIFY/)). The V1–V6 project generations and the
-earlier writer and protocol layers are gone; only version 7 projects open.
+has its own journal (D109). The V1–V6 project generations and the earlier writer
+and protocol layers are gone; only version 7 projects open.
 
 ### Data root
 
@@ -447,8 +447,7 @@ personal memory, skill discovery or delegation. A prompt asking for no tools is
 not enforcement; read-only sandboxing alone still permits reads and tool loops.
 Prove the restricted profile in T00B before sending real resumes. Keep model
 responses task-specific and schema-constrained. Archive bookkeeping, evidence,
-duration labels and all other deterministic work follow
-[the execution policy](execution-policy.md).
+duration labels and all other deterministic work run in code.
 
 ## Canonical project contract
 
@@ -579,8 +578,7 @@ over stdin, `--ephemeral`, JSON Schema, validated final output, timeout and clea
 Add JSON event handling for usage and cancellation. Its full persistent coding
 thread driver is not needed for these bounded operations. Keep Python as the
 service runtime; adapt the subprocess protocol rather than importing T3's complete
-TypeScript/Effect server. Exact source paths and license notes are in
-[cli-integration.md](cli-integration.md).
+TypeScript/Effect server.
 
 Check executable version, structured output, ephemeral behavior, native login
 mode, and restricted configuration before declaring the provider ready. Use

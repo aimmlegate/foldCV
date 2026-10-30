@@ -110,7 +110,7 @@ def test_rule_seed_holds_only_the_two_presets():
     assert DEFAULT_RULES.startswith("## Preset: shorten\n")
     assert FIRST_PRESET.search(DEFAULT_RULES).start() == 0 and "Editorial" not in DEFAULT_RULES
     assert set(presets(DEFAULT_RULES)) == {"shorten", "clarify"}
-    for excluded in ["scripts/", "PDF", "mail@example.com", "branded footer", "CODEX_HOME", "0700"]:
+    for excluded in ["scripts/", "PDF", "branded footer", "CODEX_HOME", "0700"]:
         assert excluded not in DEFAULT_RULES
     assert data_root().parts[-2:] == ("Application Support", "FoldCV")
     normalized = captured_rules(DEFAULT_RULES.replace("\n", "\r\n"), 1)

@@ -1,4 +1,4 @@
-"""S5: the Generic 2.1.0 package through the actual export route and captured worker (V01, V03, V04) and long content (V02)."""
+"""S5: the two-column package through the actual export route and captured worker (V01, V03, V04) and long content (V02)."""
 
 import uuid
 
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.slow
 
 EXPORTS = {}
 F10_LINE = 'Reduced median latency by 80%.'
-# W01's measured Generic faces and sizes (half-points): name, profession, section, project, body.
+# W01's measured faces and sizes (half-points): name, profession, section, project, body.
 STYLES = {'name': ('Source Sans Pro Black', '36', '0'), 'profession': ('Source Sans Pro Semibold', '32', '0'),
     'section': ('Source Sans Pro', '28', '1'), 'project': ('Source Sans Pro Semibold', '24', '0'),
     'body': ('Source Sans Pro Light', '20', '0'), 'emphasis': ('Source Sans Pro Semibold', '20', '0')}
@@ -99,8 +99,8 @@ async def test_renamed_headings_and_opaque_block_ids_keep_the_same_presentation(
 
 
 @pytest.mark.asyncio
-async def test_branded_export_carries_logo_repeating_footer_captured_fonts_and_exact_links(tmp_path_factory):
-    # V04: assets are the captured bytes; the footer repeats on the first and every following page.
+async def test_export_carries_logo_captured_fonts_and_exact_links_without_a_footer(tmp_path_factory):
+    # V04: assets are the captured bytes; an empty footer text writes no footer part.
     workspace, content = await f10_export(tmp_path_factory)
     package, archive = workspace.project.template_package, parts(content)
     tree = xml(content)
@@ -110,12 +110,10 @@ async def test_branded_export_carries_logo_repeating_footer_captured_fonts_and_e
         relations = etree.fromstring(archive['word/_rels/' + part + '.rels'])
         return [sha256(archive['word/' + child.get('Target')]) for child in relations if child.get('Type').endswith('/image')]
     python = icon_catalog(package).files['python'].sha256
-    assert images('header1.xml') == [assets['generic']] and images('document.xml') == [python]
-    references = {(node.tag, node.get(qn('w:type'))) for node in tree.xpath('//w:sectPr/w:footerReference', namespaces=NS)}
-    assert references == {(qn('w:footerReference'), 'default'), (qn('w:footerReference'), 'first')}
+    assert images('header1.xml') == [assets['logo']] and images('document.xml') == [python]
+    assert not tree.xpath('//w:sectPr/w:footerReference', namespaces=NS)
     assert tree.xpath('//w:sectPr/w:titlePg', namespaces=NS)
-    footers = [name for name in archive if name.startswith('word/footer')]
-    assert len(footers) == 2 and all(emitted(xml(content, name)) == 'mail@example.com' for name in footers)
+    assert not [name for name in archive if name.startswith('word/footer')]
     fonts, relations = xml(content, 'word/fontTable.xml'), etree.fromstring(archive['word/_rels/fontTable.xml.rels'])
     captured, embedded = {asset.sha256 for asset in package.assets if asset.role == 'font'}, set()
     for embed in fonts.xpath('//w:embedRegular|//w:embedBold|//w:embedItalic|//w:embedBoldItalic', namespaces=NS):

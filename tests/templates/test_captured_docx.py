@@ -92,7 +92,6 @@ def test_actual_employment_preserves_text_order_geometry_and_captured_assets(cap
     assert tree.xpath('//w:body/w:p/w:pPr/w:pBdr/w:bottom/@w:color', namespaces=NS) == ['888888']
     assert tree.xpath('//w:body/w:p/w:pPr/w:pBdr/w:bottom/@w:sz', namespaces=NS) == ['8']
     assert not xml(content, 'word/header1.xml').xpath('//w:pBdr', namespaces=NS)
-    assert int(tree.xpath('string(//w:pgMar/@w:footer)', namespaces=NS)) > 0
     assert tree.xpath('//w:pPr/w:shd/@w:fill', namespaces=NS) == ['EFEFEF']
     assert tree.xpath('//w:pPr[w:shd]/w:ind/@w:left', namespaces=NS) == ['0']
     assert tree.xpath('//w:pPr[w:shd]/w:ind/@w:firstLine', namespaces=NS) == ['105']
@@ -101,7 +100,7 @@ def test_actual_employment_preserves_text_order_geometry_and_captured_assets(cap
     assert tree.xpath('//w:numPr', namespaces=NS)
     archive = parts(content)
     import base64
-    assert archive['word/media/image1.png'] == base64.b64decode(next(asset.bytes_base64 for asset in captured_request.package.assets if asset.id == 'generic'))
+    assert archive['word/media/image1.png'] == base64.b64decode(next(asset.bytes_base64 for asset in captured_request.package.assets if asset.id == 'logo'))
     fonts = xml(content, 'word/fontTable.xml')
     for embed in fonts.xpath('//w:embedRegular|//w:embedBold|//w:embedItalic|//w:embedBoldItalic', namespaces=NS):
         import uuid
@@ -135,6 +134,15 @@ def test_literal_field_manual_scope_marks_controls_are_exact_at_emission(capture
     assert block.content[0].text == value
 
 
+def test_a_footer_text_repeats_on_the_first_and_following_pages(captured_request, tmp_path):
+    def edit(config):
+        config['style']['footer']['text'] = 'Synthetic footer'
+    content = render_captured_docx(configured(captured_request, edit), tmp_path)
+    assert int(xml(content).xpath('string(//w:pgMar/@w:footer)', namespaces=NS)) > 0
+    footers = [name for name in parts(content) if name.startswith('word/footer')]
+    assert len(footers) == 2 and all(emitted(xml(content, name)) == 'Synthetic footer' for name in footers)
+
+
 def test_changed_recipe_optional_logo_divider_footer_and_geometry(captured_request, tmp_path):
     def edit(config):
         config['style']['header'].update(logo=None, divider=None)
@@ -149,7 +157,6 @@ def test_changed_recipe_optional_logo_divider_footer_and_geometry(captured_reque
     assert tree.xpath('string(//w:pgMar/@w:top)', namespaces=NS) == '600'
     assert tree.xpath('//w:tblGrid/w:gridCol/@w:w', namespaces=NS) == ['2000', '400', '9000']
     assert not any(name.startswith('word/media/') for name in parts(content))
-    assert not any(b'mail@example.com' in raw for name, raw in parts(content).items() if name.endswith('.xml'))
 
 
 @pytest.mark.parametrize('damage', ['right_sidebar', 'negative_first_offset', 'collapsed_column', 'huge_page'])

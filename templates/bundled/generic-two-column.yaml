@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 2.8.0
+  revision: 1.0.0
   name: Две колонки
   default_locale: ru
 model:
@@ -665,7 +665,7 @@ style:
     profession_top: 40.19
     overflow: grow_header_and_move_body
     logo:
-      asset: generic
+      asset: logo
       x: 487.6
       top: 18.69
       width: 104.91
@@ -698,7 +698,7 @@ style:
     icon_fit: contain
     missing_icon: initial
   footer:
-    text: mail@example.com
+    text: ''
     center_x: 275.65
     baseline_y: 803
     style: footer
@@ -977,7 +977,7 @@ assets:
   SourceSansPro-BlackIt: assets/SourceSansPro-BlackIt.ttf
   source-sans-license: assets/SourceSansPro-LICENSE.txt
   source-sans-provenance: assets/source-sans-provenance.json
-  generic:
+  logo:
     path: assets/foldcv.png
     role: logo
   technology-icons: assets/technology-icons.json
@@ -998,7 +998,7 @@ provenance:
     sha256: fe4f875c9d1ca3ad6a480a986b79f754a201d67d1b26091200eca187d34c7202
   precedence: explicit_user_decisions_then_written_requirements_then_examples
   decisions:
-  - Keep the Generic logo and corporate footer, as confirmed by the user.
+  - Use the FoldCV logo and no footer text.
   - Both examples use one template with optional content, not two independent schemas.
   interpretations:
   - Examples contain no evidence for fixed task, result, focus or character limits.

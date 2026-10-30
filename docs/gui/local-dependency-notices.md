@@ -20,8 +20,8 @@ this run to a personal local developer setup; the project's public licensing and
 distribution route remain undecided. Reference template asset rights also need
 a distribution decision.
 
-The T3 Code source inspection in [cli-integration.md](cli-integration.md) was a
-protocol reference at revision `98beed1a226c42b85c52ff5ee9d5dbb67d776a77`.
+The T3 Code source inspection was a protocol reference at revision
+`98beed1a226c42b85c52ff5ee9d5dbb67d776a77`.
 This T17 package adds no copied T3 implementation or bundled CLI. The optional
 user-installed Codex CLI uses its own subscription login. There is no paid API
 fallback and no claim of unlimited or zero-cost subscription use.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 from collections import OrderedDict
+import os
 from pathlib import Path
 import threading
 
@@ -20,10 +21,22 @@ from .models import TemplateDefinition, TemplatePackage
 from .projection import SchemaFailure, validate_schema
 
 BUNDLED_DIR = Path(__file__).resolve().parents[3] / "templates/bundled"
-# Templates shipped with the app by id, sharing one asset folder; the first one is the default until the user picks
-# another.
-BUNDLED_TEMPLATES = {"generic-two-column": BUNDLED_DIR / "generic-two-column.yaml",
-    "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml"}
+LOCAL_DIR = BUNDLED_DIR.with_name("local")
+
+
+def shipped_templates(local_dir: Path = LOCAL_DIR) -> dict[str, Path]:
+    """Templates shipped with the app by id; the first one is the default until the user picks another.
+
+    The ignored local folder holds private templates of a local build, each with its own assets. They come first, so
+    such a build keeps its default.
+    """
+    local = {} if os.environ.get("FOLDCV_PUBLIC_TEMPLATES") == "1" else {
+        path.stem: path for path in sorted(local_dir.glob("*.yaml"))}
+    return {**local, "generic-two-column": BUNDLED_DIR / "generic-two-column.yaml",
+        "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml"}
+
+
+BUNDLED_TEMPLATES = shipped_templates()
 BUNDLED_TEMPLATE = BUNDLED_TEMPLATES["generic-two-column"]
 _VERIFIED_PACKAGES = OrderedDict()
 _VERIFIED_LOCK = threading.Lock()

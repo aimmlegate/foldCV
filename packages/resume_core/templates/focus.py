@@ -91,7 +91,7 @@ _CATALOGS, _CATALOG_LOCK = {}, threading.Lock()
 
 
 def catalog_for(package):
-    """`icon_catalog` decoded once for the latest few packages: the Generic pack is 6.8 MB. Replies, edits and the
+    """`icon_catalog` decoded once for the latest few packages: the two-column pack is 6.8 MB. Replies, edits and the
     icon search run in worker threads. A catalog captured unreadable has no icons, so its rows stay text only; new
     packages refuse it at compile."""
     with _CATALOG_LOCK:
@@ -214,7 +214,7 @@ def row_icon(package, facts, row, catalog=None, chosen=None):
 
 
 def duration_text(months, locale):
-    """Whole years from a year on, months below it, as the Generic examples write them (6 лет, 10 месяцев)."""
+    """Whole years from a year on, months below it, as the reference examples write them (6 лет, 10 месяцев)."""
     if months <= 0:
         return None
     russian = locale == 'ru'

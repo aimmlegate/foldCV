@@ -45,8 +45,6 @@ The old `styles.css` and `agent-chat.css` paths are compatibility imports.
 
 ## React adoption
 
-Use [the adoption plan](../../../docs/gui/prototype-adoption-plan.md) and
-[the coding prompt](../../../docs/gui/prompts/05-prototype-adoption.md).
 Import the exact CSS and sprite; convert the shell and fragments mechanically
 to JSX with typed props, preserving DOM structure, classes, spacing and states.
 Radix supplies behavior and accessibility, not a replacement visual theme.
@@ -63,5 +61,5 @@ defaults or claims. Remove the prototype screen switcher and demo disclosures;
 replace sample values with real state. Keep product labels in natural Russian.
 The prototype uses system fonts and Georgia; it has no remote font dependency.
 
-See the 13 screenshots in `../screenshots/` for visual states. The separate
-measured DOCX template and its assets remain governed by the export contract.
+The separate measured DOCX template and its assets remain governed by the export
+contract.

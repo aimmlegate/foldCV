@@ -8,6 +8,8 @@ import pytest
 
 # Every repository commit and cache hit is cross-checked in tests (simplification plan 2.1).
 os.environ.setdefault('FOLDCV_VERIFY', '1')
+# Tests see what a clean clone ships, whatever the ignored local template folder holds.
+os.environ.setdefault('FOLDCV_PUBLIC_TEMPLATES', '1')
 
 
 @pytest.fixture(autouse=True)

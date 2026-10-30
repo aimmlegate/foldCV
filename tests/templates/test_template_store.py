@@ -15,7 +15,7 @@ GENERIC, SECOND = 'generic-two-column', 'second-one-column'
 
 
 def second_bundled(tmp_path, monkeypatch):
-    """A synthetic second bundled template: the Generic files under another id and name."""
+    """A synthetic second bundled template: the two-column files under another id and name."""
     folder = tmp_path / 'bundled-second'
     shutil.copytree(BUNDLED_TEMPLATE.parent, folder)
     text = BUNDLED_TEMPLATE.read_text(encoding='utf-8')

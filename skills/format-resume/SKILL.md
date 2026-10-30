@@ -1,6 +1,6 @@
 ---
 name: format-resume
-description: Rewrite a resume from arbitrary source text and render it in the fixed Generic PDF layout. Use for candidate CV conversion, factual review, and experiments with input/output resume pairs.
+description: Rewrite a resume from arbitrary source text and render it in the fixed PDF layout. Use for candidate CV conversion, factual review, and experiments with input/output resume pairs.
 ---
 
 # Resume conversion

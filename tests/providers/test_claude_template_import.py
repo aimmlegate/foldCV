@@ -1,4 +1,4 @@
-"""MP05 gate: the bundled Generic import publishes through the Claude provider and its CLI stream, offline."""
+"""MP05 gate: the bundled two-column import publishes through the Claude provider and its CLI stream, offline."""
 
 import pytest
 

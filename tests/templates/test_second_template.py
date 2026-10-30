@@ -75,7 +75,6 @@ async def test_the_export_uses_the_templates_own_columns_type_and_branding(tmp_p
     assert re.findall(r'<w:gridCol w:w="(\d+)"', document) == ['2600', '200', '8400']
     assert '<w:sz w:val="22"/>' in document
     assert hyperlinks(content) == [(TITLE, (URLS[0], 'External')), (TITLE, (URLS[1], 'External'))]
-    assert not any('generic' in value.lower() for value in xml_parts.values())
     assert not any('<w:drawing' in value for name, value in xml_parts.items() if name.startswith('word/header'))
     footers = [value for name, value in xml_parts.items() if re.fullmatch(r'word/footer\d+\.xml', name)]
     assert footers and all('Synthetic publications CV' in value for value in footers)
@@ -150,14 +149,14 @@ def test_a_mounted_project_keeps_its_template_while_another_template_is_active(t
                 json={'schemaVersion': 1, 'editorToken': editor.token, 'snapshot': editor.response['snapshot']})
             assert response.status_code == 200, response.text
             attempt = repository.read(identifier).project.exports[-1]
-            exported.append((attempt.package_hash, parts(response.content)['word/footer1.xml']))
+            exported.append((attempt.package_hash, parts(response.content).get('word/footer1.xml', '')))
         # The mounted project's presentation is still its own; a new upload captures the active second template.
         assert project_presentation(repository.read(first_id))['recipe'] == mounted['recipe']
         assert app.state.intake.package().package_hash == publications_package().package_hash
     hashes = [value for value, _footer in exported]
     assert hashes == [first.project.template_package.package_hash, second.project.template_package.package_hash,
         first.project.template_package.package_hash]
-    assert 'mail@example.com' in exported[0][1] and 'Synthetic publications CV' in exported[1][1] and exported[2][1] == exported[0][1]
+    assert 'Synthetic publications CV' not in exported[0][1] and 'Synthetic publications CV' in exported[1][1] and exported[2][1] == exported[0][1]
 
 
 def test_a_date_or_period_shows_its_stated_wording_and_other_objects_their_json():

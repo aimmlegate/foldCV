@@ -1,6 +1,6 @@
 {
   "assets": {
-    "skills/format-resume/assets/NOTICE.md": "513f1b54603bc0657b166b03a219181498b7143b7d82da0ec60290889319663a",
+    "skills/format-resume/assets/NOTICE.md": "edf9d4554a22de24629cb088a70266b0c3c30920a8b798e07d490f24d9fd052f",
     "skills/format-resume/assets/devicon/LICENSE": "121194741d4a915b9f5890fdd6dd95121f9b1f816517c792358d72d7c838d664",
     "skills/format-resume/assets/devicon/cplusplus.png": "97067628be544f333ec2c22cd6e97c30116b69ec966822d770434d84c33f538b",
     "skills/format-resume/assets/devicon/csharp.png": "456f7742f055e47bc238c957f4a9a840f1b3b833b2b51b89d8f8279ec623e0b1",
@@ -20,7 +20,7 @@
     "skills/format-resume/assets/fonts/SourceSansPro-Light.ttf": "ce323db75733028ec2961b442b3368117d4daf724e3217d120f1990da8533fd0",
     "skills/format-resume/assets/fonts/SourceSansPro-Regular.ttf": "c6f835b6a6d942b196e2607bf73a7b086407ae8dbdc928c23a2fb4893ec383f6",
     "skills/format-resume/assets/fonts/SourceSansPro-Semibold.ttf": "72bf9aa2e78b8c78444ae74b6be09411d5fb5bf0eb9bcdfd47082cc5d9b536df",
-    "skills/format-resume/assets/images/foldcv.png": "42307992f55b416274ef03298419a5876f2f6aa9739ceb0fd2ac3ef2b00ccefc",
+    "skills/format-resume/assets/images/foldcv.png": "4e430f3970d948898185dc230bc1350bfacaa11121cdd0d4d210d4741bce7a24",
     "skills/format-resume/assets/images/golang.png": "83ed4e8435ecfd18469b0cf2982c7cb3b5915a56d495f0b99faa8d76b020dd37",
     "skills/format-resume/assets/images/kafka.png": "5673a3cc3a891f5fd26ccafcd407eae071c697b2c735ba195f2df2e321a5bcaa",
     "skills/format-resume/assets/images/kubernetes.png": "5a6327018268341943e4b4d14a9d7feb68892ffd66d23c0f2b6789e64af7909e",
@@ -29,8 +29,8 @@
     "skills/format-resume/assets/images/postgresql.png": "891033e94d1591e39fbddfbf92dd0ec053405b1d38b46e95236237617ab4166c",
     "skills/format-resume/assets/images/rabbitmq.png": "3699048d1113a4847726d28b4544640e841d059bdde993783426e56eb955c294",
     "skills/format-resume/assets/images/redis.png": "911140ca2dd0972a284e0ddce6dce87de9488d41f30ef1761b860660cb4fe839",
-    "templates/foldcv-reference/reference-measurements.json": "dc93b0aba16dc23df66b99c13921c24bfc91e31224e07aa992cbded2302dad4e",
-    "templates/foldcv-reference/spec.json": "ccfe4ded1df3e75560dcf8bf773e32e4fff67407cfcccbd45217d7c1e5f3d85f"
+    "templates/foldcv-reference/reference-measurements.json": "be97ea1ce951878d72b1cfd8ad0a6399ba1f52dc6de9ef15b97e43d3ed0ef9b5",
+    "templates/foldcv-reference/spec.json": "d934d73919a56ae0b2a2c2f220cb05bd3b9847d615ab1ff50a2481186571238c"
   },
   "contentPolicyVersion": "rich-1",
   "id": "foldcv-reference",

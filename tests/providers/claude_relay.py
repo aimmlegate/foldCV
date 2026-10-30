@@ -1,7 +1,7 @@
-"""The bundled Generic import through the Claude provider and the CLI stand-in, offline (MP05 gate and schema list).
+"""The bundled two-column import through the Claude provider and the CLI stand-in, offline (MP05 gate and schema list).
 
 The product transport drives `ClaudeCliProvider` under the import's permit, as the import task does; only the CLI is
-the stand-in, which answers each task with the scripted Generic reply left under its prompt's hash.
+the stand-in, which answers each task with the scripted two-column reply left under its prompt's hash.
 """
 
 import asyncio
@@ -53,7 +53,7 @@ def audit(directory: Path) -> list[list[str]]:
 
 
 async def relay_import(root: Path, name: str = "F10"):
-    """One published Generic import of a synthetic fixture, three blocks at once; returns (fixture, result, stand-in)."""
+    """One published two-column import of a synthetic fixture, three blocks at once; returns (fixture, result, stand-in)."""
     directory, operations = root / "claude stand-in", root / "operations"
     cli = stand_in(directory)
     operations.mkdir(mode=0o700)

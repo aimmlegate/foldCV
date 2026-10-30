@@ -34,7 +34,7 @@ def main():
                     'fonts':sorted({span['font'] for span in spans}),
                     'textOutsidePage':[span['text'][:40] for span in spans if not page.rect.contains(pymupdf.Rect(span['bbox']))],
                     'firstOrigins':[{'text':span['text'][:30],'origin':span['origin'],'size':span['size']} for span in spans if span['text'].strip()][:8],
-                    'footerOrigins':[span['origin'] for span in spans if 'mail@example.com' in span['text']],
+                    'footerOrigins':[span['origin'] for span in spans if span['size'] == 12 and span['origin'][1] > 780],
                     'drawings':[list(drawing['rect']) for drawing in page.get_drawings() if drawing['rect'].width>400],
                     'images':[info['bbox'] for info in page.get_image_info()]})
         expected=['FINAL_MARKER']+[f'JOB_END_{i+1}' for i in range(5 if name=='long' else 1)]

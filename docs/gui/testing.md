@@ -1,8 +1,6 @@
 # Test strategy
 
-> One bounded run per suite (D109, [simplification plan](simplification-plan.md) section 5).
-> The earlier strategy text (T00–T17 matrix, recovery migration, NE, NB and CAP evidence gates):
-> `git show 405b9d06:docs/gui/testing.md`.
+> One bounded run per suite (D109).
 
 ## Commands
 
@@ -87,7 +85,7 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
 | `tests/repository` | repository commit, atomic save, revisions and replay, build isolation, journal, editor token, concurrency, tasks |
 | `tests/projects` | `/v2` project routes: golden authored operations, edits, history, clipboard, import task, resume and permit, export, archive, images, sources, metadata, store and catalog; F10 composition (slow) |
 | `tests/assistant` | runs, tools, compiler, proposals, permissions, actions, store, MCP listener, runtime, web fetcher, skills |
-| `tests/templates` | V7 template domain: preparation, mutations, paste, scopes, relations, sync, import pipeline, sidecar, review, captured DOCX; scripted Generic and second-template imports (slow); golden corpus in `golden/` |
+| `tests/templates` | V7 template domain: preparation, mutations, paste, scopes, relations, sync, import pipeline, sidecar, review, captured DOCX; scripted two-column and second-template imports (slow); golden corpus in `golden/` |
 | `tests/facts` | facts panel, fact mutations, sync, dependencies, dates, technology lists |
 | `tests/render` | DOCX rendering, layout, Focus, localization; real conversions (slow) |
 | `tests/rewrite` | rewrite preview route, timing, text rewrite |
@@ -147,17 +145,15 @@ cd apps/web && npm run build && cd ../..
   refused. Rewrites are refused and `--template-call-cap` is not accepted, because the ledger
   does not count them. Only with an explicit user allowance.
 - stdout prints the origin and the one-shot URL; the secret is only in `<root>/launch.json`.
-- Check lists: A editing (SR03), B assistant (SR05), C import, export and files (SR04) in the
-  simplification plan.
 - T3 cannot prove native IME, clipboard, drag or Word; those stay manual.
 
 ## Benchmark
 
-`docs/gui/research/save-pipeline-bench/bench.py` measures one V7 edit through `/v2` on the
-synthetic 3.3 MB fixture in a new temporary store:
+`tools/save_bench/bench.py` measures one V7 edit through `/v2` on the synthetic 3.3 MB
+fixture in a new temporary store:
 
 ```sh
-SPC_GC=freeze .venv/bin/python -I docs/gui/research/save-pipeline-bench/bench.py . --api v2 --edits 4
+SPC_GC=freeze .venv/bin/python -I tools/save_bench/bench.py . --api v2 --edits 4
 ```
 
 Gate: 1.5 s per edit with `SPC_GC=freeze`. Measured 2026-10-27: 830–918 ms (default GC

@@ -24,7 +24,7 @@ def header_config():
 
 
 def test_captured_compiler_one_and_two_without_slots_keep_exact_bytes_and_derivation():
-    assert hashlib.sha256(OLD_TWO.read_bytes()).hexdigest()=='2c17ba2032055b1c85b42925cdeb2114fd9ea04b271aa18cf9419b55caf756ec'
+    assert hashlib.sha256(OLD_TWO.read_bytes()).hexdigest()=='14a256abcf1729cede6fede2b3535449a404f456ff1eb5e77e3b9e460d1d36a3'
     for package in [retained(),TemplatePackage.model_validate_json(OLD_TWO.read_bytes())]:
         raw=canonical(package)
         assert b'header_slot' not in raw and verify_package(package)==package

@@ -29,7 +29,7 @@ FOCUS = [('Python', '10 months'), ('SQL', None), ('UnknownTool', '7 weeks')]
 
 
 def technology_package(missing_icon='initial', label=None, max_items=None):
-    """The synthetic Focus view bound to the technology builtin, as the Generic template binds it; a label shows before
+    """The synthetic Focus view bound to the technology builtin, as the two-column template binds it; a label shows before
     each row's name."""
     config = view_package().definition.model_dump(mode='json', by_alias=True)
     focus = next(value for value in config['fact_types'] if value['id'] == 'focus')
