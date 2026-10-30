@@ -334,3 +334,12 @@ async def test_with_three_calls_at_once_the_projects_block_runs_in_groups_and_sh
         (issue.code, issue.rule_id) for issue in whole_workspace.project.import_issues]
     # The outline and its review, then one call and one review per group, replace the block's call and review.
     assert spent_calls(result) == spent_calls(whole) - 2 + 2 + 2 * groups
+
+
+@pytest.mark.asyncio
+async def test_an_old_job_without_a_company_stays_in_the_document(tmp_path):
+    table = TABLES['F10'](True)
+    table['projects'][0][0]['company'] = None
+    _fixture, _result, workspace, _originals = await generic_import(tmp_path, 'F10', rewrite=True, table=table)
+    shown = views(workspace)
+    assert 'other_projects' not in shown and '2006 – 2008' in shown['projects']

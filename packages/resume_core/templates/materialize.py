@@ -25,6 +25,10 @@ def scope_lines(sources, spans):
         yield from (line_spans(source, unit) or [span]) if whole else [span]
 
 
+def shows_employer(cell):
+    return cell is not None and bool(cell.raw_input or cell.manual_scope_id is not None)
+
+
 def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
     verify_package(package)
     declarations = {value.id: value for value in package.definition.blocks}
@@ -46,8 +50,10 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         if stored is None:
             continue
         if value.kind == 'partition_employment':
-            hidden.setdefault(stored['detailedBlock'], set()).update(stored['compact'])
-            compact[stored['compactBlock']] = list(stored['compact'])
+            # The compact view names a job by its employer; a job with nothing to show there stays detailed.
+            named = [record for record in stored['compact'] if shows_employer(current.get(field_key(record, 'employer')))]
+            hidden.setdefault(stored['detailedBlock'], set()).update(named)
+            compact[stored['compactBlock']] = named
         elif value.kind == 'assign_skills':
             for group, records in stored['hidden'].items():
                 hidden.setdefault(group, set()).update(records)
@@ -202,7 +208,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             # The compact view names each old employment record by its current employer cell.
             listed(declaration, sections, stable_id(operation_id, declaration.id, 'compact'), [DisplayField(('items', str(index)), record,
                 handle_of.get(record), current[field_key(record, 'employer')]) for index, record in enumerate(record
-                    for record in compact[declaration.id] if record in active_records and field_key(record, 'employer') in current)])
+                    for record in compact[declaration.id] if record in active_records)])
         # An object view's list of independent records: the records below its root that no record of this view owns.
         listing = [field for (view, identifier), field in fields.items() if declaration.view.mode == 'object'
             and view == declaration.id and (view, identifier) not in suppressed and field.record_id not in hidden.get(view, ())
