@@ -9,6 +9,7 @@ from packages.resume_core.models.agent import AgentWebSource
 from packages.resume_core.models.template_render import TemplateRendererIdentity
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from resume_api.agent.web import PublicFetcher
+from resume_api.assistant import proposals as proposal_service
 from tests.assistant.support import PROJECT, assistant_app, conversation, finish, papers, proposals, start
 from tests.support.assistant_tools import Fetcher, tool_session
 
@@ -33,6 +34,22 @@ async def test_fetch_and_call_budgets_are_exact_and_cumulative():
         assert reply(await session.call("check_resume", lambda: {"issues": []}))["error"]["code"] == "AGENT_CANCELLED"
     finally:
         await session.close()
+
+
+def test_a_proposal_over_its_preview_bound_names_the_limit_and_says_to_split(tmp_path, monkeypatch):
+    results = []
+
+    async def steps(tools, _value, _cancel, _emit):
+        ops = [{'op': 'insert_blocks', 'afterBlockId': 'block-paper-a', 'blocks': [{'text': 'Строка'}]}]
+        results.append(await tools.call('propose_changes', {'request': {'summary': 'Большая правка', 'ops': ops}}))
+        return 'Готово.'
+    # Eleven real ops of twenty blocks make these entries, and take too long to compile here.
+    entries = [{'target': f'block-{index}', 'label': 'insert_blocks', 'before': '', 'after': 'Строка'} for index in range(220)]
+    monkeypatch.setattr(proposal_service, 'preview', lambda *_: entries)
+    with assistant_app(tmp_path, steps) as (client, _application, _runtime):
+        finish(client, start(client, conversation(client)))
+        assert results[0]['error']['code'] == 'AGENT_CALL_TOO_LARGE'
+        assert '200' in results[0]['detail'][0] and 'Split' in results[0]['detail'][0] and proposals(client) == []
 
 
 class LimitFetcher(Fetcher):

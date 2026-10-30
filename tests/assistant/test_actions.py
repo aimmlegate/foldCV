@@ -1,5 +1,6 @@
 """Project actions: one per proposal, a preview, Apply through the same service calls the project buttons use."""
 
+from resume_api.assistant.proposals import date_text, formatting_date
 from tests.assistant.support import PROJECT, Editor, apply, assistant_app, base, proposals, proposing, run_once
 
 
@@ -39,6 +40,19 @@ def test_formatting_date_archive_and_restore_apply_one_action_each(tmp_path):
         assert application.state.projects.catalog.get(PROJECT).archived
         assert apply(client, editor, restored['id'], mutation='apply-3')['action']['archived'] is False
         assert not application.state.projects.catalog.get(PROJECT).archived
+
+
+def test_the_formatting_date_preview_shows_dates_as_the_facts_do(tmp_path):
+    with assistant_app(tmp_path) as (client, application, runtime):
+        current = application.state.projects.repository.read(PROJECT).formatting_as_of
+        run_once(client, proposing(action('formatting_date', '2026-03')), runtime)
+        entry = proposals(client)[0]['preview'][0]
+        assert entry['after'] == '2026-03'
+        assert entry['before'] == date_text(current) and entry['before'].startswith(f'{current.year:04d}')
+
+
+def test_date_text_follows_the_precision():
+    assert [date_text(formatting_date(value)) for value in ('2026', '2026-3', '2026-03-05')] == ['2026', '2026-03', '2026-03-05']
 
 
 def test_delete_needs_the_project_id_and_removes_the_project_and_its_assistant_files(tmp_path):

@@ -13,7 +13,7 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import ValidationError
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_compiler import CompileFailure
+from packages.resume_core.assistant_compiler import CompileFailure, find_record, target_text
 from packages.resume_core.assistant_store import AgentFailure, identity
 from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, AgentFinding
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
@@ -243,8 +243,14 @@ class ToolSession(PrivateMcp):
         for item in request.findings:
             if not set(item.source_ids) <= known:
                 raise AgentFailure('AGENT_EVIDENCE_INVALID')
-            stored.append(AgentFinding(id=identity('finding'), runId=self.control.run_id, severity=item.severity,
-                message=item.message, anchors=[self.anchor(target) for target in item.targets], sourceIds=item.source_ids))
+            anchors = [self.anchor(target) for target in item.targets]
+            try:
+                stored.append(AgentFinding(id=identity('finding'), runId=self.control.run_id, severity=item.severity,
+                    message=item.message, anchors=anchors, sourceIds=item.source_ids))
+            except ValidationError:
+                raise context.refusal('AGENT_CALL_TOO_LARGE', f'One finding with its quoted targets may take at most '
+                    f'{limits.FINDING_BYTES} bytes; give shorter ranges with start and end, or split it into several '
+                    'findings.') from None
         return Stored({'findingIds': [finding.id for finding in stored]},
             lambda: self.service.write(self.service.record_findings, self.control, stored))
 
@@ -260,10 +266,10 @@ class ToolSession(PrivateMcp):
             text = ''.join(inline_text(span) for span in spans)
             stamp = dependency(self.pinned, 'block', block.id)
         else:
-            record = next((value for value in project.facts.records if value.id == target.record_id), None)
+            record, _extension = find_record(self.pinned, target.record_id)
             if record is None:
                 raise AgentFailure('AGENT_EVIDENCE_INVALID')
-            text = context.record_text(self.pinned, record.id)
+            text = target_text(self.pinned, record.id)
             stamp = dependency(self.pinned, 'record', record.id)
         maximum = len(text.encode('utf-16-le')) // 2
         start = target.start or 0
