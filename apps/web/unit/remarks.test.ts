@@ -128,3 +128,10 @@ test("the plugin marks a field node and a block's own text, and nothing while th
   assert.deepEqual(decorations(doc, null), []);
   assert.deepEqual(decorations(doc, { cells: new Map(), blocks: new Map() }), []);
 });
+
+test("a value the user typed gets no doubtful mark", () => {
+  const typed = { ...unresolved("Sample Labs"), userCorrected: true };
+  const facts = { records: [{ id: "labs", kind: "employment", employer: typed,
+    periods: [{ id: "p1", start: typed, end: typed, present: { ...known("н.в."), value: true } }] }] };
+  assert.deepEqual(sorted(remarkMarks(document, [], facts).cells), []);
+});

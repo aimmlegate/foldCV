@@ -3,6 +3,7 @@
 import threading
 
 from packages.resume_core.models.assistant import AssistantApplyRequestV1
+from packages.resume_core.project_journal import JournalStale
 from resume_api.assistant import proposals as proposal_service
 from resume_api.projects.errors import ProjectFailure
 from tests.assistant.support import (PROJECT, Editor, apply, assistant_app, base, manual_edit, proposals, proposing,
@@ -68,6 +69,52 @@ def test_a_manual_edit_of_a_touched_block_makes_the_proposal_stale_and_an_unrela
         assert refused['error']['code'] == 'ASSISTANT_PROPOSAL_STALE' and refused['targets'] == ['block-paper-a']
         assert apply(client, editor, other['id'], mutation='apply-2')['proposal']['state'] == 'applied'
         assert editor.history['undo']['actionId'] == other['id']
+
+
+def test_a_history_proposal_shows_the_text_it_reverts_and_redo_the_text_it_restores(tmp_path):
+    with assistant_app(tmp_path) as (client, _application, runtime):
+        editor = Editor(client, PROJECT)
+        block = editor.workspace().project.document.regions[2].blocks[0]
+        text = ''.join(part.text for part in block.content)
+        manual_edit(editor)
+        run_once(client, proposing({'op': 'history', 'direction': 'undo'}), runtime)
+        proposal = proposals(client)[-1]
+        entry = next(value for value in proposal['preview'] if value['target'] == block.id)
+        assert entry['label'] == 'undo' and entry['before'] == 'Human' + text[6:] and entry['after'] == text
+        apply(client, editor, proposal['id'])
+        run_once(client, proposing({'op': 'history', 'direction': 'redo'}), runtime, request_id='request-2')
+        entry = next(value for value in proposals(client)[-1]['preview'] if value['target'] == block.id)
+        assert (entry['label'], entry['before'], entry['after']) == ('redo', text, 'Human' + text[6:])
+
+
+def test_a_history_proposal_refuses_an_entry_that_no_longer_applies(tmp_path, monkeypatch):
+    results = []
+
+    async def steps(tools, _value, _cancel, _emit):
+        results.append(await tools.call('propose_changes', {'request': {'summary': 'Отмена',
+            'ops': [{'op': 'history', 'direction': 'undo'}]}}))
+        return 'Готово.'
+    with assistant_app(tmp_path) as (client, _application, runtime):
+        manual_edit(Editor(client, PROJECT))
+
+        def stale(_workspace, _payloads):
+            raise JournalStale('synthetic')
+        monkeypatch.setattr(proposal_service, 'apply_payloads', stale)
+        run_once(client, steps, runtime)
+        assert results[0]['error']['code'] == 'ASSISTANT_HISTORY_EMPTY' and proposals(client) == []
+
+
+def test_a_chat_undo_updates_the_remembered_focus_icons(tmp_path, monkeypatch):
+    with assistant_app(tmp_path) as (client, application, runtime):
+        projects, editor = application.state.projects, Editor(client, PROJECT)
+        manual_edit(editor)
+        run_once(client, proposing({'op': 'history', 'direction': 'undo'}), runtime)
+        proposal = proposals(client)[-1]
+        calls = []
+        monkeypatch.setattr(projects, 'remember_icons', lambda before, after: calls.append((before, after)))
+        apply(client, editor, proposal['id'])
+        session = projects.repository.open(PROJECT)
+        assert len(calls) == 1 and calls[0][1] is session.workspace and calls[0][0] is not session.workspace
 
 
 def test_a_history_proposal_is_stale_once_the_stack_top_changed(tmp_path):

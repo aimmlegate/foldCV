@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from .models.settings import Rules
+from .project_limits import REWRITE_INSTRUCTION_CHARS
 from .storage import StorageFailure, atomic_write, data_root, locked_root, private_file
 
 
@@ -128,7 +129,9 @@ class RulesStore:
 
     def save(self, markdown: str, base_revision: int) -> Rules:
         text = normalize_markdown(markdown)
-        presets(text)
+        # Only a save is checked: a rules file already on disk stays readable.
+        if any(len(body) > REWRITE_INSTRUCTION_CHARS for body in presets(text).values()):
+            raise RulesFailure("RULES_PRESET_TOO_LONG")
         try:
             with locked_root(self.root, ".rules.lock"):
                 current = self._read()

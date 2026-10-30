@@ -16,6 +16,8 @@ from .models import (CapturedAsset, CompilationManifest, CompiledBlock, Compiled
 from .projection import (FORMATS, PROFILE_ID, PROFILE_VERSION, SchemaFailure,
                          binding_shape, project_payload, reachable_schema, schema_at, validate_schema)
 from .builtin_mapping import check_item_roots, types_at, validate_builtin_mapping, validate_item_pointer
+from .focus import icon_catalog
+from .operations import runnable
 
 COMPILER_VERSION = "template-compiler-1"
 COMPILER_VERSION_2 = "template-compiler-2"
@@ -136,6 +138,30 @@ def dependency_order(definition: TemplateDefinition) -> dict[str, int]:
     return {key: index for index, key in enumerate(ordered)}
 
 
+def check_runs(definition):
+    """Refuse what every import would refuse or lose. New packages only: stored ones re-verify without it and keep
+    opening, and their runtime refuses or shows source lines."""
+    operations = {item.id: item for item in definition.operations}
+    blocks = {item.id: item for item in definition.blocks}
+    for operation in definition.operations:
+        if not runnable(operation, definition):
+            raise SchemaFailure("/operations/" + operation.id, "operation is not registered or its inputs do not let it run")
+        if operation.kind == "partition_employment":
+            # The materializer lists old jobs through this field; any other view hides them from both blocks.
+            compact = blocks[operation.parameters.compact]
+            if not any(node.type in {"join_items", "bullets", "tags"} and node.field == "/items" and node.item_field is None
+                    for node in compact.view.nodes):
+                raise SchemaFailure("/blocks/" + compact.id + "/view", "compact block must show the list /items")
+    for block in definition.blocks:
+        if block.mode == "derived":
+            source = operations[block.operation]
+            if source.kind != "partition_employment" or source.parameters.compact != block.id:
+                raise SchemaFailure("/blocks/" + block.id + "/operation",
+                    "derived block needs the partition_employment operation that names it compact")
+        if not block.view.nodes and block.view.fallback_style is None:
+            raise SchemaFailure("/blocks/" + block.id + "/view", "a view without nodes needs fallback_style")
+
+
 def compile_template(path: Path) -> TemplatePackage:
     path = Path(path)
     raw = path.read_bytes()
@@ -153,6 +179,7 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml", assets=None
     compiled, recipe, manifest = compile_definition(definition, version)
     # New packages only: stored packages re-verify without it and keep opening; their runtime refuses such replies.
     check_item_roots(definition)
+    check_runs(definition)
     if not TEMPLATE_ID.fullmatch(definition.template.id):
         raise SchemaFailure("/template/id", "template id must use letters, digits, '.', '_' or '-' and start with a letter or digit")
     captured = []
@@ -163,6 +190,9 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml", assets=None
             blob = asset_path(root, asset.path).read_bytes()
         elif len(blob) > ASSET_BYTES:
             raise SchemaFailure("/assets/" + asset.path, "asset exceeds technical byte limit")
+        # A stored asset with no bytes reads as not loaded, and a render input refuses it.
+        if not blob:
+            raise SchemaFailure("/assets/" + asset.path, "asset is empty")
         total += len(blob)
         if total > PACKAGE_BYTES: raise SchemaFailure("/assets", "package exceeds technical byte limit")
         captured.append(CapturedAsset(id=asset.id,path=asset.path,role=asset.role,mimeType=asset.mime_type,
@@ -172,11 +202,16 @@ def compile_bytes(raw: bytes, root: Path, *, original_format="yaml", assets=None
         "projectionVersion":PROJECTION_VERSION,"recipe":recipe.model_dump(by_alias=True),
         "assets":{a.id:a.sha256 for a in captured},"blocks":[b.model_dump(by_alias=True) for b in compiled],
         "manifest":manifest.model_dump(by_alias=True)}
-    return TemplatePackage(schemaVersion=1,id=definition.template.id,revision=definition.template.revision,
+    package = TemplatePackage(schemaVersion=1,id=definition.template.id,revision=definition.template.revision,
         packageHash=sha256(canonical(identity)),configHash=config_hash,originalHash=sha256(raw),
         originalFormat=original_format,originalBase64=base64.b64encode(raw).decode("ascii"),definition=definition,
         compilerVersion=version,operationVersion=OPERATION_VERSION,projectionVersion=PROJECTION_VERSION,
         recipe=recipe,assets=captured,blocks=compiled,manifest=manifest)
+    try:
+        icon_catalog(package)
+    except ValueError as error:
+        raise SchemaFailure("/style/focus/icon_catalog", str(error)) from None
+    return package
 
 
 def compile_definition_v1(definition: TemplateDefinition):

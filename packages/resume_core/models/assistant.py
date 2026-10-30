@@ -158,6 +158,8 @@ class CreateFactOp(Wire):
     kind: Literal['candidate', 'employment', 'technology', 'education', 'language', 'claim', 'period']
     values: dict[str, str] = Field(default_factory=dict, max_length=20)
     job_id: Id | None = None
+    # The line a technology joins when its scope has several (the refusal lists them).
+    target_id: Id | None = None
 
 
 class DeleteFactOp(Wire):
@@ -279,6 +281,8 @@ class PublishFindingsV1(Wire):
 class ModelChoiceV1(Wire):
     model: str = Field(max_length=80)
     state: Literal['unverified', 'verified', 'incompatible']
+    # The provider's display name; the model list groups by it, as Settings does (D119).
+    provider: str | None = Field(default=None, max_length=40)
 
 
 class AssistantCapabilitiesV1(Wire):

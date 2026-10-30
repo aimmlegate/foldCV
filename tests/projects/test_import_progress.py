@@ -10,7 +10,7 @@ import pytest
 
 from packages.resume_core.reasoning import ModelReasoning
 from resume_api.connection import Metadata, Quota
-from resume_api.projects.import_progress import import_progress, quiet_limit
+from resume_api.projects.import_progress import import_progress, phase_of, quiet_limit
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import CatalogAdapter, app_client, operation_of, upload
 
@@ -93,6 +93,20 @@ def test_an_import_is_stalled_after_a_silence_longer_than_its_time_limit_or_past
     busy = operation(attempt('task-projects', 'initial', 3800))
     assert progress(busy, 3810, admitted_at=at(5))['stalled'] is False
     assert progress(busy, 3830, admitted_at=at(5))['stalled'] is True
+
+
+def test_the_publication_phase_starts_with_assembly_and_its_bound_only_reports_a_stall():
+    # The document is assembled before the finalization record is saved; that time showed as model work with an hour
+    # of allowed silence, so a stuck assembly never looked stalled. Nothing stops the run at the bound.
+    calls = (attempt('task-identity', 'initial', 10, 30, 'completed'),)
+    value = operation(*calls, results=['task-identity', 'task-projects', 'task-project-window'])
+    assembling = progress(value, 40, admitted_at=at(5))
+    assert (assembling['phase'], assembling['done'], assembling['quietLimitSeconds']) == ('publication', 3, 218)
+    assert progress(value, 30 + 219, admitted_at=at(5))['stalled'] is True
+    running = operation(*calls, results=['task-identity'])
+    assert progress(running, 40, admitted_at=at(5))['phase'] == 'processing'
+    assert phase_of('processing', SimpleNamespace(state='processing', tasks=[], task_results=[])) == 'processing'
+    assert phase_of('queued', value) == 'queued' and phase_of('processing', None) == 'processing'
 
 
 def test_a_queued_import_is_quiet_from_the_last_queue_movement_and_ignores_old_records():

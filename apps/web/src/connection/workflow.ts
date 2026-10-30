@@ -37,8 +37,10 @@ export type ConnectionSnapshot = {
   experimentalMode: boolean;
 };
 
+/** `error`: the service's code when it refused, shown through the catalog; else the client's own text. */
 export type ProviderActivity = { pending: boolean; detaching: boolean; error: string | null };
-export type ConnectionView = { snapshot: ConnectionSnapshot; pending: boolean; detaching: boolean; error: string | null;
+/** `readFailed`: the last read of the state failed, so what is shown may be old or nothing at all. */
+export type ConnectionView = { snapshot: ConnectionSnapshot; pending: boolean; detaching: boolean; error: string | null; readFailed: boolean;
   activity: Partial<Record<ProviderKind, ProviderActivity>> };
 
 const states = new Set<ConnectionState>(["unchecked", "detached", "cli_missing", "launcher_unsupported", "unsupported_version", "login_required",
@@ -133,30 +135,50 @@ export function validConnection(value: unknown): value is ConnectionSnapshot {
   return !value.generationReady || (value.experimentalMode && value.selectedModel !== null);
 }
 
+/** A refusal from the host routes, with its public code. */
+class HostRefusal extends Error {
+  constructor(readonly code: string) { super(code); }
+}
+
+async function refusalCode(response: Response): Promise<string> {
+  try {
+    const value: unknown = await response.json();
+    const error = record(value) ? value.error : null;
+    return record(error) && typeof error.code === "string" ? error.code : "REQUEST_FAILED";
+  } catch { return "REQUEST_FAILED"; }
+}
+
+const reason = (error: unknown, fallback: string): string => error instanceof HostRefusal ? error.code : fallback;
+
 export class ConnectionWorkflow {
   private epochs = new Map<ProviderKind, number>();
   private aborts = new Map<ProviderKind, AbortController>();
   private peeks = 0;
   private closed = false;
-  private installationPoll: ReturnType<typeof setInterval> | null = null;
-  private pollingInstallation = false;
-  view: ConnectionView = { snapshot: initial, pending: false, detaching: false, error: null, activity: {} };
+  private readFailed = false;
+  private poll: ReturnType<typeof setInterval> | null = null;
+  private polling = false;
+  view: ConnectionView = { snapshot: initial, pending: false, detaching: false, error: null, readFailed: false, activity: {} };
 
   constructor(private readonly onChange: (view: ConnectionView) => void,
-              private readonly request: typeof fetch = (input, init) => fetch(input, init)) {}
+              private readonly request: typeof fetch = (input, init) => fetch(input, init),
+              private readonly loginPollMs = 1000) {}
 
   private publish(snapshot: ConnectionSnapshot, activity: ConnectionView["activity"]): void {
     if (this.closed) return;
     const all = Object.values(activity);
     this.view = { snapshot, activity, pending: all.some(item => item?.pending), detaching: all.some(item => item?.detaching),
-      error: all.find(item => item?.error)?.error ?? null };
+      error: all.find(item => item?.error)?.error ?? null, readFailed: this.readFailed };
     this.onChange(this.view);
     const installing = snapshot.providers.some(item => item.installation && installingStates.includes(item.installation.state));
-    if (installing && !this.view.detaching && this.installationPoll === null) {
-      this.installationPoll = setInterval(() => { void this.pollInstallation(); }, 300);
-    } else if ((!installing || this.view.detaching) && this.installationPoll !== null) {
-      clearInterval(this.installationPoll);
-      this.installationPoll = null;
+    // A sign-in found by a read has no request of its own to end it: only further reads show that it finished.
+    const signingIn = snapshot.providers.some(item => item.state === "login_pending" && !activity[item.kind]?.pending);
+    const follow = (installing || signingIn) && !this.view.detaching;
+    if (follow && this.poll === null) {
+      this.poll = setInterval(() => { void this.pollProviders(); }, installing ? 300 : this.loginPollMs);
+    } else if (!follow && this.poll !== null) {
+      clearInterval(this.poll);
+      this.poll = null;
     }
   }
 
@@ -187,9 +209,9 @@ export class ConnectionWorkflow {
     return !this.closed && this.epochs.get(kind) === epoch;
   }
 
-  private async pollInstallation(): Promise<void> {
-    if (this.pollingInstallation || this.view.detaching) return;
-    this.pollingInstallation = true;
+  private async pollProviders(): Promise<void> {
+    if (this.polling || this.view.detaching) return;
+    this.polling = true;
     try {
       const snapshot = await this.post("peek", {}, null);
       const before = this.view.snapshot.providers;
@@ -206,7 +228,7 @@ export class ConnectionWorkflow {
             && !this.activityOf(item.kind).pending) await this.refresh(item.kind);
       }
     } catch { /* Keep the last observed progress until the next poll. */ }
-    finally { this.pollingInstallation = false; }
+    finally { this.polling = false; }
   }
 
   private async post(path: string, body: object, kind: ProviderKind | null, signal?: AbortSignal): Promise<ConnectionSnapshot> {
@@ -215,7 +237,8 @@ export class ConnectionWorkflow {
     const payload = kind === null ? body : { provider: kind, ...body };
     const response = await this.request(peek ? "/v1/settings/connection" : `/v1/host/${path}`, { method: peek ? "GET" : "POST", credentials: "same-origin",
       ...(peek ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }), ...(signal ? { signal } : {}) });
-    if (!response.ok || !response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
+    if (!response.ok) throw new HostRefusal(await refusalCode(response));
+    if (!response.headers.get("content-type")?.startsWith("application/json")) throw new Error("request failed");
     const length = Number(response.headers.get("content-length") ?? "0");
     if (!Number.isFinite(length) || length > 65_536) throw new Error("response too large");
     if (!response.body) throw new Error("empty response");
@@ -249,20 +272,21 @@ export class ConnectionWorkflow {
     try {
       const snapshot = await this.post(path, body, kind, abort.signal);
       if (this.current(kind, epoch)) this.update(kind, null, snapshot);
-    } catch {
-      if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: failure });
+    } catch (error) {
+      if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: reason(error, failure) });
     } finally { if (this.aborts.get(kind) === abort) this.aborts.delete(kind); }
   }
 
   /** Reads every provider without starting a process, then checks the providers that are on and not checked yet. */
   async peek(check = true): Promise<void> {
     const epoch = ++this.peeks;
+    if (this.readFailed) { this.readFailed = false; this.publish(this.view.snapshot, this.view.activity); }
     try {
       const snapshot = await this.post("peek", {}, null);
       if (this.closed || epoch !== this.peeks) return;
       this.publish(snapshot, this.view.activity);
     } catch {
-      if (!this.closed && epoch === this.peeks) this.publish(this.view.snapshot, { ...this.view.activity });
+      if (!this.closed && epoch === this.peeks) { this.readFailed = true; this.publish(this.view.snapshot, this.view.activity); }
       return;
     }
     if (check) await this.checkUnchecked();
@@ -278,11 +302,13 @@ export class ConnectionWorkflow {
 
   refresh(kind: ProviderKind): Promise<void> { return this.run(kind, "status"); }
   discover(kind: ProviderKind): Promise<void> { return this.run(kind, "discover"); }
-  /** The processing model, saved through the provider that runs it. */
-  select(modelName: string): Promise<void> {
+  /** The processing model, saved through the provider that runs it; true when it is saved. Another provider's own
+   * error says nothing about this save (D119). */
+  async select(modelName: string): Promise<boolean> {
     const owner = modelProvider(this.view.snapshot, modelName);
-    if (!owner || !this.view.snapshot.models.includes(modelName)) return Promise.resolve();
-    return this.run(owner.kind, "select", { model: modelName });
+    if (!owner || !this.view.snapshot.models.includes(modelName)) return false;
+    await this.run(owner.kind, "select", { model: modelName });
+    return !this.activityOf(owner.kind).error && this.view.snapshot.selectedModel === modelName;
   }
   /** Turns a provider on (then checks it) or off (a clean detach on the server, never a sign-out). */
   async enable(kind: ProviderKind, enabled: boolean): Promise<void> {
@@ -314,7 +340,7 @@ export class ConnectionWorkflow {
         const item = this.entry(kind);
         if (item?.installation?.state === "ready" && item.state !== "detached") await this.refresh(kind);
       }
-    } catch { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: "Could not cancel installation. Try again." }); }
+    } catch (error) { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: reason(error, "Could not cancel installation. Try again.") }); }
   }
   async login(kind: ProviderKind): Promise<void> {
     if (this.entry(kind)?.state !== "login_required") return;
@@ -322,14 +348,21 @@ export class ConnectionWorkflow {
     this.publish({ ...this.view.snapshot, providers }, this.view.activity);
     const epoch = (this.epochs.get(kind) ?? 0) + 1;
     await this.run(kind, "login");
-    if (this.epochs.get(kind) === epoch && this.entry(kind)?.state === "login_required" && !this.activityOf(kind).error) await this.refresh(kind);
+    if (this.epochs.get(kind) !== epoch) return;
+    const activity = this.activityOf(kind);
+    if (activity.error) {
+      // The sign-in shown ahead of the reply did not start, unless the reply was lost: the read below tells.
+      const restored = this.view.snapshot.providers.map(value => value.kind === kind ? { ...value, state: "login_required" as const } : value);
+      this.update(kind, activity, { ...this.view.snapshot, providers: restored });
+      await this.peek(false);
+    } else if (this.entry(kind)?.state === "login_required") await this.refresh(kind);
   }
   /** Passes the code from the provider's sign-in page to the running sign-in; the reply changes nothing on screen. */
   async sendLoginCode(kind: ProviderKind, code: string): Promise<boolean> {
     const value = code.trim();
     if (this.entry(kind)?.state !== "login_pending" || !loginCodePattern.test(value)) return false;
     try { await this.post("login-code", { code: value }, kind); return true; }
-    catch { this.update(kind, { ...this.activityOf(kind), error: "Could not send the sign-in code. Try again." }); return false; }
+    catch (error) { this.update(kind, { ...this.activityOf(kind), error: reason(error, "Could not send the sign-in code. Try again.") }); return false; }
   }
   async cancelLogin(kind: ProviderKind): Promise<void> {
     if (this.activityOf(kind).detaching) return;
@@ -338,7 +371,7 @@ export class ConnectionWorkflow {
     try {
       const snapshot = await this.post("cancel-login", {}, kind);
       if (this.current(kind, epoch)) this.update(kind, null, snapshot);
-    } catch { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: "Could not stop sign-in. Try again." }); }
+    } catch (error) { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: reason(error, "Could not stop sign-in. Try again.") }); }
   }
   async detach(kind: ProviderKind): Promise<void> {
     if (this.activityOf(kind).detaching) return;
@@ -354,13 +387,13 @@ export class ConnectionWorkflow {
     try {
       const snapshot = await this.post("detach", {}, kind);
       if (this.current(kind, epoch)) this.update(kind, null, snapshot);
-    } catch { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: "Could not confirm detach. Try again." }, cleared); }
+    } catch (error) { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: reason(error, "Could not confirm detach. Try again.") }, cleared); }
   }
   close(): void {
     this.closed = true;
     for (const abort of this.aborts.values()) abort.abort();
     this.aborts.clear();
-    if (this.installationPoll !== null) clearInterval(this.installationPoll);
-    this.installationPoll = null;
+    if (this.poll !== null) clearInterval(this.poll);
+    this.poll = null;
   }
 }

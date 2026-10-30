@@ -68,6 +68,13 @@ for (const raw of ["FUTURE_SAVE_FAILURE", "toString", "__proto__", "Cannot read 
   });
 }
 
+test("no message sends the user to the hidden «Лимиты» section (D110)", () => {
+  for (const [key, message] of Object.entries(catalog.messages)) assert.ok(!message.includes("Лимиты"), key);
+  for (const code of ["IMPORT_PROCESSING_EXHAUSTED", "PROJECT_TOO_LARGE", "JOB_STORAGE_FULL"]) assert.ok(!knownErrorMessage(code)?.includes("настройках"), code);
+  assert.match(knownErrorMessage("IMPORT_PROCESSING_EXHAUSTED") ?? "", /исходник короче/u);
+  assert.match(knownErrorMessage("PROJECT_TOO_LARGE") ?? "", /Уменьшите объём/u);
+});
+
 test("presentation preserves machine errors and existing human validation text", () => {
   const error = new ProjectApiFailure("PROJECT_SAVE_FAILED", 503);
   const message = errorMessage(error);
@@ -99,13 +106,29 @@ test("save status and installation render descriptions without error codes in vi
   assert.ok(!installation.includes("download_failed")); assert.match(installation, /скачать/u);
 });
 
+test("installation failures of any provider never name another one", () => {
+  for (const error of ["busy", "unsafe_directory", "unsupported_platform", "download_failed", "checksum_failed", "invalid_package", "install_failed"] as const) {
+    const card = renderToStaticMarkup(createElement(Installation, { value: { available: true, state: "failed",
+      version: "0.0.0", downloadedBytes: 0, totalBytes: 1, error }, display: "Claude" }));
+    assert.ok(!card.includes("Codex"), error);
+  }
+  for (const code of ["INSTALL_NOT_AVAILABLE", "LOGIN_NOT_AVAILABLE"]) assert.ok(!knownErrorMessage(code)?.includes("Codex"), code);
+});
+
 test("save failures, pending work and import warnings keep distinct meanings", () => {
   assert.match(errorMessage("DRAFT_STORAGE_FAILED"), /сохранить черновик/u);
   assert.match(errorMessage("DRAFT_STORAGE_FULL"), /объём хранения/u);
   assert.match(errorMessage("OUTCOME_UNKNOWN"), /не подтверждено/u);
   assert.match(errorMessage("BUSY"), /другое действие/u);
-  assert.match(errorMessage("busy"), /Codex/u);
+  assert.match(errorMessage("busy"), /другая работа/u);
   assert.match(errorMessage("IMAGE_INVALID"), /добавить или прочитать/u);
   assert.match(errorMessage("IMAGE"), /не распознано как текст/u);
   assert.match(errorMessage("IMPORT_CONTENT_RECOVERED"), /восстановлена/u);
+});
+
+test("a refused export names its fragment and other failures stay as they are", () => {
+  const located = new ProjectApiFailure("RICH_EXPORT_UNSUPPORTED", 422, { blockId: "block-1", fragment: "Текст абзаца" });
+  assert.equal(errorMessage(located), `${knownErrorMessage("RICH_EXPORT_UNSUPPORTED")} Фрагмент: «Текст абзаца».`);
+  assert.equal(errorMessage(new ProjectApiFailure("RICH_EXPORT_UNSUPPORTED", 422, { blockId: "block-1", fragment: "" })), knownErrorMessage("RICH_EXPORT_UNSUPPORTED"));
+  assert.equal(errorMessage(new ProjectApiFailure("FONT_UNAVAILABLE", 422)), knownErrorMessage("FONT_UNAVAILABLE"));
 });

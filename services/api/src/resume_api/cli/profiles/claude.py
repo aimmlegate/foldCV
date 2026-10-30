@@ -90,6 +90,12 @@ class ClaudeCliProfile:
     def config_dir(self) -> Path:
         return self.root / "claude"
 
+    @property
+    def workdir(self) -> Path:
+        """One empty working directory for every call (D116), as for Codex: a per-call cwd would differ between the
+        prompts. Temporary files stay under the operation directory."""
+        return self.root / "cwd"
+
     def prepare(self) -> None:
         if self.root.exists() and not (self.root / MARKER).is_file():
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
@@ -110,6 +116,7 @@ class ClaudeCliProfile:
                 or stat.S_IMODE(marker.stat().st_mode) != 0o600):
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
         _private_directory(self.config_dir, create=True)
+        _private_directory(self.workdir, create=True)
         if not Path("/usr/bin/sandbox-exec").is_file():
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
 

@@ -26,10 +26,13 @@ export type Blocks2 = [string, ...string[]];
 export type Icon = string | null;
 export type Links = string[];
 export type Style = string;
+export type Full = boolean;
 export type Icons = boolean;
 export type Records = string[];
 export type Fonts = string[];
 export type Icons1 = string[];
+export type Addperiod = boolean;
+export type Periods = string[];
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
 export type Bold1 = string | null;
@@ -38,6 +41,7 @@ export type Italic1 = string | null;
 export type Regular = string | null;
 export type Lineheight = number;
 export type Size1 = number;
+export type Technologylines = string[][];
 export type Blockid = string;
 export type Jobid = string | null;
 export type Label = string;
@@ -140,6 +144,7 @@ export type Day = number | null;
 export type Month = number | null;
 export type Precision = "year" | "month" | "day";
 export type Year = number;
+export type Changedblockids = string[];
 export type Clientmutationid = string;
 export type Requestsha256 = string;
 export type Resultingrevision = number;
@@ -262,7 +267,7 @@ export type Status4 = "known" | "unknown" | "unresolved" | "pending" | "conflict
 export type Usercorrected5 = boolean;
 export type Value1 = boolean | null;
 export type Revision8 = number;
-export type Periods = WorkingPeriod[];
+export type Periods1 = WorkingPeriod[];
 export type Revision9 = number;
 export type Usercorrected6 = boolean;
 export type Evidence6 = EvidenceSpan[];
@@ -270,7 +275,7 @@ export type Id11 = string;
 export type Jobid1 = string;
 export type Kind4 = "subproject";
 export type Origin4 = "source" | "user";
-export type Periods1 = WorkingPeriod[];
+export type Periods2 = WorkingPeriod[];
 export type Revision10 = number;
 export type Usercorrected7 = boolean;
 export type Evidence7 = EvidenceSpan[];
@@ -409,7 +414,7 @@ export type Start1 = string;
 /**
  * @maxItems 40
  */
-export type Periods2 = ImportPeriod[];
+export type Periods3 = ImportPeriod[];
 export type Role = string;
 export type Display = string;
 export type Experience = string;
@@ -2040,8 +2045,11 @@ export interface EditorPlanV1 {
   fonts: Fonts;
   iconFiles?: Iconfiles;
   icons: Icons1;
+  jobs?: Jobs;
   styles: Styles;
+  technologyLines?: Technologylines;
   technologyTargets?: Technologytargets;
+  unshownFields?: Unshownfields;
 }
 export interface Blocks1 {
   [k: string]: EditorBlock;
@@ -2068,11 +2076,22 @@ export interface Inline {
  * The facts panel can add, remove and move Focus rows, set their years and choose their icons.
  */
 export interface EditorFocusPanel {
+  full?: Full;
   icons?: Icons;
   records: Records;
 }
 export interface Iconfiles {
   [k: string]: string;
+}
+export interface Jobs {
+  [k: string]: EditorJob;
+}
+/**
+ * One job in the facts panel.
+ */
+export interface EditorJob {
+  addPeriod?: Addperiod;
+  periods: Periods;
 }
 export interface Styles {
   [k: string]: EditorStyle;
@@ -2106,6 +2125,9 @@ export interface EditorTechnologyTarget {
 export interface EditorPlacement {
   afterId: Afterid;
   parentId: Parentid;
+}
+export interface Unshownfields {
+  [k: string]: string[];
 }
 export interface CompiledRecipe {
   capabilities: Capabilities;
@@ -2296,9 +2318,20 @@ export interface PartialDate {
   year: Year;
 }
 export interface RichMutationReplay {
+  changedBlockIds?: Changedblockids;
   clientMutationId: Clientmutationid;
+  createdBlocks?: Createdblocks;
+  createdIds?: Createdids;
   requestSha256: Requestsha256;
   resultingRevision: Resultingrevision;
+}
+export interface Createdblocks {
+  [k: string]: string[];
+}
+export interface Createdids {
+  [k: string]: {
+    [k: string]: string;
+  };
 }
 export interface RichPreDraftV2 {
   facts: WorkingFactsV2;
@@ -2479,7 +2512,7 @@ export interface EmploymentRecord {
   id: Id9;
   kind: Kind3;
   origin: Origin3;
-  periods: Periods;
+  periods: Periods1;
   revision: Revision9;
   role: WorkingFieldStr;
   userCorrected?: Usercorrected6;
@@ -2515,7 +2548,7 @@ export interface SubprojectRecord {
   kind: Kind4;
   name: WorkingFieldStr;
   origin: Origin4;
-  periods: Periods1;
+  periods: Periods2;
   revision: Revision10;
   role: WorkingFieldStr;
   userCorrected?: Usercorrected7;
@@ -2686,7 +2719,7 @@ export interface ImportFact {
 export interface ImportEmployment {
   employer?: Employer;
   kind: Kind14;
-  periods?: Periods2;
+  periods?: Periods3;
   role?: Role;
   technologies?: Technologies;
 }

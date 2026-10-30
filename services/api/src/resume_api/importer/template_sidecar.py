@@ -83,11 +83,11 @@ class OperationSidecar:
             raw = stream.read(WORKSPACE_CEILING_BYTES + 1)
         try:
             value = json.loads(raw)
-            if (len(raw) > WORKSPACE_CEILING_BYTES or set(value) != {'schemaVersion', 'projectRevision', 'operation', 'facts'}
-                    or value['schemaVersion'] != 1):
+            if (len(raw) > WORKSPACE_CEILING_BYTES or not isinstance(value, dict)
+                    or set(value) != {'schemaVersion', 'projectRevision', 'operation', 'facts'} or value['schemaVersion'] != 1):
                 raise ValueError('sidecar shape')
             operation, facts = ImportOperation.model_validate(value['operation']), WorkingFactsV2.model_validate(value["facts"])
-        except ValueError:
+        except (ValueError, TypeError, RecursionError):
             raise RepositoryFailure('JOB_STORE_CORRUPT') from None
         if operation.id != operation_id or type(value['projectRevision']) is not int:
             raise RepositoryFailure('JOB_STORE_CORRUPT')

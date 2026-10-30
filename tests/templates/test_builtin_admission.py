@@ -202,6 +202,34 @@ def test_rejected_owner_withholds_its_entire_nested_dependency_chain():
     assert after.observations and all(value.admission in {'rejected', 'uncertain'} for value in after.observations)
 
 
+def withheld_case(monkeypatch, kind, relations=()):
+    from types import SimpleNamespace
+    from packages.resume_core import template_builtin_admission as admission
+    monkeypatch.setattr(admission, 'bind_builtin_allocation', lambda *_args, **_options: None)
+    declarations = {'sub': SimpleNamespace(builtin_kind='subproject', builtin_fields={'value': None}),
+        'job': SimpleNamespace(builtin_kind='employment', builtin_fields={'value': None}),
+        'claim': SimpleNamespace(builtin_kind='claim', builtin_fields={'value': None})}
+    identities = [SimpleNamespace(record_id=name, semantic_type=name, item_handle='item-' + name, cell_ids={}, period_ids={})
+        for name in declarations]
+    field = SimpleNamespace(field_key='value', pointer='/0/value')
+    allocation = SimpleNamespace(record_id=kind, semantic_type=kind,
+        canonical_fields={'value': SimpleNamespace(cell_id='cell', field_key='value', period_id=None)})
+    return make_builtin_candidate(SimpleNamespace(captured_items=identities, allocations=[]), allocation, declarations[kind],
+        [field], [{'value': 'Task'}], {'cell'} if kind == 'claim' else set(), [], SimpleNamespace(records=[]), declarations,
+        list(relations))
+
+
+def test_a_new_subproject_without_an_admitted_cell_is_skipped_before_its_owner_is_read(monkeypatch):
+    # K04: a denied subproject relation left no owner, and the raised error discarded the admission of the whole block.
+    assert withheld_case(monkeypatch, 'sub') == (None, set())
+
+
+def test_a_claim_of_a_subproject_with_no_admitted_owner_waits_with_it(monkeypatch):
+    from types import SimpleNamespace
+    relation = SimpleNamespace(active=True, kind='owned_by', subject_id='claim', target_id='sub')
+    assert withheld_case(monkeypatch, 'claim', [relation]) == (None, set())
+
+
 def test_disabled_rewriting_shows_a_cited_line_without_its_line_break():
     # Reference replies cite whole lines; the closing line break is not part of the source wording.
     package = employment_package()

@@ -1,11 +1,13 @@
 """F01 keeps employer and team-result evidence in distinct retained source units."""
 
 import json
+from unittest import mock
 from pathlib import Path
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes, sha256
+from packages.resume_core.templates import compiler
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 
@@ -40,7 +42,9 @@ def claim_fixture(*, dependent=False):
         config['operations'] = [{'id': 'dependent-facts', 'kind': 'preserve_stated_text', 'version': 1,
             'inputs': [{'kind': 'fact_type', 'id': 'claims'}, {'kind': 'fact_type', 'id': 'employers'},
                 {'kind': 'block', 'id': 'arbitrary-paper-view'}], 'depends_on': [], 'parameters': {}}]
-    captured = compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
+    # `dependent-facts` models a stored package whose operation kind the runtime refuses; a new package would not compile.
+    with mock.patch.object(compiler, 'check_runs', lambda _definition: None):
+        captured = compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
     return captured, source, raw
 
 

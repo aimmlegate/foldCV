@@ -1,6 +1,6 @@
 import { errorMessage } from "../../errors/messages";
 import { useRef, useState } from "react";
-import { fields, names, labels, type RecordValue, type Kind } from "../../rich/fact-fields";
+import { names, labels, offeredFields, type RecordValue, type Kind } from "../../rich/fact-fields";
 import type { PanelCommand } from "../../rich/v7-panel";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
@@ -9,11 +9,16 @@ import { factError } from "./error";
 import { DateInput } from "./DateInput";
 
 export type FactTarget = { kind: Kind; record: RecordValue | null; remove?: boolean };
-export function FactDialog({ target, close, submit }: { target: FactTarget; close: () => void; submit: (command: PanelCommand) => Promise<void> }) {
+export function FactDialog({ target, close, submit, unshown, addPeriod = false }: { target: FactTarget; close: () => void; submit: (command: PanelCommand) => Promise<void>;
+  /** The record's fields the document has no place for; the dialog leaves them out. */
+  unshown?: readonly string[] | undefined;
+  /** The document has a place for another period of this job. */
+  addPeriod?: boolean;
+}) {
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const form = useRef<HTMLFormElement>(null);
   const record = target.record;
-  const inputs = record ? fields(record) : names[target.kind].map(([key, label]) => ({ key, label, text: "", checked: undefined }));
+  const inputs = record ? offeredFields(record, unshown) : names[target.kind].map(([key, label]) => ({ key, label, text: "", checked: undefined }));
   const addingPeriod = !record && target.kind === "employment" ? [{ key: "start", label: "Начало", text: "", checked: undefined },
     { key: "end", label: "Окончание", text: "", checked: undefined }] : [];
   function changes(element: HTMLFormElement): Record<string, string> {
@@ -39,6 +44,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
       void apply(record ? { operation: "edit", recordId: record.id, values } : { operation: "add", recordKind: target.kind, values });
     }}>
       {target.remove ? <p className="dialog-copy">{target.kind === "claim" ? "Текст резюме не изменится." : "Поля этого факта будут удалены из документа."}</p> : <>
+        {!inputs.length && <p className="dialog-copy">Этого факта нет в документе, поэтому здесь его не изменить.</p>}
         <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => "date" in field || field.key === "start" || field.key === "end" || field.key === "completion"
           ? <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
           : target.kind === "claim" ? <div key={field.key} className="full">
@@ -53,7 +59,7 @@ export function FactDialog({ target, close, submit }: { target: FactTarget; clos
           {record.periods.map((period, index) => <button className="text-button" type="button" key={period.id} disabled={busy}
             onClick={() => { if (form.current) void apply({ operation: "remove_period", recordId: record.id, periodId: period.id,
               values: Object.fromEntries(Object.entries(changes(form.current)).filter(([key]) => !key.startsWith(`period:${period.id}:`))) }); }}>Удалить период {index + 1}</button>)}
-          <button className="text-button" type="button" disabled={busy} onClick={() => { if (form.current) void apply({ operation: "add_period", recordId: record.id, values: changes(form.current) }); }}>Добавить период</button>
+          {addPeriod && <button className="text-button" type="button" disabled={busy} onClick={() => { if (form.current) void apply({ operation: "add_period", recordId: record.id, values: changes(form.current) }); }}>Добавить период</button>}
         </div>}
       </>}
       {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}

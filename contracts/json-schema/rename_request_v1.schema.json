@@ -7,17 +7,10 @@
       "type": "integer"
     },
     "editorToken": {
-      "anyOf": [
-        {
-          "maxLength": 128,
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Editortoken"
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
     },
     "title": {
       "maxLength": 200,
@@ -27,6 +20,7 @@
     }
   },
   "required": [
+    "editorToken",
     "baseRevision",
     "title"
   ],

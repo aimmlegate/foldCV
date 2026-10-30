@@ -116,12 +116,19 @@ class AssistantStore:
 
     # Conversations
 
+    def _readable(self, path):
+        """One unreadable conversation stays on disk and out of the lists; it does not fail the project's others."""
+        try:
+            return self._read(path, ConversationFile)
+        except AgentFailure:
+            return None
+
     def conversations(self, project_id):
         folder = self.directory(project_id, "conversations")
         with self.lock:
             items = []
             for path in sorted(folder.glob("*.json")) if folder.exists() else []:
-                stored = self._read(path, ConversationFile)
+                stored = self._readable(path)
                 if stored is not None:
                     items.append(AssistantConversationV1(id=stored.id, title=stored.title, createdAt=stored.created_at,
                         updatedAt=stored.updated_at))
@@ -140,7 +147,7 @@ class AssistantStore:
         folder = self.directory(project_id, "conversations")
         kept = {item.id for item in self.conversations(project_id)}
         for path in folder.glob("*.json"):
-            if path.stem not in kept:
+            if path.stem not in kept and self._readable(path) is not None:
                 path.unlink(missing_ok=True)
 
     def conversation(self, project_id, conversation_id):
@@ -168,7 +175,7 @@ class AssistantStore:
         folder = self.directory(project_id, "conversations")
         with self.lock:
             for path in folder.glob("*.json") if folder.exists() else []:
-                stored = self._read(path, ConversationFile)
+                stored = self._readable(path)
                 if stored is None:
                     continue
                 for run in stored.runs:

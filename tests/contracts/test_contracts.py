@@ -6,11 +6,16 @@ from functools import cache
 import json
 from pathlib import Path
 
+from fastapi.routing import APIRoute
 from jsonschema import Draft202012Validator
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from packages.resume_core.models.contracts import Project
+from resume_api.projects.archive import ArchiveDownload
+from resume_api.projects.exports import ExportCommand, ExportRetry
+from resume_api.projects.imports import ImportCommand
+from tests.service.app_fixtures import HealthyConnection, make_app
 from tools.generate_contracts import CONTRACTS
 
 
@@ -100,3 +105,36 @@ def test_partial_save_preserves_source_bytes_reference() -> None:
     project = Project.model_validate(partial)
     assert project.sources[0].byte_ref == "sources/source_1/original.txt"
     assert project.template is None
+
+
+def test_every_route_body_is_strict_and_refuses_unknown_fields(tmp_path):
+    app = make_app(tmp_path, connection_adapter=HealthyConnection())
+    bodies = {param.field_info.annotation for route in app.app.routes if isinstance(route, APIRoute)
+              for param in route.dependant.body_params}
+    models = {body for body in bodies if isinstance(body, type) and issubclass(body, BaseModel)}
+    assert {ImportCommand, ExportCommand, ExportRetry, ArchiveDownload} <= models
+    assert {model.__name__ for model in models if model.model_config.get("extra") != "forbid"
+            or not model.model_config.get("strict")} == set()
+
+
+@pytest.mark.parametrize("model", [ImportCommand, ExportCommand, ExportRetry, ArchiveDownload])
+def test_loose_route_bodies_are_registered_contracts(model):
+    assert model in CONTRACTS.values()
+
+
+@pytest.mark.parametrize("model,body", [
+    (ImportCommand, {"kind": "start", "allowRewrite": True}),
+    (ImportCommand, {"kind": "start", "allowTextRewrite": "no"}),
+    (ExportRetry, {"editorToken": "token", "extra": 1}),
+    (ArchiveDownload, {"editorToken": "token", "projectRevision": "7", "documentRevision": 1}),
+    (ArchiveDownload, {"editorToken": "token", "projectRevision": 7, "documentRevision": True}),
+], ids=["renamed-key", "coerced-bool", "unknown-key", "coerced-int", "bool-as-int"])
+def test_route_bodies_refuse_renamed_keys_and_coerced_values(model, body):
+    with pytest.raises(ValidationError):
+        model.model_validate(body)
+
+
+def test_route_bodies_accept_the_shapes_the_client_sends():
+    assert ImportCommand.model_validate({"kind": "start", "clientRequestId": "request", "allowTextRewrite": True,
+                                         "effort": "high"}).allow_text_rewrite is True
+    assert ArchiveDownload.model_validate({"editorToken": "token", "projectRevision": 7, "documentRevision": 1})

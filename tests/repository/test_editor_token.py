@@ -34,3 +34,11 @@ def test_only_a_bounded_number_of_replaced_tokens_is_remembered(tmp_path):
     session = repository(tmp_path).open(PROJECT)
     tokens = [session.open_editor() for _ in range(20)]
     assert code(session, tokens[-2]) == 'EDITOR_REPLACED' and code(session, tokens[0]) == 'EDITOR_TOKEN_UNKNOWN'
+
+
+@pytest.mark.parametrize('token', ['токен', 'editor_\ud800'])
+def test_a_token_that_is_not_ascii_is_unknown_and_never_a_crash(tmp_path, token):
+    session = repository(tmp_path).open(PROJECT)
+    first = session.open_editor()
+    session.open_editor()
+    assert code(session, token) == 'EDITOR_TOKEN_UNKNOWN' and code(session, first) == 'EDITOR_REPLACED'

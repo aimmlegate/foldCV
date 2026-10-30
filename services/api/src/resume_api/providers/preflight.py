@@ -10,6 +10,8 @@ from typing import Callable, Generic, TypeVar
 
 ResultT = TypeVar("ResultT")
 TTL_SECONDS = 300
+# A model call has the import's remaining time (D114); qualifying the CLI stays as short as in a connection check.
+QUALIFICATION_SECONDS = 15
 
 
 def _stamp(path):

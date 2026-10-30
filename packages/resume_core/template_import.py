@@ -11,9 +11,12 @@ from .templates.compiler import canonical, dependency_order, sha256
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
 GENERATION_SLOTS = frozenset({'initial', 'primary_repair', 'fallback_repair'})
+REPAIR_SLOTS = frozenset({'primary_repair', 'fallback_repair'})
 # D117: the outline of a block that extracts its entries on their own, and the review of that outline.
 OUTLINE_SLOTS = frozenset({'outline', 'outline_review'})
 IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
+# No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
+ACCOUNT_STOP = frozenset({'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'})
 
 
 def processing_protocol(submission):
@@ -276,6 +279,36 @@ def spent_calls(operation):
     return sum(attempt.state != 'released' for attempt in operation.attempts)
 
 
+def stops_import(operation, attempt):
+    # An unavailable fallback model fails only its own repair (E07); the import model being refused stops everything.
+    return attempt.error_code in ACCOUNT_STOP and (attempt.error_code != 'MODEL_DENIED'
+        or attempt.model.model == operation.capture.primary.model)
+
+
+def stopped_call(operation, attempt):
+    """A call a cancel or an account failure ended without a usable reply. It says nothing about the block, so its
+    slot stays free and a resume calls again; it stays on record and counts as spent."""
+    return (attempt.state in {'returned', 'reconciled'} and attempt.cleanup.state == 'verified'
+        and attempt.outcome != 'completed' and attempt.proposal_record_id is None and attempt.review_receipt_id is None
+        and (attempt.outcome == 'cancelled' or stops_import(operation, attempt)))
+
+
+def owed_reviews(operation, *, excluding=None):
+    """Repairs still waiting for their review, each holding one call of the cap: a repair counts only after its review.
+    A refused repair goes unreviewed and an ended task owes nothing."""
+    ended = {task.id for task in operation.tasks if task.state in TERMINAL_TASKS}
+    reviewed, owed = set(), 0
+    for attempt in reversed(operation.attempts):
+        if attempt.state == 'released' or attempt.task_id in ended or attempt.task_id == excluding:
+            continue
+        if attempt.slot in {'review', 'replacement_review'}:
+            reviewed.add(attempt.task_id)
+        elif attempt.slot in REPAIR_SLOTS and attempt.task_id not in reviewed and attempt.outcome in {None, 'completed'}:
+            reviewed.add(attempt.task_id)
+            owed += 1
+    return owed
+
+
 def cleanup_verified(operation):
     return all(attempt.cleanup.state == 'verified' for attempt in operation.attempts)
 
@@ -294,9 +327,13 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     if (any(attempt.state not in {'released', *IN_FLIGHT} and attempt.cleanup.state != 'verified' for attempt in result.attempts)
             or len(in_flight) >= result.capture.policy.concurrency or any(attempt.task_id == task_id for attempt in in_flight)):
         raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN')
-    if spent_calls(result) >= result.capture.policy.call_cap:
+    # A repair takes its review's call with its own, in this one transition: parallel blocks saw the same free calls.
+    needed = 2 if slot in REPAIR_SLOTS else 1
+    held = owed_reviews(result, excluding=task_id if slot in {'review', 'replacement_review'} else None)
+    if spent_calls(result) + held + needed > result.capture.policy.call_cap:
         raise TemplateImportFailure('IMPORT_CALL_CAP')
-    prior = [attempt for attempt in result.attempts if attempt.task_id == task_id and attempt.state != 'released']
+    prior = [attempt for attempt in result.attempts if attempt.task_id == task_id and attempt.state != 'released'
+        and not stopped_call(result, attempt)]
     if slot in GENERATION_SLOTS:
         if any(attempt.slot == slot for attempt in prior):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
@@ -608,5 +645,6 @@ def capture_finalization(operation, project, now, *, id_factory=identity):
         return previous.model_copy(deep=True)
     if project.template_package.package_hash != operation.capture.package_hash:
         raise RepositoryFailure('DEPENDENCY_CHANGED')
+    # expiresAt is a record only: nothing stops a publication at it, the progress report shows a slow one as stalled.
     return FinalizationCandidate(id=id_factory('finalization'), authorizationId=current.id, **values,
         candidateHash=digest(values), startedAt=now, expiresAt=expiry(now, operation.capture.policy.finalization_seconds))

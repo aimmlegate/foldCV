@@ -1,5 +1,7 @@
 """The employment subset renders admitted cells and exact nonoverlapping source spans."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from packages.resume_core.models.template_document import FieldOccurrence
@@ -8,9 +10,11 @@ from packages.resume_core.template_assembly import assemble_template
 from packages.resume_core.template_identity import capture_span, source_slice
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.materialize import materialize
+from packages.resume_core.templates.materialize_nodes import DisplayField, render_nodes
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
 from packages.resume_core.templates.span_coverage import overlaps
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
+from tests.templates.generic_fixtures import generic_package
 from tests.templates.pipeline_fixtures import source_draft
 from tests.templates.test_builtin_admission import accept, proposed_from
 
@@ -61,6 +65,16 @@ def test_one_employment_materializes_stable_editable_cells_and_optional_sections
     assert len({part.binding_id for part in occurrences}) == len(occurrences)
     assert all(part.presentation.node_index is not None for part in occurrences)
     assert all(value.block_ids for value in coverage if value.disposition == 'accepted')
+
+
+def test_an_ongoing_period_without_a_start_shows_its_label_alone():
+    package = generic_package()
+    view = next(value for value in package.definition.blocks if value.id == 'projects')
+    ongoing = DisplayField(('period', 'ongoing'), 'job', 'handle', SimpleNamespace(id='present', typed_value=True,
+        raw_input='true', manual_scope_id=None))
+    blocks, _displayed = render_nodes(package, view, 'instance', [ongoing], {}, set(),
+        {'separator': ' – ', 'ongoingLabel': {'ru': 'по настоящее время'}})
+    assert [[part.text for part in block['content']] for block in blocks] == [['по настоящее время']]
 
 
 def test_unbound_period_raw_never_becomes_current_document_text():
@@ -168,8 +182,9 @@ def test_captured_nested_human_claim_without_sidecar_stays_with_current_owner_as
 
 
 @pytest.mark.parametrize('explicit_style', [False, True])
-def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit_style):
+def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit_style, monkeypatch):
     import json
+    from packages.resume_core.templates import compiler
     from packages.resume_core.templates.compiler import compile_bytes
     from packages.resume_core.templates.store import BUNDLED_TEMPLATE
     from tests.templates.pipeline_fixtures import setup_operation
@@ -177,6 +192,8 @@ def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit
     config['blocks'][0]['view']['nodes'] = []
     if not explicit_style:
         config['blocks'][0]['view'].pop('fallback_style')
+        # New packages refuse this view; one already stored still reaches the materializer.
+        monkeypatch.setattr(compiler, 'check_runs', lambda _definition: None)
     package = compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
     src, _raw = employment_source()
     operation, _command, _package, _source, facts = setup_operation(captured=package, src=src)

@@ -92,11 +92,15 @@ _CATALOGS, _CATALOG_LOCK = {}, threading.Lock()
 
 def catalog_for(package):
     """`icon_catalog` decoded once for the latest few packages: the Generic pack is 6.8 MB. Replies, edits and the
-    icon search run in worker threads."""
+    icon search run in worker threads. A catalog captured unreadable has no icons, so its rows stay text only; new
+    packages refuse it at compile."""
     with _CATALOG_LOCK:
         found = _CATALOGS.get(package.package_hash)
     if found is None:
-        found = icon_catalog(package)
+        try:
+            found = icon_catalog(package)
+        except ValueError:
+            found = IconCatalog()
         with _CATALOG_LOCK:
             _CATALOGS[package.package_hash] = found
             while len(_CATALOGS) > 4:
@@ -224,8 +228,8 @@ def duration_text(months, locale):
 
 def focus_durations(facts, as_of, locale):
     """Technology record id to the time the jobs listing that technology span (D104: the user chose durations counted
-    from projects when the CV states none). Overlaps count once, an ongoing job runs to the formatting date, and a
-    period without a known start or end is left out; partial dates count the middle of their range."""
+    from projects when the CV states none). Overlaps count once, no job counts past the formatting date, an ongoing job
+    runs to it, and a period without a known start or end is left out; partial dates count the middle of their range."""
     jobs = {record.id: record for record in facts.records if record.kind in {'employment', 'subproject'}}
     groups, owners = {}, {}
     for record in facts.records:
@@ -246,7 +250,7 @@ def focus_durations(facts, as_of, locale):
             if period.present.status == 'known' and period.present.value is True:
                 end = (now, now)
             elif period.end.status == 'known' and period.end.value is not None:
-                end = month_bounds(period.end.value)
+                end = tuple(min(value, now) for value in month_bounds(period.end.value))
             else:
                 continue
             start = month_bounds(period.start.value)

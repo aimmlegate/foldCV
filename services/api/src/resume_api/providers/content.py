@@ -97,13 +97,16 @@ class ContentFailure(Exception):
     def __init__(self, code: str, *, logical_attempts: int = 0,
                  usage: ReportedUsage = ReportedUsage(),
                  cleanup_verified: bool | None = None,
-                 dispatch_witness: dict[str, JsonValue] | None = None, raw_return: str | None = None):
+                 dispatch_witness: dict[str, JsonValue] | None = None, raw_return: str | None = None,
+                 version: str | None = None):
         self.code = code
         self.logical_attempts = logical_attempts
         self.usage = usage
         self.cleanup_verified = cleanup_verified
         self.dispatch_witness = dispatch_witness
         self.raw_return = raw_return
+        # The CLI version a qualification read before it failed; the connection state names it.
+        self.version = version
         super().__init__(code)
 
 

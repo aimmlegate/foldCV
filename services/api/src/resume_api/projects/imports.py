@@ -19,8 +19,8 @@ from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
 from .exports import pinned
-from .fold import sidecar_store
-from .import_progress import import_progress
+from .fold import ahead, sidecar_store
+from .import_progress import import_progress, phase_of
 
 LOG = logging.getLogger(__name__)
 # A cancelled model call ends within seconds (its process group is stopped); the wait at shutdown and sign-out.
@@ -28,7 +28,7 @@ STOP_SECONDS = 15
 
 
 class ImportCommand(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     client_request_id: str = Field(default='import', alias='clientRequestId', min_length=1, max_length=200)
     allow_text_rewrite: bool = Field(default=False, alias='allowTextRewrite')
     kind: Literal['start', 'resume', 'cancel']
@@ -263,7 +263,7 @@ class ImportService:
             # Only an admitted task moves between processing and publication; the runner owns the earlier stages.
             stage = None
             if task.stage in {'processing', 'publication'}:
-                stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+                stage = phase_of(task.stage, operation)
             self.projects.tasks.update(task.id, stage=stage, detail=details)
         return self.projects.tasks.list(project_id)
 
@@ -278,8 +278,11 @@ class ImportService:
             base, operation, facts = stored
             raw = (session.directory / 'workspace.json').read_bytes()
             workspace = decode_project(session.directory, raw, history=True)
-            if base != workspace.project_revision:
+            if base > workspace.project_revision or base < workspace.project_revision and ahead(session, operation):
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
+            if base < workspace.project_revision:
+                # A commit folded it and stopped before removing the file; the next commit removes it (plan 2.7).
+                return None
             copied = workspace.model_copy(deep=True)
             owner = copied.project or copied.pre_draft
             if owner is None or not any(item.id == operation.id for item in owner.template_operations):

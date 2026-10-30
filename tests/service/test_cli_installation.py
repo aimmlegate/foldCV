@@ -22,6 +22,7 @@ from resume_api.cli.experimental_profile import ExperimentalCliProfile, Experime
 from resume_api.cli.installation import CliInstallation, InstallationFailure, MARKER
 from resume_api.connection import ConnectionAdapter, Metadata, Quota
 from resume_api.lifecycle import OperationFiles
+from tests.settings.test_providers import running_rewrite
 
 ORIGIN = "http://127.0.0.1:39281"
 SECRET = "synthetic-cli-installation-0123456789"
@@ -280,6 +281,18 @@ async def test_cancel_before_download_starts_has_a_terminal_state(package, tmp_p
         assert await asyncio.to_thread(started.wait, 2)
         assert (await post(client, "cancel-install")).json()["installation"]["state"] == "cancelled"
         assert (await pending).json()["installation"]["state"] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_install_stops_model_work_and_then_takes_the_permit(package, tmp_path):
+    app = make_app(tmp_path)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
+        assert (await post(client, "status")).json()["state"] == "cli_missing"
+        with running_rewrite(app) as cancel:
+            reply = await post(client, "install")
+            assert reply.status_code == 200 and cancel.is_set()
+        assert reply.json()["installation"]["state"] == "ready"
 
 
 @pytest.mark.asyncio

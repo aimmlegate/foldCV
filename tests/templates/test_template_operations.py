@@ -158,3 +158,26 @@ async def test_partition_view_shows_detailed_employment_and_compact_names_while_
     else:
         assert 'OTHER PROJECTS' not in texts
     assert '2009 – 2011' in texts and '2020 – present' in texts and '2010 – 2011-10' in texts
+
+
+@pytest.mark.asyncio
+async def test_an_old_job_with_no_employer_to_show_stays_detailed_instead_of_leaving_the_document(tmp_path):
+    src, raw = employment_source('F04')
+    fixture = EmploymentFixture(tmp_path, captured=history_package(), src=src, original_bytes=raw, cap=4, fallback=False)
+    fixture.pipeline.derive = derive_task
+    def script(_request, value):
+        if 'targets' in value:
+            return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'], 'disposition': 'satisfied',
+                'reason': '', 'evidence': [], 'actionable': False} for target in value['targets']]}
+        proposal = history_proposal(src)
+        proposal['payload'][0]['company'] = None
+        next(item for item in proposal['fields'] if item['pointer'] == '/0/company')['evidence'] = []
+        return proposal
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.publication.state == 'saved'
+    current = fixture.current().project
+    old = next(record for record in current.facts.records if record.kind == 'employment' and record.employer.value is None)
+    texts = [''.join(part.text for part in block.content) for block in current.document.blocks()]
+    # Its period shows under the detailed block; the compact list has nothing to name it by.
+    assert '2008 – 2010' in texts and 'OTHER PROJECTS' not in texts and old.periods

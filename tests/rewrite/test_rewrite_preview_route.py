@@ -1,12 +1,26 @@
 """POST /v2/projects/{id}/rewrite/preview: one generation over the exact selected text with the captured reasoning;
 the preview never edits the project, a stale selection is refused before the model, and Apply is an ordinary edit."""
 
+import asyncio
+from contextlib import asynccontextmanager
+from pathlib import Path
+import sys
+import threading
+
+import pytest
+
 from packages.resume_core.preferences import PreferencesStore
+from packages.resume_core.reasoning import ModelReasoning
 from tests.settings.test_rewrite_reasoning import Adapter
 from packages.resume_core.templates.presentation import snapshot_identity
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
+from resume_api.app import ProviderSlot
+from resume_api.cli.profiles.claude import ClaudeCliProfile
+from resume_api.connection import Metadata, Quota
 from resume_api.providers.content import ContentResult, ReportedUsage
+from resume_api.template_rewrite import EARLY_CANCELS_KEPT, TemplateRewrite
 from tests.projects.support import Editor, v2_app
+from tests.service.app_fixtures import HealthyConnection, add_project, make_app, open_project, signed_in
 from tests.projects.test_edit_routes import typing
 from tests.templates.storage_fixtures import workspace as papers
 
@@ -122,3 +136,112 @@ def test_a_rewrite_finishes_while_an_import_holds_its_inference_permit(tmp_path)
             assert preview(editor)['text'] == 'Clear'
         finally:
             INFERENCE.release()
+
+
+def test_a_cancel_sent_before_the_preview_registers_stops_it_before_the_model(tmp_path):
+    provider = Provider('Clear')
+    with v2_app(tmp_path, [papers()], content_provider=provider) as (client, _application):
+        editor = Editor(client, PROJECT)
+        assert editor.call('post', '/rewrite/cancel', {'editorToken': editor.token, 'requestId': 'rewrite-1'}) == {'cancelled': True}
+        assert preview(editor, status=409)['error']['code'] == 'CANCELLED'
+        assert provider.requests == []
+        task, = [task for task in client.get('/v2/projects/' + PROJECT + '/tasks').json()['tasks'] if task['kind'] == 'rewrite']
+        assert (task['state'], task['error']) == ('cancelled', 'CANCELLED')
+        # The cancel named one request; the next one runs.
+        assert preview(editor, request_id='rewrite-2')['text'] == 'Clear'
+
+
+def test_early_cancels_are_bounded():
+    rewrite = TemplateRewrite(lambda: None, preferences=None, temp_root=None, worker_slot=None, cleanup_error=None)
+    for number in range(EARLY_CANCELS_KEPT + 5):
+        assert rewrite.cancel('project', str(number))
+    assert len(rewrite.early) == EARLY_CANCELS_KEPT and ('project', '0') not in rewrite.early
+
+
+class Queued(Provider):
+    """Reports the task stage it sees while waiting for its permit and after admission."""
+
+    def __init__(self, stage):
+        super().__init__('Clear')
+        self.stage, self.stages = stage, []
+
+    def generate_queued(self, request, files, cancel, admitted):
+        self.stages.append(self.stage())
+        admitted()
+        self.stages.append(self.stage())
+        return self.generate(request, files, cancel)
+
+
+def test_the_task_stage_is_queued_until_the_provider_admits_the_call(tmp_path):
+    stage = {}
+    provider = Queued(lambda: stage['read']())
+    with v2_app(tmp_path, [papers()], content_provider=provider) as (client, application):
+        stage['read'] = lambda: application.state.projects.tasks.list(PROJECT)[-1]['stage']
+        assert preview(Editor(client, PROJECT))['text'] == 'Clear'
+    assert provider.stages == ['queued', 'generating']
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_handler_stops_its_model_call_and_worker(tmp_path):
+    entered, finished, seen = threading.Event(), threading.Event(), {}
+
+    class Held:
+        def generate(self, request, files, cancel):
+            seen['process'] = files.spawn(Path(sys.executable), ('-c', 'import signal; signal.pause()'), capture=False)
+            entered.set()
+            seen['cancelled'] = cancel.wait(5)
+            finished.set()
+            return ContentResult(PlainTextReply(text='Clear'), ReportedUsage(), 'fixture', request.policy.model, .01, 1)
+
+    @asynccontextmanager
+    async def slot(_cancel):
+        yield
+
+    rewrite = TemplateRewrite(lambda: (Held(), 'fixture'), preferences=None, temp_root=tmp_path, worker_slot=slot,
+        cleanup_error=lambda _error: None)
+    handler = asyncio.create_task(rewrite.text('project', 'rewrite-1', 'Make clearer.', 'Shared'))
+    await asyncio.to_thread(entered.wait, 5)
+    handler.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await handler
+    assert seen['process'].poll() is not None, 'the worker process stops with the handler'
+    await asyncio.to_thread(finished.wait, 6)
+    assert seen['cancelled'] is True
+    assert rewrite.cancels == {} and rewrite.tasks == {} and rewrite.files == {}
+
+
+class QuotaAdapter:
+    executable = None
+
+    def __init__(self, quota):
+        self.quota = quota
+
+    def inspect(self, _files, _cancel, *, full=True):
+        return Metadata('2.1.320 (Claude Code)', ('claude-sonnet-5-5',), 'max', Quota(self.quota),
+            {'claude-sonnet-5-5': ModelReasoning(default='high', supported=['low', 'high'])}, 'graceful')
+
+
+class ClaudeProvider(Provider):
+    template_adapter = 'claude_cli'
+
+    def invalidate_preflight(self):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_a_rewrite_on_an_exhausted_plan_names_the_plan(tmp_path):
+    executable = tmp_path / 'cli'
+    executable.write_text('#!' + sys.executable + '\n')
+    executable.chmod(0o700)
+    slot = ProviderSlot(QuotaAdapter('exhausted'), ClaudeProvider('Clear'), ClaudeCliProfile(tmp_path / 'claude profile', executable))
+    app = make_app(tmp_path, connection_adapter=HealthyConnection(), provider_slots={'claude_cli': slot})
+    add_project(app)
+    async with signed_in(app) as client:
+        await client.post('/v1/host/enable', json={'provider': 'claude_cli', 'enabled': True})
+        assert (await client.post('/v1/host/status', json={'provider': 'claude_cli'})).json()['state'] == 'quota_exhausted'
+        await client.post('/v1/host/select', json={'provider': 'claude_cli', 'model': 'claude-sonnet-5-5'})
+        token, snapshot = await open_project(client)
+        reply = await client.post(f'/v2/projects/{PROJECT}/rewrite/preview', json={'editorToken': token, 'requestId': 'rewrite-1',
+            'snapshot': snapshot, 'instruction': 'Make clearer.',
+            'range': {'blockId': 'block-paper-a', 'beforeRevision': 1, 'cellId': None, 'field': 'content', 'start': 0, 'end': 6}})
+    assert (reply.status_code, reply.json()['error']['code']) == (409, 'QUOTA_EXHAUSTED')

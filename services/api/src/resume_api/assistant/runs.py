@@ -53,6 +53,7 @@ class AgentConnection:
     epoch: str
     reason: str | None = None
     reasoning: dict = field(default_factory=dict)
+    providers: dict = field(default_factory=dict)
 
     def effort(self, model, chosen):
         """The chosen assistant effort, else the model's catalog default; None keeps the runtime default."""
@@ -129,8 +130,8 @@ class AssistantService:
             'AGENT_MODEL_UNAVAILABLE' if model not in connection.models else
             'AGENT_MODEL_INCOMPATIBLE' if connection.refuses(model, connection.effort(model, settings.reasoning_effort))
             else None)
-        models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified')
-            for value in connection.models]
+        models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified',
+            provider=connection.providers.get(value)) for value in connection.models]
         return AssistantCapabilitiesV1(ready=reason is None, unavailable=AssistantErrorV1(code=reason) if reason else None,
             models=models, webAvailable=self.runtime_for(model) is not None, tools=list(TOOL_NAMES))
 

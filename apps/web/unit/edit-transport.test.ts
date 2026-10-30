@@ -291,3 +291,43 @@ test("closing the queue ignores a late reply and sends nothing after it", async 
   assert.deepEqual(adopted, []);
   assert.equal(queue.template.state.kind, "closed");
 });
+
+test("a read older than the adopted reply leaves the connection on the newer state", async () => {
+  const older = structuredClone(base), newer = structuredClone(base);
+  newer.workspace.projectRevision = older.workspace.projectRevision + 1;
+  const fetcher: Fetcher = () => Promise.resolve(new Response(JSON.stringify(older), { status: 200 }));
+  const connection = new ProjectEditorConnection("template-project", "token", newer, { undo: null, redo: null }, fetcher);
+  assert.equal((await connection.read()).workspace.projectRevision, newer.workspace.projectRevision);
+  assert.equal(connection.response.workspace.projectRevision, newer.workspace.projectRevision);
+  const same = structuredClone(newer);
+  same.workspace.documentRevision++;
+  const again = new ProjectEditorConnection("template-project", "token", newer, { undo: null, redo: null },
+    () => Promise.resolve(new Response(JSON.stringify(same), { status: 200 })));
+  assert.equal((await again.read()).workspace.documentRevision, same.workspace.documentRevision, "an equal revision is a fresh read");
+});
+
+test("a replayed split without its created block re-reads the project and reports later input on it", async () => {
+  const applied = structuredClone(base);
+  applied.workspace.projectRevision++;
+  applied.workspace.documentRevision++;
+  const reads: string[] = [], lost: string[] = [], key = containerKey(container);
+  const queue = new RichSaveQueue({ durable: base, sessionId: "session", ports: {
+    edit: request => Promise.resolve({ ...result(applied, request.clientMutationId), replayed: true }),
+    read: () => {
+      reads.push("read");
+      const current = structuredClone(applied);
+      current.workspace.mutationReplay = [{ clientMutationId: "split", requestSha256: "0".repeat(64), resultingRevision: current.workspace.projectRevision }];
+      return Promise.resolve(current);
+    },
+    adopted: () => {}, changed: () => {}, retained: () => {}, released: () => {},
+    lost: items => lost.push(...items.map(item => item.clientMutationId)),
+  } });
+  queue.template.enqueue({ localId: "split-op", prior: new Map([[key, paperA]]),
+    operation: { kind: "split_block", container, offset: 8, created: "local-1" } }, "action", 0, "split");
+  queue.template.enqueue(insert("typed-op", "X", "", "local-1"), "action", 0, "typed");
+  await queue.flush();
+  assert.deepEqual(reads, ["read"]);
+  assert.deepEqual(lost, ["typed"]);
+  assert.equal(queue.template.state.kind, "ready");
+  assert.equal(queue.template.pending.length, 0);
+});

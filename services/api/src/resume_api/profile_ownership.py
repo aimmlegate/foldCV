@@ -103,6 +103,10 @@ def recover_profile(profile, operations_root):
         return True
 
 
+def _marked(profile, marker):
+    return (profile.root / marker).exists() or (profile.root / marker).is_symlink()
+
+
 def _acquire(profile, cancel, deadline, blocking):
     """Open the profile lock file and take its exclusive lock; the returned descriptor holds it."""
     profile.prepare()
@@ -113,7 +117,7 @@ def _acquire(profile, cancel, deadline, blocking):
         if path.stat().st_nlink != 1:
             raise StorageFailure("UNSAFE_STORAGE")
         while True:
-            if (profile.root / BLOCKED).exists() or (profile.root / BLOCKED).is_symlink():
+            if _marked(profile, BLOCKED):
                 raise AdmissionBlocked()
             if cancel.is_set():
                 raise AdmissionCancelled()
@@ -127,9 +131,8 @@ def _acquire(profile, cancel, deadline, blocking):
                 cancel.wait(0.025)
                 continue
             try:
-                for marker in (BLOCKED, SHARED):
-                    if (profile.root / marker).exists() or (profile.root / marker).is_symlink():
-                        raise AdmissionBlocked()
+                if _marked(profile, BLOCKED) or _marked(profile, SHARED):
+                    raise AdmissionBlocked()
             except BaseException:
                 fcntl.flock(descriptor, fcntl.LOCK_UN)
                 raise
@@ -179,6 +182,9 @@ def _join(profile, cancel, deadline, blocking):
             first = hold is None
             if first:
                 hold = _HOLDS[key] = _SharedHold(key)
+            elif _marked(profile, BLOCKED):
+                # A call of this hold failed cleanup: its process may live, and no new one starts beside it.
+                raise AdmissionBlocked()
             else:
                 hold.count += 1
         if first:

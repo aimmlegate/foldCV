@@ -12,6 +12,14 @@ from .captured_fonts import CapturedFontResolver,FontRequest,FontSelection
 from .template import RenderFailure
 
 
+# Invisible characters that carry no content: an export leaves them out instead of refusing their block.
+INVISIBLE=str.maketrans('','','\u00ad\u200b\ufeff')
+
+
+def visible_text(text):
+    return (text or '').translate(INVISIBLE)
+
+
 @dataclass(frozen=True)
 class RunStyle:
     selection: FontSelection
@@ -87,7 +95,7 @@ class CapturedStyleResolver:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         self._reference(block.presentation)
         result=self._run(block,span.presentation if span.presentation is not None else block.presentation,span.styles)
-        self.validate_text(result.selection,span.text)
+        self.validate_text(result.selection,visible_text(span.text))
         return result
 
     def paragraph(self,block):
@@ -95,7 +103,7 @@ class CapturedStyleResolver:
                 for span in block.content):
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         self._reference(block.presentation)
-        runs=[self.run(block,span) for span,_link in authored_spans(block) if span.text]
+        runs=[self.run(block,span) for span,_link in authored_spans(block) if visible_text(span.text)]
         height=max(run.line_height for run in runs) if runs else self._run(block,block.presentation).line_height
         alignment=(block.presentation.overrides.alignment if block.presentation.overrides.alignment is not None
             else block.props.alignment)

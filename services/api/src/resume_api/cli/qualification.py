@@ -83,15 +83,22 @@ def resolve(executable: Path) -> Path:
     return resolved
 
 
-def signature(executable: Path, *, codesign: Path = Path("/usr/bin/codesign")) -> Signature:
-    """Strictly verify the code signature of the resolved binary and read its publisher."""
+def publisher_requirement(team_id: str, identifier: str) -> str:
+    return f'anchor apple generic and identifier "{identifier}" and certificate leaf[subject.OU] = "{team_id}"'
+
+
+def signature(executable: Path, *, codesign: Path = Path("/usr/bin/codesign"),
+              requirement: str | None = None) -> Signature:
+    """Strictly verify the code signature of the resolved binary and read its publisher. The text `codesign -d` prints
+    is what the binary claims; only `requirement` proves that an Apple-issued chain signed it."""
     resolved = resolve(executable)
     info = resolved.stat()
-    key = (str(resolved), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    key = (str(resolved), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns, requirement)
     if key in _SIGNATURES:
         return _SIGNATURES[key]
+    verify = (f"-R={requirement}",) if requirement is not None else ()
     try:
-        subprocess.run([str(codesign), "--verify", "--strict", str(resolved)], check=True,
+        subprocess.run([str(codesign), "--verify", "--strict", *verify, str(resolved)], check=True,
                        capture_output=True, timeout=60, env={"PATH": os.defpath})
         shown = subprocess.run([str(codesign), "-d", "--verbose=2", str(resolved)], check=True,
                                capture_output=True, timeout=60, env={"PATH": os.defpath})
@@ -100,14 +107,14 @@ def signature(executable: Path, *, codesign: Path = Path("/usr/bin/codesign")) -
     fields = dict(line.split("=", 1) for line in shown.stderr.decode("utf-8", "replace").splitlines()
                   if "=" in line)
     team, identifier = fields.get("TeamIdentifier", ""), fields.get("Identifier", "")
-    if not re.fullmatch(r"[A-Z0-9]{10}", team) or not identifier:
+    if fields.get("Signature") == "adhoc" or not re.fullmatch(r"[A-Z0-9]{10}", team) or not identifier:
         raise QualificationError("CLI_UNSUPPORTED")
     _SIGNATURES[key] = Signature(team, identifier)
     return _SIGNATURES[key]
 
 
 def require_publisher(executable: Path, team_id: str, identifier: str) -> Path:
-    found = signature(executable)
+    found = signature(executable, requirement=publisher_requirement(team_id, identifier))
     if found.team_id != team_id or found.identifier != identifier:
         raise QualificationError("CLI_UNSUPPORTED")
     return resolve(executable)

@@ -20,13 +20,15 @@ export type AssistantMessage = AgentMessage;
 export type AssistantSource = AgentWebSource;
 export type AssistantFinding = AgentFinding;
 export type AssistantSelection = NonNullable<AssistantRunRequestV2["selection"]>;
+/** The loading line of a run whose follow loop gave up; Stop follows the run again. */
+export const lostLink = "Нет связи с помощником";
 export const terminal = (run: Run | null): boolean => run !== null && ["completed", "failed", "cancelled", "interrupted"].includes(run.state);
 export type AssistantView = {
   settings: AgentSettings | null; capabilities: AssistantCapabilitiesV1 | null; flags: AgentFlags;
   conversations: AssistantConversationV1[]; conversationId: string | null; messages: AssistantMessage[];
   sources: AssistantSource[]; findings: AssistantFinding[]; files: AssistantFileV1[]; run: Run | null;
   activity: AssistantEvent[]; partial: string; partialTruncated: boolean;
-  proposals: Proposal[]; proposalBusy: string | null; staleProposals: string[];
+  proposals: Proposal[]; proposalBusy: string | null; proposalAction: "apply" | "discard" | null; staleProposals: string[];
   draft: string; submitting: boolean; pendingSend: boolean; error: string | null; loading?: string | null;
 };
 /** The open editor: Apply goes through its token, flushes its typing first and adopts the committed result. */
@@ -53,7 +55,7 @@ const lasting = (error: unknown): boolean => error instanceof AgentApiFailure &&
 export class AssistantController {
   view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: true }, conversations: [],
     conversationId: null, messages: [], sources: [], findings: [], files: [], run: null, activity: [], partial: "",
-    partialTruncated: false, proposals: [], proposalBusy: null, staleProposals: [], draft: "", submitting: false,
+    partialTruncated: false, proposals: [], proposalBusy: null, proposalAction: null, staleProposals: [], draft: "", submitting: false,
     pendingSend: false, error: null };
   private closed = false;
   private epoch = 0;
@@ -61,12 +63,15 @@ export class AssistantController {
   private stream: AbortController | null = null;
   private following: Promise<void> | null = null;
   private pending: Pending | null = null;
+  // Message reads answer out of order: `reads` numbers them, `applied` is the newest one shown.
+  private reads = 0;
+  private applied = 0;
   private readonly drafts = new Map<string, string>();
   // The whole conversation as last read; the transcript shows sources and findings as they arrive or are opened.
   private loaded: { sources: AssistantSource[]; findings: AssistantFinding[] } = { sources: [], findings: [] };
 
   constructor(readonly api: Port, private readonly editor: AssistantEditor, private readonly changed: (view: AssistantView) => void,
-    private readonly retryMs = 250) {}
+    private readonly retryMs = 250, private readonly stopMs = 6000) {}
 
   get active(): boolean { return this.view.submitting || this.view.pendingSend || this.view.proposalBusy !== null || this.view.run !== null && !terminal(this.view.run); }
   private publish(update: Partial<AssistantView>): void {
@@ -120,16 +125,25 @@ export class AssistantController {
     return this.wait("Сохраняем модель", async () => {
       const settings = this.view.settings;
       if (!settings) return;
+      const effort = settings.reasoningEffort ?? null;
+      const save = (reasoningEffort: typeof effort) => this.api.saveSettings({ expectedRevision: settings.revision, enabled,
+        selectedAgentModel: model, reasoningEffort });
       try {
-        const next = await this.api.saveSettings({ expectedRevision: settings.revision, enabled, selectedAgentModel: model });
-        this.publish({ settings: next, error: null }); await this.refreshWork();
+        let next: AgentSettings, notice: string | null = null;
+        try { next = await save(effort); }
+        catch (error) {
+          // The stored level goes only when the new model lacks it, and the panel says so.
+          if (effort === null || code(error) !== "AGENT_MODEL_INCOMPATIBLE") throw error;
+          next = await save(null); notice = "AGENT_REASONING_DROPPED";
+        }
+        this.publish({ settings: next, error: notice }); await this.refreshWork();
       } catch (error) { this.publish({ error: code(error) }); await this.refreshWork().catch(() => {}); }
     });
   }
 
   async newConversation(): Promise<void> {
     return this.wait("Создаём диалог", async () => {
-      if (this.view.submitting || this.view.proposalBusy) throw new AgentApiFailure("AGENT_BUSY");
+      if (this.view.submitting || this.view.pendingSend || this.view.proposalBusy) throw new AgentApiFailure("AGENT_BUSY");
       if (this.view.run && !terminal(this.view.run)) await this.stopWork();
       this.drafts.set(this.view.conversationId ?? "", this.view.draft);
       const conversation = await this.api.createConversation();
@@ -143,7 +157,7 @@ export class AssistantController {
   async select(id: string): Promise<void> { return this.wait("Открываем диалог", () => this.selectWork(id)); }
   private async selectWork(id: string): Promise<void> {
     if (id === this.view.conversationId) return;
-    if (this.view.submitting || this.view.proposalBusy) throw new AgentApiFailure("AGENT_BUSY");
+    if (this.view.submitting || this.view.pendingSend || this.view.proposalBusy) throw new AgentApiFailure("AGENT_BUSY");
     if (this.view.run && !terminal(this.view.run)) await this.stopWork();
     this.drafts.set(this.view.conversationId ?? "", this.view.draft);
     const epoch = this.leaveConversation();
@@ -180,13 +194,16 @@ export class AssistantController {
     }
   }
   private async reloadMessages(): Promise<void> {
-    const id = this.view.conversationId, epoch = this.epoch;
+    const id = this.view.conversationId, epoch = this.epoch, read = ++this.reads;
     if (!id) return;
     const value = await this.api.messages(id);
-    if (this.closed || epoch !== this.epoch) return;
+    if (this.closed || epoch !== this.epoch || read < this.applied) return;
+    this.applied = read;
     this.loaded = { sources: value.sources, findings: value.findings };
-    const runs = [...value.runs], current = this.view.run ? runs.find(run => run.id === this.view.run?.id) : undefined;
-    this.publish({ messages: messagesOf(value), files: [...value.files ?? []], ...(current ? { run: current } : {}) });
+    const runs = [...value.runs], shown = this.view.run, current = shown ? runs.find(run => run.id === shown.id) : undefined;
+    // A read sent before the run ended can still say running; only a poll that follows the run moves its state on.
+    const fresh = current && (!terminal(shown) || terminal(current));
+    this.publish({ messages: messagesOf(value), files: [...value.files ?? []], ...(fresh ? { run: current } : {}) });
   }
 
   async send(selection: () => Promise<AssistantSelection | null> = () => Promise.resolve(null)): Promise<void> {
@@ -246,16 +263,12 @@ export class AssistantController {
           for (const event of reply.events) if (event.sequence > after) this.accept(event);
           after = Math.max(after, reply.next);
           this.publish({ run: reply.run });
-          if (terminal(reply.run)) {
-            await this.reloadMessages(); await this.refreshProposals();
-            this.publish({ partial: "" });
-            return;
-          }
+          if (terminal(reply.run)) { await this.finishRun(); return; }
         } catch (error) {
           if (this.closed || stream.signal.aborted || epoch !== this.epoch) return;
           if (lasting(error)) { this.label(this.link, null); this.publish({ error: code(error) }); return; }
           if (++failures > FOLLOW_RETRIES) {
-            this.label(this.link, "Нет связи с помощником");
+            this.label(this.link, lostLink);
             this.publish({ error: error instanceof AgentApiFailure ? error.code : "SERVICE_UNAVAILABLE" });
             return;
           }
@@ -266,6 +279,11 @@ export class AssistantController {
     })().catch(error => { this.publish({ error: code(error) }); })
       .finally(() => { if (this.following === work) this.following = null; });
     this.following = work;
+  }
+  /** The run ended: its answer, files and proposals are read. */
+  private async finishRun(): Promise<void> {
+    await this.reloadMessages(); await this.refreshProposals();
+    this.publish({ partial: "" });
   }
   private accept(event: AssistantEvent): void {
     const activity = event.type === "activity.updated" ? this.view.activity.filter(item => item.type !== "activity.updated" || item.payload.itemId !== event.payload.itemId) : this.view.activity;
@@ -289,7 +307,7 @@ export class AssistantController {
    * which is one undo action. A stale proposal stays a draft and shows the stale notice. */
   async applyProposal(proposal: Proposal): Promise<void> {
     if (this.closed || this.view.proposalBusy || proposal.state !== "draft") return;
-    this.publish({ proposalBusy: proposal.id, error: null });
+    this.publish({ proposalBusy: proposal.id, proposalAction: "apply", error: null });
     try {
       const result = await this.editor.applyProposal(proposal.id, this.view.flags.allowEdits);
       this.publish({ proposals: this.view.proposals.map(item => item.id === result.proposal.id ? result.proposal : item) });
@@ -299,34 +317,56 @@ export class AssistantController {
       if (failure === "ASSISTANT_PROPOSAL_STALE") this.publish({ staleProposals: [...new Set([...this.view.staleProposals, proposal.id])] });
       this.publish({ error: failure });
     } finally {
-      this.publish({ proposalBusy: null });
+      this.publish({ proposalBusy: null, proposalAction: null });
       await this.refreshProposals().catch(() => {});
     }
   }
   async discardProposal(proposal: Proposal): Promise<void> {
     if (this.closed || this.view.proposalBusy || proposal.state !== "draft") return;
-    this.publish({ proposalBusy: proposal.id, error: null });
+    this.publish({ proposalBusy: proposal.id, proposalAction: "discard", error: null });
     try {
       const value = await this.api.discard(proposal.id);
       this.publish({ proposals: this.view.proposals.map(item => item.id === value.id ? value : item) });
     } catch (error) { this.publish({ error: code(error) }); }
-    finally { this.publish({ proposalBusy: null }); }
+    finally { this.publish({ proposalBusy: null, proposalAction: null }); }
   }
 
   async stop(): Promise<void> { return this.wait("Останавливаем", () => this.stopWork()); }
   private async stopWork(): Promise<void> {
     ++this.sendEpoch;
+    await this.repeatPending();
     const run = this.view.run;
     if (run && !terminal(run)) {
-      this.publish({ run: await this.api.cancel(run.id) });
-      // A loop that lost the run follows it again from the start, so the partial answer is read again too.
-      if (!this.following && !terminal(this.view.run)) { this.publish({ partial: "", partialTruncated: false, activity: [] }); this.follow(run); }
-      // The loop sees the run end; a run that does not end in time is reported, not hidden.
+      const reply = await this.api.cancel(run.id);
+      this.publish({ run: reply }); this.label(this.link, null);
+      if (!this.following) {
+        this.publish({ error: null });
+        // A loop that lost the run follows it again from the start, so the partial answer is read again too.
+        if (terminal(reply)) await this.finishRun();
+        else { this.publish({ partial: "", partialTruncated: false, activity: [] }); this.follow(run); }
+      }
+      // The loop sees the run end. A run that does not end in time is reported until it does; the loop still follows it.
       const following = this.following;
-      if (following) await Promise.race([following, pause(6000)]);
-      if (this.view.run && !terminal(this.view.run)) throw new AgentApiFailure("AGENT_CLEANUP_FAILED");
+      if (following) await Promise.race([following, pause(this.stopMs)]);
+      if (this.view.run && !terminal(this.view.run)) throw new AgentApiFailure("AGENT_STOP_PENDING");
     }
     this.pending = null; this.publish({ pendingSend: false, submitting: false });
+  }
+  /** Stop on a lost send reply: the same request returns the run the server may have started, so it can be cancelled.
+   * A refusal means no run started; any other failure leaves the send pending and is reported. */
+  private async repeatPending(): Promise<void> {
+    const pending = this.pending;
+    if (!pending || !this.view.pendingSend || this.view.submitting) return;
+    try {
+      const run = await this.api.submit(pending.conversationId, pending.request);
+      this.pending = null;
+      this.publish({ run, draft: "", partial: "", partialTruncated: false, activity: [], pendingSend: false, error: null });
+      await this.reloadMessages().catch(() => {});
+    } catch (error) {
+      if (!(error instanceof AgentApiFailure && error.status >= 400 && error.status < 500)) throw error;
+      this.pending = null;
+      this.publish({ pendingSend: false, error: code(error) });
+    }
   }
   close(): void { this.closed = true; ++this.epoch; ++this.sendEpoch; this.stream?.abort(); }
 }

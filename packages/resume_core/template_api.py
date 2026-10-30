@@ -67,6 +67,16 @@ class EditorFocusPanel(Wire):
     records: list[Id]
     # A row's icon can be chosen from the template's icons (D122).
     icons: bool = Field(default=False, exclude_if=lambda value: not value)
+    # The template's view takes no further row.
+    full: bool = Field(default=False, exclude_if=lambda value: not value)
+
+
+class EditorJob(Wire):
+    """One job in the facts panel."""
+    # Each period as the document writes it.
+    periods: list[str]
+    # A new period has a place in the document; a job in a compressed list has none.
+    add_period: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class EditorPlanV1(Wire):
@@ -81,6 +91,11 @@ class EditorPlanV1(Wire):
     technology_targets: list[EditorTechnologyTarget] = Field(default_factory=list, exclude_if=lambda value: not value)
     # Absent when the template's Focus is not one view the panel can change.
     focus_panel: EditorFocusPanel | None = Field(default=None, exclude_if=lambda value: value is None)
+    jobs: dict[Id, EditorJob] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    # By record, the fields the document has no place for; the panel's dialog leaves them out.
+    unshown_fields: dict[Id, list[str]] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    # The technologies of each line with several; a move stays inside its line.
+    technology_lines: list[list[Id]] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

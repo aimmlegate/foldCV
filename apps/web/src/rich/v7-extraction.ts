@@ -397,6 +397,11 @@ export function insertionAt(state: EditorState): Insertion | { reason: string } 
   }
 }
 
+/** The selection as the editor shows it: one line per text block, hard breaks as line ends. */
+export function selectedText(state: EditorState): string {
+  return state.doc.textBetween(state.selection.from, state.selection.to, "\n", leafText);
+}
+
 /** What a copy names for Python: whole sibling blocks, or a text range inside one block. */
 export function copySource(state: EditorState): ClipboardSource | null {
   const blocks = selectedBlocks(state);

@@ -162,6 +162,10 @@ class RichMutationReplay(Wire):
     client_mutation_id: Id
     request_sha256: Sha256
     resulting_revision: Revision
+    # What the edit's reply named, so a retry after a restart gets the same reply; older rows have none.
+    created_ids: dict[str, dict[str, Id]] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    created_blocks: dict[str, list[Id]] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    changed_block_ids: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class WarningLocation(Wire):

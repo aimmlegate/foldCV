@@ -116,3 +116,33 @@ async def test_model_work_queues_behind_a_waiting_exclusive_holder_instead_of_st
         release.set()
         thread.join(5)
     assert not admission.locked()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["codex", "claude"])
+async def test_a_call_cancelled_before_its_owned_permit_is_recorded_as_never_dispatched(tmp_path, kind):
+    from pathlib import Path
+    from types import SimpleNamespace
+    from resume_api.importer.template_transport import JOB_PERMIT, ProviderTemplateTransport
+    from resume_api.inference_admission import InferenceAdmission
+    from resume_api.providers import claude_cli, codex_cli
+    from resume_api.providers.content import ContentFailure, outcome_state
+    module = codex_cli if kind == "codex" else claude_cli
+    cli = Path("/bin/echo")
+    provider = getattr(module, "CodexCliProvider" if kind == "codex" else "ClaudeCliProvider")(
+        cli, fixture_transport=module.FixtureTransport(cli))
+    admission = InferenceAdmission()
+    permit = await admission.reserve(asyncio.Event())
+    cancel = threading.Event()
+    cancel.set()
+    transport = ProviderTemplateTransport(lambda: (provider, "model-a"), tmp_path)
+    token = JOB_PERMIT.set(permit)
+    try:
+        with pytest.raises(ContentFailure) as stopped:
+            transport.generate(SimpleNamespace(policy=SimpleNamespace(model="model-a")), cancel)
+    finally:
+        JOB_PERMIT.reset(token)
+        permit.release()
+    failure = stopped.value
+    assert failure.code == "CANCELLED" and outcome_state(failure.code) == "cancelled"
+    assert failure.cleanup_verified is True and failure.dispatch_witness == {"neverDispatched": True}

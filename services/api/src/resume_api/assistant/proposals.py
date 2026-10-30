@@ -8,17 +8,25 @@ the current workspace and commits them with the proposal id as the action id, so
 
 from __future__ import annotations
 
-from packages.resume_core.assistant_compiler import CompileFailure, changed_targets, compile_ops, preview, touched
+from packages.resume_core import agent_limits as limits
+from packages.resume_core.assistant_compiler import (CompileFailure, changed_targets, compile_ops, preview, target_text,
+    touched)
 from packages.resume_core.assistant_store import AgentFailure, digest, identity, timestamp
 from packages.resume_core.models.assistant import (AssistantActionResultV1, AssistantApplyResultV1,
     AssistantChangeProposalV1)
 from packages.resume_core.models.contracts import PartialDate
 from packages.resume_core.models.projects import DeleteRequestV1, RenameRequestV1
+from packages.resume_core.project_journal import JournalStale, apply as apply_payloads, snapshot
 from packages.resume_core.project_repository import RepositoryFailure
 
 from resume_api.projects import editing
 from resume_api.projects.errors import ProjectFailure
 from resume_api.projects.service import response_for_workspace
+
+from . import context
+
+# As `AssistantChangeProposalV1` bounds them.
+TOUCHED_TARGETS, PREVIEW_ENTRIES = 500, limits.EDIT_OPERATIONS * 2
 
 
 def refused(error):
@@ -41,18 +49,51 @@ def formatting_date(value):
         raise CompileFailure('ASSISTANT_OP_INVALID', 'formatting_date') from None
 
 
+def date_text(date):
+    """As the facts' date fields show a date: 2026, 2026-03 or 2026-03-15."""
+    parts = [f'{date.year:04d}']
+    if date.month is not None:
+        parts.append(f'{date.month:02d}')
+    if date.day is not None:
+        parts.append(f'{date.day:02d}')
+    return '-'.join(parts)
+
+
 def action_preview(workspace, op):
     if op.action == 'rename':
         if not (op.value or '').strip():
             raise CompileFailure('ASSISTANT_OP_INVALID', 'rename')
         return [{'target': workspace.project_id, 'label': 'rename', 'before': workspace.title, 'after': op.value.strip()}]
     if op.action == 'formatting_date':
-        date = formatting_date(op.value)
-        return [{'target': workspace.project_id, 'label': 'formatting_date', 'before': workspace.formatting_as_of.model_dump_json(
-            by_alias=True), 'after': date.model_dump_json(by_alias=True)}]
+        return [{'target': workspace.project_id, 'label': 'formatting_date', 'before': date_text(workspace.formatting_as_of),
+            'after': date_text(formatting_date(op.value))}]
     if op.action == 'delete' and op.target_id != workspace.project_id:
         raise CompileFailure('ASSISTANT_OP_INVALID', 'delete needs targetId equal to the project id')
     return [{'target': workspace.project_id, 'label': op.action, 'before': workspace.title, 'after': workspace.title}]
+
+
+def history_preview(session, direction):
+    """The text of each block and record the top journal entry changes, now and after Undo or Redo; the current workspace,
+    not the run's pinned one, is what Apply reverts. An entry that no longer applies is not offered."""
+    current = session.workspace
+    try:
+        action, payloads = session.journal.target(direction, snapshot(current))
+        after = apply_payloads(current, payloads)
+    except (JournalStale, ValueError):
+        raise CompileFailure('ASSISTANT_HISTORY_EMPTY', direction) from None
+    changed = {identifier for kind, identifier in payloads if kind in {'block', 'placement', 'builtin', 'extension'}}
+    blocks = [block.id for block in current.project.document.blocks() if block.id in changed]
+    entries = [{'target': identifier, 'label': direction, 'before': target_text(current, identifier)[:16000],
+        'after': target_text(after, identifier)[:16000]} for identifier in [*blocks, *sorted(changed - set(blocks))]]
+    return entries[:PREVIEW_ENTRIES] or [{'target': action.action_id, 'label': direction, 'before': '', 'after': ''}]
+
+
+def within_bounds(hashes, shown):
+    """A proposal the model cannot store is refused with the limit, not a bare validation error."""
+    if len(hashes) > TOUCHED_TARGETS or len(shown) > PREVIEW_ENTRIES:
+        raise context.refusal('AGENT_CALL_TOO_LARGE', f'This proposal touches {len(hashes)} targets and shows {len(shown)} '
+            f'changes; one proposal may touch at most {TOUCHED_TARGETS} and show at most {PREVIEW_ENTRIES}. Split it into '
+            'several proposals over different blocks.')
 
 
 def propose(service, run, pinned, request):
@@ -65,10 +106,10 @@ def propose(service, run, pinned, request):
         session = service.projects.repository.open(project_id)
         with session.lock:
             top = session.journal.top(first.direction)
-        if top is None:
-            raise CompileFailure('ASSISTANT_HISTORY_EMPTY', first.direction)
+            if top is None:
+                raise CompileFailure('ASSISTANT_HISTORY_EMPTY', first.direction)
+            shown = history_preview(session, first.direction)
         kind, hashes, expected = 'history', {}, top.action_id
-        shown = [{'target': top.action_id, 'label': first.direction, 'before': '', 'after': ''}]
     elif first.op == 'action':
         kind, hashes, shown = 'action', {}, action_preview(pinned, first)
     else:
@@ -81,6 +122,7 @@ def propose(service, run, pinned, request):
         if after is pinned:
             raise CompileFailure('ASSISTANT_PROPOSAL_EMPTY')
         shown = preview(pinned, after, request.ops)
+    within_bounds(hashes, shown)
     now = timestamp()
     return AssistantChangeProposalV1(schemaVersion=1, id=proposal_id, projectId=project_id,
         conversationId=run.conversation_id, runId=run.id, kind=kind, summary=request.summary,
@@ -134,7 +176,7 @@ def apply(service, project_id, proposal_id, request):
                 kind='edit', build=build)
             edit = editing.result(projects, session, outcome, request.client_mutation_id)
         elif proposal.kind == 'history':
-            direction = proposal.ops[0].direction
+            direction, before = proposal.ops[0].direction, session.workspace
             try:
                 outcome = repository.history(project_id, direction=direction, base_revision=session.revision,
                     client_mutation_id=request.client_mutation_id, request_sha256=request_sha256,
@@ -143,6 +185,8 @@ def apply(service, project_id, proposal_id, request):
                 if error.code == 'HISTORY_STALE':
                     raise ProjectFailure('ASSISTANT_PROPOSAL_STALE', 409, targets=[proposal.expected_action_id]) from None
                 raise
+            if not outcome.replayed and session.workspace is not before:
+                projects.remember_icons(before, session.workspace)
             edit = editing.result(projects, session, outcome, request.client_mutation_id)
         elif proposal.ops[0].action != 'delete':
             action = run_action(service, project_id, proposal.ops[0], request)

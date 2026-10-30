@@ -5,15 +5,16 @@ from .models.rich_document import FactFieldSpan
 from .models.rich_facts import TechnologyRecord
 from .models.template_document import BoundLink, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
 from .rich_dependencies import placements
-from .rich_fields import field_key, inline_groups, set_text, working_field
+from .rich_fields import field_key, inline_groups, occurrences, set_text, working_field
 from .rich_panel import FIELDS
 from .template_api import EditorPlacement, EditorTechnologyTarget
 from .template_builtin_admission import unknown
 from .template_facts import delete_subject_in_place
-from .template_panel_creation import _report_cells
+from .template_panel_creation import _report_cells, period_jobs
 from .template_panel_focus import experience_text, focus_only, focus_rows, focus_view, show_experience
+from .template_panel_lines import field_place, line_text, node_labels, period_text, show_fields
 from .template_preparation_panel import (_join_technology_line, _patch_displays, _split_technology_line, drop_empty_titles,
-    field_occurrence, restore_view, sibling_lists, technology_lines, view_position, view_title)
+    field_occurrence, line_is_list, restore_view, sibling_lists, technology_lines, view_position, view_title)
 from .templates.materialize_nodes import literal, locale_text, reference
 from .templates.operations import OperationContext, active, display_pointer, select_role_branch
 from .templates.projection import pointer_tokens
@@ -22,6 +23,9 @@ from .technologies import normalize_name
 # The fields the panel's dialog shows; employment has its own path.
 EDIT_FIELDS = {kind: set(FIELDS[kind]) for kind in ('candidate', 'technology', 'education', 'language', 'claim')}
 REMOVABLE = {'technology', 'education', 'language'}
+# Fields the dialog shows that only reach the document through a template node.
+DOCUMENT_FIELDS = {'candidate': EDIT_FIELDS['candidate'], 'education': EDIT_FIELDS['education'],
+    'language': EDIT_FIELDS['language'], 'employment': {'employer', 'role'}}
 # A group's target names its view, so it stays the same when the group's line goes and comes back.
 VIEW_TARGET = 'view:'
 
@@ -149,6 +153,27 @@ def technology_targets(project):
     return [target for _order, target in sorted(general, key=lambda value: value[0])] + owned
 
 
+def panel_plan(project):
+    """What the facts panel shows and offers beyond its targets (D113): each job's periods as the document writes them and
+    whether it can take another, the fields with no place in the document, and the technologies that share a line, the
+    only order a move can change."""
+    package, jobs, unshown = project.template_package, {}, {}
+    addable = period_jobs(project)
+    shown = {(group.record_id, group.key) for group in occurrences(project.document).values()}
+    for record in project.facts.records:
+        missing = sorted(key for key in DOCUMENT_FIELDS.get(record.kind, ()) if (record.id, key) not in shown
+            and field_place(project, record, key) is None)
+        if missing:
+            unshown[record.id] = missing
+        if record.kind == 'employment':
+            jobs[record.id] = {'periods': [period_text(period, package) for period in record.periods],
+                **({'addPeriod': True} if record.id in addable else {})}
+    lines = [identifiers for _block, _container, content, _owner in technology_lines(project)
+        if len(identifiers := [entry[0] for entry in _split_technology_line(content)[1]]) > 1
+        and len(identifiers) == len(set(identifiers))]
+    return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('technologyLines', lines)) if value}
+
+
 def _view_position(project, view):
     position = view_position(project.document, project.template_package, view)
     if position is None:
@@ -199,6 +224,7 @@ def edit_record(project, command, allocator):
     _patch_displays(project, candidate, original, updated, selected, set(), allocator)
     if 'experience' in selected:
         show_experience(candidate, updated, allocator)
+    show_fields(candidate, updated, selected - {'experience'}, allocator)
     steps = [{'kind': 'put_record', 'beforeRevision': original.revision, 'record': updated.model_dump(by_alias=True)}]
     for key in sorted(selected):
         cell = field_key(original.id, key)
@@ -213,26 +239,6 @@ def _bound(span, removed):
         return any(value is not None and value.record_id in removed for value in (span.label_binding, span.url_binding)) \
             or any(_bound(child, removed) for child in span.content)
     return isinstance(span, FactFieldSpan) and span.record_id in removed
-
-
-def _text(block):
-    return ''.join(part.text for part in block.content) if all(isinstance(part, PresentedText) for part in block.content) else None
-
-
-def _labels(project, lines):
-    """The label line the import writes before each of these lines, when its node has one."""
-    package = project.template_package
-    views, locale, found = {value.id: value for value in package.definition.blocks}, package.definition.template.default_locale, set()
-    for items in sibling_lists(project.document):
-        for previous, block in zip(items, items[1:]):
-            ref, before = block.presentation, previous.presentation
-            if block.id not in lines or ref is None or before is None or ref.node_index is None or ref.view_key not in views:
-                continue
-            label = locale_text(views[ref.view_key].view.nodes[ref.node_index].label, locale)
-            if label and (before.view_key, before.template_instance_id, before.node_index) == (
-                    ref.view_key, ref.template_instance_id, ref.node_index) and _text(previous) == label:
-                found.add(previous.id)
-    return found
 
 
 def remove_records(project, command, action_id):
@@ -264,10 +270,13 @@ def remove_records(project, command, action_id):
         prefix, entries, trailing = _split_technology_line(content)
         kept = [entry for entry in entries if entry[0] not in removed]
         if len(kept) != len(entries):
+            # A name inside other text would leave a broken sentence; that text is the user's to edit.
+            if container == 'content' and not line_is_list(candidate.template_package, block):
+                raise ValueError('PANEL_LINE_SHARED')
             content[:] = _join_technology_line(prefix, kept, trailing)
             if not kept and container == 'content' and not block.children and all(isinstance(node, PresentedText) for node in content):
                 emptied.add(block.id)
-    emptied |= _labels(candidate, emptied)
+    emptied |= node_labels(candidate, emptied)
     views = set()
     def prune(items):
         for block in list(items):
@@ -276,7 +285,6 @@ def remove_records(project, command, action_id):
                 items.remove(block)
                 continue
             prune(block.children)
-            # A removed record shown inside other text would leave a broken sentence; that text is the user's to edit.
             if any(_bound(span, removed) for _container, content in inline_groups(block) for span in content):
                 raise ValueError('PANEL_LINE_SHARED')
             block.provenance = [value for value in block.provenance if getattr(value, 'record_id', None) not in removed]
@@ -357,7 +365,7 @@ def add_technology(project, operation, allocator):
         label = locale_text(node.label, locale)
         # A label an earlier removal left behind is used again, not doubled.
         labelled = bool(label) and any(child.presentation is not None and child.presentation.node_index == index
-            and _text(child) == label for child in block.children)
+            and line_text(child) == label for child in block.children)
         # After the item's blocks of earlier nodes and the node's own label, where the import puts the line.
         at = sum(1 for child in block.children if child.presentation is not None and child.presentation.node_index is not None
             and child.presentation.node_index <= index)

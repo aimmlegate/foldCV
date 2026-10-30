@@ -29,8 +29,8 @@ import threading
 from .models.rich_workspace import RichMutationReplay
 from .models.template_workspace import WorkspaceV7
 from .project_journal import JournalStale, ProjectJournal, apply as apply_payloads, snapshot
-from .project_limits import project_file_bytes
-from .project_store import ProjectStore, ProjectStoreFailure, owned_file, strict_json
+from .project_limits import ARCHIVE_ENTRY_BYTES, project_file_bytes
+from .project_store import SAFE_ID, ProjectStore, ProjectStoreFailure, owned_file, strict_json
 from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
 
@@ -38,6 +38,9 @@ REPLAY_WINDOW = 200
 CLIPBOARD_CAPTURES = 20
 OPEN_SESSIONS = 3
 REPLACED_TOKENS = 16
+# Past this many ids an edit's replay row keeps none: a split, the one reply a client depends on, names a few.
+REPLAY_DETAIL_IDS = 64
+EXPORT_ATTEMPTS = 20
 LOG = logging.getLogger(__name__)
 BLOB_KINDS = {'sources': '.bin', 'history': '.bin', 'template-assets': '.bin', 'renders': '.docx'}
 
@@ -67,8 +70,24 @@ def rich_snapshot_bytes(workspace) -> bytes:
     return raw
 
 
+def budget_bytes(workspace, raw):
+    """What the Settings size counts of a project file. Publication moves a pre-draft's import records to history
+    files (D105), so they do not count before it either: a run must not fail at its last step on them."""
+    if workspace.project is not None or workspace.pre_draft is None:
+        return len(raw)
+    from .models.template_workspace import history_bytes
+    return len(raw) - sum(len(history_bytes(value)) for value in workspace.pre_draft.template_operations)
+
+
 def stored_owners(data):
     return [owner for owner in (data.get('project'), data.get('preDraft')) if isinstance(owner, dict)] if isinstance(data, dict) else []
+
+
+def stored_assets(owner):
+    """The asset rows of a stored package. A wrong shape gives none here and fails model validation after."""
+    package = owner.get('templatePackage')
+    assets = package.get('assets') if isinstance(package, dict) else None
+    return assets if isinstance(assets, list) else []
 
 
 def inline_history(data) -> bool:
@@ -78,7 +97,7 @@ def inline_history(data) -> bool:
     project = data.get('project')
     return (isinstance(project, dict) and 'templateOperations' in project) or any(
         isinstance(asset, dict) and 'bytesBase64' in asset
-        for owner in stored_owners(data) for asset in ((owner.get('templatePackage') or {}).get('assets') or []))
+        for owner in stored_owners(data) for asset in stored_assets(owner))
 
 
 def history_blobs(workspace):
@@ -112,6 +131,8 @@ def read_history_file(directory, digest):
     if not isinstance(digest, str) or re.fullmatch(r'[0-9a-f]{64}', digest) is None:
         raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
     path = blob_path(directory, 'history', digest)
+    if not path.exists() and not path.is_symlink():
+        raise ProjectStoreFailure('PROJECT_HISTORY_MISSING')
     owned_file(path, WORKSPACE_BYTES)
     raw = path.read_bytes()
     if hashlib.sha256(raw).hexdigest() != digest:
@@ -126,16 +147,17 @@ def load_stored_data(directory, raw, *, history=False):
     from .templates.models import asset_text, remember_asset
     data = strict_json(raw)
     for owner in stored_owners(data):
-        for asset in ((owner.get('templatePackage') or {}).get('assets') or []):
+        for asset in stored_assets(owner):
             digest = asset.get('sha256') if isinstance(asset, dict) else None
             if isinstance(digest, str) and 'bytesBase64' not in asset and asset_text(digest) is None:
                 path = blob_path(directory, 'template-assets', digest)
                 owned_file(path, 20 * 1024 * 1024)
                 remember_asset(digest, base64.b64encode(path.read_bytes()).decode('ascii'))
     project = data.get('project') if isinstance(data, dict) else None
-    if history and isinstance(project, dict) and project.get('importHistory') and 'templateOperations' not in project:
+    references = project.get('importHistory') if isinstance(project, dict) else None
+    if history and references and isinstance(references, list) and 'templateOperations' not in project:
         project['templateOperations'] = [strict_json(read_history_file(directory, ref.get('sha256')))
-            for ref in project['importHistory'] if isinstance(ref, dict)]
+            for ref in references if isinstance(ref, dict)]
     return data
 
 
@@ -159,24 +181,24 @@ def externalize_history(store, *, moved=None):
             target = directory / 'workspace.json'
             if not target.is_file() or target.is_symlink():
                 continue
-            owned_file(target)
-            raw = target.read_bytes()
             try:
+                owned_file(target, WORKSPACE_BYTES)
+                raw = target.read_bytes()
                 if not inline_history(strict_json(raw)):
                     continue
                 workspace = WorkspaceV7.model_validate(load_stored_data(directory, raw))
-            except (ValueError, RecursionError):
-                # An unreadable file stays as it is; opening that project reports it, the service still starts.
+                for kind, identifier, blob, _checksum in history_blobs(workspace):
+                    path = blob_path(directory, kind, identifier)
+                    if not path.exists():
+                        atomic_write(path, blob)
+                slim = rich_snapshot_bytes(workspace)
+                if moved is not None:
+                    moved(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
+                atomic_write(target, slim)
+                result.append(workspace.project_id)
+            except (ProjectStoreFailure, StorageFailure, OSError, ValueError, RecursionError):
+                # One bad file stays as it is; opening that project reports it, the service still starts.
                 continue
-            for kind, identifier, blob, _checksum in history_blobs(workspace):
-                path = blob_path(directory, kind, identifier)
-                if not path.exists():
-                    atomic_write(path, blob)
-            slim = rich_snapshot_bytes(workspace)
-            if moved is not None:
-                moved(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
-            atomic_write(target, slim)
-            result.append(workspace.project_id)
         return result
 
 
@@ -265,9 +287,9 @@ class ProjectSession:
             return self.editor_token
 
     def require_editor(self, token):
-        if token is not None and secrets.compare_digest(token, self.editor_token or ''):
+        if token is not None and _same_token(token, self.editor_token or ''):
             return
-        if token is not None and any(secrets.compare_digest(token, value) for value in self.replaced_tokens):
+        if token is not None and any(_same_token(token, value) for value in self.replaced_tokens):
             raise RepositoryFailure('EDITOR_REPLACED')
         raise RepositoryFailure('EDITOR_TOKEN_UNKNOWN')
 
@@ -276,6 +298,11 @@ class ProjectSession:
         self.clipboard.move_to_end(identifier)
         while len(self.clipboard) > CLIPBOARD_CAPTURES:
             self.clipboard.popitem(last=False)
+
+
+def _same_token(token, value):
+    # compare_digest refuses a non-ASCII str, and a request can carry any text.
+    return secrets.compare_digest(token.encode('utf-8', 'replace'), value.encode('utf-8'))
 
 
 def _now():
@@ -310,7 +337,58 @@ class ProjectRepository:
                 raise RepositoryFailure(error.code) from None
             except (StorageFailure, OSError, ValueError):
                 raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
+            self._reconcile()
             self.started = True
+
+    def _reconcile(self):
+        """Finish what a crash or a failed cleanup left. Never stops the start: the listing reports a damaged registry."""
+        failures = (RepositoryFailure, ProjectStoreFailure, StorageFailure, OSError, ValueError, RecursionError)
+        try:
+            pending = self._recover_folders()
+        except failures as error:
+            LOG.warning('project folders not reconciled: %s', type(error).__name__)
+            return
+        for project_id in pending:
+            try:
+                self.cleanup_deleted(project_id)
+            except failures as error:
+                LOG.warning('deleted project not cleaned: %s', type(error).__name__)
+
+    def _recover_folders(self):
+        """Bring back or remove folders the registry does not name; returns the deletions still to clean up."""
+        if not self.store.registry_path.exists():
+            return []
+        with locked_root(self.root, '.projects.lock'):
+            registry = self.store._registry()
+            known = {entry.project_id for entry in registry.entries}
+            recovered = False
+            for directory in sorted(self.store.projects.iterdir()):
+                if directory.name in known or SAFE_ID.fullmatch(directory.name) is None or directory.is_symlink() or not directory.is_dir():
+                    continue
+                try:
+                    recovered = self._recover_folder(directory, registry) or recovered
+                except (RepositoryFailure, ProjectStoreFailure, StorageFailure, OSError, ValueError) as error:
+                    LOG.warning('project folder left as it is: %s', type(error).__name__)
+            if recovered:
+                self.store._write_registry(registry)
+            return [entry.project_id for entry in registry.entries if entry.tombstoned and entry.cleanup_status in {'pending', 'failed'}]
+
+    def _recover_folder(self, directory, registry):
+        """A complete project whose registry write was lost is listed again; a partial create is removed; a folder this
+        service did not make stays."""
+        marker, target = directory / '.project-identity.json', directory / 'workspace.json'
+        if target.exists() or target.is_symlink():
+            if not marker.exists():
+                return False
+            workspace, _key = self._read_file(self.store._directory(directory.name), directory.name)
+            self.store._upsert(registry, workspace)
+            return True
+        if marker.exists():
+            self.store._directory(directory.name)
+        elif any(not path.name.startswith('.foldcv-write-') for path in directory.iterdir()):
+            return False
+        _remove_project_files(directory)
+        return False
 
     def _directory(self, project_id, create=False):
         try:
@@ -319,9 +397,14 @@ class ProjectRepository:
             raise RepositoryFailure(error.code) from None
         except StorageFailure:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+        except OSError:
+            raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
 
     def _registry_entry(self, project_id):
-        registry = self.store.registry()
+        try:
+            registry = self.store.registry()
+        except ProjectStoreFailure as error:
+            raise RepositoryFailure(error.code) from None
         return next((entry for entry in registry.entries if entry.project_id == project_id), None)
 
     def listing(self):
@@ -421,7 +504,8 @@ class ProjectRepository:
     def _seeded(workspace):
         from .template_preparation_ids import existing_ids
         replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
-            row.resulting_revision, 'edit', replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
+            row.resulting_revision, 'edit', details={'created_ids': row.created_ids, 'created_blocks': row.created_blocks,
+            'changed_block_ids': row.changed_block_ids}, replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
         return replays, existing_ids(workspace)
 
     def _evict(self, *, keep):
@@ -472,6 +556,7 @@ class ProjectRepository:
         session.journal.compact(revision=session.workspace.project_revision)
         try:
             self._sweep(session)
+            self._sweep_renders(session)
         except RepositoryFailure:
             LOG.warning('asset sweep failed on close')
 
@@ -594,11 +679,13 @@ class ProjectRepository:
             after = fold(session, after) or after
         if after is before:
             raise RuntimeError('a commit needs a new workspace object')
+        if after.project is not None:
+            after.project = _latest_export(after.project)
         after.updated_at = self.clock()
         replay = list(before.mutation_replay)
         if client_mutation_id is not None:
             replay.append(RichMutationReplay(clientMutationId=client_mutation_id, requestSha256=request_sha256,
-                resultingRevision=after.project_revision))
+                resultingRevision=after.project_revision, **_replay_details(details)))
         after.mutation_replay = replay[-REPLAY_WINDOW:]
         try:
             after = validated_with_history(after)
@@ -608,7 +695,9 @@ class ProjectRepository:
             raw = rich_snapshot_bytes(after)
         except ProjectStoreFailure as error:
             raise RepositoryFailure(error.code) from None
-        if len(raw) > project_file_bytes():
+        # D096: a lowered setting blocks growth; an edit that keeps or shrinks the file always saves, and a pre-draft's
+        # import records do not count before publication moves them to history files.
+        if len(raw) > project_file_bytes() and budget_bytes(after, raw) > project_file_bytes() and len(raw) > session.file_key[1]:
             raise RepositoryFailure('PROJECT_TOO_LARGE')
         loaded = bool(after.project is not None and after.project.template_operations)
         try:
@@ -679,9 +768,12 @@ class ProjectRepository:
         for kind, identifier, blob, checksum in blobs:
             path = blob_path(directory, kind, identifier)
             if kind == 'history':
+                # Each one has to fit an archive entry, and D104 keeps these files out of the Settings budget.
+                if len(blob) > ARCHIVE_ENTRY_BYTES:
+                    raise RepositoryFailure('PROJECT_TOO_LARGE')
                 remember_history(checksum, blob)
             if path.exists() or path.is_symlink():
-                owned_file(path, DOCX_BYTES if kind == 'renders' else 32 * 1024 * 1024)
+                owned_file(path, DOCX_BYTES if kind == 'renders' else ARCHIVE_ENTRY_BYTES)
                 if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
                     raise RepositoryFailure('ARTIFACT_BYTES_MISMATCH' if kind == 'renders' else 'SOURCE_BYTES_MISMATCH')
             else:
@@ -706,10 +798,14 @@ class ProjectRepository:
                 directory = self.store._directory(workspace.project_id, create=True)
                 if (directory / 'workspace.json').exists():
                     raise RepositoryFailure('PROJECT_EXISTS')
-                self._write_blobs(directory, [*history_blobs(workspace), *blobs])
-                atomic_write(directory / 'workspace.json', raw)
-                self.store._upsert(registry, workspace)
-                self.store._write_registry(registry)
+                try:
+                    self._write_blobs(directory, [*history_blobs(workspace), *blobs])
+                    atomic_write(directory / 'workspace.json', raw)
+                    self.store._upsert(registry, workspace)
+                    self.store._write_registry(registry)
+                except Exception:
+                    self._discard_created(directory)
+                    raise
         except RepositoryFailure:
             raise
         except ProjectStoreFailure as error:
@@ -719,6 +815,15 @@ class ProjectRepository:
         except OSError:
             raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
         return self.open(workspace.project_id)
+
+    def _discard_created(self, directory):
+        """Remove the folder of a failed create, unless its registry entry reached the disk after all. A failure here is
+        left to the next start."""
+        try:
+            if all(entry.project_id != directory.name for entry in self.store._registry().entries):
+                _remove_project_files(directory)
+        except (ProjectStoreFailure, StorageFailure, OSError, ValueError) as error:
+            LOG.warning('failed create not removed: %s', type(error).__name__)
 
     def _write_registry_entry(self, workspace):
         try:
@@ -808,6 +913,10 @@ class ProjectRepository:
         try:
             private_directory(folder)
             for path in folder.iterdir():
+                if path.name.startswith('.foldcv-write-'):
+                    # Writes run under this lock, so this one is left from a crash.
+                    path.unlink()
+                    continue
                 if re.fullmatch(r'[0-9a-f]{64}\.(?:png|jpg)', path.name) is None:
                     raise StorageFailure('UNSAFE_STORAGE')
                 if 'images/' + path.name not in keep:
@@ -818,44 +927,76 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
         return removed
 
+    def sweep_renders(self, project_id):
+        """Remove the DOCX files of older exports now; a failure is left to the sweep on close."""
+        session = self.open(project_id)
+        with session.lock:
+            try:
+                self._sweep_renders(session)
+            except RepositoryFailure:
+                LOG.warning('render sweep failed')
+
+    def _sweep_renders(self, session):
+        folder = session.directory / 'renders'
+        project = session.workspace.project
+        if project is None or not folder.exists():
+            return
+        keep = {blob_path(session.directory, 'renders', render.id).name for render in project.renders}
+        try:
+            private_directory(folder)
+            for path in folder.iterdir():
+                if path.name.startswith('.foldcv-write-'):
+                    path.unlink()
+                elif path.suffix == '.docx' and path.name not in keep:
+                    owned_file(path, DOCX_BYTES)
+                    path.unlink()
+        except (OSError, StorageFailure):
+            raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+
+
+BLOB_FOLDERS = {'sources': r'[0-9a-f]{64}\.bin', 'renders': r'[0-9a-f]{64}\.(?:docx|foldcv)',
+    'images': r'[0-9a-f]{64}\.(?:png|jpg)', 'history': r'[0-9a-f]{64}\.bin', 'template-assets': r'[0-9a-f]{64}\.bin',
+    'imports': r'[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?'}
+
 
 def _remove_project_files(directory):
+    """Remove what the project owns. Anything else stays, with the marker that lets a later pass finish, and the removal
+    ends in StorageFailure."""
     marker = directory / '.project-identity.json'
-    files, folders = [], []
+    files, folders, unknown = [], [], []
+
+    def owned(path, limit):
+        try:
+            owned_file(path, limit)
+            files.append(path)
+        except StorageFailure:
+            unknown.append(path)
+
     for path in directory.iterdir():
         if path.name in {'workspace.json', '.project-identity.json', 'history.jsonl'}:
-            owned_file(path, 2 * WORKSPACE_BYTES); files.append(path)
-        elif path.name in {'sources', 'renders', 'images', 'history', 'template-assets'}:
-            private_directory(path)
-            suffix = {'sources': 'bin', 'renders': '(?:docx|foldcv)', 'images': '(?:png|jpg)', 'history': 'bin',
-                'template-assets': 'bin'}[path.name]
-            for blob in path.iterdir():
-                if blob.name.startswith('.foldcv-write-'):
-                    files.append(blob)
-                    continue
-                if re.fullmatch(r'[0-9a-f]{64}\.' + suffix, blob.name) is None:
-                    raise StorageFailure('UNSAFE_STORAGE')
-                owned_file(blob, DOCX_BYTES); files.append(blob)
-            folders.append(path)
-        elif path.name == 'imports':
+            owned(path, 2 * WORKSPACE_BYTES)
+        elif path.name in BLOB_FOLDERS and path.is_dir() and not path.is_symlink():
             private_directory(path)
             for blob in path.iterdir():
                 if blob.name.startswith('.foldcv-write-'):
                     files.append(blob)
-                    continue
-                if re.fullmatch(r'[A-Za-z0-9_-]{1,128}\.json(?:\.tmp)?', blob.name) is None:
-                    raise StorageFailure('UNSAFE_STORAGE')
-                owned_file(blob, WORKSPACE_BYTES); files.append(blob)
+                elif re.fullmatch(BLOB_FOLDERS[path.name], blob.name) is None:
+                    unknown.append(blob)
+                else:
+                    owned(blob, WORKSPACE_BYTES)
             folders.append(path)
         elif path.name.startswith('.foldcv-write-'):
             files.append(path)
         else:
-            raise StorageFailure('UNSAFE_STORAGE')
+            unknown.append(path)
     for path in files:
         if path != marker:
             path.unlink()
     for path in folders:
-        path.rmdir()
+        if not any(path.iterdir()):
+            path.rmdir()
+    if unknown:
+        raise StorageFailure('UNSAFE_STORAGE')
     if marker.exists():
         marker.unlink()
     directory.rmdir()
@@ -878,6 +1019,25 @@ def _stored(directory, raw, after, loaded):
 def _digest(workspace):
     from .templates.compiler import canonical
     return hashlib.sha256(canonical(workspace)).hexdigest()
+
+
+def _latest_export(project):
+    """A retry needs the latest capture and a download the latest DOCX, so an export replaces the one before it in the
+    project file. Runs on every commit: this also trims a project saved with many."""
+    attempts = project.exports[-EXPORT_ATTEMPTS:]
+    if len(project.export_inputs) <= 1 and len(project.renders) <= 1 and len(attempts) == len(project.exports):
+        return project
+    named = {attempt.id for attempt in attempts}
+    return project.model_copy(update={'exports': attempts, 'renders': project.renders[-1:],
+        'export_inputs': [value for value in project.export_inputs[-1:] if value.attempt_id in named]})
+
+
+def _replay_details(details):
+    """The parts of an edit's reply a retry after a restart repeats; `action` and the like stay out."""
+    ids, blocks, changed = details.get('created_ids') or {}, details.get('created_blocks') or {}, details.get('changed_block_ids') or []
+    if len(changed) + sum(map(len, ids.values())) + sum(map(len, blocks.values())) > REPLAY_DETAIL_IDS:
+        return {}
+    return {'createdIds': ids, 'createdBlocks': blocks, 'changedBlockIds': changed}
 
 
 def _created(details):

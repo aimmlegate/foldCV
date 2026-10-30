@@ -11,12 +11,14 @@ import pytest
 
 from packages.resume_core.models.projects import DeleteRequestV1
 from packages.resume_core.project_repository import RepositoryFailure
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.template_import import entries_of, spent_calls
 from resume_api.inference_admission import InferenceAdmission
 from resume_api.projects import rewrite
 from resume_api.projects.errors import ProjectFailure
 from resume_api.projects.imports import ImportCommand, ImportService
 from resume_api.projects.service import ProjectService
+from resume_api.providers.content import ContentFailure, ContentTransportReturn, ReportedUsage
+from tests.templates.entry_fixtures import entries_package, entries_script, lines_source
 from tests.templates.pipeline_fixtures import blocks_package
 from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
 
@@ -53,11 +55,11 @@ def finalizing(options):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('cancel_at,resumed_calls', [(0, 2), (3, 0)])
+@pytest.mark.parametrize('cancel_at,resumed_calls', [(0, 3), (3, 0)])
 async def test_a_cancelled_import_stays_unsaved_after_a_restart_and_resume_repeats_no_finished_call(tmp_path, cancel_at,
         resumed_calls):
-    # Two blocks, two calls each. A cancel during block one stops before block two; one during the last review stops
-    # before publication, and the resume publishes without a model call.
+    # Two blocks, two calls each. A cancel during a block's call stops before that block's next call, and the reply it
+    # got is kept; one during the last review stops before publication, and the resume publishes without a model call.
     fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False)
     projects = services(fixture)
     original = fixture.transport.generate
@@ -86,6 +88,77 @@ async def test_a_cancelled_import_stays_unsaved_after_a_restart_and_resume_repea
     assert published.state == 'published' and published.capture == operation.capture
     assert len(fixture.transport.calls) == spent_calls(published) == calls + resumed_calls == 4
     assert [task.state for task in published.tasks] == ['accepted', 'accepted']
+
+
+def stopped_call(request):
+    """A call the CLI stops on a cancel: the process ended, cleanup is proved and no reply came."""
+    witness = {'transport': 'exec', 'dispatched': True}
+    request.on_return(ContentTransportReturn('', 'cancelled', 'CANCELLED', 1, ReportedUsage(), True, witness, 'medium'))
+    raise ContentFailure('CANCELLED', logical_attempts=1, usage=ReportedUsage(), cleanup_verified=True, dispatch_witness=witness, raw_return='')
+
+
+def stop_at(fixture, projects, matches):
+    """Stop the running import in the first call `matches` picks, as a provider that honours the cancel does."""
+    original, stopped = fixture.transport.generate, []
+    def generate(request, cancel):
+        value = request.request_value
+        if not stopped and matches(value):
+            stopped.append(value)
+            fixture.transport.calls.append(value)
+            for task in projects.tasks.running(fixture.project, 'import'):
+                projects.tasks.cancel(task.id)
+            stopped_call(request)
+        return original(request, cancel)
+    fixture.transport.generate = generate
+    return original
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('concurrency', [1, 2])
+@pytest.mark.parametrize('stage', ['extraction', 'review'])
+async def test_a_call_stopped_by_a_cancel_is_no_failed_block_and_a_resume_runs_it_again(tmp_path, stage, concurrency):
+    # A stop saved the block in flight as a source fallback, so the resume never called for it: Stop, Retry on a stalled
+    # run, sign-out and a restart each lost the blocks in flight for good.
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False, concurrency=concurrency)
+    projects = services(fixture)
+    original = stop_at(fixture, projects, lambda value: ('targets' in value) == (stage == 'review'))
+    status = await run_import(projects, fixture)
+    assert (status['state'], status['error']) == ('cancelled', None)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    assert stopped.task_results == [] and not stopped.issues
+    assert sum(attempt.outcome == 'cancelled' for attempt in stopped.attempts) == 1
+    fixture.transport.generate = original
+    calls = len(fixture.transport.calls)
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    assert published.state == 'published' and not published.issues
+    assert [task.state for task in published.tasks] == ['accepted', 'accepted']
+    assert {result.disposition for result in published.task_results} == {'admitted'}
+    assert len(fixture.transport.calls) > calls and spent_calls(published) == len(fixture.transport.calls)
+    # The stopped call stays on record and counted; its slot is used again.
+    assert sum(attempt.outcome == 'cancelled' for attempt in published.attempts) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('slot', ['outline', 'outline_review'])
+async def test_a_stopped_outline_call_runs_again_on_resume(tmp_path, slot):
+    fixture = RuntimeFixture(tmp_path, captured=entries_package(), src=lines_source()[0], original_bytes=lines_source()[1],
+        cap=20, fallback=False, concurrency=2)
+    fixture.transport.scripted = entries_script()
+    projects = services(fixture)
+    original = stop_at(fixture, projects, lambda value: value.get('slot') == slot)
+    status = await run_import(projects, fixture)
+    assert (status['state'], status['error']) == ('cancelled', None)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    assert not any(result.disposition == 'source_fallback' for result in stopped.task_results)
+    fixture.transport.generate = original
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    slots = [attempt.slot for attempt in published.attempts]
+    assert slots.count(slot) == 2 and not published.issues and published.state == 'published'
+    assert len(entries_of(published, published.tasks[0].id)) == 2
 
 
 @pytest.mark.asyncio
@@ -159,7 +232,7 @@ async def test_deleting_a_project_stops_its_rewrite_preview_through_the_rewrite_
     fixture = RuntimeFixture(tmp_path)
     projects = services(fixture)
     cancels = {}
-    async def rewrite_text(project_id, request_id, _instruction, _source):
+    async def rewrite_text(project_id, request_id, _instruction, _source, _admitted):
         stop = cancels[(project_id, request_id)] = threading.Event()
         await asyncio.to_thread(stop.wait, 10)
         raise ProjectFailure('CANCELLED', 409)

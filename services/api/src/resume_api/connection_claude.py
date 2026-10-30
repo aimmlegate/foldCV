@@ -50,7 +50,7 @@ class ClaudeConnectionAdapter:
         try:
             probe = provider.probe(files, cancel, deadline=time.monotonic() + 15)
         except ContentFailure as error:
-            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
+            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED"), error.version) from None
         if not full:
             return Metadata(probe.version, (), None, NOT_PROVIDED, version_status=probe.status)
         return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning), probe.status)

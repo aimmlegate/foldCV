@@ -40,6 +40,7 @@ from packages.resume_core.models.settings import (RulesSettings, RulesSettingsEr
 from .projects.errors import ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
+from packages.resume_core.templates.loading import CONFIG_BYTES
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
 from .profile_ownership import native_profile, recover_profile
 from packages.resume_core.assistant_store import AgentFailure
@@ -50,13 +51,17 @@ MAX_BODY = 1_048_576
 MAX_CONCURRENT = 2
 BODY_TIMEOUT_SECONDS = 10
 CANCEL_GRACE_SECONDS = 0.5
+# A connection check waits this long behind model work, then answers BUSY.
+CHECK_WAIT_SECONDS = 30
+# A sign-in or install stops model work first and waits for it; the longest stop wait of that work.
+MODEL_STOP_SECONDS = 65
 # "not_provided": the provider has no sanctioned usage read (decision 15); runs stay allowed.
 USABLE_QUOTA = frozenset({"available", "not_provided"})
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
                             "host/select", "host/cancel-login", "host/install", "host/cancel-install",
                             "host/enable", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
-JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
+TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 
 
 @dataclass
@@ -90,6 +95,12 @@ def strict_json(raw: bytes) -> object:
         raise ValueError("non-finite number")
 
     return json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid_constant)
+
+
+def takes_json(method: str, path: str) -> bool:
+    """Every /v1/ PUT and every template-config write has one strict JSON body; the other /v1/ POSTs that do are listed."""
+    return ((method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path.startswith("/v1/"))
+            or (method in {"POST", "PUT"} and path.startswith(TEMPLATE_CONFIG_PATH)))
 
 
 def is_json_media_type(raw: bytes) -> bool:
@@ -165,6 +176,9 @@ class LocalBoundary:
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
                     # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
                     body_limit = MAX_BODY + 64 * 1024
+                if path.startswith(TEMPLATE_CONFIG_PATH):
+                    # The compiler's own limit, plus the JSON escapes of a text of that size (its line ends and quotes).
+                    body_limit = 2 * CONFIG_BYTES
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
@@ -173,7 +187,7 @@ class LocalBoundary:
                     break
             body = b"".join(chunks)
             project_json = path.startswith("/v2/projects") and path != "/v2/projects/archive"
-            if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
+            if takes_json(method, path) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
                     return
@@ -360,7 +374,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def experimental_ready(model=None) -> bool:
         kind = catalog().get(model or processing_model())
-        return kind is not None and usable(kind) and not busy(kind)
+        return kind is not None and usable(kind)
 
     def lifecycle_code(error: SpikeError) -> str:
         nonlocal unsafe_cleanup
@@ -429,6 +443,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     def import_selected_provider():
         return preferred_provider("selected_import_model")
 
+    def unavailable_code(field):
+        """Why the model chosen in `field` cannot run: a known exhausted plan is named, because "connect a model" sent
+        the user to Settings for nothing (D104)."""
+        stored = stored_preferences()
+        kind = catalog().get((getattr(stored, field) if stored else None) or processing_model())
+        # Without a chosen model, the plan is named when every provider that is on has used it up.
+        exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
+        return ("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted" for item in exhausted)
+                else "CONNECTION_REQUIRED")
+
     from packages.resume_core.project_repository import ProjectRepository
     from .projects.exports import ExportService, production_render
     from .projects.fold import register_import_fold
@@ -448,7 +472,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         **({"clock": clock} if clock is not None else {}))
     app.state.intake = intake
     rewrite = TemplateRewrite(lambda: preferred_provider("selected_rewrite_model"), preferences=preferences_store,
-        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of)
+        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of,
+        unavailable=lambda: unavailable_code("selected_rewrite_model"))
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
     mount_projects_v2(app, projects)
 
@@ -457,7 +482,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def agent_connection():
         owners = catalog()
-        ready_kinds = {kind for kind in kinds() if connected(kind) and not busy(kind)}
+        ready_kinds = {kind for kind in kinds() if connected(kind)}
         listed = [kind for kind in kinds() if on(kind)]
         reason = ("AGENT_CLEANUP_FAILED" if unsafe_cleanup or INFERENCE.blocked else
             "AGENT_AUTH_REQUIRED" if any(states[kind].state in {"login_required", "login_pending", "detached"} for kind in listed) else
@@ -465,8 +490,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         ready = bool(ready_kinds)
         # A ready assistant offers the models of the providers that can run now; a model of another one is unavailable.
         models = tuple(model for model, kind in owners.items() if not ready or kind in ready_kinds)
+        displays = {item.kind: item.display for item in registry.listed()}
         return AgentConnection(ready, models, "connection_" + connection_namespace + "_" + str(connection_epoch),
-            None if ready else reason, catalog_reasoning(owners))
+            None if ready else reason, catalog_reasoning(owners), {model: displays[kind] for model, kind in owners.items()})
 
     resolved_agent_runtime = agent_runtime
     if resolved_agent_runtime is None and experimental_profile is not None:
@@ -490,14 +516,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         from packages.resume_core.template_import import digest as capture_digest
         selected = import_selected_provider()
         if selected is None:
-            # A known exhausted plan is named as such; "connect a model" sent the user to Settings for nothing (D104).
-            stored = stored_preferences()
-            kind = catalog().get((stored.selected_import_model if stored else None) or processing_model())
-            # Without a chosen model, the plan is named when every provider that is on has used it up.
-            exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
-            raise ProjectFailure("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted"
-                                                                        for item in exhausted)
-                                 else "CONNECTION_REQUIRED", 409)
+            raise ProjectFailure(unavailable_code("selected_import_model"), 409)
         provider, model = selected
         reasoning = reasoning_of(model)
         if effort is not None and (reasoning is None or effort not in reasoning.supported):
@@ -667,7 +686,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def rules_failure(error: RulesFailure):
         status = 409 if error.code == "RULES_STALE" else 422 if error.code in {
-            "RULES_PRESETS_REQUIRED", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
+            "RULES_PRESETS_REQUIRED", "RULES_PRESET_TOO_LONG", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
         payload = RulesSettingsError.model_validate({
             "error": {"code": error.code, "retryable": False, "stage": "rules"},
             "requiredHeadings": list(PRESET_HEADINGS.values()) if error.code == "RULES_PRESETS_REQUIRED" else [],
@@ -837,18 +856,17 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             if unsafe_cleanup or INFERENCE.blocked:
                 states[kind] = ProviderState(state="cleanup_blocked")
                 return connection_response(kind)
-            if INFERENCE.locked():
-                return connection_response(kind) if job not in {"login", "install"} else problem("BUSY", 429, "host", True)
             if job == "login" and states[kind].state != "login_required":
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
             if job == "install" and (installation is None or states[kind].state not in {
                     "cli_missing", "unsupported_version", "launcher_unsupported"}):
                 return problem("INSTALL_NOT_AVAILABLE", 409, "host")
-            # One connection job per provider; the other provider's checks go on.
+            # Beside the provider's own sign-in or install a check starts nothing: the reply is that job's state.
+            if job not in {"login", "install"} and (kind in login_tasks or kind in install_tasks):
+                return connection_response(kind)
+            # One connection job per provider; jobs and model work take turns at the exclusive permit (D121).
             if cancellation_pending or active >= MAX_CONCURRENT or busy(kind):
                 return problem("BUSY", 429, "host", True)
-            if slot.provider is not None:
-                slot.provider.invalidate_preflight()
             active += 1
             epoch = epochs[kind]
             profile = slot.profile
@@ -858,18 +876,28 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 installation.cancel = cancel
                 installation.update(state="downloading", downloadedBytes=0, error=None)
 
+            wait = MODEL_STOP_SECONDS if job in {"login", "install"} else CHECK_WAIT_SECONDS
+
+            def admitted():
+                return INFERENCE.hold(cancel, deadline=time.monotonic() + wait, exclusive=True)
+
+            def run():
+                # Under the permit: a check that gives up behind model work leaves the metadata of that work alone.
+                if slot.provider is not None:
+                    slot.provider.invalidate_preflight()
+                return work(files, cancel)
+
             def execute():
                 if job == "install":
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), files.open():
-                        return work(files, cancel)
+                    with admitted(), files.open():
+                        return run()
                 if profile is not None and not profile.executable.is_file():
                     raise ConnectionFailure("CLI_MISSING")
                 try:
-                    with INFERENCE.hold(cancel, deadline=time.monotonic() + 15, exclusive=True), native_profile(
-                            profile, cancel, deadline=time.monotonic() + 15, blocking=False,
-                            operations_root=temp_root):
+                    with admitted(), native_profile(profile, cancel, deadline=time.monotonic() + 15, blocking=False,
+                                                    operations_root=temp_root):
                         with files.open():
-                            return work(files, cancel)
+                            return run()
                 except (ExperimentalProfileError, ClaudeProfileError) as error:
                     raise ConnectionFailure("UNSUPPORTED_VERSION" if str(error) == "CLI_UNSUPPORTED" else "METADATA_FAILED") from None
 
@@ -882,10 +910,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 connection_epoch += 1
                 epochs[kind] += 1
                 epoch = epochs[kind]
-                # An import may use both providers, so a new sign-in or CLI on either stops all model work.
+                # An import may use both providers, so a new sign-in or CLI on either stops all model work (D119). The
+                # job's thread starts after this, and its exclusive permit then waits for that work to end.
                 assistant.stop_all()
-                # A running import holds the permit and makes this BUSY; one not yet admitted would call the model
-                # under the new sign-in or CLI.
+                rewrite.request_shutdown()
                 projects.imports.stop_all()
                 if job == "install":
                     install_tasks[kind] = task
@@ -916,10 +944,17 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                                              versionStatus=result.version_status, models=list(result.models), quota=quota,
                                              modelReasoning=result.reasoning, metadataReady=job != "discover")
                 return connection_response(kind)
-        except (AdmissionTimeout, AdmissionCancelled):
+        except (AdmissionTimeout, AdmissionCancelled) as error:
             if job == "install":
                 installation.update(state="cancelled" if cancel.is_set() else "failed",
                                     error="cancelled" if cancel.is_set() else "busy")
+            elif job == "login":
+                async with gate:
+                    if epoch == epochs[kind]:
+                        states[kind] = ProviderState(state="login_required", version=states[kind].version)
+            elif isinstance(error, AdmissionTimeout):
+                # The check did not run, so the old state must not read as its result.
+                return problem("BUSY", 429, "host", True)
             return connection_response(kind)
         except AdmissionBlocked:
             if job == "install":

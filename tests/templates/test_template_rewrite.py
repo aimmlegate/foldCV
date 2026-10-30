@@ -66,5 +66,6 @@ def test_failure_and_cancellation_report_codes_and_release_the_request(tmp_path)
         return cancelled.value
     error = asyncio.run(run())
     assert (error.code, error.status) == ('CANCELLED', 409)
-    assert service.cancel('project', 'request-3') is False
+    # A cancel for a request that is not registered is remembered as an early cancel, so it is never refused.
+    assert service.cancel('project', 'request-3') is True
     assert service.cancels == {}

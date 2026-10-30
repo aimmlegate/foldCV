@@ -13,7 +13,7 @@ import pytest
 from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.storage import private_directory
 from resume_api.inference_admission import AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
-from resume_api.profile_ownership import native_profile, recover_profile
+from resume_api.profile_ownership import BLOCKED, native_profile, recover_profile
 
 
 def profile(root):
@@ -188,3 +188,16 @@ def test_profile_cleanup_marker_requires_its_own_verified_operation_root(tmp_pat
     assert not recover_profile(owned, operations)
     with native_profile(owned, threading.Event(), deadline=deadline()):
         pass
+
+
+def test_a_call_cannot_join_a_shared_hold_after_a_blocked_marker(tmp_path):
+    owned, cancel = profile(tmp_path / "native-profile"), threading.Event()
+    with native_profile(owned, cancel, deadline=deadline(), shared=True, operations_root=tmp_path):
+        # Another call of the hold failed cleanup, as `_owned` records it.
+        (owned.root / BLOCKED).write_text("{}")
+        with pytest.raises(AdmissionBlocked):
+            with native_profile(owned, cancel, deadline=deadline(), shared=True, operations_root=tmp_path):
+                pytest.fail("a call joined the hold beside a process that may live")
+    # The refused call left the hold, so the last one out still released the lock.
+    (owned.root / BLOCKED).unlink()
+    assert profile_free(owned)

@@ -1,4 +1,5 @@
 export type Model = string;
+export type Provider = string | null;
 export type State = "unverified" | "verified" | "incompatible";
 /**
  * @maxItems 100
@@ -157,6 +158,7 @@ export interface AssistantCapabilitiesV1 {
 }
 export interface ModelChoiceV1 {
   model: Model;
+  provider?: Provider;
   state: State;
 }
 export interface AssistantErrorV1 {

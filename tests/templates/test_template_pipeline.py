@@ -5,8 +5,10 @@ import copy
 import pytest
 
 from packages.resume_core.template_import import CleanupProof, digest, reconcile_cleanup, spent_calls
+from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
+from tests.templates.generic_fixtures import span
 from tests.templates.pipeline_fixtures import resume_command
-from tests.templates.template_runtime_fixtures import RuntimeFixture
+from tests.templates.template_runtime_fixtures import EmploymentFixture, RuntimeFixture
 from tests.templates.template_runtime_fixtures import import_task
 from tests.templates.test_semantic_admission import raw_proposal
 from tests.templates.evidence_references import model_targets
@@ -518,7 +520,7 @@ async def test_a_coverage_finding_without_a_reviewed_repair_is_still_shown(tmp_p
 def test_a_repair_wins_only_when_it_keeps_every_admitted_value():
     from packages.resume_core.template_review import ShownValue, _text_key, repair_wins
     def shown(text, line='u1', reworded=False):
-        return ShownValue('item-' + text, 'foldcv:programming', 'display', _text_key(text), frozenset({('s', line)}), reworded)
+        return ShownValue('item-' + text, 'foldcv:programming', 'display', _text_key(text), frozenset({('s', line, 0, 10)}), reworded)
     first = [shown('Go'), shown('NodeJS'), shown('Kafka 4.0.x')]
     scope = {'scope-task'}
     # Spelling differences are one value; a lost version is a lost value.
@@ -533,6 +535,139 @@ def test_a_repair_wins_only_when_it_keeps_every_admitted_value():
     fixed = shown('Создал кластер из трёх брокеров', 'u3', True)
     assert not repair_wins(claims, {'cell-1'}, [shown('Создавал aggregate functions', 'u1', True), fixed], set())
     assert repair_wins(claims, {'cell-1'}, [shown('Создавал aggregate functions', 'u1', True), claims[1], fixed], set())
+
+
+def shown_at(item, text, spans=(), reworded=False):
+    # The repair comparison needs only these parts of a value.
+    from packages.resume_core.template_review import ShownValue, _text_key
+    return ShownValue(item, 'foldcv:programming', 'display', _text_key(text), frozenset(spans), reworded)
+
+
+def test_two_lines_of_one_source_unit_are_two_claims():
+    from packages.resume_core.template_review import repair_wins
+    # One PDF text block is one unit: the repair writes the claim of its third line over the admitted claim of its second.
+    admitted = shown_at('claim', 'Настроил мониторинг', {('s', 'block', 20, 40)}, True)
+    other_line = shown_at('claim', 'Сократил задержку на 80%', {('s', 'block', 40, 60)}, True)
+    same_line = shown_at('claim', 'Сократили задержку', {('s', 'block', 25, 35)}, True)
+    assert not repair_wins([admitted], {'cell-1'}, [other_line], set())
+    assert repair_wins([admitted], {'cell-1'}, [same_line], set())
+
+
+@pytest.mark.parametrize('first, second, same', [('C#', 'C++', False), ('C', 'C#', False), ('.NET', 'NET', False),
+    ('Kafka 4.0.x', 'Kafka', False), ('Node.js', 'NodeJS', True), ('node-js', 'Node JS', True), ('C#', 'c#', True),
+    ('Настроил очереди.', 'Настроил очереди', True)])
+def test_the_comparison_ignores_spelling_but_keeps_symbols_of_a_name(first, second, same):
+    from packages.resume_core.template_review import _text_key
+    assert (_text_key(first) == _text_key(second)) is same
+
+
+def test_a_changed_or_added_technology_counts_though_its_letters_match():
+    from packages.resume_core.template_review import repair_wins
+    assert not repair_wins([shown_at('a', 'C#')], {'cell-1'}, [shown_at('a', 'C++')], set())
+    # D107: the addition beside an equal letter breaks a coverage tie.
+    scope = {'scope-task'}
+    assert repair_wins([shown_at('a', 'C#')], scope, [shown_at('a', 'C#'), shown_at('b', 'C++')], scope)
+
+
+def test_an_equal_value_on_another_item_does_not_keep_a_lost_one():
+    from dataclasses import replace
+    from packages.resume_core.template_review import repair_wins
+    first = [shown_at('job-1', 'Python'), shown_at('job-2', 'Python')]
+    assert not repair_wins(first, {'cell-1'}, [first[0], shown_at('job-2', 'Django')], set())
+    # An item the repair does not send may have its value carried to a new one, as by a split.
+    assert repair_wins([shown_at('old', 'Python')], {'cell-1'}, [shown_at('new', 'Python')], set())
+    assert not repair_wins([shown_at('old', 'Python')], {'cell-1'}, [shown_at('new', 'Python')], set(), {'old'})
+    # A value an item gains is an addition though another item holds the same text.
+    scope = {'scope-task'}
+    gained = replace(shown_at('job-2', 'Python'), field_key='title')
+    assert repair_wins([first[0], gained], scope, [first[0], gained, first[1]], scope)
+
+
+@pytest.mark.asyncio
+async def test_a_repair_that_names_an_unstated_value_with_empty_evidence_keeps_the_block(tmp_path):
+    # D101: an entry with no evidence is no citation, so the value is dropped as when the reply gave no entry.
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    def script(_request, value):
+        if 'targets' in value:
+            return satisfied_review(value)
+        reply = raw_proposal(fixture.source)
+        reply['payload'][1]['journal'] = 'Unstated Journal'
+        next(field for field in reply['fields'] if field['pointer'] == '/1/journal')['evidence'] = []
+        return reply
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert [attempt.slot for attempt in result.attempts] == ['initial', 'primary_repair', 'replacement_review']
+    assert result.proposals[1].state == 'accepted' and result.tasks[0].state == 'accepted'
+    assert [(value.pointer, value.text) for value in result.proposals[1].dropped_values] == [('/1/journal', 'Unstated Journal')]
+    assert [issue.code for issue in result.issues] == ['IMPORT_VALUE_UNBOUND']
+    assert len(fixture.current().project.facts.extensions) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_notice_of_a_failing_value_also_names_the_values_the_repair_lost(tmp_path):
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    def script(_request, value):
+        if 'targets' not in value:
+            reply = raw_proposal(fixture.source)
+            without_journal(reply)
+            return reply
+        statuses = {allocation['cellIds']['status'] for allocation in value['handleMap'] if allocation['semanticType'] == 'papers'}
+        return failing_review(value, [target for target in model_targets(value) if target['targetId'] in statuses][:1])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert result.proposals[1].dropped_values and result.proposals[1].applied_receipt_id is not None
+    [issue] = result.issues
+    assert issue.code == 'IMPORT_SOURCE_FALLBACK' and issue.message.startswith('Проверка нашла ошибку')
+    assert 'Unstated Journal' in issue.message and 'Остальное в блоке принято' not in issue.message
+
+
+@pytest.mark.asyncio
+async def test_a_second_repair_stands_against_every_value_the_task_admitted(tmp_path):
+    # The primary repair touches a and wins; the fallback repair then writes over b, which only the first reply admitted.
+    fixture, reviews = RuntimeFixture(tmp_path), []
+    def script(_request, value):
+        if 'targets' in value:
+            reviews.append(value)
+            statuses = {allocation['cellIds']['status'] for allocation in value['handleMap']}
+            return failing_review(value, [target for target in model_targets(value) if target['targetId'] in statuses]
+                if len(reviews) == 1 else [])
+        if value['slot'] == 'initial':
+            return papers(fixture.source, ['a', 'b'])
+        if value['slot'] == 'primary_repair':
+            return papers(fixture.source, ['a'], captured_handles(value))
+        reply = papers(fixture.source, ['b'], captured_handles(value))
+        reply['payload'][0]['journal'] = 'Queue Review Quarterly'
+        return reply
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    first, primary, fallback = result.proposals
+    assert primary.applied_receipt_id is not None and fallback.applied_receipt_id is None
+    journals = [cell.typed_value for record in fixture.current().project.facts.extensions for cell in record.cells
+        if cell.field_key == 'journal']
+    assert sorted(journals) == ['Queue Review', 'Systems Notes']
+
+
+@pytest.mark.asyncio
+async def test_a_failed_owner_relation_shows_the_lines_of_the_value_it_withholds(tmp_path):
+    src, raw = employment_source()
+    # Two calls: the review's finding stays, with no repair to clear it.
+    fixture = EmploymentFixture(tmp_path, captured=employment_package(), src=src, original_bytes=raw, cap=2, fallback=False)
+    claim = 'Implemented queue processing.'
+    def script(_request, value):
+        if 'targets' not in value:
+            reply = employment_proposal(src)
+            # A model-sent relation may cite only the employer line, not the line of its subject.
+            relation = next(entry for entry in reply['relations'] if entry['subject'].get('key') == 'tasks-entry')
+            relation['evidence'] = [span(src, 'Example Labs')]
+            return reply
+        subject = next(allocation['recordId'] for allocation in value['handleMap'] if allocation['key'] == 'tasks-entry')
+        relation = next(entry['id'] for entry in value['relations'] if entry['subjectId'] == subject)
+        return failing_review(value, [target for target in model_targets(value) if target['targetId'] == relation])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert not any(record.kind == 'claim' and record.value.value == claim for record in fixture.current().project.facts.records)
+    outcome = result.task_results[0]
+    assert outcome.disposition == 'source_fallback' and any(claim in text for text in outcome.value['sourceTexts'].values())
 
 
 def test_coverage_review_lists_the_other_blocks_of_the_selected_branch():
@@ -796,6 +931,66 @@ async def test_an_import_task_stopped_by_the_account_reports_the_limit_and_saves
     # A restarted service keeps the import unsaved.
     fixture.restart()
     assert fixture.current().project is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('code', ['QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'])
+@pytest.mark.parametrize('stage', ['extraction', 'review'])
+async def test_a_resume_after_an_account_stop_runs_the_stopped_call_again(tmp_path, code, stage):
+    # D104: the resume took the stopped call as a finished failed attempt and published the block without content.
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False)
+    def script(_request, value):
+        if ('targets' in value) == (stage == 'review'):
+            account_failure(code)
+        return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
+    fixture.transport.scripted = script
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', code)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    fixture.transport.scripted = None
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    assert [task.state for task in published.tasks] == ['accepted', 'accepted'] and not published.issues
+    assert {result.disposition for result in published.task_results} == {'admitted'}
+    # The stopped call counts as spent and takes no repair slot.
+    assert spent_calls(published) == len(fixture.transport.calls) == 5
+    assert not any(attempt.slot in {'primary_repair', 'fallback_repair'} for attempt in published.attempts)
+
+
+@pytest.mark.asyncio
+async def test_a_resume_while_the_account_still_fails_stops_again_and_saves_nothing(tmp_path):
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), cap=20, fallback=False)
+    fixture.transport.scripted = lambda _request, _value: account_failure('QUOTA_EXHAUSTED')
+    await import_task(fixture)
+    stopped = fixture.current().pre_draft.template_operations[0]
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    assert len(fixture.transport.calls) == 2 and fixture.current().project is None
+    assert fixture.current().pre_draft.template_operations[0].task_results == []
+
+
+@pytest.mark.asyncio
+async def test_a_repair_stopped_by_the_account_runs_again_on_resume(tmp_path):
+    fixture = RuntimeFixture(tmp_path, cap=20)
+    first = refused_first(fixture, without_journal)
+    repairs = []
+    def script(request, value):
+        if value.get('slot') == 'primary_repair' and not repairs:
+            repairs.append(value)
+            account_failure('QUOTA_EXHAUSTED')
+        return first(request, value)
+    fixture.transport.scripted = script
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    stopped = fixture.current().pre_draft.template_operations[0]
+    resumed = await import_task(fixture, kind='resume', operation_id=stopped.id)
+    assert (resumed['state'], resumed['error']) == ('succeeded', None)
+    published = fixture.current().project.template_operations[0]
+    assert [attempt.slot for attempt in published.attempts] == ['initial', 'primary_repair', 'primary_repair', 'replacement_review']
+    assert published.tasks[0].state == 'accepted' and not published.issues
 
 
 @pytest.mark.asyncio

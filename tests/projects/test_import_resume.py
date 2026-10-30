@@ -1,16 +1,21 @@
 """A restarted import continues the saved operation and publishes through the same repository."""
 
+import json
+
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository
+from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
 from packages.resume_core.template_import import admit_operation
 from packages.resume_core.templates.operations import derive_task
 from resume_api.projects.fold import register_import_fold, sidecar_store
 from resume_api.importer.template_pipeline import TemplatePipeline
+from resume_api.importer.template_sidecar import OperationSidecar
+from resume_api.projects.imports import ImportService
+from resume_api.projects.service import ProjectService
 from tests.projects.support import source_blobs
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.pipeline_fixtures import resume_command
-from tests.templates.template_runtime_fixtures import EmploymentFixture, scripted_employment
+from tests.templates.template_runtime_fixtures import EmploymentFixture, RuntimeFixture, import_task, scripted_employment
 
 
 def coordinator(fixture, repository):
@@ -47,6 +52,51 @@ async def test_resume_executes_the_unfinished_tasks_from_the_sidecar(tmp_path, c
     assert len(fixture.transport.calls) > 0
     assert sidecar_store(directory).read(fixture.project, operation.id) is None
     assert 'journal gap' not in caplog.text
+
+
+def folded_leftover(fixture, monkeypatch, operation, update):
+    """A commit that folded the sidecar and crashed before removing the file; `update` runs before that commit."""
+    fixture.pipeline.update_operation(fixture.project, operation.id, lambda value, _data, _workspace: admit_operation(value, fixture.now))
+    update()
+    with monkeypatch.context() as patched:
+        patched.setattr(OperationSidecar, 'discard', lambda *_args: (_ for _ in ()).throw(OSError('crash')))
+        fixture.pipeline.update(fixture.project, operation.id, lambda value, _data, _workspace: value.model_copy(update={
+            'last_observed_at': '2026-10-21T00:00:01+00:00'}))
+    assert fixture.sidecar.read(fixture.project, operation.id)[0] < fixture.current().project_revision
+
+
+@pytest.mark.asyncio
+async def test_a_folded_sidecar_left_on_an_older_revision_does_not_block_the_resume(tmp_path, monkeypatch):
+    # The commit stands when the file removal fails (plan 2.7), and readers accept the file; each resume ended unknown.
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    projects = ProjectService(fixture.repository)
+    projects.imports = ImportService(projects, fixture.pipeline, commands=lambda *_args: fixture.command)
+    operation = await fixture.pipeline.start(fixture.project, fixture.command)
+    folded_leftover(fixture, monkeypatch, operation, lambda: None)
+    before = fixture.saved().project_revision
+    assert projects.imports.resume_saved(fixture.project, operation.id) is None
+    assert fixture.saved().project_revision == before
+    status = await import_task(fixture, kind='resume', operation_id=operation.id)
+    assert (status['state'], status['error']) == ('succeeded', None)
+    assert fixture.current().project.template_operations[0].state == 'published'
+    assert not fixture.sidecar.path(fixture.project, operation.id).exists()
+
+
+@pytest.mark.asyncio
+async def test_an_older_sidecar_with_steps_the_project_lacks_still_fences_the_resume(tmp_path):
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    projects = ProjectService(fixture.repository)
+    projects.imports = ImportService(projects, fixture.pipeline, commands=lambda *_args: fixture.command)
+    fixture.transport.fail_at = 'dispatch'
+    with pytest.raises(SystemExit):
+        await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    operation = fixture.current().pre_draft.template_operations[0]
+    path = fixture.sidecar.path(fixture.project, operation.id)
+    stored = json.loads(path.read_bytes())
+    stored['projectRevision'] -= 1
+    path.write_text(json.dumps(stored))
+    with pytest.raises(RepositoryFailure, match='OUTCOME_UNKNOWN'):
+        projects.imports.resume_saved(fixture.project, operation.id)
 
 
 @pytest.mark.asyncio

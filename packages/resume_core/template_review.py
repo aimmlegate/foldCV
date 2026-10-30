@@ -388,14 +388,15 @@ class ShownValue:
     semantic_type: str
     field_key: str
     text: str
-    units: frozenset
+    spans: frozenset
     reworded: bool
 
 
 def _text_key(value):
-    # Spelling only: "Node.js" and "NodeJS" are one value, "Kafka 4.0.x" and "Kafka" are not.
+    # Spelling only: "Node.js" and "NodeJS" are one value; "Kafka 4.0.x" and "Kafka", "C#" and "C++", ".NET" and "NET"
+    # are not. A dot goes only after a word, so a leading one stays.
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, sort_keys=True)
-    return ''.join(character for character in text.casefold() if character.isalnum())
+    return re.sub(r'[\s\-‐-―_/,;:!?"\'«»()]+|(?<=\w)\.', '', text.casefold())
 
 
 def shown_values(proposal, cell_ids, allocations, rewrite_fields):
@@ -408,27 +409,41 @@ def shown_values(proposal, cell_ids, allocations, rewrite_fields):
         if allocation.cell_ids[field.field_key] not in cell_ids or empty_value(value):
             continue
         values.append(ShownValue(field.item_handle, allocation.semantic_type, field.field_key, _text_key(value),
-            frozenset((span.source_id, span.unit_id) for span in field.evidence),
+            frozenset((span.source_id, span.unit_id, span.start, span.end) for span in field.evidence),
             any(_matches(pattern, field.pointer) for pattern in rewrite_fields)))
     return values
+
+
+def _overlap(left, right):
+    # One source unit can hold many lines (a PDF text block), so only cited text that overlaps is the same line.
+    return any(one[:2] == other[:2] and one[2] < other[3] and other[2] < one[3] for one in left for other in right)
 
 
 def _same_value(left, right):
     # A reworded value is the same claim when both cite a common source line.
     return (left.semantic_type, left.field_key) == (right.semantic_type, right.field_key) and (left.text == right.text
-        or left.reworded and right.reworded and bool(left.units & right.units))
+        or left.reworded and right.reworded and _overlap(left.spans, right.spans))
 
 
-def repair_wins(first, first_failed, repair, repair_failed):
+def repair_wins(first, first_failed, repair, repair_failed, named=()):
     """Whether a repair replaces the admitted reply: what shows after it (repair) keeps every admitted value, it adds
     no failing value, and it fixes a finding or adds a value. LIVE-09: a repair failed 142 checks where the first
     reply failed 7. D107: a repair that added ZeroMQ tied on one coverage finding and was dropped; one that fixed a
-    claim wrote over another."""
-    if any(not any(_same_value(value, other) for other in repair) for value in first):
+    claim wrote over another.
+
+    named lists the items the repair sends; a value of such an item must stay on it, an equal value elsewhere does not
+    keep it. A value of any other item may stand on any item, as when a split carries it to new ones."""
+    sent = {*named, *(value.item_handle for value in repair)}
+    def kept(value):
+        return any(_same_value(value, other) for other in repair
+            if value.item_handle not in sent or other.item_handle == value.item_handle)
+    def added(value):
+        own = [other for other in first if other.item_handle == value.item_handle]
+        return not any(_same_value(value, other) for other in own or first)
+    if not all(kept(value) for value in first):
         return False
     def values(failed):
         return {target for target in failed if not target.startswith('scope-')}
     if len(values(repair_failed)) > len(values(first_failed)):
         return False
-    return len(set(repair_failed)) < len(set(first_failed)) or any(
-        not any(_same_value(value, other) for other in first) for value in repair)
+    return len(set(repair_failed)) < len(set(first_failed)) or any(added(value) for value in repair)

@@ -4,7 +4,9 @@ import httpx
 import pytest
 
 from resume_api.app import create_app
-from packages.resume_core.rules import RulesStore
+from packages.resume_core.project_limits import REWRITE_INSTRUCTION_CHARS
+from packages.resume_core.rules import PRESET_HEADINGS, RulesStore, captured_rules, presets
+from packages.resume_core.storage import locked_root
 
 ORIGIN = "http://127.0.0.1:39329"
 SECRET = "synthetic-rules-startup-secret-0123456789"
@@ -83,3 +85,31 @@ async def test_many_rule_saves_need_no_model_and_hit_no_operation_cap(app):
             assert saved.status_code == 200
             current = saved.json()
         assert current["revision"] == 23
+
+
+def with_shorten(markdown, length):
+    """Rules whose `shorten` preset has this many characters."""
+    shorten, clarify = PRESET_HEADINGS["shorten"], PRESET_HEADINGS["clarify"]
+    return markdown[:markdown.index(shorten)] + shorten + "\n" + "я" * length + "\n\n" + clarify + "\nЯсно\n"
+
+
+@pytest.mark.asyncio
+async def test_a_preset_that_cannot_be_sent_as_an_instruction_is_refused_at_save(app, tmp_path):
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        await login(client)
+        initial = (await client.get("/v1/settings/rules")).json()
+        too_long = await client.put("/v1/settings/rules", headers={"Origin": ORIGIN}, json={
+            "markdown": with_shorten(initial["markdown"], REWRITE_INSTRUCTION_CHARS + 1), "baseRevision": initial["revision"]})
+        assert too_long.status_code == 422 and too_long.json()["error"]["code"] == "RULES_PRESET_TOO_LONG"
+        fits = await client.put("/v1/settings/rules", headers={"Origin": ORIGIN}, json={
+            "markdown": with_shorten(initial["markdown"], REWRITE_INSTRUCTION_CHARS), "baseRevision": initial["revision"]})
+        assert fits.status_code == 200 and len(fits.json()["presets"]["shorten"]) == REWRITE_INSTRUCTION_CHARS
+
+
+def test_a_longer_preset_already_saved_stays_readable(tmp_path):
+    store = RulesStore(tmp_path / "FoldCV")
+    current = store.load()
+    long = captured_rules(with_shorten(current.markdown, REWRITE_INSTRUCTION_CHARS + 1), current.revision + 1)
+    with locked_root(store.root, ".rules.lock"):
+        store._write(long)
+    assert len(presets(store.load().markdown)["shorten"]) == REWRITE_INSTRUCTION_CHARS + 1

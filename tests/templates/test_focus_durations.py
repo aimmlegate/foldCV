@@ -41,6 +41,12 @@ def test_overlapping_and_ongoing_jobs_count_each_month_once():
     assert focus_durations(facts, AS_OF, 'ru') == {identifier: '5 лет' for identifier in ['t1', 't2', 't3', 'focus']}
 
 
+def test_a_closed_job_counts_only_up_to_the_formatting_date():
+    facts = SimpleNamespace(records=[job('a', (month(2020, 3), month(2031, 11), False)),
+        job('b', (month(2020, 3), month(2021, 3), False)), technology('python', 'Python', 'a'), technology('go', 'Go', 'b')])
+    assert focus_durations(facts, AS_OF, 'ru') == {'python': '7 лет', 'go': '1 год'}
+
+
 def test_unknown_periods_and_unlinked_technologies_get_no_duration():
     facts = SimpleNamespace(records=[
         job('open', (month(2020, 1), None, False)), job('undated', (None, month(2021, 5), False)),

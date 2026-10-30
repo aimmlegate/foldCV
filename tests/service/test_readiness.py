@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import platform
-import subprocess
 import sys
 from unittest.mock import Mock
 
@@ -14,6 +13,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from tools import local_readiness as readiness
 from packages.resume_core.rendering import template
 from resume_api.connection import ConnectionAdapter, ConnectionFailure
+from tests.support.foundation import LOCAL_MANIFEST as MANIFEST, run_local
+
+
+@pytest.fixture
+def pinned_host(monkeypatch, tmp_path):
+    """The manifest's host with a frontend build and a renderer, on any machine. `tools/run-local.py --check` is the
+    check of the real host."""
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(platform, "machine", lambda: MANIFEST["architecture"])
+    monkeypatch.setattr(platform, "mac_ver", lambda: (MANIFEST["macos"], (), ""))
+    monkeypatch.setattr(platform, "python_version", lambda: MANIFEST["python"])
+    (tmp_path / "apps/web/dist").mkdir(parents=True)
+    (tmp_path / "apps/web/dist/index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(readiness, "ROOT", tmp_path)
+    monkeypatch.setattr(template, "require_template", dict)
 
 
 def test_version_probe_signals_owned_group_before_reaping(monkeypatch):
@@ -46,11 +60,17 @@ def test_version_probe_signals_owned_group_before_reaping(monkeypatch):
     assert readiness.bounded_version(Path("/synthetic/codex")) == "codex-cli fixture"
 
 
-def test_local_readiness_checks_current_pinned_runtime():
+def test_local_readiness_accepts_the_pinned_host(pinned_host):
     readiness.check_local()
 
 
-def test_local_readiness_reports_host_and_dependency_errors(monkeypatch):
+def test_local_readiness_reports_a_missing_frontend_build(pinned_host, tmp_path):
+    (tmp_path / "apps/web/dist/index.html").unlink()
+    with pytest.raises(readiness.ReadinessError, match="Frontend build is missing"):
+        readiness.check_local()
+
+
+def test_local_readiness_reports_host_and_dependency_errors(pinned_host, monkeypatch):
     monkeypatch.setattr(platform, "mac_ver", lambda: ("27.0", (), ""))
     with pytest.raises(readiness.ReadinessError, match="macOS 26.6.2 arm64"):
         readiness.check_local()
@@ -67,7 +87,7 @@ def test_local_readiness_reports_host_and_dependency_errors(monkeypatch):
     ("FONT_UNAVAILABLE", "app-local fonts"),
     ("ASSET_MISMATCH", "checked-in template assets"),
 ])
-def test_local_readiness_reports_renderer_failure(monkeypatch, code, remedy):
+def test_local_readiness_reports_renderer_failure(pinned_host, monkeypatch, code, remedy):
     def fail():
         raise template.RenderFailure(code)
     monkeypatch.setattr(template, "require_template", fail)
@@ -86,8 +106,7 @@ def test_unsupported_cli_version_never_checks_login(tmp_path):
 
 
 def test_entrypoint_reports_missing_dependency_without_traceback():
-    result = subprocess.run([sys.executable, "-S", "tools/run-local.py", "--check"],
-                            cwd=readiness.ROOT, capture_output=True, text=True, timeout=5)
+    result = run_local("--check", python_flags=("-S",))
     assert result.returncode != 0
     assert "Python dependency PyMuPDF must be 1.28.2" in result.stderr
     assert "Traceback" not in result.stderr
@@ -102,8 +121,7 @@ def test_entrypoint_handles_cli_path_with_spaces_without_login(tmp_path):
     cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.161.0\\n'\n",
                    encoding="utf-8")
     cli.chmod(0o700)
-    result = subprocess.run([sys.executable, "tools/run-local.py", "--check", "--codex-executable", str(cli)],
-                            cwd=readiness.ROOT, capture_output=True, text=True, timeout=10)
+    result = run_local("--check", "--codex-executable", str(cli), ready=True)
     assert result.returncode == 0
     assert "outside the supported range" in result.stderr
     assert "http://" not in result.stdout
