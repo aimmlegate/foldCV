@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
+from resume_api.cli.process_runner import ProcessRunner
 from resume_api.cli.profiles import claude as rules
 from resume_api.connection import ConnectionFailure
 from resume_api.connection_claude import ClaudeConnectionAdapter
@@ -159,6 +160,44 @@ def test_an_unknown_notice_is_named_in_the_log_without_its_content(fake, caplog)
     assert [record.getMessage() for record in caplog.records] == ["Claude stream event refused: system/new_notice"]
 
 
+class Open(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    summary: str
+
+
+def generate_open(fake, case="valid", **config):
+    cli, root, _directory, configure, _audit = fake
+    configure(case, **config)
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        return provider.generate(request(result=Open), files, threading.Event())
+
+
+def test_a_reply_above_half_the_budget_fits_though_the_stream_carries_it_twice(fake, monkeypatch):
+    limits = {}
+    run = ProcessRunner.run
+
+    def spy(self, *args, **options):
+        limits.update(options)
+        return run(self, *args, **options)
+
+    monkeypatch.setattr(ProcessRunner, "run", spy)
+    assert generate_open(fake, value={"summary": "x" * 140_000}).value.summary == "x" * 140_000
+    assert limits["max_line"] == 262_144 and limits["max_output"] == 8 * 262_144
+
+
+def test_a_repair_after_a_long_invalid_reply_counts_only_its_final_line(fake):
+    result = generate_open(fake, "repair", value={"summary": "x" * 100_000},
+                           invalid={"summary": "x" * 100_000, "extra": 1})
+    assert result.value.summary == "x" * 100_000 and result.logical_attempts == 2
+
+
+def test_a_reply_above_the_final_limit_is_still_too_large(fake):
+    with pytest.raises(ContentFailure) as raised:
+        generate_open(fake, value={"summary": "x" * 270_000})
+    assert raised.value.code == "OUTPUT_TOO_LARGE"
+
+
 def test_missing_structured_output_is_repaired_like_invalid_json(fake):
     failure(fake, "no_output", "INVALID_RESULT", 2)
 
@@ -246,17 +285,28 @@ def test_connection_reports_catalog_plan_and_no_quota_source(fake):
     assert not any(entry["generation"] for entry in audit())
 
 
-@pytest.mark.parametrize(("case", "code", "extra"), [
-    ("logged_out", "LOGIN_REQUIRED", {}), ("api_key", "API_KEY_MODE", {}),
-    ("valid", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}),
+@pytest.mark.parametrize(("case", "code", "extra", "version"), [
+    ("logged_out", "LOGIN_REQUIRED", {}, "2.1.308"), ("api_key", "API_KEY_MODE", {}, "2.1.308"),
+    ("valid", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}, "2.1.200"),
+    ("valid", "UNSUPPORTED_VERSION", {"version": "no version here"}, None),
 ])
-def test_connection_states(fake, case, code, extra):
+def test_connection_states_name_the_version_the_cli_reported(fake, case, code, extra, version):
     cli, root, _directory, configure, _audit = fake
     configure(case, **extra)
     with pytest.raises(ConnectionFailure) as raised:
         with OperationFiles(root).open() as files:
             ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)).inspect(files, threading.Event())
-    assert raised.value.code == code
+    assert raised.value.code == code and raised.value.version == version
+
+
+@pytest.mark.parametrize(("subscription", "plan"), [("max", "max"), ("team_premium", "team_premium"), ("Claude Max", None),
+                                                    ("x" * 41, None), (7, None), (None, None)])
+def test_only_a_plan_the_client_accepts_is_reported(fake, subscription, plan):
+    cli, root, _directory, configure, _audit = fake
+    configure(subscription=subscription)
+    with OperationFiles(root).open() as files:
+        metadata = ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)).inspect(files, threading.Event())
+    assert metadata.plan == plan
 
 
 def test_login_runs_the_cli_sign_in_only_when_signed_out(fake):
@@ -356,6 +406,15 @@ def test_prepare_refuses_the_users_own_config_and_foreign_directories(tmp_path, 
     (tmp_path / "foreign").mkdir()
     with pytest.raises(rules.ClaudeProfileError):
         rules.ClaudeCliProfile(tmp_path / "foreign", Path("/bin/echo"), home=tmp_path / "home").prepare()
+
+
+def test_every_call_of_a_profile_runs_in_one_private_working_directory(tmp_path):
+    profile = rules.ClaudeCliProfile(tmp_path / "profile", Path("/bin/echo"), home=tmp_path / "home")
+    provider = ClaudeCliProvider(Path("/bin/echo"), profile=profile)
+    assert provider.process.workdir == profile.workdir == profile.root / "cwd"
+    profile.prepare()
+    assert profile.workdir.is_dir() and profile.workdir.stat().st_mode & 0o777 == 0o700
+    assert profile.environment(tmp_path)["TMPDIR"] == str(tmp_path / "tmp")
 
 
 def test_wipe_keeps_only_the_config_file_and_credentials(tmp_path):
