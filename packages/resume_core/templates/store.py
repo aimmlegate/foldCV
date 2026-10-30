@@ -189,8 +189,9 @@ class TemplateStore:
         retained = registry.get(canonical([package.id,package.revision]).decode("utf-8")) if isinstance(registry,dict) else None
         return retained is not None and retained != package.package_hash
 
-    def save(self, package: TemplatePackage, *, default: bool = False) -> None:
-        """Store the package as the current version of its id; `default` also makes that id the one new imports use."""
+    def save(self, package: TemplatePackage, *, default: bool = False, keep_text: bool = False) -> None:
+        """Store the package as the current version of its id; `default` also makes that id the one new imports use.
+        `keep_text` records the text as saved last (the Settings editor); an activation shows the bundled form instead."""
         verify_package(package)
         with locked_root(self.root, ".templates.lock"):
             registry_path = self.root / "identities.json"
@@ -209,8 +210,9 @@ class TemplateStore:
                 atomic_write(path, canonical(package))
             # The hash leaves the original text out (D106), so a change of comments or form is this same package; the
             # text saved last stays beside it.
-            atomic_write(path.parent / "original.json",
-                canonical({"format":package.original_format,"base64":package.original_base64}))
+            if keep_text:
+                atomic_write(path.parent / "original.json",
+                    canonical({"format":package.original_format,"base64":package.original_base64}))
             registry[identity] = package.package_hash
             atomic_write(registry_path, canonical(registry))
             current[package.id] = package.package_hash

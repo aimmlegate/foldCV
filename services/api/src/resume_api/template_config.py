@@ -89,7 +89,7 @@ class TemplateConfig:
         package, error = self.compile(template_id, text)
         if error is not None:
             return None, {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
-        self.store.save(package)
+        self.store.save(package, keep_text=True)
         return self.read(template_id), None
 
     def reset(self, template_id):
