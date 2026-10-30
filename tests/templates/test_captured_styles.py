@@ -193,3 +193,11 @@ def test_resolver_owns_style_and_font_metadata_after_capture(captured):
     mutable.recipe.style.text['body'].size=99;mutable.recipe.style.colors['ink']='#123456'
     resolved=resolver.run(block,block.content[0])
     assert resolved.size==10 and resolved.color=='#000000'
+
+
+@pytest.mark.parametrize('text',['soft\u00adhyphen','zero\u200bwidth','\ufeffbom','\u00ad\u200b\ufeff'])
+def test_invisible_characters_without_content_do_not_refuse_their_block(captured,text):
+    block=paragraph(captured,text=text);resolver=CapturedStyleResolver(captured)
+    assert resolver.run(block,block.content[0]).selection.font.weight==300
+    assert resolver.paragraph(block)
+    assert block.content[0].text==text

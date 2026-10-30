@@ -168,7 +168,7 @@ async def production_render(request, *, temp_root, worker_slot, renderer, cleanu
         cleanup_error(error)
         raise ProjectFailure(error.code, 503) from None
     except RenderFailure as error:
-        raise ProjectFailure(error.code, 422) from None
+        raise ProjectFailure(error.code, 422, **error.details) from None
     except asyncio.TimeoutError:
         raise ProjectFailure('RENDER_FAILED', 422) from None
     finally:

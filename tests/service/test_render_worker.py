@@ -411,6 +411,8 @@ async def test_an_intent_unlink_failure_blocks_a_restart_without_a_directory(tmp
 @pytest.mark.parametrize(("worker", "code"), [
     ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'FONT_UNAVAILABLE'}))\nsys.exit(4)\n",
      "FONT_UNAVAILABLE"),
+    ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'ASSET_MISMATCH'}))\nsys.exit(4)\n",
+     "ASSET_MISMATCH"),
     ("import sys\nsys.stderr.write('private-crash-marker')\nsys.exit(7)\n", "RICH_RENDER_FAILED"),
 ])
 @pytest.mark.asyncio
@@ -422,6 +424,22 @@ async def test_a_worker_failure_code_reaches_the_reply(tmp_path, monkeypatch, wo
         assert "private-crash-marker" not in failed.text
         assert operations(tmp_path) == []
         assert failed.status_code == 422 and failed.json()["error"]["code"] == code
+
+
+@pytest.mark.asyncio
+async def test_a_refused_fragment_reaches_the_reply_and_nothing_else_of_the_status(tmp_path, monkeypatch):
+    use_worker(monkeypatch, tmp_path, "import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'FONT_UNAVAILABLE', "
+        "'blockId': 'block-1', 'fragment': 'Текст', 'private': 'private-marker'}))\nsys.exit(4)\n")
+    app = service(tmp_path)
+    async with signed_in(app) as client:
+        failed = await export(client, await open_project(client))
+    assert failed.status_code == 422 and "private-marker" not in failed.text
+    assert (failed.json()["blockId"], failed.json()["fragment"]) == ("block-1", "Текст")
+
+
+def test_a_crashed_export_worker_gets_the_export_message():
+    catalog = json.loads((Path(__file__).resolve().parents[2] / "contracts/error-messages.ru.json").read_text(encoding="utf-8"))
+    assert catalog["codes"]["RICH_RENDER_FAILED"] == catalog["codes"]["RENDER_FAILED"] == "export"
 
 
 @pytest.mark.parametrize(("worker", "code"), [

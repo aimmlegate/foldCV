@@ -914,7 +914,7 @@
     "RICH_PATCH_INVALID": "block",
     "RICH_PROJECT_MISMATCH": "block",
     "RICH_RANGE_INVALID": "range",
-    "RICH_RENDER_FAILED": "block",
+    "RICH_RENDER_FAILED": "export",
     "RICH_TABLE_EMPTY": "rich_table_empty",
     "RICH_TABLE_IDENTITY_MISSING": "table",
     "RICH_TABLE_INVALID": "table",

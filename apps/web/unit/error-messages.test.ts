@@ -109,3 +109,10 @@ test("save failures, pending work and import warnings keep distinct meanings", (
   assert.match(errorMessage("IMAGE"), /не распознано как текст/u);
   assert.match(errorMessage("IMPORT_CONTENT_RECOVERED"), /восстановлена/u);
 });
+
+test("a refused export names its fragment and other failures stay as they are", () => {
+  const located = new ProjectApiFailure("RICH_EXPORT_UNSUPPORTED", 422, { blockId: "block-1", fragment: "Текст абзаца" });
+  assert.equal(errorMessage(located), `${knownErrorMessage("RICH_EXPORT_UNSUPPORTED")} Фрагмент: «Текст абзаца».`);
+  assert.equal(errorMessage(new ProjectApiFailure("RICH_EXPORT_UNSUPPORTED", 422, { blockId: "block-1", fragment: "" })), knownErrorMessage("RICH_EXPORT_UNSUPPORTED"));
+  assert.equal(errorMessage(new ProjectApiFailure("FONT_UNAVAILABLE", 422)), knownErrorMessage("FONT_UNAVAILABLE"));
+});
