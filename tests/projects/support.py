@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.templates.presentation import snapshot_identity
+from tests.support.foundation import ForbiddenContentProvider
 
 ORIGIN = 'http://127.0.0.1:8765'
 SECRET = 'synthetic-startup-secret-0123456789abcdef'
@@ -19,6 +20,8 @@ def source_blobs(sources):
 @contextmanager
 def v2_app(root, projects=(), **options):
     from resume_api.app import create_app
+    if not {'experimental_profile', 'provider_slots'} & options.keys():
+        options.setdefault('content_provider', ForbiddenContentProvider())
     dist = root / 'dist'
     dist.mkdir(parents=True, exist_ok=True)
     (dist / 'index.html').write_text('v2 projects')

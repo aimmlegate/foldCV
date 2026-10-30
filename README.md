@@ -64,7 +64,8 @@ qualifiers, or context. Check these against the complete source before delivery.
 Experience estimates describe project exposure, not continuous full-time use.
 
 ```sh
-.venv/bin/python -m unittest discover -s skills/format-resume/tests -v
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q -p no:cacheprovider skills/format-resume/tests
 ```
 
 ## Current command-line skill scope

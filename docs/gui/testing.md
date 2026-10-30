@@ -33,6 +33,9 @@ npm run contracts:check
   tests; pass paths for a focused run.
 - The slow conversions need the pinned LibreOffice (`tools/install-local-renderer.sh`, macOS
   arm64, installs into `.tools/`).
+- The default run needs neither `.tools/` nor `apps/web/dist`, and passes on any host: the
+  readiness tests stub the host, frontend and renderer. `tools/run-local.py --check` checks
+  the real machine.
 - `test:state` runs `node --test` with `tsx` over `apps/web/unit/*.test.ts` with the default
   reporter and coverage for `src/assistant` and `src/rich`.
 - Every client change runs `typecheck`, `lint`, `build` and `test:state`; every contract change
@@ -141,7 +144,8 @@ cd apps/web && npm run build && cd ../..
 - `--live-assistant` runs the assistant on the real Codex sign-in (`cli-experiment`, used in
   place) with synthetic projects in the temp root. Every start is charged before it runs to
   `docs/gui/handoffs/SIMPLIFY/logs/sr08-live-ledger.jsonl`, and starts past the allowance are
-  refused. Only with an explicit user allowance.
+  refused. Rewrites are refused and `--template-call-cap` is not accepted, because the ledger
+  does not count them. Only with an explicit user allowance.
 - stdout prints the origin and the one-shot URL; the secret is only in `<root>/launch.json`.
 - Check lists: A editing (SR03), B assistant (SR05), C import, export and files (SR04) in the
   simplification plan.

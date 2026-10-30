@@ -20,7 +20,7 @@ from .errors import STATUS, ProjectFailure
 
 
 class ArchiveDownload(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     editor_token: str = Field(alias='editorToken', min_length=1)
     project_revision: int = Field(alias='projectRevision')
     document_revision: int = Field(alias='documentRevision')

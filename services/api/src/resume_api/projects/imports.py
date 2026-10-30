@@ -28,7 +28,7 @@ STOP_SECONDS = 15
 
 
 class ImportCommand(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     client_request_id: str = Field(default='import', alias='clientRequestId', min_length=1, max_length=200)
     allow_text_rewrite: bool = Field(default=False, alias='allowTextRewrite')
     kind: Literal['start', 'resume', 'cancel']

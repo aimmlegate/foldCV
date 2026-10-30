@@ -15,12 +15,18 @@ from pydantic import ValidationError
 import pymupdf
 
 from packages.resume_core.rendering.preparation import PreparationFailure, PrepareRequest, prepare_document
-from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure
+from packages.resume_core.rendering.template import PACKAGE_SHA256, RenderFailure, require_docx_template
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services/api/src"))
 from resume_api.lifecycle import OperationFiles
 from resume_api.rendering import DocumentRenderer
+
+
+@pytest.fixture(autouse=True)
+def no_converter(monkeypatch):
+    # Preparation reads only the template's asset list; the converter is the conversion tests' need.
+    monkeypatch.setattr("packages.resume_core.rendering.preparation.require_template", require_docx_template)
 
 
 def example() -> dict:

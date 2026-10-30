@@ -6,6 +6,7 @@ This launcher is for the personal macOS arm64 developer run. It needs the projec
 ```sh
 .venv/bin/python -m pip install -r requirements-service.txt
 cd apps/web && npm ci && npm run build && cd ../..
+bash tools/install-local-renderer.sh
 .venv/bin/python tools/run-local.py
 ```
 

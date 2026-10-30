@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "documentRevision": {
+      "title": "Documentrevision",
+      "type": "integer"
+    },
+    "editorToken": {
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    },
+    "projectRevision": {
+      "title": "Projectrevision",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "editorToken",
+    "projectRevision",
+    "documentRevision"
+  ],
+  "title": "ArchiveDownload",
+  "type": "object"
+}
