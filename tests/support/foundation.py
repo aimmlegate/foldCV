@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 import random
 import subprocess
 import sys
-from typing import Callable
 
 
 FROZEN_DATE = date(2026, 10, 10)
@@ -28,22 +27,11 @@ class FrozenClock:
         return self.instant
 
 
-@dataclass
-class CountingContentProvider:
-    response: object
-    calls: list[tuple[str, object]] = field(default_factory=list)
-
-    def generate(self, operation: str, payload: object) -> object:
-        self.calls.append((operation, payload))
-        return self.response
-
-    def count(self, operation: str) -> int:
-        return sum(name == operation for name, _ in self.calls)
-
-
 class ForbiddenContentProvider:
-    def generate(self, operation: str, payload: object) -> object:
-        raise AssertionError(f"unexpected content operation: {operation}")
+    """The content provider of the shared app fixtures: paths that must not call a model fail here, not in a real CLI."""
+
+    def generate(self, request: object, files: object, cancel: object) -> object:
+        raise AssertionError(f"unexpected model call: {getattr(request, 'result_type', request)}")
 
 
 def isolated_root(tmp_path: Path) -> Path:
@@ -54,10 +42,6 @@ def isolated_root(tmp_path: Path) -> Path:
 
 def seeded_random() -> random.Random:
     return random.Random(FIXTURE_SEED)
-
-
-def assert_no_content_calls(action: Callable[[ForbiddenContentProvider], object]) -> object:
-    return action(ForbiddenContentProvider())
 
 
 def run_local(*args: str, python_flags: tuple[str, ...] = (), ready: bool = False,
