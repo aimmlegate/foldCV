@@ -542,6 +542,7 @@ class ProjectRepository:
         session.journal.compact(revision=session.workspace.project_revision)
         try:
             self._sweep(session)
+            self._sweep_renders(session)
         except RepositoryFailure:
             LOG.warning('asset sweep failed on close')
 
@@ -664,6 +665,8 @@ class ProjectRepository:
             after = fold(session, after) or after
         if after is before:
             raise RuntimeError('a commit needs a new workspace object')
+        if after.project is not None:
+            after.project = _latest_export(after.project)
         after.updated_at = self.clock()
         replay = list(before.mutation_replay)
         if client_mutation_id is not None:
