@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import logging
 import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
 from packages.resume_core.project_catalog import ProjectCatalog
-from packages.resume_core.project_repository import RepositoryFailure, decode_project
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
@@ -20,6 +21,7 @@ from packages.resume_core.templates.presentation import project_presentation, sn
 from .errors import ProjectFailure
 
 RESPONSES_KEPT = 4
+LOG = logging.getLogger(__name__)
 
 
 def response_for_workspace(workspace, *, generation=None):
@@ -121,15 +123,7 @@ class ProjectService:
         # workspace is never changed in place, and an evicted session has none, so its file is read.
         workspace = session.workspace if session is not None else None
         if workspace is None:
-            directory = self.repository._directory(project_id)
-            try:
-                workspace = decode_project(directory, (directory / 'workspace.json').read_bytes())
-            except ProjectStoreFailure as error:
-                raise RepositoryFailure(error.code) from None
-            except StorageFailure:
-                raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
-            except (OSError, ValueError, RecursionError):
-                raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
+            workspace, _key = self.repository._read_file(self.repository._directory(project_id), project_id)
         identity = display_identity(workspace)
         value = (identity.title, identity.subtitle)
         with self.lock:
@@ -139,11 +133,14 @@ class ProjectService:
     def open(self, project_id):
         """A fresh editor token (the previous page's token is replaced), the response, history and running tasks."""
         session = self.repository.open(project_id)
-        token = session.open_editor()
         try:
             self.catalog.update(project_id, opened=True)
         except ProjectStoreFailure as error:
-            raise RepositoryFailure(error.code) from None
+            if error.code != 'PROJECT_SAVE_FAILED':
+                raise RepositoryFailure(error.code) from None
+            # Only the recency is lost, and a page's token stays until the open can go ahead.
+            LOG.warning('last opened time not saved')
+        token = session.open_editor()
         with session.lock:
             workspace = session.workspace
             history = history_state(session)
@@ -157,8 +154,7 @@ class ProjectService:
         session = self.repository.open(project_id)
         self.require_writable(project_id)
         with session.lock:
-            if request.editor_token is not None:
-                session.require_editor(request.editor_token)
+            session.require_editor(request.editor_token)
             renamed = session.workspace.model_copy()
             renamed.title, renamed.title_manually_set = request.title.strip(), True
             self.repository.replace(project_id, base_revision=request.base_revision, workspace=renamed, reason='rename')

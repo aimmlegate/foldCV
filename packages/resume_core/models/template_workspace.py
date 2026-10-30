@@ -11,7 +11,7 @@ from collections import OrderedDict
 
 from pydantic import ConfigDict, Field, field_serializer, model_validator
 
-from ..project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
+from ..project_limits import ARCHIVE_BYTES, ARCHIVE_ENTRY_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 from .contracts import Id, Revision, Sha256, Source, Wire, _safe_path, _unique
 from .rich_document import FieldBinding, ImageBlock, NarrativeCitation, SectionBlock, SourceWitness, WorkingOwnership
 from .rich_workspace import (WorkspaceV6, RichPreDraft, LocalImageAsset, ImmutableFactEvidence,
@@ -368,7 +368,7 @@ class TemplateArchiveEntry(Wire):
     def path_role(self):
         if not _safe_path(self.path): raise ValueError('unsafe archive path')
         # Only the project file grows with the project size setting.
-        if self.role!='workspace' and self.size>32*1024*1024: raise ValueError('archive entry exceeds 32 MiB')
+        if self.role!='workspace' and self.size>ARCHIVE_ENTRY_BYTES: raise ValueError('archive entry exceeds 32 MiB')
         required={'workspace':'workspace.json','template_package':'template/package.json'}
         if self.role in required and self.path!=required[self.role]: raise ValueError('invalid archive role path')
         prefix={'source_original':'sources/','render':'renders/','user_image':'images/','template_asset':'template/assets/',

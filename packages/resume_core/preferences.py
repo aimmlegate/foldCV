@@ -66,7 +66,7 @@ class PreferencesStore:
     def load(self):
         try:
             with locked_root(self.root, '.preferences.lock'):return self._read()
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_UNAVAILABLE') from None
 
     def select_model(self, model):
@@ -74,7 +74,7 @@ class PreferencesStore:
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read();value.selected_model = model;self._write(value);return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_rewrite_reasoning(self, model, effort):
@@ -86,7 +86,7 @@ class PreferencesStore:
                 value.rewrite_reasoning_effort = effort
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_rewrite_model(self, model, supported):
@@ -101,7 +101,7 @@ class PreferencesStore:
                     value.rewrite_reasoning_effort = None
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def save_analysis(self, enabled):
@@ -111,7 +111,7 @@ class PreferencesStore:
                 value.automatic_analysis = enabled
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def save_limits(self, import_minutes, project_megabytes):
@@ -124,7 +124,7 @@ class PreferencesStore:
                 return value
         except ValidationError:
             raise PreferencesFailure('INVALID_REQUEST') from None
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_import_model(self, model):
@@ -136,7 +136,7 @@ class PreferencesStore:
                 value.selected_import_model = model
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_fallback_model(self, model):
@@ -148,7 +148,7 @@ class PreferencesStore:
                 value.selected_fallback_model = model
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def enable_provider(self, kind, enabled):
@@ -159,5 +159,5 @@ class PreferencesStore:
                 value.enabled_providers = [*kinds, kind] if enabled else kinds
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None

@@ -105,7 +105,7 @@ class ExportService:
             docxSha256=digest, docxSize=len(artifact), docxPath='renders/' + attempt.id + '.docx')
         with session.lock:
             # The record changes no undoable key, so it goes on the current workspace: commits made during the render
-            # stay, and the attempt keeps the snapshot it rendered.
+            # stay, and the attempt keeps the snapshot it rendered. The commit keeps only the latest capture and render.
             current = session.workspace
             updated = current.model_copy(deep=True)
             updated.project.exports.append(attempt)
@@ -114,6 +114,7 @@ class ExportService:
             self.projects.repository.replace(session.project_id, base_revision=current.project_revision, workspace=updated,
                 reason='export', blobs=[('renders', attempt.id, artifact, digest)], client_mutation_id='export-' + attempt.id,
                 request_sha256=hashlib.sha256(attempt.id.encode()).hexdigest())
+            self.projects.repository.sweep_renders(session.project_id)
         return ExportResult(attempt, prepared.captured.snapshot, artifact)
 
 

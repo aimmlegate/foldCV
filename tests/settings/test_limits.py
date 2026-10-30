@@ -57,3 +57,41 @@ async def test_saved_limits_apply_now_survive_restart_and_a_failed_write_keeps_t
     apply_preferences(None)
     application(tmp_path)
     assert (USER_LIMITS.import_minutes, USER_LIMITS.project_megabytes) == (90, 128)
+
+
+@pytest.mark.asyncio
+async def test_a_full_disk_during_a_limits_save_gives_the_preferences_code(tmp_path, monkeypatch):
+    app = application(tmp_path)
+    async with client_session(app) as client:
+        assert (await client.put("/v1/settings/limits", json={"importMinutes": 90, "projectMegabytes": 128})).status_code == 200
+
+        def full(*_args):
+            raise OSError(28, "No space left on device")
+        monkeypatch.setattr("packages.resume_core.preferences.atomic_write", full)
+        failed = await client.put("/v1/settings/limits", json={"importMinutes": 5, "projectMegabytes": 10})
+        assert failed.status_code == 409 and failed.json()["error"]["code"] == "PREFERENCES_SAVE_FAILED"
+    assert import_seconds() == 90 * 60 and project_file_bytes() == 128 * MIB
+
+
+def test_a_broken_preferences_lock_at_startup_falls_back_to_default_limits(tmp_path):
+    application(tmp_path)
+    store = PreferencesStore(tmp_path / "store")
+    store.save_limits(90, 128)
+    (tmp_path / "store" / ".preferences.lock").unlink()
+    (tmp_path / "store" / ".preferences.lock").mkdir()
+    application(tmp_path)
+    assert (USER_LIMITS.import_minutes, USER_LIMITS.project_megabytes) == (60, 64)
+
+
+def test_limits_belong_to_the_process_so_a_second_app_replaces_the_first_apps_limits(tmp_path):
+    # The rule is one app per process: production has one, and the autouse fixture resets the limits between tests.
+    first = tmp_path / "first"
+    first.mkdir()
+    application(first)
+    PreferencesStore(first / "store").save_limits(90, 12)
+    application(first)
+    assert project_file_bytes() == 12 * MIB
+    second = tmp_path / "second"
+    second.mkdir()
+    application(second)
+    assert project_file_bytes() == 64 * MIB

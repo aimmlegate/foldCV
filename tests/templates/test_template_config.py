@@ -163,7 +163,7 @@ async def test_routes_save_one_template_for_projects_created_after_it(tmp_path):
         reread = (await client.post('/v2/projects/' + before['projectId'] + '/open', json={})).json()['response']['workspace']
         assert reread['preDraft']['templatePackage']['packageHash'] == state['package']['packageHash']
         assert after['preDraft']['templatePackage']['packageHash'] == entry['packageHash'] != state['package']['packageHash']
-        too_long = await client.post(path + '/check', json={'text': 'x' * (1024 * 1024 + 1)})
+        too_long = await client.post(path + '/check', json={'text': 'x' * (4 * 1024 * 1024 + 1)})
         assert too_long.status_code == 413 and too_long.json()['error']['code'] == 'INPUT_TOO_LARGE'
         # Only a template the app ships can go back to its bundled file.
         refused = await client.post(path + '/reset', json={})

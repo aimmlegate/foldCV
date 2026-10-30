@@ -181,3 +181,15 @@ def test_a_long_session_compacts_its_journal_without_a_close(tmp_path, monkeypat
     assert len(path.read_bytes().splitlines()) <= 4 * 2
     reopened = ProjectRepository(tmp_path / 'data')
     assert [action.action_id for action in reopened.open(PROJECT).journal.undo] == ['action-10', 'action-11']
+
+
+def test_a_tail_line_too_deep_for_the_parser_is_truncated_and_the_project_opens(tmp_path):
+    repo = repository(tmp_path)
+    edit(repo, 'One', identifier='edit-1', action='one')
+    path = repo.open(PROJECT).directory / 'history.jsonl'
+    good = path.read_bytes()
+    with path.open('ab') as stream:
+        stream.write(b'[' * 200000 + b'\n')
+    reopened = ProjectRepository(tmp_path / 'data')
+    assert reopened.open(PROJECT).journal.state()['undo']['actionId'] == 'one'
+    assert path.read_bytes() == good

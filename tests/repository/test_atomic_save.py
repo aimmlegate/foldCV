@@ -8,7 +8,7 @@ import pytest
 
 from packages.resume_core import project_journal, storage
 from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
-from tests.repository.support import PROJECT, edit, history, repository, text_of
+from tests.repository.support import PROJECT, create_other, edit, history, repository, text_of
 
 
 class Crash(BaseException):
@@ -180,3 +180,62 @@ def test_a_failing_commit_hook_keeps_the_commit_and_its_undo_step(tmp_path):
     assert outcome.revision == 2 and repo.open(PROJECT).journal.state()['undo']['actionId'] == 'one'
     history(repo, 'undo', identifier='undo-1', expected='one')
     assert text_of(repo.read(PROJECT)) == original
+
+
+def fails_registry(repo, error):
+    def failing(_registry):
+        raise error
+    repo.store._write_registry = failing
+
+
+def test_a_failed_create_leaves_no_hidden_folder(tmp_path):
+    repo = repository(tmp_path)
+    fails_registry(repo, OSError(28, 'disk full'))
+    with pytest.raises(RepositoryFailure) as refused:
+        create_other(repo, 'other-project')
+    assert refused.value.code == 'PROJECT_SAVE_FAILED'
+    assert not (tmp_path / 'data/projects/other-project').exists()
+
+
+def test_a_crash_between_the_project_file_and_the_registry_is_recovered_at_start(tmp_path):
+    repo = repository(tmp_path)
+    fails_registry(repo, Crash())
+    with pytest.raises(Crash):
+        create_other(repo, 'other-project')
+    folder = tmp_path / 'data/projects/other-project'
+    assert (folder / 'workspace.json').is_file()
+    restarted = ProjectRepository(tmp_path / 'data')
+    restarted.start()
+    assert [entry.project_id for entry in restarted.listing()] == [PROJECT, 'other-project']
+    assert restarted.read('other-project').project_id == 'other-project'
+
+
+def test_start_removes_a_partial_create_and_leaves_what_it_did_not_make(tmp_path):
+    repo = repository(tmp_path)
+    projects = tmp_path / 'data/projects'
+    create_other(repo, 'partial-project')
+    (projects / 'partial-project/workspace.json').unlink()
+    registry = repo.store.registry()
+    registry.entries = [entry for entry in registry.entries if entry.project_id != 'partial-project']
+    repo.store._write_registry(registry)
+    foreign = projects / 'foreign-folder'
+    foreign.mkdir()
+    (foreign / 'workspace.json').write_text('not made here')
+    empty = projects / 'empty-folder'
+    empty.mkdir()
+    ProjectRepository(tmp_path / 'data').start()
+    assert not (projects / 'partial-project').exists() and not empty.exists()
+    assert (foreign / 'workspace.json').read_text() == 'not made here'
+    assert [entry.project_id for entry in ProjectRepository(tmp_path / 'data').listing()] == [PROJECT]
+
+
+def test_a_tombstone_is_never_brought_back_by_the_start(tmp_path):
+    repo = repository(tmp_path)
+    create_other(repo, 'other-project')
+    folder = tmp_path / 'data/projects/other-project'
+    (folder / 'unknown-user-file.txt').write_text('Keep')
+    assert repo.delete('other-project').cleanup_status == 'failed'
+    restarted = ProjectRepository(tmp_path / 'data')
+    restarted.start()
+    assert [entry.project_id for entry in restarted.listing()] == [PROJECT]
+    assert (folder / 'unknown-user-file.txt').read_text() == 'Keep'

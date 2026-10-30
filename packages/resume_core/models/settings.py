@@ -34,7 +34,8 @@ class RulesSettings(Rules):
 
 class RulesErrorPayload(Wire):
     code: Literal["RULES_PRESETS_REQUIRED", "RULES_STALE", "RULES_TOO_LARGE",
-                  "RULES_INVALID_TEXT", "RULES_LOAD_FAILED", "RULES_SAVE_FAILED", "RULES_UNSAFE_STORAGE"]
+                  "RULES_PRESET_TOO_LONG", "RULES_INVALID_TEXT", "RULES_LOAD_FAILED", "RULES_SAVE_FAILED",
+                  "RULES_UNSAFE_STORAGE"]
     retryable: Literal[False]
     stage: Literal["rules"]
 

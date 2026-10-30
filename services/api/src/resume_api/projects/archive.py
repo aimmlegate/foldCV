@@ -8,13 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.archive_zip import ArchiveFailure, write_zip
 from packages.resume_core.project_repository import blob_path, decode_project
+from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.template_import import identity
 from packages.resume_core.extraction.parser import MAX_SOURCE
 from packages.resume_core.rich_limits import IMAGE_BYTES
 
 from .blobs import read_owned
-from .errors import ProjectFailure
+from .errors import STATUS, ProjectFailure
 
 
 class ArchiveDownload(BaseModel):
@@ -54,8 +56,14 @@ def export_archive(service, project_id, request, *, trusted=False):
         raise ProjectFailure(error.code, 422) from None
     except ProjectFailure:
         raise
+    except ProjectStoreFailure as error:
+        raise ProjectFailure(error.code, STATUS.get(error.code, 409)) from None
+    except StorageFailure:
+        raise ProjectFailure('PROJECT_UNSAFE_STORAGE', 503) from None
     except OSError:
         raise ProjectFailure('SOURCE_BYTES_MISSING', 404) from None
+    except (ValueError, RecursionError):
+        raise ProjectFailure('PROJECT_LOAD_FAILED', 503) from None
 
 
 def import_archive(service, data):

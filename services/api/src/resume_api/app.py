@@ -40,6 +40,7 @@ from packages.resume_core.models.settings import (RulesSettings, RulesSettingsEr
 from .projects.errors import ProjectFailure
 from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
+from packages.resume_core.templates.loading import CONFIG_BYTES
 from .inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout, AdmissionCancelled
 from .profile_ownership import native_profile, recover_profile
 from packages.resume_core.assistant_store import AgentFailure
@@ -60,7 +61,7 @@ POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status",
                             "host/select", "host/cancel-login", "host/install", "host/cancel-install",
                             "host/enable", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
-JSON_PUT_PATHS = frozenset({"/v1/settings/rules", "/v1/settings/assistant"})
+TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 
 
 @dataclass
@@ -94,6 +95,12 @@ def strict_json(raw: bytes) -> object:
         raise ValueError("non-finite number")
 
     return json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid_constant)
+
+
+def takes_json(method: str, path: str) -> bool:
+    """Every /v1/ PUT and every template-config write has one strict JSON body; the other /v1/ POSTs that do are listed."""
+    return ((method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path.startswith("/v1/"))
+            or (method in {"POST", "PUT"} and path.startswith(TEMPLATE_CONFIG_PATH)))
 
 
 def is_json_media_type(raw: bytes) -> bool:
@@ -169,6 +176,9 @@ class LocalBoundary:
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
                     # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
                     body_limit = MAX_BODY + 64 * 1024
+                if path.startswith(TEMPLATE_CONFIG_PATH):
+                    # The compiler's own limit, plus the JSON escapes of a text of that size (its line ends and quotes).
+                    body_limit = 2 * CONFIG_BYTES
                 if size > body_limit:
                     await problem("INPUT_TOO_LARGE", 413)(scope, receive, send)
                     return
@@ -177,7 +187,7 @@ class LocalBoundary:
                     break
             body = b"".join(chunks)
             project_json = path.startswith("/v2/projects") and path != "/v2/projects/archive"
-            if (method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path in JSON_PUT_PATHS) or project_json:
+            if takes_json(method, path) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
                     return
@@ -676,7 +686,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def rules_failure(error: RulesFailure):
         status = 409 if error.code == "RULES_STALE" else 422 if error.code in {
-            "RULES_PRESETS_REQUIRED", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
+            "RULES_PRESETS_REQUIRED", "RULES_PRESET_TOO_LONG", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
         payload = RulesSettingsError.model_validate({
             "error": {"code": error.code, "retryable": False, "stage": "rules"},
             "requiredHeadings": list(PRESET_HEADINGS.values()) if error.code == "RULES_PRESETS_REQUIRED" else [],

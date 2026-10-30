@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from ..project_limits import REWRITE_INSTRUCTION_CHARS
 from .contracts import Id, Revision, Sha256, Wire
 from .template_authoring import AuthoredRange, ClipboardSelection, TemplateEditPreparationV1
 from .template_render import TemplateSnapshotIdentity
@@ -81,7 +82,7 @@ class RewritePreviewRequestV1(Wire):
     request_id: Id
     snapshot: TemplateSnapshotIdentity
     range: AuthoredRange
-    instruction: str = Field(min_length=1, max_length=8000)
+    instruction: str = Field(min_length=1, max_length=REWRITE_INSTRUCTION_CHARS)
 
 
 class TemplateRewritePreviewV1(Wire):
@@ -107,7 +108,7 @@ class RevisionConflictV1(Wire):
 
 
 class RenameRequestV1(Wire):
-    editor_token: str | None = Field(default=None, max_length=128)
+    editor_token: str = Field(min_length=1, max_length=128)
     base_revision: Revision
     title: str = Field(min_length=1, max_length=200)
 

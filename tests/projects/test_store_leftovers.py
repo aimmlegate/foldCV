@@ -2,8 +2,12 @@
 those files as they were."""
 
 import json
+import os
+
+import pytest
 
 from tests.projects.support import v2_app
+from tests.projects.test_project_catalog import FIRST, OTHER, projects
 from tests.templates.storage_fixtures import workspace
 
 
@@ -44,3 +48,28 @@ def test_startup_serves_v7_projects_and_leaves_old_job_agent_and_v6_files_untouc
         opened = client.post('/v2/projects/' + project.project_id + '/open', json={})
         assert opened.status_code == 200
     assert snapshot(data) == before
+
+
+def damaged(target, how):
+    if how == 'mode':
+        target.chmod(0o644)
+    elif how == 'hard_link':
+        os.link(target, target.parent.parent / 'second-name')
+    elif how == 'above_old_ceiling':
+        # Allowed by a raised Settings size, above the 64 MiB default of owned_file.
+        target.write_bytes(b'{' + b' ' * (65 * 1024 * 1024) + b'}')
+    else:
+        target.write_text(json.dumps({'schemaVersion': 7, 'project': {'templatePackage': how}}))
+
+
+@pytest.mark.parametrize(('how', 'code'), [('mode', 'PROJECT_UNSAFE_STORAGE'), ('hard_link', 'PROJECT_UNSAFE_STORAGE'),
+    ('above_old_ceiling', 'PROJECT_LOAD_FAILED'), ('text', 'PROJECT_LOAD_FAILED'), ({'assets': 5}, 'PROJECT_LOAD_FAILED')],
+    ids=['mode', 'hard_link', 'above_old_ceiling', 'package_text', 'assets_number'])
+def test_one_damaged_project_file_does_not_stop_the_service_from_starting(tmp_path, how, code):
+    with v2_app(tmp_path, projects()) as (_client, application):
+        target = application.state.projects.repository.open(FIRST).directory / 'workspace.json'
+    damaged(target, how)
+    with v2_app(tmp_path) as (client, _application):
+        listing = client.get('/v2/projects').json()
+        assert listing['errors'] == [{'projectId': FIRST, 'errorCode': code}]
+        assert client.get('/v2/projects/' + OTHER).status_code == 200
