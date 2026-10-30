@@ -16,9 +16,10 @@ from .models.rich_document import InlineStyles
 from .models.template_authoring import TemplateEditPreparationV1
 from .models.template_document import BoundLink, ManualScopeSpan
 from .rich_dependencies import placements
-from .rich_fields import inline_groups
+from .rich_fields import inline_groups, working_field
 from .rich_mutations import RichMutationFailure, inline_text, utf16_slice
 from .rich_panel import FIELDS
+from .template_panel_records import REMOVABLE, technology_targets
 from .template_preparation import _fields, _leaves, _length, prepare_edit
 
 KINDS = {'paragraph': {'type': 'paragraph'}, 'bullet': {'type': 'bullet_list'},
@@ -126,9 +127,8 @@ def target_text(workspace, identifier):
         return ''
     if extension:
         return '; '.join(f'{cell.field_key}: {cell.raw_input}' for cell in record.cells)
-    values = record.model_dump(mode='json', by_alias=True)
-    return '; '.join(f'{key}: {values[key]["value"] if isinstance(values.get(key), dict) else values.get(key)}'
-        for key in FIELDS.get(record.kind, ()) if key in values)
+    fields = [(key, working_field(record, key)) for key in FIELDS.get(record.kind, ())]
+    return '; '.join(f'{key}: {value.raw_text}' for key, value in fields if value is not None and value.raw_text)
 
 
 class Chain:
@@ -335,52 +335,68 @@ def _occurrence_edit(chain, found, value):
         'styles': span.styles.model_dump(mode='json', by_alias=True)})
 
 
+def _panel(chain, operation, record_id, kind, *, job_id=None, values=None, context=None):
+    step = {'kind': 'builtin_panel', 'command': {'operation': operation, 'recordId': record_id, 'recordKind': kind,
+        'jobId': job_id, 'periodId': None, 'values': values or {}}}
+    chain.apply({**step, 'placementContext': context} if context else step)
+
+
 def update_fact(chain, op):
-    """V7's panel edits employment records; other facts change through their first occurrence in the document."""
+    """A builtin field changes through the panel, even with no occurrence; a template cell through its first occurrence."""
     record, extension = find_record(chain.current, op.record_id)
     if record is None:
         raise CompileFailure('ASSISTANT_TARGET_MISSING', op.record_id)
-    if extension:
-        cell = next((value for value in record.cells if value.field_key == op.field), None)
-        if cell is None:
-            raise CompileFailure('ASSISTANT_FIELD_UNKNOWN', op.field, *sorted(value.field_key for value in record.cells))
-        found = first_occurrence(chain.current, lambda span: getattr(span, 'cell_id', None) == cell.id)
-    else:
+    if not extension:
         if op.field not in _allowed(record):
             raise CompileFailure('ASSISTANT_FIELD_UNKNOWN', op.field, *sorted(_allowed(record)))
-        if record.kind == 'employment':
-            chain.apply({'kind': 'builtin_panel', 'command': {'operation': 'edit', 'recordId': record.id,
-                'recordKind': 'employment', 'jobId': None, 'periodId': None, 'values': {op.field: op.value}}})
-            return
-        found = first_occurrence(chain.current, lambda span: getattr(span, 'record_id', None) == record.id
-            and getattr(span, 'field_key', None) == op.field)
+        _panel(chain, 'edit', record.id, record.kind, values={op.field: op.value})
+        return
+    cell = next((value for value in record.cells if value.field_key == op.field), None)
+    if cell is None:
+        raise CompileFailure('ASSISTANT_FIELD_UNKNOWN', op.field, *sorted(value.field_key for value in record.cells))
+    found = first_occurrence(chain.current, lambda span: getattr(span, 'cell_id', None) == cell.id)
     if found is None:
         raise CompileFailure('ASSISTANT_FIELD_WITHOUT_OCCURRENCE', op.field)
     _occurrence_edit(chain, found, op.value)
 
 
+def _technology_context(chain, op):
+    """The panel's placement of a new technology. A scope with several lines needs `targetId`; the refusal lists them with
+    the template's view titles, as the panel names them."""
+    scope = [value for value in technology_targets(chain.current.project) if value.job_id == op.job_id]
+    chosen = [value for value in scope if op.target_id in {None, value.block_id}]
+    if len(chosen) != 1:
+        raise CompileFailure('ASSISTANT_OP_REFUSED', 'TECHNOLOGY_GROUP_REQUIRED' if scope else 'TECHNOLOGY_LINE_MISSING',
+            *(f'{value.block_id}: {value.label}' for value in scope))
+    return {'contextBlockId': chosen[0].block_id, 'placement': chosen[0].placement.model_dump(mode='json', by_alias=True)}
+
+
 def create_fact(chain, op):
-    """V7 creates employment records and their periods; other kinds have no creation path there."""
+    """The panel adds jobs, their periods and technologies; other kinds have no adapter there."""
+    if op.target_id is not None and op.kind != 'technology':
+        raise CompileFailure('ASSISTANT_OP_INVALID', 'targetId')
     if op.kind == 'period':
         record, extension = find_record(chain.current, op.job_id) if op.job_id else (None, False)
         if record is None or extension or record.kind != 'employment':
             raise CompileFailure('ASSISTANT_TARGET_MISSING', op.job_id or 'jobId')
-        chain.apply({'kind': 'builtin_panel', 'command': {'operation': 'add_period', 'recordId': record.id,
-            'recordKind': 'employment', 'jobId': None, 'periodId': None, 'values': {}}})
-        return
-    if op.kind != 'employment':
+        _panel(chain, 'add_period', record.id, 'employment', values=dict(op.values))
+    elif op.kind == 'technology':
+        if op.values.keys() != {'display'}:
+            raise CompileFailure('ASSISTANT_FIELD_UNKNOWN', 'values', 'display')
+        _panel(chain, 'add', None, 'technology', job_id=op.job_id, values=dict(op.values), context=_technology_context(chain, op))
+    elif op.kind == 'employment':
+        _panel(chain, 'add', None, 'employment', values=dict(op.values))
+    else:
         raise CompileFailure('ASSISTANT_OP_REFUSED', 'create ' + op.kind)
-    chain.apply({'kind': 'builtin_panel', 'command': {'operation': 'add', 'recordId': None, 'recordKind': 'employment',
-        'jobId': None, 'periodId': None, 'values': dict(op.values)}})
 
 
 def delete_fact(chain, op):
-    record, _extension = find_record(chain.current, op.record_id)
+    """What the panel removes goes as there, with its separator and an emptied line; the rest is deleted as an entity."""
+    record, extension = find_record(chain.current, op.record_id)
     if record is None:
         raise CompileFailure('ASSISTANT_TARGET_MISSING', op.record_id)
-    if getattr(record, 'kind', None) == 'employment':
-        chain.apply({'kind': 'builtin_panel', 'command': {'operation': 'remove', 'recordId': record.id,
-            'recordKind': 'employment', 'jobId': None, 'periodId': None, 'values': {}}})
+    if not extension and record.kind in {'employment', *REMOVABLE}:
+        _panel(chain, 'remove', record.id, record.kind)
         return
     chain.apply({'kind': 'delete_entity', 'recordId': record.id, 'beforeRevision': record.revision})
 
@@ -414,6 +430,11 @@ def preview(before, after, ops):
     for block in after.project.document.blocks():
         if block.id not in old_blocks:
             entries.append({'target': block.id, 'label': 'insert_blocks', 'before': '', 'after': target_text(after, block.id)[:16000]})
+    # A new technology joins an existing line, so neither a target nor a new block shows it.
+    known = {record.id for record in before.project.facts.records}
+    for record in after.project.facts.records:
+        if record.kind == 'technology' and record.id not in known:
+            entries.append({'target': record.id, 'label': 'create_fact', 'before': '', 'after': target_text(after, record.id)[:16000]})
     if not entries:
         entries.append({'target': 'facts', 'label': ops[0].op if ops else 'facts', 'before': '', 'after': ''})
     return entries

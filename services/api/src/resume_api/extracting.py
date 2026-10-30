@@ -6,6 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 import re
+import time
 
 from packages.resume_core import host
 from packages.resume_core.extraction.models import ExtractResult
@@ -17,6 +18,7 @@ WORKER = Path(__file__).resolve().parents[4] / "packages/resume_core/extraction/
 MAX_BODY = MAX_SOURCE + 8192
 MAX_RESULT = 4 * 1024 * 1024
 MAX_RSS_KB = 512 * 1024
+MAX_SECONDS = 120
 # Windows has no RLIMIT_AS for the worker to set; its job caps the committed memory instead.
 COMMIT_LIMIT = 768 * 1024 * 1024
 BOUNDARY = re.compile(rb"^[A-Za-z0-9'()+_,./:=?-]{1,70}$")
@@ -83,8 +85,12 @@ async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFile
     executable, arguments = python_worker("extract", str(WORKER))
     process = files.spawn(host.Confined(executable, memory=COMMIT_LIMIT) if host.WINDOWS else executable, arguments,
                           capture=False)
+    deadline = time.monotonic() + MAX_SECONDS
     try:
         while process.poll() is None:
+            if time.monotonic() > deadline:
+                files.stop_worker()
+                raise UploadFailure("EXTRACT_TIMEOUT")
             rss = await asyncio.to_thread(_rss_kb, process)
             if rss is None and process.poll() is None:
                 files.stop_worker()

@@ -6,10 +6,23 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .models.settings import Preferences, ProviderSelection
+from .models.settings import DEFAULT_PROVIDER, Preferences
 from .storage import StorageFailure, atomic_write, locked_root, private_file
 
 MODEL = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z')
+
+
+def migrated(raw):
+    """Files of the one-active-provider design (MP01 to MP07): the active provider's choices stay, the kept choices of
+    the other one are dropped, and a Claude choice turns Claude on next to Codex (D119)."""
+    if not isinstance(raw, dict) or 'enabledProviders' in raw or not {'selectedProvider', 'providerSelections'} & raw.keys():
+        return raw
+    raw = dict(raw)
+    active, kept = raw.pop('selectedProvider', DEFAULT_PROVIDER), raw.pop('providerSelections', {})
+    if active not in ('codex_cli', 'claude_cli') or not isinstance(kept, dict) or active in kept:
+        raise ValueError()
+    raw['enabledProviders'] = [DEFAULT_PROVIDER] + (['claude_cli'] if active == 'claude_cli' else [])
+    return raw
 
 
 class PreferencesFailure(Exception):
@@ -38,14 +51,11 @@ class PreferencesStore:
                     if key in result:raise ValueError()
                     result[key] = value
                 return result
-            value = Preferences.model_validate(json.loads(raw, object_pairs_hook=unique))
-            kept = [model for selection in value.provider_selections.values() for model in (
-                selection.selected_model, selection.selected_import_model, selection.selected_fallback_model,
-                selection.selected_rewrite_model, selection.selected_agent_model)]
+            value = Preferences.model_validate(migrated(json.loads(raw, object_pairs_hook=unique)))
             for model in (value.selected_model, value.selected_import_model, value.selected_fallback_model,
-                          value.selected_rewrite_model, *kept):
+                          value.selected_rewrite_model):
                 if model is not None and not MODEL.fullmatch(model):raise ValueError()
-            if value.selected_provider in value.provider_selections:raise ValueError()
+            if len(set(value.enabled_providers)) != len(value.enabled_providers):raise ValueError()
             return value
         except (OSError, ValueError, ValidationError):
             raise PreferencesFailure('PREFERENCES_CORRUPT') from None
@@ -56,7 +66,7 @@ class PreferencesStore:
     def load(self):
         try:
             with locked_root(self.root, '.preferences.lock'):return self._read()
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_UNAVAILABLE') from None
 
     def select_model(self, model):
@@ -64,7 +74,7 @@ class PreferencesStore:
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read();value.selected_model = model;self._write(value);return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_rewrite_reasoning(self, model, effort):
@@ -76,7 +86,7 @@ class PreferencesStore:
                 value.rewrite_reasoning_effort = effort
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_rewrite_model(self, model, supported):
@@ -91,7 +101,7 @@ class PreferencesStore:
                     value.rewrite_reasoning_effort = None
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def save_analysis(self, enabled):
@@ -101,7 +111,7 @@ class PreferencesStore:
                 value.automatic_analysis = enabled
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def save_limits(self, import_minutes, project_megabytes):
@@ -114,7 +124,7 @@ class PreferencesStore:
                 return value
         except ValidationError:
             raise PreferencesFailure('INVALID_REQUEST') from None
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_import_model(self, model):
@@ -126,7 +136,7 @@ class PreferencesStore:
                 value.selected_import_model = model
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
     def select_fallback_model(self, model):
@@ -138,31 +148,16 @@ class PreferencesStore:
                 value.selected_fallback_model = model
                 self._write(value)
                 return value
-        except StorageFailure:
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
-    def select_provider(self, kind, agent_model, agent_effort=None):
-        """Keeps the outgoing provider's choices, including the assistant model and effort held in their own
-        file, and restores the incoming provider's; returns the preferences and the assistant pair to restore."""
+    def enable_provider(self, kind, enabled):
         try:
             with locked_root(self.root, '.preferences.lock'):
                 value = self._read()
-                if value.selected_provider == kind:
-                    return value, (agent_model, agent_effort)
-                selections = dict(value.provider_selections)
-                selections[value.selected_provider] = ProviderSelection(
-                    selectedModel=value.selected_model, selectedImportModel=value.selected_import_model,
-                    selectedFallbackModel=value.selected_fallback_model, selectedRewriteModel=value.selected_rewrite_model,
-                    rewriteReasoningEffort=value.rewrite_reasoning_effort, selectedAgentModel=agent_model,
-                    agentReasoningEffort=agent_effort)
-                restored = selections.pop(kind, ProviderSelection())
-                value.selected_provider = kind
-                value.selected_model, value.selected_import_model = restored.selected_model, restored.selected_import_model
-                value.selected_fallback_model = restored.selected_fallback_model
-                value.selected_rewrite_model = restored.selected_rewrite_model
-                value.rewrite_reasoning_effort = restored.rewrite_reasoning_effort
-                value.provider_selections = selections
+                kinds = [item for item in value.enabled_providers if item != kind]
+                value.enabled_providers = [*kinds, kind] if enabled else kinds
                 self._write(value)
-                return value, (restored.selected_agent_model, restored.agent_reasoning_effort)
-        except StorageFailure:
+                return value
+        except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None

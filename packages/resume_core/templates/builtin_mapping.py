@@ -26,6 +26,8 @@ def types_at(schema, pointer):
         return set(value)
     branches = node.get('anyOf')
     if isinstance(branches, list):
+        if not all(isinstance(branch, dict) for branch in branches):
+            raise SchemaFailure(pointer, 'anyOf branches must be schema objects')
         return set().union(*(types_at({**branch, '$defs': schema.get('$defs', {})}, '') for branch in branches))
     return set()
 

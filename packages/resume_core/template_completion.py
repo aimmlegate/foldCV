@@ -13,6 +13,10 @@ has, or that no binding holds, carries no fact and is dropped; an entry inside a
 the raw wording of a date or period cites the values read from it; a foreign field name at a pointer with one bound
 field names that field; an item reference of a type no binding at that pointer holds cannot name that value's item,
 so the value gets a new item instead.
+
+A repair resends the whole reply, so an item of the reply under repair stays that item: a value without an item ref
+joins the item of the same kind at the same place, and a repair whose items no longer line up with it is refused by
+name. Without this every admitted item came back as a second copy.
 """
 
 from copy import deepcopy
@@ -66,11 +70,13 @@ def stated_text(payload, pointer):
         return value.strip() or None
     if isinstance(value, dict) and isinstance(value.get('raw'), str):
         return value['raw'].strip() or None
-    tokens = pointer_tokens(pointer)
-    if isinstance(value, (bool, int, float)) and tokens:
-        parent = payload_value(payload, pointer_of(tokens[:-1]))
-        if isinstance(parent, dict) and isinstance(parent.get('raw'), str):
-            return parent['raw'].strip() or None
+    if isinstance(value, (bool, int, float)):
+        tokens = pointer_tokens(pointer)
+        parent = payload_value(payload, pointer_of(tokens[:-1])) if tokens else None
+        if isinstance(parent, dict) and isinstance(parent.get('raw'), str) and parent['raw'].strip():
+            return parent['raw'].strip()
+        # false states nothing a source line could show; a number stands in the source as its digits.
+        return None if value is False else 'true' if value is True else str(value).removesuffix('.0')
     return None
 
 
@@ -78,10 +84,17 @@ def _narrowest(hits):
     return [option for option in hits if not any(other is not option and _inside(other.span, option.span) for other in hits)]
 
 
-def stating(text, table):
-    """Refs of the narrowest offered entries that contain the text word for word."""
+def stating(text, table, anchors=()):
+    """Refs of the narrowest offered entries that contain the text word for word. anchors are the refs already cited
+    for the same item: the lines from the first anchor down are its own, nearest first; the lines above it, which end
+    the previous item, count only when those state nothing. Any of them would also anchor the item's later values."""
     pattern = re.compile(r'(?<!\w)' + re.escape(text) + r'(?!\w)')
     narrow = _narrowest([option for option in table.values() if pattern.search(option.text)])
+    order = {ref: index for index, ref in enumerate(table)}
+    anchored = [order[anchor] for anchor in anchors if anchor in order]
+    if anchored:
+        below = [option for option in narrow if order[option.ref] >= min(anchored)]
+        narrow = sorted(below or narrow, key=lambda option: min(abs(order[option.ref] - value) for value in anchored))
     return [option.ref for option in narrow[:STATED_LIMIT]]
 
 
@@ -236,7 +249,71 @@ def without_unbound(reply, unbound, instances):
     return {**reply, 'payload': payload, 'fields': fields, 'discoveries': discoveries or reply.get('discoveries')}, dropped
 
 
-def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None):
+def _cleared(reply, pointer):
+    """The reply with the value at pointer set to null; the reply given stays as it was."""
+    payload = deepcopy(reply.get('payload'))
+    tokens = pointer_tokens(pointer)
+    parent = payload_value(payload, pointer_of(tokens[:-1]))
+    parent[int(tokens[-1]) if isinstance(parent, list) else tokens[-1]] = None
+    return {**reply, 'payload': payload}
+
+
+def _offered_items(previous, bindings, kinds):
+    """{(semantic type, item root): H ref} of the items in the reply under repair."""
+    previous = previous or {}
+    refs = {entry.get('pointer'): entry.get('item') for entry in previous.get('fields') or [] if entry.get('item')}
+    result = {}
+    for pointer, semantic, field in _binding_instances(previous.get('payload'), bindings):
+        if kinds.get(refs.get(pointer)) == semantic:
+            result[(semantic, pointer_of(_bound_root(pointer, semantic, field, bindings)))] = refs[pointer]
+    return result
+
+
+def _item_values(payload, bindings):
+    """{(semantic type, item root): its non-empty values}; values of nested items belong to those items."""
+    result = {}
+    for pointer, semantic, field in _binding_instances(payload, bindings):
+        value = payload_value(payload, pointer)
+        if not empty_value(value):
+            root = (semantic, pointer_of(_bound_root(pointer, semantic, field, bindings)))
+            result.setdefault(root, set()).add((field, json.dumps(value, ensure_ascii=False, sort_keys=True)))
+    return result
+
+
+def _misplaced(pointer):
+    return ValueError('item at ' + pointer + ' does not line up with previousReply: give one value of each item this repair '
+        'keeps its item {kind: handle, ref} from previousReply')
+
+
+def _kept_items(free, handles, offered, payload, previous, bindings):
+    """{root: H ref} for the roots of a repair that name no item: each keeps the item at its place in the reply under
+    repair. An item left out, or one the repair names at another place, can mean the items moved. Then a root binds
+    only when it reads as the item at its place, and otherwise the repair is refused: binding it to its neighbour's
+    place would leave the neighbour's own item beside it as a second copy."""
+    named = {ref for refs in handles.values() for ref in refs}
+    moved = [pointer for (semantic, pointer), refs in handles.items()
+        if refs & set(offered.values()) and offered.get((semantic, pointer)) not in refs]
+    kept = {}
+    for root in free:
+        if any(_under(root[1], pointer) for pointer in moved):
+            raise _misplaced(root[1])
+        if root in offered:
+            if offered[root] in named:
+                raise _misplaced(root[1])
+            kept[root] = offered[root]
+    left_out = [root for root, ref in offered.items() if ref not in named and ref not in kept.values()]
+    if left_out and kept:
+        before, after = _item_values(previous.get('payload'), bindings), _item_values(payload, bindings)
+        for root in kept:
+            rivals = [value for value in left_out if value[0] == root[0]
+                and pointer_tokens(value[1])[:-1] == pointer_tokens(root[1])[:-1]]
+            shared = lambda place: len(after.get(root, set()) & before.get(place, set()))
+            if rivals and (not shared(root) or any(shared(value) > shared(root) for value in rivals)):
+                raise _misplaced(root[1])
+    return kept
+
+
+def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None, previous=None):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
@@ -248,7 +325,9 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
 
     preferred, for one entry of a block (D117), is the part of the table that holds the entry's lines: a value is
     cited from those lines first and from the whole table only when they do not state it. A value that four entries
-    share otherwise took the first lines that state it, another entry's, and failed its own entry's review."""
+    share otherwise took the first lines that state it, another entry's, and failed its own entry's review.
+
+    previous, for a repair, is the reply under repair as its request shows it; see _kept_items."""
     if not isinstance(reply, dict) or not bindings:
         return reply
     payload = reply.get('payload')
@@ -299,21 +378,26 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
         if entry.get('effectiveCells') is None:
             entry['effectiveCells'] = []
         entries.append(entry)
-    # A moved or renamed entry joins the value's own entry, if the reply gave one, instead of duplicating it.
+    # A moved or renamed entry joins the value's other entry, given or moved too, instead of duplicating it.
     for entry in moved:
-        own = next((other for other in entries if other is not entry and not any(other is value for value in moved)
+        own = next((other for other in entries if other is not entry
             and (other.get('pointer'), other.get('fieldKey')) == (entry['pointer'], entry.get('fieldKey'))), None)
         if own is not None:
             own['evidence'] = list(dict.fromkeys([*(own.get('evidence') or []), *(entry.get('evidence') or [])]))
+            own['effectiveCells'] = list(dict.fromkeys([*(own.get('effectiveCells') or []), *(entry.get('effectiveCells') or [])]))
+            own['item'] = own.get('item') or entry.get('item')
             entries = [value for value in entries if value is not entry]
     roots_of = {}
     for pointer, pairs in instances.items():
         roots_of[pointer] = {pointer_of(_bound_root(pointer, semantic, field, bindings)) for semantic, field in pairs}
+    tops = {}
     def top_root(pointer):
         # The outermost item a value belongs to: a task of a job is anchored by the whole job's lines, not only its own.
-        prefixes = [root for roots in roots_of.values() for root in roots
-            if isinstance(pointer, str) and (pointer == root or under(pointer, root))]
-        return min(prefixes, key=len) if prefixes else None
+        if pointer not in tops:
+            prefixes = [root for roots in roots_of.values() for root in roots
+                if isinstance(pointer, str) and (pointer == root or under(pointer, root))]
+            tops[pointer] = min(prefixes, key=len) if prefixes else None
+        return tops[pointer]
     def anchors_for(pointer):
         root = top_root(pointer)
         if root is None:
@@ -329,25 +413,33 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
         if not text:
             return None
         for scope in ([preferred, table] if preferred else [table]):
-            found = stating(text, scope) or stating_words(text, scope) or stating_stems(text, scope, anchors_for(pointer))
+            anchors = anchors_for(pointer)
+            found = stating(text, scope, anchors) or stating_words(text, scope) or stating_stems(text, scope, anchors)
             if found:
                 return found
         return None
     given = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries}
+    cited = {(entry.get('pointer'), entry.get('fieldKey')) for entry in entries
+        if entry.get('evidence') or entry.get('effectiveCells')}
     unbound = []
     for pointer in sorted(instances, key=_natural):
         for _semantic, field in instances[pointer]:
-            if (pointer, field) in given:
+            if (pointer, field) in cited:
                 continue
             evidence = derived_evidence(pointer)
-            if evidence is not None:
+            if evidence is None and pointer and payload_value(payload, pointer) is False:
+                # A false flag no line states (ongoing on a job with no dates) carries no fact, so it reads as null.
+                reply = _cleared(reply, pointer)
+                payload, evidence = reply['payload'], []
+            if evidence is None:
+                if dropped is not None:
+                    unbound.append((pointer, field))
+            elif (pointer, field) not in given:
                 entries.append({'item': None, 'fieldKey': field, 'pointer': pointer, 'evidence': evidence, 'effectiveCells': []})
-            elif dropped is not None:
-                unbound.append((pointer, field))
     if unbound:
         reduced, gone = without_unbound(reply, unbound, instances)
         dropped.extend(gone)
-        return complete_reply(reduced, bindings, table, references, allowed_relations, preferred=preferred)
+        return complete_reply(reduced, bindings, table, references, allowed_relations, preferred=preferred, previous=previous)
     for entry in entries:
         if not entry.get('evidence') and not entry.get('effectiveCells') and entry.get('pointer') in instances:
             entry['evidence'] = derived_evidence(entry['pointer']) or []
@@ -369,9 +461,17 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
             declared[identity] = value.get('key')
     handles = {root: {entry['item'].get('ref') for entry in values if isinstance(entry.get('item'), dict)
         and entry['item'].get('kind') == 'handle'} for root, values in roots.items()}
+    # Split and merge stay explicit; every other new item is added.
+    explicit = [dict(value) for value in reply.get('lineage') or [] if value.get('kind') in {'split', 'merge'}]
+    children = {child for value in explicit for child in value.get('children') or []}
+    ordered = sorted(roots, key=lambda value: (_natural(value[1]), value[0]))
+    kept = _kept_items([root for root in ordered if not handles[root] and declared.get(root) not in children], handles,
+        _offered_items(previous, bindings, kinds), payload, previous, bindings) if previous else {}
+    for root, ref in kept.items():
+        handles[root] = {ref}
     taken = {value.get('key') for value in discoveries}
     keys, added = {}, []
-    for root in sorted(roots, key=lambda value: (_natural(value[1]), value[0])):
+    for root in ordered:
         if handles[root]:
             continue
         key = declared.get(root)
@@ -386,13 +486,10 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
         for entry in values:
             if root in keys:
                 entry['item'] = {'kind': 'discovery_key', 'key': keys[root]}
-            elif len(handles[root]) == 1 and entry.get('item') is None:
+            elif len(handles[root]) == 1 and (entry.get('item') is None or root in kept):
                 entry['item'] = {'kind': 'handle', 'ref': next(iter(handles[root]))}
     used = set(keys.values())
     discoveries = [value for value in discoveries if value.get('key') in used] + added
-    # Split and merge stay explicit; every other new item is added.
-    explicit = [dict(value) for value in reply.get('lineage') or [] if value.get('kind') in {'split', 'merge'}]
-    children = {child for value in explicit for child in value.get('children') or []}
     new = [value['key'] for value in discoveries if value['key'] not in children]
     lineage = explicit + ([{'kind': 'add', 'parents': [], 'children': new}] if new else [])
     return {**reply, 'fields': entries, 'discoveries': discoveries, 'lineage': lineage,

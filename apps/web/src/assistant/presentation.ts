@@ -1,5 +1,6 @@
 import { errorMessage } from "../errors/messages";
-import type { AssistantView } from "./controller";
+import { lostLink, terminal, type AssistantView } from "./controller";
+import type { Run } from "./api";
 
 export function errorText(code: string | null): string {
   return code ? errorMessage(code, "Помощник не закончил работу. Готовое осталось в диалоге.") : "";
@@ -14,6 +15,18 @@ export function runText(view: AssistantView): string {
 export function canSend(view: AssistantView, applying = false): boolean {
   return !view.submitting && !view.loading && !applying && (!view.run || ["completed", "failed", "cancelled", "interrupted"].includes(view.run.state))
     && (view.pendingSend || view.capabilities?.ready === true) && !!view.draft.trim() && [...view.draft].length <= 8000;
+}
+/** Stop already works. A run whose follow loop gave up can be stopped again even while cancelling: that follows it again. */
+export function stopBusy(view: AssistantView): boolean {
+  return view.loading === "Останавливаем" || view.run?.state === "cancelling" && view.loading !== lostLink;
+}
+/** The panel re-reads capabilities while it shows a refusal: a connection check can end at any moment. */
+export function rereadsCapabilities(view: AssistantView | null): boolean {
+  return view?.settings?.enabled === true && Boolean(view.capabilities?.unavailable);
+}
+/** "Still stopping" is the client's own notice: it ends with the run. */
+export function shownFailure(failure: string | null, run: Run | null): string | null {
+  return failure === "AGENT_STOP_PENDING" && terminal(run) ? null : failure;
 }
 export function submitKey(key: string, shift: boolean, composing: boolean, nativeComposing: boolean, keyCode: number): boolean {
   return key === "Enter" && !shift && !composing && !nativeComposing && keyCode !== 229;

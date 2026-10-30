@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from io import BytesIO
+from itertools import count
 from pathlib import PurePosixPath
 import posixpath
 import re
@@ -240,6 +241,8 @@ def _paragraph_text(paragraph: ET.Element, styles: ParagraphStyles | None = None
             return
         if node.tag == W + "t":
             parts.append(node.text or "")
+        elif node.tag == W + "noBreakHyphen":
+            parts.append("\u2011")
         elif node.tag == W + "tab":
             parts.append("\t")
         elif node.tag in {W + "br", W + "cr"}:
@@ -259,13 +262,25 @@ def _paragraph(paragraph: ET.Element, location: ExtractLocation, out: Collected,
     tags = {node.tag.rsplit("}", 1)[-1] for node in paragraph.iter()}
     if "txbxContent" in tags:
         out.gap("TEXT_BOX", location)
+    if paragraph.find(".//" + W + "sym") is not None:
+        out.gap("UNSUPPORTED_CONTENT", location)
     if tags & {"shape", "sp", "pict", "object", "AlternateContent"}:
         out.gap("SHAPE", location)
     if tags & {"drawing", "imagedata", "blip"}:
         out.gap("IMAGE", location)
 
 
-def _table(table: ET.Element, index: int, out: Collected, styles: ParagraphStyles, part: str | None = None) -> None:
+def _opened(nodes):
+    """Body-level nodes in reading order, each content control replaced by its content."""
+    for node in nodes:
+        if node.tag != W + "sdt":
+            yield node
+        elif (content := node.find(W + "sdtContent")) is not None:
+            yield from _opened(content)
+
+
+def _table(table: ET.Element, tables, out: Collected, styles: ParagraphStyles, part: str | None = None) -> None:
+    index = next(tables)
     def wrapped_rows(node):
         if node.tag == W + "tr":
             return 1
@@ -300,6 +315,8 @@ def _table(table: ET.Element, index: int, out: Collected, styles: ParagraphStyle
                 if cell_child.tag == W + "p":
                     _paragraph(cell_child, location, out, styles, column_span=column_span, row_merge=row_merge)
                     paragraph_index += 1
+                elif cell_child.tag == W + "tbl":
+                    _table(cell_child, tables, out, styles, part)
                 else:
                     out.gap("UNSUPPORTED_CONTENT", location)
             column += column_span
@@ -318,14 +335,13 @@ def _docx(data: bytes, out: Collected) -> None:
     if body is None:
         raise ExtractFailure("EXTRACT_MALFORMED")
     paragraph_index = 0
-    table_index = 0
-    for child in body:
+    tables = count()
+    for child in _opened(body):
         if child.tag == W + "p":
             _paragraph(child, ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"), out, styles)
             paragraph_index += 1
         elif child.tag == W + "tbl":
-            _table(child, table_index, out, styles, "word/document.xml")
-            table_index += 1
+            _table(child, tables, out, styles, "word/document.xml")
         elif child.tag != W + "sectPr":
             out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind="paragraph", paragraph=paragraph_index, part="word/document.xml"))
     for name in sorted(contents):
@@ -337,14 +353,13 @@ def _docx(data: bytes, out: Collected) -> None:
             root = _check_xml(contents[name])
             kind = "header" if "header" in name else "footer"
             paragraph_index = 0
-            table_index = 0
+            tables = count()
             for child in root:
                 if child.tag == W + "p":
                     _paragraph(child, ExtractLocation(kind=kind, paragraph=paragraph_index, part=name), out, styles)
                     paragraph_index += 1
                 elif child.tag == W + "tbl":
-                    _table(child, table_index, out, styles, name)
-                    table_index += 1
+                    _table(child, tables, out, styles, name)
                 else:
                     out.gap("UNSUPPORTED_CONTENT", ExtractLocation(kind=kind, paragraph=paragraph_index, part=name))
     if not out.units:
@@ -364,7 +379,7 @@ def extract(data: bytes, original_name: str, pasted: bool = False) -> ExtractRes
     elif extension == ".pdf" and data.startswith(b"%PDF-"):
         kind, mime, parser, version = "pdf", "application/pdf", "pymupdf", pymupdf.VersionBind + "/layout2"
     elif extension == ".docx" and data.startswith(b"PK\x03\x04"):
-        kind, mime, parser, version = "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "ooxml", "2"
+        kind, mime, parser, version = "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "ooxml", "3"
     elif extension in {".txt", ".md", ".markdown"} and not data.startswith((b"%PDF-", b"PK\x03\x04", b"\xd0\xcf\x11\xe0")):
         kind = "markdown" if extension in {".md", ".markdown"} else "txt"
         mime, parser, version = "text/markdown" if kind == "markdown" else "text/plain", "utf8", "2"

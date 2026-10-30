@@ -1,4 +1,4 @@
-"""An import call waits for the shared inference permit instead of failing its block (SR00 flag 2, permit lifecycle)."""
+"""An import runs beside an assistant turn on the shared inference admission (D121, permit lifecycle)."""
 
 import asyncio
 from pathlib import Path
@@ -14,7 +14,7 @@ from tests.templates.template_runtime_fixtures import RuntimeFixture
 
 
 @pytest.mark.asyncio
-async def test_an_import_call_waits_while_another_turn_holds_the_inference_permit(tmp_path):
+async def test_an_import_finishes_while_an_assistant_turn_holds_its_permit(tmp_path):
     fixture = RuntimeFixture(tmp_path, fallback=False)
     controlled = fixture.transport
     provider = CodexCliProvider(Path('/nonexistent/synthetic-cli'))
@@ -23,19 +23,15 @@ async def test_an_import_call_waits_while_another_turn_holds_the_inference_permi
         tmp_path / 'transport')
     projects = ProjectService(fixture.repository)
     imports = ImportService(projects, fixture.pipeline, commands=lambda *_args: fixture.command)
-    # An assistant turn holds the permit when the import starts.
+    # An assistant turn holds a permit for the whole import.
     assert INFERENCE.acquire(blocking=False)
     try:
         identifier = await imports.start(fixture.project, ImportCommand(kind='start', clientRequestId='request'),
             asyncio.Event())
-        runner = imports.runners[identifier]
-        for _ in range(200):
-            if runner.done() or INFERENCE.waiting:
-                break
-            await asyncio.sleep(0.01)
+        await asyncio.wait_for(imports.runners[identifier], 30)
+        assert INFERENCE.shared == 1
     finally:
         INFERENCE.release()
-    await runner
     [status] = projects.tasks.list(fixture.project)
     operation = fixture.current().project.template_operations[0]
     assert status['state'] == 'succeeded'

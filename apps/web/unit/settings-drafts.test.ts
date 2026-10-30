@@ -61,23 +61,13 @@ test("partial Save retains failed drafts and Cancel keeps successful writes", as
   assert.equal(h.controller.state.draft.agentEnabled, false); assert.equal(h.controller.state.draft.markdown, originalRules);
 });
 
-test("the assistant effort is a draft saved with the assistant model and reread after a provider switch", async () => {
+test("the assistant effort is a draft saved with the assistant model", async () => {
   const h = setup(); await h.controller.load();
   assert.equal(h.controller.state.draft.agentEffort, null);
   h.controller.change("agentModel", "agent-b"); h.controller.change("agentEffort", "high");
   assert.deepEqual(h.controller.dirty, ["assistant"]);
-  await h.controller.reloadChoices();
-  assert.equal(h.controller.state.draft.agentEffort, "high", "dirty drafts are never replaced");
   await h.controller.save();
   assert.deepEqual(h.calls.at(-1), { part: "assistant", value: { expectedRevision: 1, enabled: false, selectedAgentModel: "agent-b", reasoningEffort: "high" } });
-  assert.deepEqual(h.controller.dirty, []);
-  // The server switched provider: other choices are in place now.
-  h.server.preferences = { ...h.server.preferences, selectedModel: "claude-model", selectedRewriteModel: "claude-rewrite", rewriteReasoningEffort: "low" };
-  h.server.assistant = { ...h.server.assistant, revision: 3, selectedAgentModel: "claude-agent", reasoningEffort: null };
-  await h.controller.reloadChoices();
-  assert.equal(h.controller.state.draft.model, "claude-model"); assert.equal(h.controller.state.draft.reasoning, "low");
-  assert.equal(h.controller.state.draft.rewriteModel, "claude-rewrite");
-  assert.equal(h.controller.state.draft.agentModel, "claude-agent"); assert.equal(h.controller.state.draft.agentEffort, null);
   assert.deepEqual(h.controller.dirty, []);
 });
 
@@ -240,6 +230,23 @@ test("the rewrite model saves before its level, which must be one that model rep
   h.controller.change("rewriteModel", null); await h.controller.save();
   assert.deepEqual(h.calls.slice(-2), [{ part: "rewrite", value: null }, { part: "reasoning", value: { model: "model-a", effort: "high" } }]);
   assert.equal(h.server.preferences.rewriteReasoningEffort, "high"); assert.deepEqual(h.controller.dirty, []);
+});
+
+test("reopened Settings adopts a model chosen in the assistant panel, so its next save is not a conflict", async () => {
+  const h = setup(); await h.controller.load();
+  Object.assign(h.server.assistant, { revision: 5, enabled: true, selectedAgentModel: "panel-model", reasoningEffort: "high" });
+  await h.controller.refreshAssistant();
+  assert.equal(h.controller.state.draft.agentModel, "panel-model"); assert.equal(h.controller.state.draft.agentEffort, "high");
+  assert.deepEqual(h.controller.dirty, []);
+  h.controller.change("agentEffort", "low"); await h.controller.save();
+  assert.deepEqual(h.controller.dirty, []); assert.equal(h.server.assistant.revision, 6);
+  // An unsaved edit stays, on the new revision.
+  h.controller.change("agentModel", "local-choice");
+  h.server.assistant.revision = 8;
+  await h.controller.refreshAssistant();
+  assert.equal(h.controller.state.draft.agentModel, "local-choice");
+  await h.controller.save();
+  assert.equal(h.server.assistant.selectedAgentModel, "local-choice");
 });
 
 test("reopened Settings shows rewrite choices saved in the popover and keeps its own unsaved edits", async () => {

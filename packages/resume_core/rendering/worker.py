@@ -289,13 +289,13 @@ def main() -> int:
         (workspace / "render-status.json").write_text(error.error.model_dump_json(by_alias=True), encoding="utf-8")
         return 1
     except RenderFailure as error:
-        code = error.code
+        code, details = error.code, error.details
     except Exception:
         if (workspace / "docx-input.json").is_file():
             (workspace / "render-status.json").write_text(failure("DOCX_RENDER_FAILED").error.model_dump_json(by_alias=True), encoding="utf-8")
             return 1
-        code = "RENDER_FAILED"
-    (workspace / "render-status.json").write_text(json.dumps({"code": code}), encoding="utf-8")
+        code, details = "RENDER_FAILED", {}
+    (workspace / "render-status.json").write_text(json.dumps({"code": code, **details}), encoding="utf-8")
     return 1
 
 

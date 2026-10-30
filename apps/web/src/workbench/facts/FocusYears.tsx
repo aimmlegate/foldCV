@@ -6,12 +6,14 @@ import { Button } from "../ui/Button";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 import { yearsValue } from "../../rich/v7-focus";
 
-/** One Focus row: the whole years its technology states, else that statement or the shown line for the placeholder. */
-export type FocusEntry = { recordId: string; display: string; years: number | null; detail: string };
+/** One Focus row: the whole years its technology states, else that statement or the shown line for the placeholder;
+ * the icon the document shows and whether the user chose it (D122). */
+export type FocusEntry = { recordId: string; display: string; years: number | null; detail: string;
+  icon: { id: string; url: string } | null; chosen: boolean };
 type Entry = FocusEntry;
 
-function YearsRow({ entry, paused, submit, edit, drag }: { entry: Entry; paused: boolean; submit: (command: PanelCommand) => Promise<void>;
-  edit: (recordId: string) => void; drag: ReturnType<typeof useTechnologyDrag> }) {
+function YearsRow({ entry, paused, submit, edit, drag, pickIcon }: { entry: Entry; paused: boolean; submit: (command: PanelCommand) => Promise<void>;
+  edit: (recordId: string) => void; drag: ReturnType<typeof useTechnologyDrag>; pickIcon: ((recordId: string) => void) | null }) {
   const saved = entry.years === null ? "" : String(entry.years);
   const [value, setValue] = useState(saved), [bad, setBad] = useState(false), [busy, setBusy] = useState(false);
   const running = useRef(false);
@@ -33,9 +35,14 @@ function YearsRow({ entry, paused, submit, edit, drag }: { entry: Entry; paused:
     catch { /* The facts panel shows the error. */ }
     finally { running.current = false; setBusy(false); }
   }
-  return <form className="focus-years-row" data-fact-id={entry.recordId} {...drag.target(entry.recordId)} onSubmit={event => { event.preventDefault(); void save(); }}>
+  return <form className={pickIcon ? "focus-years-row with-icon" : "focus-years-row"} data-fact-id={entry.recordId} {...drag.target(entry.recordId)}
+    onSubmit={event => { event.preventDefault(); void save(); }}>
     <button type="button" className="technology-drag" aria-label={`Порядок в фокусе: ${entry.display}`} title="Перетащите или Alt+↑/↓"
       disabled={paused || busy} {...drag.handle(entry.recordId)}><span aria-hidden="true">⠿</span></button>
+    {pickIcon && <button type="button" className="focus-icon" aria-label={`Иконка: ${entry.display}`} disabled={paused || busy}
+      title={entry.chosen ? "Иконка выбрана вручную. Изменить" : "Выбрать иконку"} onClick={() => pickIcon(entry.recordId)}>
+      {entry.icon ? <img src={entry.icon.url} alt="" /> : <span className="focus-icon-empty" aria-hidden="true" />}
+    </button>}
     <button type="button" className="focus-name" aria-label={`Изменить: ${entry.display}`} disabled={paused || busy}
       onClick={() => edit(entry.recordId)}>{entry.display}</button>
     <input aria-label={`Лет опыта: ${entry.display}`} type="number" min={0} max={100} step={1} inputMode="numeric"
@@ -49,10 +56,12 @@ function YearsRow({ entry, paused, submit, edit, drag }: { entry: Entry; paused:
   </form>;
 }
 
-export function FocusYears({ entries, options, paused, submit, edit }: { entries: readonly Entry[]; options: readonly Entry[]; paused: boolean;
+export function FocusYears({ entries, options, paused, submit, edit, pickIcon = null }: { entries: readonly Entry[]; options: readonly Entry[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
   /** Opens the technology's own dialog: its name and any stated experience, such as 10 месяцев. */
-  edit: (recordId: string) => void }) {
+  edit: (recordId: string) => void;
+  /** Opens the icon search for a row; null when the template has no icons to choose from (D122). */
+  pickIcon?: ((recordId: string) => void) | null }) {
   const [selected, setSelected] = useState(""), [busy, setBusy] = useState(false);
   const running = useRef(false);
   const choice = options.some(option => option.recordId === selected) ? selected : options[0]?.recordId ?? "";
@@ -68,7 +77,7 @@ export function FocusYears({ entries, options, paused, submit, edit }: { entries
   }
   return <div className="focus-years" aria-label="Фокус">
     <p className="technology-label">Фокус · лет опыта</p>
-    {entries.map(entry => <YearsRow key={entry.recordId} entry={entry} paused={paused} submit={submit} edit={edit} drag={drag} />)}
+    {entries.map(entry => <YearsRow key={entry.recordId} entry={entry} paused={paused} submit={submit} edit={edit} drag={drag} pickIcon={pickIcon} />)}
     {drag.dragging && entries.length > 1 && <div className="technology-drop-end" {...drag.target(null)}>В конец списка</div>}
     {options.length > 0 && <form className="focus-add" onSubmit={event => { event.preventDefault(); void add(); }}>
       <select aria-label="Технология для фокуса" value={choice} disabled={paused || busy} onChange={event => setSelected(event.target.value)}>

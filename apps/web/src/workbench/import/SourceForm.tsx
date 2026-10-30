@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { preferencesRequest, saveImportModelRequest } from "../../api/client";
-import type { ConnectionSnapshot } from "../../connection/workflow";
-import { isReasoningEffort, longReasoning, type ReasoningEffort } from "../../connection/reasoning";
+import { modelGroups, type ConnectionSnapshot } from "../../connection/workflow";
+import type { ReasoningEffort } from "../../connection/reasoning";
 import { errorMessage } from "../../errors/messages";
 import { shownTemplate, templateImportStatus, type ImportOptions, type TemplateEntry } from "../../projects/api";
-import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSelect";
+import { ModelOptions } from "../settings/ModelSelect";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
+import { chosenEffort, EffortField, RewriteField } from "./ImportChoices";
 
 /** A new resume from one file (PDF, DOCX, TXT, Markdown) with a template, the import model, its effort and the rewrite
  * choice. Without the template list the upload uses the default template. `active`: shown, not behind Settings. */
@@ -33,13 +34,8 @@ export function SourceForm({ active, busy, process, connection }: {
     }).catch(() => {});
     return () => { alive = false; };
   }, [active]);
-  const models = connection?.models ?? [];
   const model = importModel ?? connection?.selectedModel ?? null;
   const reasoning = model ? connection?.modelReasoning?.[model] : undefined;
-  const chosen = effort && reasoning?.supported.includes(effort) ? effort : null;
-  // The level the import runs at: the chosen one, else the model's default (D114: it applies to every block).
-  const effective = chosen ?? reasoning?.default ?? null;
-  const slow = effective !== null && longReasoning(effective);
   async function changeModel(next: string | null) {
     setSaving(true); setModelError("");
     try { setImportModel((await saveImportModelRequest(next)).selectedImportModel ?? null); }
@@ -67,25 +63,12 @@ export function SourceForm({ active, busy, process, connection }: {
         <select className="model-select" id="import-model" aria-label="Модель импорта" value={importModel ?? ""}
           disabled={busy || saving || !loaded || !connection?.metadataReady} onChange={event => void changeModel(event.currentTarget.value || null)}>
           <option value="">{connection?.selectedModel ? `Модель обработки · ${connection.selectedModel}` : "Модель обработки"}</option>
-          {(importModel && !models.includes(importModel) ? [importModel, ...models] : models).map(name =>
-            <option key={name} value={name} disabled={!models.includes(name)}>{name}{models.includes(name) ? "" : " · недоступна"}</option>)}
+          <ModelOptions groups={modelGroups(connection)} value={importModel} />
         </select></div>
-      <div className="import-option"><label htmlFor="import-effort">Рассуждения</label>
-        <select className="model-select" id="import-effort" aria-label="Уровень рассуждений импорта" value={chosen ?? ""}
-          aria-describedby={slow ? "import-effort-help" : undefined}
-          disabled={busy || !reasoning?.supported.length} onChange={event => {
-            const next = event.currentTarget.value;
-            setEffort(isReasoningEffort(next) ? next : null);
-          }}>
-          <option value="">{defaultReasoningLabel(reasoning?.default)}</option>
-          {(reasoning?.supported ?? []).map(value => <option key={value} value={value}>{reasoningLabels[value]}</option>)}
-        </select>
-        {slow && <small id="import-effort-help">Импорт на высоком уровне рассуждений может занять больше времени.</small>}</div>
-      <label className="import-rewrite" htmlFor="import-rewrite"><input className="switch" id="import-rewrite" type="checkbox" role="switch"
-        checked={rewrite} disabled={busy} aria-describedby="import-rewrite-help" onChange={event => setRewrite(event.currentTarget.checked)} />
-        <span>Переписывать текст<small id="import-rewrite-help">{rewrite ? "Модель улучшит формулировки." : "Только оформление."}</small></span></label>
+      <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} />
+      <RewriteField rewrite={rewrite} disabled={busy} change={setRewrite} />
       <Button className="import-process-button" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!file}
-        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite, effort: chosen }, templateId); }}>Обработать<Icon name="arrow" /></Button>
+        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite, effort: chosenEffort(effort, reasoning) }, templateId); }}>Обработать<Icon name="arrow" /></Button>
     </div>
     {modelError && <p className="notice error" role="alert">{modelError}</p>}
   </div></section>;

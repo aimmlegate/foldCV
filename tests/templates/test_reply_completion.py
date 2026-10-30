@@ -505,3 +505,124 @@ def test_unbound_values_leave_the_payload_and_later_pointers_move_down():
     assert [(entry['pointer'], entry['evidence']) for entry in reduced['fields']] == [('/0/tasks/1/value', ['S3'])]
     assert dropped == [{'pointer': '/0/tasks/1/value', 'fieldKey': 'value', 'text': 'Invented task.'},
         {'pointer': '/1/role', 'fieldKey': 'role', 'text': 'Invented role'}]
+
+
+# Review findings of 2026-10-30 (L03): repairs and rewrite-off on one synthetic two-job source.
+from types import SimpleNamespace
+
+from packages.resume_core.models.contracts import Source
+from packages.resume_core.models.template_import import ReferenceTable
+from packages.resume_core.template_completion import stated_text, stating
+from packages.resume_core.template_wording import display_raw_input
+from packages.resume_core.templates.compiler import sha256
+
+TWO_JOBS = ('Example One — engineer, 2019–2020\nPython\nРазработка REST API\nExample Two — engineer, 2021–2022\nPython\n'
+    'Разработка REST API\nНастройка CI\n')
+NO_OFFERS = ReferenceTable.model_validate({'items': [], 'cells': [], 'relations': []})
+
+
+def text_source(text):
+    raw = text.encode()
+    return Source(id='source', revision=1, originalName='a.txt', mimeType='text/plain', byteSha256=sha256(raw), byteRef='sources/a.txt',
+        parser='text', parserVersion='1', units=[{'id': 'unit', 'revision': 1, 'order': 0, 'text': text,
+        'location': {'kind': 'pasted', 'index': 0, 'row': None, 'column': None}, 'disposition': 'shown', 'representedFactIds': []}],
+        overlays=[], warnings=[])
+
+
+def offered(text):
+    src = text_source(text)
+    unit = src.units[0]
+    options = evidence_options([capture_span(src, unit), *line_spans(src, unit)], [src])
+    return options, {option.ref: option for option in options}, {option.text.rstrip('\n'): option.ref for option in options}
+
+
+def two_jobs(ongoing=False, when=True):
+    def span(raw, start, end):
+        return period(raw, date(start, int(start)), date(end, int(end)), ongoing) if when else period(None, None, None, ongoing)
+    return [job('Example One', 'engineer', span('2019–2020', '2019', '2020'), technologies=['Python'], tasks=['Разработка REST API']),
+        job('Example Two', 'engineer', span('2021–2022', '2021', '2022'), technologies=['Python'],
+            tasks=['Разработка REST API', 'Настройка CI'])]
+
+
+def projects():
+    return next(block for block in generic_package().definition.blocks if block.id == 'projects')
+
+
+def shown_without_rewriting(options, table, entries, pointer, value):
+    field = SimpleNamespace(pointer=pointer, effective_cell_ids=[], evidence=[table[ref].span for ref in entries[pointer]['evidence']])
+    review = SimpleNamespace(allow_text_rewrite=False, semantic_context={'sourceWordingPointers': [pointer]}, schema_version=2, evidence=options)
+    return display_raw_input(review, field, value)
+
+
+def test_without_rewriting_a_value_on_a_repeated_line_shows_that_line_once():
+    options, table, _lines = offered(TWO_JOBS)
+    done = complete_reply(reply(two_jobs()), projects().bindings, table, NO_OFFERS)
+    entries = {value['pointer']: value for value in done['fields']}
+    assert len(entries['/0/tasks/0/value']['evidence']) == 2
+    assert shown_without_rewriting(options, table, entries, '/0/tasks/0/value', 'Разработка REST API') == 'Разработка REST API'
+
+
+def test_without_rewriting_a_list_level_entry_shows_each_value_its_own_line():
+    options, table, lines = offered(TWO_JOBS)
+    given = [entry('/1/tasks', [lines['Разработка REST API'], lines['Настройка CI']])]
+    done = complete_reply(reply(two_jobs(), given), projects().bindings, table, NO_OFFERS)
+    entries = {value['pointer']: value for value in done['fields']}
+    assert shown_without_rewriting(options, table, entries, '/1/tasks/0/value', 'Разработка REST API') == 'Разработка REST API'
+    assert shown_without_rewriting(options, table, entries, '/1/tasks/1/value', 'Настройка CI') == 'Настройка CI'
+
+
+def test_without_rewriting_a_value_built_from_two_lines_shows_both():
+    options, table, lines = offered(TWO_JOBS)
+    entries = {'/x': {'evidence': [lines['Настройка CI'], lines['Разработка REST API']]}}
+    assert shown_without_rewriting(options, table, entries, '/x', 'Разработка REST API, настройка CI').splitlines() == [
+        'Разработка REST API', 'Настройка CI']
+
+
+def test_a_word_for_word_value_cites_its_own_items_lines_first():
+    text = ''.join('Job ' + str(index) + ' — engineer\nPython\n' for index in range(1, 6))
+    _options, table, lines = offered(text)
+    python = [ref for ref, option in table.items() if option.text == 'Python\n']
+    assert stating('Python', table) == python[:3]
+    assert stating('Python', table, [lines['Job 5 — engineer']])[0] == python[4]
+    # The line just above an item's header ends the previous item.
+    _options, table, lines = offered(TWO_JOBS)
+    [second] = stating('Разработка REST API', table, [lines['Example Two — engineer, 2021–2022']])
+    assert table[second].span.start > table[lines['Example Two — engineer, 2021–2022']].span.start
+    # With no line of its own an item may still cite the lines above it.
+    assert stating('Example One', table, [lines['Example Two — engineer, 2021–2022']])
+
+
+def test_a_block_running_whole_cites_each_jobs_value_from_that_job():
+    text = ''.join('Job ' + str(index) + ' — engineer\nPython\n' for index in range(1, 6))
+    _options, table, lines = offered(text)
+    payload = [job('Job ' + str(index), 'engineer', None, technologies=['Python']) for index in range(1, 6)]
+    done = complete_reply(reply(payload), projects().bindings, table, NO_OFFERS)
+    [last] = [value for value in done['fields'] if value['pointer'] == '/4/technologies/0/display']
+    assert table[last['evidence'][0]].span.start > table[lines['Job 5 — engineer']].span.start
+
+
+def test_a_number_cites_its_digits_and_a_true_flag_its_text():
+    assert stated_text({'year': 2024}, '/year') == '2024' and stated_text({'share': 2.5}, '/share') == '2.5'
+    assert stated_text({'year': 2024.0}, '/year') == '2024' and stated_text({'flag': True}, '/flag') == 'true'
+    assert stated_text({'flag': False}, '/flag') is None
+    assert stated_text({'raw': '2019–2020', 'ongoing': False}, '/ongoing') == '2019–2020'
+
+
+@pytest.mark.parametrize('dropped', [None, []])
+def test_a_false_flag_no_line_states_carries_no_fact_and_is_never_dropped_with_a_notice(dropped):
+    _options, table, _lines = offered(TWO_JOBS)
+    payload = two_jobs(when=False)
+    done = complete_reply(reply(payload), projects().bindings, table, NO_OFFERS, dropped=dropped)
+    assert payload[0]['period']['ongoing'] is False and done['payload'][0]['period']['ongoing'] is None
+    assert not dropped
+    [flag] = [value for value in done['fields'] if value['pointer'] == '/0/period/ongoing']
+    assert flag['evidence'] == []
+
+
+def test_two_entries_inside_one_bound_value_become_one():
+    _options, table, lines = offered(TWO_JOBS)
+    header = lines['Example One — engineer, 2019–2020']
+    given = [entry('/0/period/start/raw', [header]), entry('/0/period/start/year', [lines['Python'], header])]
+    done = complete_reply(reply(two_jobs(), given), projects().bindings, table, NO_OFFERS)
+    [start] = [value for value in done['fields'] if value['pointer'] == '/0/period/start']
+    assert start['fieldKey'] == 'start' and sorted(start['evidence']) == sorted([header, lines['Python']])

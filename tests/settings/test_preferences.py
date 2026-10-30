@@ -25,51 +25,55 @@ def test_private_preferences_keep_defaults_model_and_unrelated_fields_on_restart
     assert stat.S_IMODE(root.stat().st_mode) == 0o700 and stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert set(json.loads(store.path.read_text())) == {'schemaVersion', 'automaticAnalysis', 'theme', 'selectedModel',
         'selectedImportModel', 'selectedFallbackModel', 'selectedRewriteModel', 'rewriteReasoningEffort', 'importMinutes',
-        'projectMegabytes', 'selectedProvider', 'providerSelections'}
+        'projectMegabytes', 'enabledProviders'}
 
 
-def test_preferences_from_before_providers_load_as_codex(tmp_path):
+def test_preferences_from_before_providers_turn_codex_on(tmp_path):
     root = tmp_path / 'FoldCV'
     RulesStore(root).load()
     store = PreferencesStore(root)
     atomic_write(store.path, json.dumps({'schemaVersion': 1, 'automaticAnalysis': False, 'theme': 'dark',
         'selectedModel': 'model-a', 'selectedImportModel': 'model-b', 'rewriteReasoningEffort': 'high'}).encode())
     value = store.load()
-    assert value.selected_provider == 'codex_cli' and value.provider_selections == {}
+    assert value.enabled_providers == ['codex_cli']
     assert (value.selected_model, value.selected_import_model, value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'high')
     assert not value.automatic_analysis and value.theme == 'dark'
 
 
-def test_provider_switch_keeps_and_restores_each_providers_choices(tmp_path):
+@pytest.mark.parametrize(('active', 'enabled'), [('codex_cli', ['codex_cli']), ('claude_cli', ['codex_cli', 'claude_cli'])])
+def test_choices_of_the_one_active_design_keep_the_active_ones(tmp_path, active, enabled):
+    """D119: the active provider's choices stay, the kept ones of the other provider go, and Claude stays on."""
     root = tmp_path / 'FoldCV'
     RulesStore(root).load()
     store = PreferencesStore(root)
-    store.select_model('model-a')
+    atomic_write(store.path, json.dumps({'schemaVersion': 1, 'automaticAnalysis': False, 'theme': 'system',
+        'selectedModel': 'model-a', 'selectedRewriteModel': 'model-d', 'selectedProvider': active,
+        'providerSelections': {'codex_cli' if active == 'claude_cli' else 'claude_cli': {'selectedModel': 'model-x'}}}).encode())
+    value = store.load()
+    assert (value.selected_model, value.selected_rewrite_model, value.enabled_providers) == ('model-a', 'model-d', enabled)
     store.select_import_model('model-b')
-    store.select_fallback_model('model-c')
-    store.select_rewrite_model('model-d', {'high'})
-    store.select_rewrite_reasoning('model-d', 'high')
-    value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
-    assert value.selected_provider == 'claude_cli' and agent == (None, None)
-    assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
-            value.selected_rewrite_model, value.rewrite_reasoning_effort) == (None, None, None, None, None)
-    store.select_model('claude-model')
-    value, agent = store.select_provider('codex_cli', 'agent-b', 'max')
-    assert agent == ('agent-a', 'low') and value.selected_provider == 'codex_cli'
-    assert (value.selected_model, value.selected_import_model, value.selected_fallback_model,
-            value.selected_rewrite_model, value.rewrite_reasoning_effort) == ('model-a', 'model-b', 'model-c', 'model-d', 'high')
-    assert set(value.provider_selections) == {'claude_cli'}
-    value, agent = store.select_provider('claude_cli', 'agent-a', 'low')
-    assert value.selected_model == 'claude-model' and agent == ('agent-b', 'max')
-    assert store.select_provider('claude_cli', 'agent-x', None) == (store.load(), ('agent-x', None))
+    assert set(json.loads(store.path.read_text())) >= {'enabledProviders'}
+    assert not {'selectedProvider', 'providerSelections'} & set(json.loads(store.path.read_text()))
+
+
+def test_providers_turn_on_and_off_in_order(tmp_path):
+    root = tmp_path / 'FoldCV'
+    RulesStore(root).load()
+    store = PreferencesStore(root)
+    assert store.enable_provider('claude_cli', True).enabled_providers == ['codex_cli', 'claude_cli']
+    assert store.enable_provider('claude_cli', True).enabled_providers == ['codex_cli', 'claude_cli']
+    assert store.enable_provider('codex_cli', False).enabled_providers == ['claude_cli']
+    assert PreferencesStore(root).load().enabled_providers == ['claude_cli']
 
 
 @pytest.mark.parametrize('change', [
     {'selectedProvider': 'grok_cli'},
     {'providerSelections': {'codex_cli': {'selectedModel': 'model-a'}}},
     {'selectedProvider': 'claude_cli', 'providerSelections': {'claude_cli': {}}},
-    {'providerSelections': {'claude_cli': {'selectedAgentModel': 'email@example.invalid'}}},
-    {'providerSelections': {'claude_cli': {'selectedRewriteModel': 'email@example.invalid'}}},
+    {'providerSelections': []},
+    {'enabledProviders': ['grok_cli']},
+    {'enabledProviders': ['codex_cli', 'codex_cli']},
+    {'selectedRewriteModel': 'email@example.invalid'},
 ])
 def test_invalid_provider_preferences_are_corrupt_without_reset(tmp_path, change):
     root = tmp_path / 'FoldCV'

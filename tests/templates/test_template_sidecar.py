@@ -4,9 +4,10 @@ import json
 
 import pytest
 
-from packages.resume_core.project_repository import RepositoryFailure
+from packages.resume_core import project_repository as repository_module
+from packages.resume_core.project_repository import RepositoryFailure, rich_snapshot_bytes
 from packages.resume_core.template_import import spent_calls
-from tests.templates.template_runtime_fixtures import RuntimeFixture
+from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
 
 
 def counted(fixture):
@@ -66,6 +67,46 @@ async def test_a_save_that_lost_sidecar_steps_or_a_damaged_sidecar_fences_the_re
     path.write_text('{"schemaVersion": 1, "projectRevision": 1}')
     with pytest.raises(RepositoryFailure, match='JOB_STORE_CORRUPT'):
         fixture.pipeline.read(fixture.project)
+
+
+@pytest.mark.parametrize('raw', [b'5', b'null', b'[{}]', b'"text"', b'[' * 200_000], ids=['number', 'null', 'list', 'string', 'deep'])
+@pytest.mark.asyncio
+async def test_a_sidecar_that_is_no_json_object_is_reported_as_corrupt(tmp_path, raw):
+    # A scalar, null or a list of objects raised TypeError: a raw 500 and PROCESS_FAILED instead of the corrupt code.
+    fixture = RuntimeFixture(tmp_path)
+    operation = await fixture.pipeline.start(fixture.project, fixture.command)
+    path = fixture.sidecar.path(fixture.project, operation.id)
+    path.parent.mkdir(mode=0o700)
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(RepositoryFailure, match='JOB_STORE_CORRUPT'):
+        fixture.pipeline.read(fixture.project)
+
+
+@pytest.mark.asyncio
+async def test_the_size_setting_does_not_count_the_running_import_a_publication_moves_to_history(tmp_path, monkeypatch):
+    # D096 and D105: the import spent its calls, then the pre-draft commit counted the operation inline and failed
+    # PROJECT_TOO_LARGE, also on every resume, though the published file fits.
+    fixture = RuntimeFixture(tmp_path, fallback=False)
+    limit = len(rich_snapshot_bytes(fixture.repository.read(fixture.project))) + 40_000
+    monkeypatch.setattr(repository_module, 'project_file_bytes', lambda: limit)
+    status = await import_task(fixture)
+    assert (status['state'], status['error']) == ('succeeded', None)
+    published = fixture.current()
+    assert len((fixture.directory / 'workspace.json').read_bytes()) <= limit
+    assert len(rich_snapshot_bytes(published)) <= limit and len(fixture.transport.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_pre_draft_over_the_size_setting_without_its_import_is_still_refused(tmp_path, monkeypatch):
+    fixture = RuntimeFixture(tmp_path)
+    await fixture.pipeline.start(fixture.project, fixture.command)
+    workspace = fixture.repository.read(fixture.project)
+    limit = repository_module.budget_bytes(workspace, rich_snapshot_bytes(workspace)) - 1
+    monkeypatch.setattr(repository_module, 'project_file_bytes', lambda: limit)
+    with pytest.raises(RepositoryFailure, match='PROJECT_TOO_LARGE'):
+        fixture.pipeline.update(fixture.project, fixture.current().pre_draft.template_operations[0].id,
+            lambda value, _data, _workspace: value.model_copy(update={'last_observed_at': fixture.now}))
 
 
 @pytest.mark.asyncio

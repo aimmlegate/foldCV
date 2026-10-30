@@ -93,6 +93,11 @@ class ClaudeCliProfile:
         return self.root / "claude"
 
     @property
+    def workdir(self) -> Path:
+        """One empty working directory for every call (D116), as for Codex: a per-call cwd would differ between the
+        prompts. Temporary files stay under the operation directory."""
+        return self.root / "cwd"
+
     def windows_home(self) -> Path:
         """Home and app data of the CLI on Windows, so it does not read or write the user's own."""
         return self.root / "home"
@@ -117,6 +122,7 @@ class ClaudeCliProfile:
                 or not host.private_mode(marker.stat(), 0o600)):
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
         _private_directory(self.config_dir, create=True)
+        _private_directory(self.workdir, create=True)
         if host.WINDOWS:
             _private_directory(self.windows_home, create=True)
         elif not Path("/usr/bin/sandbox-exec").is_file():

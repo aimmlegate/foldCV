@@ -1,5 +1,5 @@
 import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
-import type { EditorTechnologyTarget } from "../contracts/generated/template_project_response_v1";
+import type { EditorPlanV1, EditorTechnologyTarget } from "../contracts/generated/template_project_response_v1";
 import type { PanelCommandV7 } from "./v7-translation";
 
 /** The facts panel's command; the V7 session translates it below. A technology add names the line Python offered. */
@@ -7,6 +7,10 @@ export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | 
 
 /** A place Python's editor plan offers for a new technology, with the placement Python checks. */
 export type TechnologyTarget = EditorTechnologyTarget;
+
+/** What Python's plan says the panel shows and offers (D113): each job's periods as the document writes them and whether it
+ * can take another, the fields with no place in the document, and the technologies that share a line. */
+export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { add: ReadonlySet<string>; remove: ReadonlySet<string> } = {
@@ -28,6 +32,13 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
     const focus: PanelCommandV7 = { operation: command.operation, recordId: command.recordId };
     if (command.operation === "move_focus" && command.beforeRecordId) focus.beforeRecordId = command.beforeRecordId;
     return [focus];
+  }
+  if (command.operation === "set_focus_icon") {
+    // One of the template's icons, or "" for the template's own choice (D122).
+    const icon = values?.["icon"];
+    if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || icon === undefined
+      || Object.keys(values ?? {}).length !== 1) return null;
+    return [{ operation: "set_focus_icon", recordId: command.recordId, values: { icon } }];
   }
   if (command.operation === "move_technology") {
     if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;

@@ -39,12 +39,22 @@ def prepared_response(response, request, allocator, mutation, preview):
         requestHash=preparation_hash(request), createdIds=allocator.created_ids, mutation=mutation, preview=preview)
 
 
+def _mutation(workspace, request, steps, kind):
+    return TemplateMutationV1(schemaVersion=1, projectId=workspace.project_id, clientMutationId=request.client_mutation_id,
+        actionId=request.capture.action_id, kind=kind,
+        capture=request.capture.model_copy(deep=True), steps=steps, history={'kind': 'edit', 'originActionId': None})
+
+
+def next_facts(response, request, steps):
+    """The facts these steps leave, before the document steps that follow from them are written."""
+    workspace = response.workspace
+    return apply_fact_steps(workspace.project.facts, _mutation(workspace, request, steps, 'panel'))
+
+
 def finish_preparation(response, request, allocator, steps, candidate, *, kind='structure'):
     workspace = response.workspace
     def mutation(values):
-        return TemplateMutationV1(schemaVersion=1, projectId=workspace.project_id, clientMutationId=request.client_mutation_id,
-            actionId=request.capture.action_id, kind=kind,
-            capture=request.capture.model_copy(deep=True), steps=values, history={'kind': 'edit', 'originActionId': None})
+        return _mutation(workspace, request, values, kind)
     initial = mutation(steps)
     candidate.facts = apply_fact_steps(workspace.project.facts, initial)
     from .template_scope_displays import apply_scope_displays

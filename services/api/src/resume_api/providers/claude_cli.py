@@ -21,15 +21,15 @@ from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.profiles import claude as profile_rules
 from resume_api.cli.profiles.claude import ClaudeCliProfile, ClaudeProfileError
-from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout
+from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers import claude_catalog
-from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
+from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import PreflightCache, _stamp
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.rewrite_timing import add_phase, measure
 
@@ -44,6 +44,9 @@ ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHA
 # `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while (MP05-2).
 NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
 FORBIDDEN = {"compact_boundary", "permission_denied"}
+# The stream repeats the reply (each tool call of a schema retry, then the result) and adds thinking. Only the final
+# line counts against the reply budget, as Codex's one final message does; this keeps the whole stream bounded.
+STREAM_MULTIPLE = 8
 LOG = logging.getLogger(__name__)
 
 
@@ -79,6 +82,7 @@ class ClaudeEvents:
         self.tool_ids: set[str] = set()
         self.error: str | None = None
         self.output = False
+        self.final_bytes = 0
 
     @property
     def renewal(self) -> bool:
@@ -112,6 +116,7 @@ class ClaudeEvents:
         elif kind == "user":
             self._user(event)
         elif kind == "result":
+            self.final_bytes = len(raw)
             self._result(event)
         else:
             raise _unknown(kind)
@@ -239,7 +244,8 @@ class ClaudeCliProvider:
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock)
         self.model_started = None
-        self.process = ProcessRunner(self.executable, clock=clock, launch=profile.launch if profile else None)
+        self.process = ProcessRunner(self.executable, clock=clock, launch=profile.launch if profile else None,
+                                     workdir=getattr(profile, "workdir", None))
 
     @property
     def native(self) -> bool:
@@ -269,7 +275,7 @@ class ClaudeCliProvider:
             raise ContentFailure(error.code) from None
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
-        end = deadline if deadline is not None else self.clock() + 15
+        end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
         fixture = self.fixture_transport is not None and self.fixture_transport.executable.absolute() == self.executable
         if not fixture:
             if self.profile is None:
@@ -281,8 +287,19 @@ class ClaudeCliProvider:
         try:
             raw, _ = self._run(files, ("--version",), end, cancel)
             version = qualification.Version.parse(raw.decode("utf-8", "strict"))
-            raw_help, _ = self._run(files, ("--help",), end, cancel)
         except (ProcessExit, UnicodeError, qualification.QualificationError):
+            raise ContentFailure("CLI_UNSUPPORTED") from None
+        try:
+            return self._qualified(files, cancel, end, version)
+        except ContentFailure as error:
+            error.version = str(version) if len(str(version)) <= 80 else None
+            raise
+
+    def _qualified(self, files: OperationFiles, cancel: threading.Event, end: float,
+                   version: qualification.Version) -> Probe:
+        try:
+            raw_help, _ = self._run(files, ("--help",), end, cancel)
+        except ProcessExit:
             raise ContentFailure("CLI_UNSUPPORTED") from None
         status = profile_rules.COMPATIBILITY.status(version)
         if status in {"unsupported", "broken"}:
@@ -308,7 +325,9 @@ class ClaudeCliProvider:
         if self.profile is not None and (not isinstance(configured, str)
                                          or Path(configured).resolve() != self.profile.config_dir.resolve()):
             raise ContentFailure("CLI_PROFILE_UNSAFE")
-        plan = body.get("subscriptionType") if isinstance(body.get("subscriptionType"), str) else None
+        subscription = body.get("subscriptionType")
+        # The client refuses a whole reply over a plan outside this pattern; a plan label is not worth that.
+        plan = subscription if isinstance(subscription, str) and PLAN.fullmatch(subscription) else None
         return Probe(str(version), status, method, plan, True, claude_catalog.reasoning_for(version))
 
     def preflight(self, files, cancel, model, *, deadline, effort=None) -> Probe:
@@ -318,7 +337,7 @@ class ClaudeCliProvider:
         if cached is not None:
             self.check_effort(cached, model, effort)
             return cached
-        probe = self.probe(files, cancel, deadline=deadline)
+        probe = self.probe(files, cancel, deadline=min(deadline, self.clock() + QUALIFICATION_SECONDS))
         if model not in probe.reasoning:
             raise ContentFailure("MODEL_DENIED")
         if key == self._key():
@@ -355,22 +374,21 @@ class ClaudeCliProvider:
     def generate_owned(self, request, files, cancel, permit):
         try:
             with permit.hold(cancel):
-                with self._profile_owner(cancel, files.root, share=permit):
+                with self._profile_owner(cancel, files.root):
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+        except AdmissionCancelled:
+            raise ContentFailure("CANCELLED", cleanup_verified=True, dispatch_witness={"neverDispatched": True}) from None
 
     @contextmanager
-    def _profile_owner(self, cancel, operations_root, share=None):
+    def _profile_owner(self, cancel, operations_root):
+        # Model calls share the profile (D121); sessions, caches and logs go once the last of them ends.
+        wipe = self.profile.wipe if self.profile is not None else None
         try:
             with native_profile(self.profile, cancel, deadline=time.monotonic() + 30,
-                                operations_root=operations_root, share=share):
-                try:
-                    yield
-                finally:
-                    # Shared holders may still run; the next exclusive operation wipes for them.
-                    if self.profile is not None and share is None:
-                        self.profile.wipe()
+                                operations_root=operations_root, shared=True, cleanup=wipe):
+                yield
         except AdmissionBlocked:
             INFERENCE.block()
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
@@ -458,8 +476,9 @@ class ClaudeCliProvider:
                     raise ContentFailure("BUDGET_EXCEEDED")
                 if consumed_output >= policy.max_total_output_bytes:
                     raise ContentFailure("BUDGET_EXCEEDED")
+                remaining = policy.max_total_output_bytes - consumed_output
                 events = ClaudeEvents(model=policy.model, version=probe.version, structured=not plain,
-                                      max_bytes=policy.max_total_output_bytes - consumed_output)
+                                      max_bytes=remaining)
                 attempts += 1
                 try:
                     try:
@@ -486,10 +505,9 @@ class ClaudeCliProvider:
 
                         with measure("cli_process"):
                             try:
-                                output, errors = self._run(files, args, deadline, cancel, data=prompt,
-                                                           on_line=accept, on_spawn=spawned,
-                                                           max_line=policy.max_total_output_bytes - consumed_output,
-                                                           max_output=policy.max_total_output_bytes - consumed_output)
+                                _, errors = self._run(files, args, deadline, cancel, data=prompt,
+                                                      on_line=accept, on_spawn=spawned, max_line=remaining,
+                                                      max_output=STREAM_MULTIPLE * remaining)
                             except ProcessExit as error:
                                 if events.complete or not events.started:
                                     raise ContentFailure(startup_failure(error.stderr)
@@ -498,7 +516,7 @@ class ClaudeCliProvider:
                     finally:
                         usages.append(events.usage)
                         raw_return = events.text
-                    consumed_output += len(output) + len(errors)
+                    consumed_output += events.final_bytes + len(errors)
                     observed("completed" if events.complete else "incomplete")
                     with measure("decode"):
                         value = events.result(request.result_type, output_schema,

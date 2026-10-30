@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from packages.resume_core.dates import (
-    estimate_exposure, month_bounds, old_job, partial_date, project_experience, union_months,
+    estimate_exposure, format_date, month_bounds, old_job, partial_date, project_experience, source_date, union_months,
 )
 from packages.resume_core.models.contracts import Period, Project
 
@@ -134,3 +134,22 @@ def test_exact_fifteen_year_cutoff_including_leap_day() -> None:
     assert not old_job("2011", "2026")
     assert not old_job("0001", "0015")
     assert date(*partial_date("2024-02-29").lower()).day == 29
+
+
+@pytest.mark.parametrize('text,year,month,day', [('2020', 2020, None, None), ('2020-03', 2020, 3, None), ('03.2020', 2020, 3, None),
+    ('3/2020', 2020, 3, None), ('15.03.2020', 2020, 3, 15), ('Март 2020', 2020, 3, None), ('mar 2020', 2020, 3, None)])
+def test_source_dates_read_as_written(text, year, month, day):
+    value, _pattern = source_date(text)
+    assert (value.year, value.month, value.day) == (year, month, day)
+
+
+@pytest.mark.parametrize('text', ['', 'весна 2021', '13.2020', '31.02.2020', '15.03/2020', 'н.в.'])
+def test_other_text_is_no_source_date(text):
+    assert source_date(text) is None
+
+
+@pytest.mark.parametrize('sibling,value,expected', [('11.2023', '2020-04', '04.2020'), ('11/2023', '2020-04', '04/2020'),
+    ('2023', '2020-04', '2020'), ('2023-11', '2020-04-02', '2020-04'), ('11.2023', '2020', '2020'),
+    ('Ноябрь 2023', '2020-03', 'Март 2020'), ('ноя 2023', '2020-03', 'мар 2020'), ('01.11.2023', '2020-04-02', '02.04.2020')])
+def test_a_date_takes_its_siblings_pattern_and_precision(sibling, value, expected):
+    assert format_date(partial_date(value), source_date(sibling)[1]) == expected

@@ -163,6 +163,7 @@ async def test_oversize_individual_paragraphs_flow_across_pages(tmp_path):
         assert len(set(locations)) >= 2
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_unknown_focus_icon_fails_with_a_public_code_and_cleans(tmp_path):
     data = json.loads((FIXTURES / "short.json").read_text(encoding="utf-8"))
@@ -205,7 +206,7 @@ def test_bounds_and_unavailable_assets_fail_visibly(tmp_path, monkeypatch):
         request_for(data, "too-many-focus")
     data["focus"] = [{"label": "Bad", "duration": "", "icon": "external"}]
     assert request_for(data, "unknown-icon")
-    manifest = require_template()
+    manifest = template.require_docx_template()
     with pytest.raises(RenderFailure, match="UNSUPPORTED_FOCUS_ICON"):
         template.icon_path("external", manifest)
     monkeypatch.setattr(template, "SOFFICE", tmp_path / "missing")
@@ -216,7 +217,12 @@ def test_bounds_and_unavailable_assets_fail_visibly(tmp_path, monkeypatch):
     monkeypatch.setattr(template, "SOFFICE", wrong_converter)
     with pytest.raises(RenderFailure, match="CONVERTER_MISMATCH"):
         template.require_template()
-    monkeypatch.setattr(template, "SOFFICE", worker.SOFFICE)
+    # A stand-in that matches the pin, so the font checks run without the installed converter.
+    pinned = tmp_path / "pinned-soffice"
+    pinned.write_bytes(b"pinned binary")
+    monkeypatch.setattr(template, "require_docx_template", lambda: {
+        **manifest, "converter": {"sha256": hashlib.sha256(b"pinned binary").hexdigest()}})
+    monkeypatch.setattr(template, "SOFFICE", pinned)
     monkeypatch.setattr(template, "APP_FONTS", tmp_path / "missing-fonts")
     with pytest.raises(RenderFailure, match="FONT_UNAVAILABLE"):
         template.require_template()

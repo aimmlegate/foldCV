@@ -18,7 +18,7 @@ from pydantic import BaseModel, ValidationError
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.inference_admission import INFERENCE, AdmissionTimeout, AdmissionBlocked
+from resume_api.inference_admission import INFERENCE, AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
 from resume_api.rewrite_timing import add_phase, measure
 from packages.resume_core.text_rewrite import PlainTextReply
@@ -28,13 +28,14 @@ from resume_api.providers.content import (ContentFailure, ContentInput, ContentR
                                           ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import PreflightCache, preflight_key
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, preflight_key
 from resume_api.cli.profile import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments, overrides,
                                      qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
 
 
 MODEL = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z")
+PLAN = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 MAX_SCHEMA = 65_536
 MAX_RESULT = 65_536
 MAX_DEPTH = 32
@@ -236,11 +237,12 @@ class CodexCliProvider:
         if cached is not None:
             self.check_effort(cached, model, effort)
             return cached
-        probe = self.probe(files, cancel, deadline=deadline)
+        bound = min(deadline, self.clock() + QUALIFICATION_SECONDS)
+        probe = self.probe(files, cancel, deadline=bound)
         if not probe.generation_ready:
             raise ContentFailure("CLI_PROFILE_UNSAFE")
         metadata = {}
-        models = self.list_models(files, cancel, deadline=deadline, reasoning=metadata)
+        models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
         probe = replace(probe, reasoning=metadata)
         if model not in models:
             raise ContentFailure("MODEL_DENIED")
@@ -272,7 +274,7 @@ class CodexCliProvider:
         return self.experimental_profile.config(files.path) if self.experimental_profile else overrides(files.path)
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
-        end = deadline if deadline is not None else self.clock() + 15
+        end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
         version_raw, _ = self._run(files, ("--version",), end, cancel)
         try:
             version = version_raw.decode("utf-8", "strict").strip()
@@ -304,7 +306,7 @@ class CodexCliProvider:
                      () if fixture_ready or experimental_ready else GAPS)
 
     def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None, reasoning=None) -> tuple[str, ...]:
-        end = deadline if deadline is not None else self.clock() + 15
+        end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
         state = {"id": 0, "models": ()}
 
         def request(identifier: int, method: str, params: dict[str, object]) -> bytes:
@@ -394,17 +396,19 @@ class CodexCliProvider:
     def generate_owned(self, request, files, cancel, permit):
         try:
             with permit.hold(cancel):
-                # Calls under one job permit share the profile, so independent import blocks run at once (CT10).
-                with self._profile_owner(cancel, files.root, share=permit):
+                # Model calls share the profile, so import blocks and other model work run at once (CT10, D121).
+                with self._profile_owner(cancel, files.root):
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+        except AdmissionCancelled:
+            raise ContentFailure("CANCELLED", cleanup_verified=True, dispatch_witness={"neverDispatched": True}) from None
 
     @contextmanager
-    def _profile_owner(self, cancel, operations_root, share=None):
+    def _profile_owner(self, cancel, operations_root):
         try:
             with native_profile(self.experimental_profile, cancel, deadline=time.monotonic() + 30,
-                    operations_root=operations_root, share=share):
+                    operations_root=operations_root, shared=True):
                 yield
         except AdmissionBlocked:
             INFERENCE.block()

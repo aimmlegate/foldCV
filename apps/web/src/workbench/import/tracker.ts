@@ -59,7 +59,9 @@ export class ImportTracker {
     this.put({ ...entry, stopping: true });
     try {
       const task = await this.api.cancel(projectId, entry.task.id);
-      this.settle(projectId, entry.task.id, current => ({ ...current, task, stopping: false, polledAt: this.now() }));
+      const updated = this.settle(projectId, entry.task.id, current => ({ ...current, task, stopping: false, polledAt: this.now() }));
+      // The stop can come after publication, and then the reply is the finished import.
+      if (updated && updated.task.state !== "running") this.finished(updated);
     } catch (error) {
       this.settle(projectId, entry.task.id, current => ({ ...current, stopping: false, failure: codeOf(error) }));
     }
@@ -83,9 +85,15 @@ export class ImportTracker {
       if (entry.task.state === "running" && view.kind === "stalled")
         await this.api.cancel(projectId, entry.task.id).catch(() => null);
       const operation = operationOf(entry.task) ?? await this.api.operation(projectId);
-      const options = this.options.get(projectId) ?? { allowTextRewrite: true, effort: null };
-      const task = operation ? await this.api.resume(projectId, operation)
-        : await this.api.start(projectId, { clientRequestId: crypto.randomUUID(), ...options });
+      const options = this.options.get(projectId);
+      const begin = operation ? () => this.api.resume(projectId, operation)
+        : options ? () => this.api.start(projectId, { clientRequestId: crypto.randomUUID(), ...options }) : null;
+      if (!begin) {
+        // Nothing holds the rewrite choice: without this entry the pre-draft screen asks for it again.
+        if (this.entries.get(projectId)?.task.id === entry.task.id) this.dismiss(projectId);
+        return;
+      }
+      const task = await begin();
       if (this.closed || this.entries.get(projectId)?.task.id !== entry.task.id) return;
       this.track(projectId, task, entry.title);
     } catch (error) {

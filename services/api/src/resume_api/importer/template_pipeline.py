@@ -21,10 +21,11 @@ from packages.resume_core.template_identity import (capture_span, empty_value, e
     offered_evidence, source_slice)
 from packages.resume_core.template_entries import (closed_state, entry_part, entry_records, grouped, line_options,
     ordered_entries, outline_part, parse_outline, parse_outline_review, reorder_records, splits_entries)
-from packages.resume_core.template_import import (GENERATION_SLOTS, ProcessingDeadline, TemplateImportFailure, add_entry_tasks,
-    add_outline_review, admit_operation, attempt_in, authorization, cancel_operation, capture_finalization, capture_task_input,
-    checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time, record_return, reconcile_cleanup,
-    recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, task_in)
+from packages.resume_core.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
+    TemplateImportFailure, add_entry_tasks, add_outline_review, admit_operation, attempt_in, authorization, cancel_operation,
+    capture_finalization, capture_task_input, checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time,
+    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
+    stopped_call, stops_import, task_in)
 from packages.resume_core.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
 from packages.resume_core.template_prompt import model_prompt
@@ -37,23 +38,19 @@ from ..providers.dynamic_result import dynamic_result
 from .template_sidecar import OperationSidecar
 
 
-# No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
-ACCOUNT_STOP = frozenset({'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'})
-
-
 class AccountStop(TemplateImportFailure):
     pass
-
-
-def stops_import(operation, attempt):
-    # An unavailable fallback model fails only its own repair (E07); the import model being refused stops everything.
-    return attempt.error_code in ACCOUNT_STOP and (attempt.error_code != 'MODEL_DENIED'
-        or attempt.model.model == operation.capture.primary.model)
 
 
 def account_stop(operation):
     """The account-wide failure that stopped this import, or None."""
     return next((attempt.error_code for attempt in operation.attempts if stops_import(operation, attempt)), None)
+
+
+def halted(operation, attempt, cancel):
+    """The block ends here without a result: a stop leaves it unfinished for a resume, and unknown cleanup fences it."""
+    return (cancel.is_set() or operation.state == 'cancelled' or attempt.cleanup.state != 'verified'
+        or attempt.outcome == 'cancelled')
 
 
 @dataclass(frozen=True)
@@ -119,15 +116,20 @@ CACHED_READS = 4
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
 # follows the category sentence.
 # I4: a repair that still states values no source line states keeps the block; the removed values are named once.
-UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}. Остальное в блоке принято.'
+UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}.'
+
+
+def unbound_text(proposal):
+    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
+    return UNBOUND_MESSAGE.format(values=values)
 
 
 def unbound_issues(id_factory, task_id, proposal, fingerprint):
     if not proposal.dropped_values:
         return []
-    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
     return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id], blockIds=[],
-        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND', message=UNBOUND_MESSAGE.format(values=values),
+        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND',
+        message=unbound_text(proposal) + ' Остальное в блоке принято.',
         importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
         retiredByAction=None)]
 
@@ -168,14 +170,22 @@ def better_repair(operation, package, first_receipt, receipt, review, proposal):
     rewrite = block.rewrite.fields if operation.capture.allow_text_rewrite else []
     allocations = item_identities(operation)
     # What each review admitted; admitted_cell_ids leaves out cells an earlier admission already holds unchanged.
-    first_review = next(value.value for value in operation.review_inputs if value.attempt_id == first_receipt.attempt_id)
-    before = shown_values(first, set(decide_review(first_review, first_receipt, first).admitted_cell_ids), allocations, rewrite)
+    # A second repair stands against all of it, the latest value per cell: the last admission may not name every item.
+    shown = {}
+    for applied in operation.proposals:
+        if applied.applied_receipt_id is None or attempt_in(operation, applied.attempt_id).task_id != task.id:
+            continue
+        its_receipt = next(value for value in operation.receipts if value.id == applied.applied_receipt_id)
+        its_review = next(value.value for value in operation.review_inputs if value.attempt_id == its_receipt.attempt_id)
+        cells = set(decide_review(its_review, its_receipt, applied).admitted_cell_ids)
+        shown.update({(value.item_handle, value.field_key): value for value in shown_values(applied, cells, allocations, rewrite)})
+    before = list(shown.values())
     admitted = decide_review(review, receipt, proposal).admitted_cell_ids
     # The view reads every active record, so items the repair does not send keep their admitted values.
     touched = {field.item_handle for field in proposal.resolved_fields}
     after = [value for value in before if value.item_handle not in touched]
     return repair_wins(before, failed_targets(first_receipt),
-        after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt))
+        after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt), touched)
 
 
 def previous_reply(proposal, offered, references):
@@ -625,7 +635,7 @@ class TemplatePipeline:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
-                and attempt.slot == slot and attempt.state != 'released'), None)
+                and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
             if slot != 'initial' and not feedback:
                 break
             if slot == 'fallback_repair' and operation.capture.fallback is None:
@@ -672,7 +682,7 @@ class TemplatePipeline:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             attempt = attempt_in(operation, attempt_id)
-            if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+            if halted(operation, attempt, cancel):
                 return
             await asyncio.to_thread(self.guard, project, operation)
             if attempt.outcome != 'completed' and attempt.proposal_record_id is None:
@@ -723,7 +733,8 @@ class TemplatePipeline:
                 # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                 previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
             review_attempt = next((value for value in operation.attempts if value.task_id == task_id
-                and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)), None)
+                and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
+                and value.state != 'released' and not stopped_call(operation, value)), None)
             try:
                 if review_attempt is None:
                     review_id = await self.call(project, operation_id, task_id,
@@ -731,6 +742,9 @@ class TemplatePipeline:
                         review_schema(review), deadline, cancel, review=review)
                 else:
                     review_id = review_attempt.id
+                operation = operation_in(await self.view(project), operation_id)
+                if halted(operation, attempt_in(operation, review_id), cancel):
+                    return
                 await asyncio.to_thread(self.recheck, project, operation_id)
                 kept_first = [False]
                 def accept(value, current, _workspace):
@@ -762,7 +776,8 @@ class TemplatePipeline:
                 await self.finish_admitted(project, operation_id, task_id, proposal)
                 return
             unresolved = list(decision.unresolved_target_ids)
-        await self.fallback(project, operation_id, task_id, unresolved)
+        if not cancel.is_set():
+            await self.fallback(project, operation_id, task_id, unresolved)
 
     async def finish_admitted(self, project, operation_id, task_id, proposal):
         workspace = await self.view(project)
@@ -788,7 +803,7 @@ class TemplatePipeline:
             # Resumed after its entries were added: they run on and the block closes when they all ended.
             return Spawned(task_id, tuple(child.id for child in children), True)
         existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id and attempt.slot == 'outline'
-            and attempt.state != 'released'), None)
+            and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
         if existing is None:
             if any(attempt.task_id == task_id and attempt.slot in GENERATION_SLOTS for attempt in operation.attempts):
                 return None
@@ -815,7 +830,7 @@ class TemplatePipeline:
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
         attempt = attempt_in(operation, attempt_id)
-        if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+        if halted(operation, attempt, cancel):
             # A fenced or cancelled import: the task ends here like any block's, without a result.
             return Spawned(task_id, (), False)
         if attempt.outcome != 'completed' or attempt.raw_return is None:
@@ -850,7 +865,7 @@ class TemplatePipeline:
         parent_id = task.parent_task_id
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
         existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
-            and attempt.slot == 'outline_review' and attempt.state != 'released'), None)
+            and attempt.slot == 'outline_review' and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
         unresolved, missing, remarks = [], [], []
         if existing is None:
             offered = offered_evidence(stored.value) or {}
@@ -868,9 +883,11 @@ class TemplatePipeline:
             attempt_id = existing.id
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
+        if cancel.is_set():
+            return None
         if attempt_id is not None:
             attempt = attempt_in(operation, attempt_id)
-            if attempt.cleanup.state != 'verified' or operation.state == 'cancelled':
+            if halted(operation, attempt, cancel):
                 return None
             if attempt.outcome == 'completed' and attempt.raw_return is not None:
                 try:
@@ -1021,16 +1038,12 @@ class TemplatePipeline:
         return attempt_id
 
     def reconcile_unlaunched(self, operation, attempt_id, now):
+        """Release an attempt whose call stopped before the transport: that control flow is the never-dispatched proof."""
         result = operation.model_copy(deep=True)
         attempt = attempt_in(result, attempt_id)
         attempt.error_code = 'IMPORT_PROCESSING_EXHAUSTED'
-        proof = self.transport.reconcile(attempt)
-        if proof is not None:
-            return reconcile_cleanup(result, proof, now)
-        attempt.state = 'outcome_unknown'
-        attempt.cleanup = CleanupOutcome(state='unknown', evidenceHash=None, witness=None)
-        result.state = 'fenced'
-        return result
+        return reconcile_cleanup(result, CleanupProof(attempt.id, digest(attempt.owner), digest({'unlaunched': attempt.id}),
+            'coordinator-never-launched', True), now)
 
     async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False):
         def finish(operation, _data, _workspace):
@@ -1082,8 +1095,14 @@ class TemplatePipeline:
             rejected = {result.target_id for result in failures}
             proposal = next((value for value in reversed(operation.proposals) if value.applied_receipt_id == receipt.id), None)
             allocated = {value.item_handle: value for value in item_identities(operation)}
+            # A failed owner relation withholds its subject and what that subject owns, and may cite other lines than theirs.
+            owners = [value for value in proposal.resolved_relations if value.kind in {'owned_by', 'extension_of'}] if proposal else []
+            denied = {value.subject_id for value in owners if value.id in rejected}
+            while grown := {value.subject_id for value in owners if value.target_id in denied} - denied:
+                denied |= grown
             affected = [span for field in proposal.resolved_fields
-                if allocated[field.item_handle].cell_ids[field.field_key] in rejected for span in field.evidence] if proposal else []
+                if allocated[field.item_handle].cell_ids[field.field_key] in rejected
+                    or allocated[field.item_handle].record_id in denied for span in field.evidence] if proposal else []
             if proposal is not None:
                 from packages.resume_core.template_proposals import relation_evidence
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
@@ -1113,6 +1132,8 @@ class TemplatePipeline:
             message = 'Проверка не завершилась. Принятые данные в блоке сохранены.'
         else:
             message = fallback_message(first, len(failures), shown=not kept and len(spans) > len(leftover))
+        if applied is not None and applied.dropped_values:
+            message += ' ' + unbound_text(applied)
         # A rejected cell is absent from the document. The scope target keeps the notice on this block's view.
         targets = list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id]
         if kept and not any(target.startswith('scope-') for target in targets):

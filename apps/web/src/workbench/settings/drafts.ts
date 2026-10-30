@@ -96,12 +96,6 @@ export class SettingsDrafts {
     } else errors.assistant = "Не удалось загрузить настройки помощника. Повторите загрузку.";
     this.publish({ draft, errors, loading: false });
   }
-  /** A provider switch moved that provider's choices into place on the server; with clean drafts, read them again. */
-  async reloadChoices(): Promise<void> {
-    if (this.state.saving || this.closed || this.dirty.length > 0) return;
-    this.publish({ preferences: null, assistant: null, saved: [] });
-    await this.load();
-  }
   cancel(): void {
     if (this.state.saving) return;
     const { preferences, rules, assistant, draft } = this.state;
@@ -129,6 +123,17 @@ export class SettingsDrafts {
     if (!dirty.includes("fallback")) draft.fallbackModel = preferences.selectedFallbackModel ?? null;
     if (!dirty.includes("limits")) { draft.importMinutes = limit(preferences, "importMinutes"); draft.projectMegabytes = limit(preferences, "projectMegabytes"); }
     this.publish({ preferences, draft });
+  }
+  /** Adopts assistant settings saved elsewhere (the panel's model choice), so the next save has the current revision;
+   * unsaved edits stay. */
+  async refreshAssistant(): Promise<void> {
+    if (this.state.saving || this.state.loading || this.closed || !this.state.assistant) return;
+    const epoch = this.epoch, assistant = await this.api.assistant().catch(() => null);
+    if (!assistant || this.closed || epoch !== this.epoch || this.state.saving || this.state.loading) return;
+    const draft = { ...this.state.draft };
+    if (!this.dirty.includes("assistant")) { draft.agentEnabled = assistant.enabled; draft.agentModel = assistant.selectedAgentModel;
+      draft.agentEffort = assistant.reasoningEffort ?? null; }
+    this.publish({ assistant, draft });
   }
   async reloadRules(): Promise<void> {
     if (this.state.saving || this.state.loading || this.closed) return;

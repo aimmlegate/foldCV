@@ -6,6 +6,7 @@ from .models.template_document import BoundLink, FieldRef, ManualScopeSpan, Pres
 from .rich_fields import field_key, inline_groups
 from .rich_mutations import cut_inline, inline_text, locate, utf16_slice
 from .template_preparation_common import allocator_for, finish_preparation, preparation_hash, prepared_response, validate_preparation
+from .template_preparation_blocks import changed_block_steps
 from .template_preparation_cells import human_cell_steps
 from .template_ranges import FlankRecorder
 
@@ -52,6 +53,35 @@ def _raw_occurrence(document, bound):
                 if _identity(span) == _identity(bound):
                     result.append(utf16_slice(text, start, end))
     return ''.join(result)
+
+
+def _plain(span):
+    return PresentedText(type='text', text=span.text, styles=span.styles.model_copy(deep=True),
+        presentation=getattr(span, 'presentation', None), citations=[value.model_copy(deep=True) for value in getattr(span, 'citations', [])])
+
+
+def _detach_copies(document, bound):
+    """The field's other occurrences become plain text, as a shared edit leaves them: the fact took the typed text, so a
+    bound copy would show a stale value. Returns the ids of the blocks that held one."""
+    cell, root = _identity(bound)
+    def other(reference):
+        return _identity(reference)[0] == cell and _identity(reference)[1] != root
+    touched = set()
+    for block in document.blocks():
+        for _container, content in inline_groups(block):
+            for index, span in enumerate(content):
+                if isinstance(span, FactFieldSpan) and other(span):
+                    content[index] = _plain(span)
+                elif isinstance(span, BoundLink) and span.label_binding is not None and other(span.label_binding):
+                    label = [_plain(part) if isinstance(part, FactFieldSpan) else part for part in span.content]
+                    if span.url_binding is None:
+                        content[index:index + 1] = label
+                    else:
+                        span.content, span.label_binding = label, None
+                else:
+                    continue
+                touched.add(block.id)
+    return touched
 
 
 def _range_content(block, selected):
@@ -246,6 +276,12 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
             raw = _raw_occurrence(candidate.document, bound)
             steps += human_cell_steps(workspace, sorted({_identity(span)[0] for span in fields}), raw,
                 request.capture.action_id, [original.id], allocator)
+            copies = _detach_copies(candidate.document, bound)
+            if copies:
+                # Two changes to one block go as one; a range step cannot name the copy beside the edit.
+                tree, _removed = changed_block_steps(workspace.project.document, candidate.document)
+                steps = tree + steps[1:] if original.id in copies else [*steps,
+                    *(step for step in tree if step['block']['id'] != original.id)]
     result = finish_preparation(response, request, allocator, steps, candidate,
         kind='typing' if isinstance(operation, ReplaceText) and replacement is None else 'structure')
     # Clipboard content is never optimistic, so a paste offers no address correspondence.
@@ -253,9 +289,10 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
     return result
 
 
-def prepare_edit(response, request, *, clipboard=None, occupied=None):
+def prepare_edit(response, request, *, clipboard=None, occupied=None, remembered=None):
     """The prepared result of one authored operation on the exact durable response; `occupied` names the ids already
-    taken (the repository session keeps them, otherwise they are collected from the workspace)."""
+    taken (the repository session keeps them, otherwise they are collected from the workspace). `remembered`: the
+    Focus icons the user chose before, which a row added from the facts panel takes (D122)."""
     if isinstance(request.operations[0], (ReplaceText, SetMarks)):
         return prepare_text_edit(response, request, occupied=occupied)
     from .models.template_authoring import PasteInline
@@ -265,7 +302,7 @@ def prepare_edit(response, request, *, clipboard=None, occupied=None):
     from .models.template_authoring import BuiltinPanel, DeleteEntity
     if isinstance(request.operations[0], (BuiltinPanel, DeleteEntity)):
         from .template_preparation_panel import prepare_panel_edit
-        return prepare_panel_edit(response, request, occupied=occupied)
+        return prepare_panel_edit(response, request, occupied=occupied, remembered=remembered)
     from .models.template_authoring import ResolveTemplateSync
     if isinstance(request.operations[0], ResolveTemplateSync):
         from .template_preparation_sync import prepare_sync_resolution

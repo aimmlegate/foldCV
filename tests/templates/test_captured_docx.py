@@ -445,3 +445,46 @@ def test_body_id_cannot_bypass_role_based_native_line_fit(captured_request, tmp_
     document.regions[0].id, document.regions[2].id = 'custom-header', 'header'
     with pytest.raises(RenderFailure, match='RICH_EXPORT_UNSUPPORTED'):
         render_captured_docx(recapture(request, document=document), tmp_path)
+
+
+def editable_block(document):
+    return next(block for block in document.blocks() if block.type == 'paragraph' and block.content)
+
+
+def test_invisible_characters_leave_the_docx_and_the_authored_text_stays(captured_request, tmp_path):
+    document = captured_request.document.model_copy(deep=True)
+    block = editable_block(document)
+    block.content = [PresentedText(type='text', text='\ufeffsoft\u00adhy\u200bphen', styles={}),
+        PresentedText(type='text', text='\u200b', styles={})]
+    request = recapture(captured_request, document=document)
+    before = canonical(request)
+    body = parts(render_captured_docx(request, tmp_path))['word/document.xml'].decode()
+    assert 'softhyphen' in body and not set('\ufeff\u00ad\u200b') & set(body)
+    assert canonical(request) == before
+
+
+@pytest.mark.parametrize(('text', 'code'), [('Missing \U0010ffff', 'FONT_UNAVAILABLE'), ('decomposed e\u0301', 'RICH_EXPORT_UNSUPPORTED')])
+def test_a_refused_character_names_its_block_and_fragment(captured_request, tmp_path, text, code):
+    document = captured_request.document.model_copy(deep=True)
+    block = editable_block(document)
+    block.content = [PresentedText(type='text', text=text, styles={})]
+    with pytest.raises(RenderFailure, match=code) as caught:
+        render_captured_docx(recapture(captured_request, document=document), tmp_path)
+    assert caught.value.details == {'blockId': block.id, 'fragment': text}
+
+
+def test_a_band_title_too_long_for_its_line_names_its_block(captured_request, tmp_path):
+    document = captured_request.document.model_copy(deep=True)
+    block = next(block for block in document.blocks() if block.type == 'heading')
+    block.content = [PresentedText(type='text', text='Wrapped heading ' * 60, styles={})]
+    with pytest.raises(RenderFailure) as caught:
+        render_captured_docx(recapture(captured_request, document=document), tmp_path)
+    assert caught.value.details['blockId'] == block.id and len(caught.value.details['fragment']) == 60
+
+
+def test_a_refusal_outside_any_block_names_none(captured_request, tmp_path, monkeypatch):
+    from packages.resume_core.rendering import captured_docx
+    monkeypatch.setattr(captured_docx, 'DOCX_BYTES', 1)
+    with pytest.raises(RenderFailure, match='RENDER_OUTPUT_LIMIT') as caught:
+        render_captured_docx(captured_request, tmp_path)
+    assert caught.value.details == {}

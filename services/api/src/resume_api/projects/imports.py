@@ -19,8 +19,8 @@ from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
 from .exports import pinned
-from .fold import sidecar_store
-from .import_progress import import_progress
+from .fold import ahead, sidecar_store
+from .import_progress import import_progress, phase_of
 
 LOG = logging.getLogger(__name__)
 # A cancelled model call ends within seconds (its process group is stopped); the wait at shutdown and sign-out.
@@ -28,7 +28,7 @@ STOP_SECONDS = 15
 
 
 class ImportCommand(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     client_request_id: str = Field(default='import', alias='clientRequestId', min_length=1, max_length=200)
     allow_text_rewrite: bool = Field(default=False, alias='allowTextRewrite')
     kind: Literal['start', 'resume', 'cancel']
@@ -77,7 +77,7 @@ class ImportService:
         # When an import last took or returned the inference permit: a queued import is quiet only while this stays.
         self.queue_moved = None
         # project -> (permit, operation id): a permit whose import may still own a model process stays held until
-        # every attempt of that operation has verified cleanup.
+        # every attempt of that operation has verified cleanup; until then sign-in and CLI install wait.
         self.retained = {}
 
     def _require_pipeline(self):
@@ -138,8 +138,8 @@ class ImportService:
                         operation_id = match.id
                 except Exception:
                     pass
-            # One permit for the whole run, as the job runtime held it: parallel blocks run under it and an
-            # assistant turn waits instead of turning a block into a source fallback.
+            # One shared permit for the whole run: its parallel blocks run under it, beside other imports, rewrites
+            # and assistant turns (D121); a sign-in or CLI install waits for it instead of changing the CLI mid-run.
             held['permit'], held['operation'] = await self._permit(task, operation_id, started), operation_id
             held['token'] = JOB_PERMIT.set(held['permit'])
             self.queue_moved = self.wall()
@@ -167,12 +167,12 @@ class ImportService:
         if retained is not None:
             permit, owner = retained
             if owner == operation_id or not await asyncio.to_thread(self._verified, project_id, owner):
-                # The same import continues, or an earlier one may still own a process: nothing else may start.
+                # The same import continues, or an earlier one may still own a process: keep its permit.
                 return permit
             permit.release()
         if self.admission.busy():
-            # Another import or an assistant turn has the permit: the start reply returns now and this task waits in
-            # the queue, instead of the reply timing out while the task keeps waiting.
+            # A sign-in, CLI install or connection check has the exclusive permit: the start reply returns now and this
+            # task waits in the queue, instead of the reply timing out while the task keeps waiting.
             self.projects.tasks.update(task.id, stage='queued', detail={'operationId': operation_id,
                 'queuedAt': self.wall().isoformat()})
             started.set()
@@ -188,7 +188,7 @@ class ImportService:
         try:
             workspace = reader(project_id)
         except Exception:
-            # Unknown cleanup keeps the permit: no other inference may start beside a process that may live.
+            # Unknown cleanup keeps the permit: no sign-in or install may start beside a process that may live.
             return False
         owner = workspace.project or workspace.pre_draft
         operation = next((item for item in owner.template_operations if item.id == operation_id), None)
@@ -202,7 +202,7 @@ class ImportService:
 
     def release(self, project_id):
         """Free the permit a stopped import of this project kept. The project is being deleted, so no later run of it
-        can prove that cleanup, and every other import and assistant turn would wait for it forever."""
+        can prove that cleanup, and every sign-in and CLI install would wait for it forever."""
         retained = self.retained.pop(project_id, None)
         if retained is not None:
             retained[0].release()
@@ -263,7 +263,7 @@ class ImportService:
             # Only an admitted task moves between processing and publication; the runner owns the earlier stages.
             stage = None
             if task.stage in {'processing', 'publication'}:
-                stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+                stage = phase_of(task.stage, operation)
             self.projects.tasks.update(task.id, stage=stage, detail=details)
         return self.projects.tasks.list(project_id)
 
@@ -278,8 +278,11 @@ class ImportService:
             base, operation, facts = stored
             raw = (session.directory / 'workspace.json').read_bytes()
             workspace = decode_project(session.directory, raw, history=True)
-            if base != workspace.project_revision:
+            if base > workspace.project_revision or base < workspace.project_revision and ahead(session, operation):
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
+            if base < workspace.project_revision:
+                # A commit folded it and stopped before removing the file; the next commit removes it (plan 2.7).
+                return None
             copied = workspace.model_copy(deep=True)
             owner = copied.project or copied.pre_draft
             if owner is None or not any(item.id == operation.id for item in owner.template_operations):

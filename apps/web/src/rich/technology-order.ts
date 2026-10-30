@@ -28,6 +28,12 @@ export function documentTechnologies(facts: Pick<WorkingFacts, "records">, docum
   return records.sort((left, right) => (order.get(left.id) ?? Infinity) - (order.get(right.id) ?? Infinity));
 }
 
+/** The listed technologies a move of `id` can reach, itself included: Python moves a technology only inside its line. */
+export function lineMates(lines: readonly (readonly string[])[], ids: readonly string[], id: string): string[] {
+  const mates = new Set(lines.filter(line => line.includes(id)).flat());
+  return ids.filter(value => mates.has(value));
+}
+
 export function adjacentTechnology(ids: readonly string[], id: string, direction: -1 | 1): string | null | undefined {
   const index = ids.indexOf(id);
   if (index < 0 || index + direction < 0 || index + direction >= ids.length) return undefined;

@@ -14,9 +14,10 @@ PACKAGE_SHA256 = "d081df948bfd55d107c38d40387a9758f563f9c14a9cffc4a847f44cb687b8
 
 
 class RenderFailure(Exception):
-    def __init__(self, code: str):
+    def __init__(self, code: str, details: dict | None = None):
         super().__init__(code)
         self.code = code
+        self.details = details or {}
 
 
 def sha256_file(path: Path) -> str:

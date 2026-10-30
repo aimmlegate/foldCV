@@ -64,7 +64,7 @@ class TemplateDocxRenderer:
 
     ALLOWED = frozenset({"RICH_EXPORT_UNSUPPORTED", "RICH_TEMPLATE_MISMATCH", "RICH_TEMPLATE_ASSET_MISMATCH",
         "RICH_TEMPLATE_UNAVAILABLE", "RENDER_OUTPUT_LIMIT", "RENDERER_MISMATCH", "RICH_IMAGE_MISSING", "RICH_TABLE_INVALID",
-        "FONT_UNAVAILABLE", "FONT_MISMATCH", "ASSET_UNAVAILABLE"})
+        "FONT_UNAVAILABLE", "FONT_MISMATCH", "ASSET_UNAVAILABLE", "ASSET_MISMATCH"})
 
     def __init__(self, *, executor=None):
         self.executor = executor
@@ -87,10 +87,12 @@ class TemplateDocxRenderer:
             files.stop_worker()
         if code:
             try:
-                error = json.loads((workspace / "render-status.json").read_bytes())["code"]
+                status = json.loads((workspace / "render-status.json").read_bytes())
+                error = status["code"]
             except (OSError, ValueError, KeyError, TypeError):
-                error = "RICH_RENDER_FAILED"
-            raise RenderFailure(error if error in self.ALLOWED else "RICH_RENDER_FAILED")
+                status, error = {}, "RICH_RENDER_FAILED"
+            located = {key: status[key] for key in ("blockId", "fragment") if isinstance(status.get(key), str)}
+            raise RenderFailure(error if error in self.ALLOWED else "RICH_RENDER_FAILED", located)
         result = workspace / "resume.docx"
         try:
             if not result.is_file() or result.stat().st_size > DOCX_BYTES:

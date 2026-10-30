@@ -18,6 +18,14 @@ test("the preview shows the server's before and after text as plain text, with n
   assert.ok(html.includes("одним шагом"));
 });
 
+test("a history proposal compares the text Undo or Redo changes and skips an entry with none", () => {
+  const preview = [{ target: "block-paper-a", label: "undo", before: "Новый текст", after: "Старый текст" },
+    { target: "action-1", label: "undo", before: "", after: "" }];
+  const html = render({ value: proposal({ kind: "history", ops: [{ op: "history", direction: "undo" }], preview }) });
+  assert.ok(html.includes("Было") && html.includes("Новый текст") && html.includes("Старый текст") && html.includes("История · 1"));
+  assert.equal(html.includes("История · 2"), false);
+});
+
 test("Apply needs a current draft and the edits flag; Discard needs only a draft", () => {
   const value = proposal();
   assert.deepEqual(proposalControls(value, false, false, true), { apply: true, discard: true, reason: null });

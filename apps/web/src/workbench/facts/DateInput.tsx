@@ -16,7 +16,7 @@ export function DateInput({ name, label, field, disabled }: {
       <select aria-label={`Точность: ${label}`} value={precision} disabled={disabled} onChange={event => {
         const next = event.currentTarget.value;
         if (next !== "year" && next !== "month" && next !== "day" && next !== "text") return;
-        const updated = changePrecision(value, next);
+        const updated = changePrecision(value, next, field?.rawText);
         setPrecision(next); setValue(updated); setNeedsChoice(!updated && !!raw);
         if (updated) setRaw(updated);
       }}><option value="year">Год</option><option value="month">Месяц</option><option value="day">Дата</option><option value="text">Как в исходнике</option></select>

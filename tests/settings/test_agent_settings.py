@@ -76,4 +76,3 @@ def test_assistant_effort_is_checked_against_the_model_and_old_files_load_withou
     # An unchanged choice saves without a catalog, like the model.
     assert settings.save(AgentSettingsRequest(expectedRevision=5, enabled=False, selectedAgentModel="model-a",
         reasoningEffort="high"), None).revision == 6
-    assert settings.restore_model("model-b", "max").reasoning_effort == "max"

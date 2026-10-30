@@ -16,7 +16,7 @@ function harness() {
     tasks: async projectId => { calls.push(`tasks:${projectId}`); if (failing) throw new Error("REQUEST_FAILED"); const value = current.get(projectId); return value ? [value] : []; },
     cancel: async (projectId, taskId) => { calls.push(`cancel:${projectId}:${taskId}`); const value = task(projectId, taskId, "cancelled"); current.set(projectId, value); return value; },
     resume: async (projectId, operation) => { calls.push(`resume:${projectId}:${operation}`); const value = task(projectId, `${projectId}-resumed`); current.set(projectId, value); return value; },
-    start: async projectId => { calls.push(`start:${projectId}`); const value = task(projectId, `${projectId}-started`); current.set(projectId, value); return value; },
+    start: async (projectId, body) => { calls.push(`start:${projectId}:${body.allowTextRewrite}:${body.effort}`); const value = task(projectId, `${projectId}-started`); current.set(projectId, value); return value; },
     operation: async projectId => { calls.push(`operation:${projectId}`); return null; },
   };
   const tracker = new ImportTracker(entries => { snapshot = entries; }, entry => finished.push(entry),
@@ -32,6 +32,7 @@ test("imports of two projects are followed at once and stopping one leaves the o
   assert.deepEqual(calls, ["tasks:a", "tasks:b"]);
   await tracker.stop("a");
   assert.equal(entries().get("a")?.task.state, "cancelled");
+  assert.deepEqual(finished.splice(0).map(entry => entry.task.state), ["cancelled"]);
   calls.length = 0;
   current.set("b", task("b", "b-1", "succeeded"));
   await tick();
@@ -81,8 +82,29 @@ test("Retry of a stalled run stops it, then continues the operation; a failed st
   calls.length = 0;
   tracker.track("b", task("b", "b-1", "failed", {}), "b.pdf", { allowTextRewrite: false, effort: "high" });
   await tracker.retry("b");
-  assert.deepEqual(calls, ["operation:b", "start:b"]);
+  assert.deepEqual(calls, ["operation:b", "start:b:false:high"], "the start keeps the user's own choices");
   tracker.close();
+});
+
+test("Retry with no operation and no saved choice starts nothing: the pre-draft screen asks again", async () => {
+  const { tracker, calls, entries, finished } = harness();
+  tracker.track("a", task("a", "a-1", "failed", {}), "a.pdf");
+  finished.length = 0;
+  await tracker.retry("a");
+  assert.deepEqual(calls, ["operation:a"], "no start with a guessed rewrite choice");
+  assert.equal(entries().get("a"), undefined);
+  tracker.close();
+});
+
+test("a stop whose reply is the finished import runs the finish step like a poll does", async () => {
+  const api: ImportApi = { tasks: async () => [], cancel: async (projectId, id) => task(projectId, id, "succeeded"),
+    resume: async () => { throw new Error("unused"); }, start: async () => { throw new Error("unused"); }, operation: async () => null };
+  const done: ImportEntry[] = [];
+  const stopping = new ImportTracker(() => {}, entry => done.push(entry), { api, now: () => 0, wait: () => new Promise<void>(() => {}) });
+  stopping.track("a", task("a", "a-1"), "a.pdf");
+  await stopping.stop("a");
+  assert.deepEqual(done.map(entry => entry.task.state), ["succeeded"]);
+  stopping.close();
 });
 
 test("Retry leaves a healthy run alone, and a status read for a task Retry replaced meanwhile is dropped", async () => {

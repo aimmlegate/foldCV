@@ -162,3 +162,17 @@ async def test_a_cleanup_failure_blocks_later_uploads(tmp_path, monkeypatch):
         second = await upload(client, "y.txt", b"safe")
         assert second["warnings"] == ["PROCESS_CLEANUP_FAILED", "NO_USABLE_TEXT"]
     assert calls == ["x.txt"]
+
+
+@pytest.mark.asyncio
+async def test_a_worker_past_the_deadline_is_stopped_with_its_own_code_and_frees_the_upload(tmp_path, monkeypatch):
+    worker = tmp_path / "synthetic-stuck.py"
+    worker.write_text("import time\nwhile True:\n    time.sleep(0.05)\n", encoding="utf-8")
+    monkeypatch.setattr(extracting, "WORKER", worker)
+    monkeypatch.setattr(extracting, "MAX_SECONDS", 0.2)
+    app = uploads(tmp_path)
+    async with signed_in(app) as client:
+        reply = await client.post("/v1/rich/projects/template-input", files={"file": ("source.txt", b"text")})
+        assert reply.status_code == 201
+        assert reply.json()["workspace"]["preDraft"]["warnings"] == ["EXTRACT_TIMEOUT", "NO_USABLE_TEXT"]
+    assert operations(tmp_path) == []

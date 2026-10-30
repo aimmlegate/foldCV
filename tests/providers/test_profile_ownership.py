@@ -1,4 +1,4 @@
-"""Cross-process ownership of the native profile: exclusive lock, shared holds per import, blocked cleanup markers."""
+"""Cross-process ownership of the native profile: exclusive lock, one shared hold for model calls, cleanup markers."""
 
 import fcntl
 import os
@@ -13,7 +13,7 @@ import pytest
 from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.storage import private_directory
 from resume_api.inference_admission import AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
-from resume_api.profile_ownership import native_profile, recover_profile
+from resume_api.profile_ownership import BLOCKED, native_profile, recover_profile
 
 
 def profile(root):
@@ -73,15 +73,16 @@ def test_profile_ownership_excludes_another_process_and_is_cancellable(tmp_path)
         assert path.stat().st_mode & 0o777 == 0o600
 
 
-def test_calls_under_one_share_key_hold_the_profile_together_and_the_last_one_releases_it(tmp_path):
-    # CT10: blocks of one import run at once under the job's permit; another owner still waits for all of them.
-    owned, permit = profile(tmp_path / "native-profile"), object()
+def test_shared_calls_hold_the_profile_together_and_the_last_one_cleans_and_releases_it(tmp_path):
+    # CT10, D121: model calls of any import, rewrite or turn run at once; an exclusive owner waits for all of them.
+    owned = profile(tmp_path / "native-profile")
     together, first_out, second_out = threading.Barrier(3, timeout=5), threading.Event(), threading.Event()
-    errors = []
+    errors, cleaned = [], []
 
     def call(leave):
         try:
-            with native_profile(owned, threading.Event(), deadline=deadline(), share=permit):
+            with native_profile(owned, threading.Event(), deadline=deadline(), shared=True,
+                                cleanup=lambda: cleaned.append(profile_free(owned))):
                 together.wait()
                 leave.wait(5)
         except Exception as error:
@@ -93,17 +94,18 @@ def test_calls_under_one_share_key_hold_the_profile_together_and_the_last_one_re
     assert not profile_free(owned)
     first_out.set()
     threads[0].join(5)
-    assert not profile_free(owned)
+    assert not profile_free(owned) and cleaned == []
     second_out.set()
     threads[1].join(5)
-    assert not errors and profile_free(owned)
+    # The cleanup ran once, while the lock was still held.
+    assert not errors and cleaned == [False] and profile_free(owned)
 
 
-def test_another_share_key_waits_for_the_shared_hold(tmp_path):
+def test_an_exclusive_owner_waits_for_the_shared_hold(tmp_path):
     owned, inside, leave = profile(tmp_path / "native-profile"), threading.Event(), threading.Event()
 
     def hold():
-        with native_profile(owned, threading.Event(), deadline=deadline(), share="first-import"):
+        with native_profile(owned, threading.Event(), deadline=deadline(), shared=True):
             inside.set()
             leave.wait(5)
     thread = threading.Thread(target=hold)
@@ -112,18 +114,17 @@ def test_another_share_key_waits_for_the_shared_hold(tmp_path):
         assert inside.wait(5)
         cancel = StopWhenWaiting()
         with pytest.raises(AdmissionCancelled):
-            with native_profile(owned, cancel, deadline=deadline(), share="second-import"):
-                pytest.fail("a second import joined the first one's profile hold")
+            with native_profile(owned, cancel, deadline=deadline()):
+                pytest.fail("an exclusive owner entered beside a model call")
         assert cancel.waited.is_set()
     finally:
         leave.set()
         thread.join(5)
-    with native_profile(owned, threading.Event(), deadline=deadline(), share="second-import"):
-        pass
+    assert profile_free(owned)
 
 
 def test_a_joiner_takes_the_profile_itself_when_the_first_call_could_not(tmp_path):
-    owned, permit = profile(tmp_path / "native-profile"), object()
+    owned = profile(tmp_path / "native-profile")
     # A separate open file description holds the lock like a foreign owner would.
     foreign = os.open(owned.root / ".foldcv-inference.lock", os.O_RDWR | os.O_CREAT, 0o600)
     fcntl.flock(foreign, fcntl.LOCK_EX)
@@ -147,7 +148,7 @@ def test_a_joiner_takes_the_profile_itself_when_the_first_call_could_not(tmp_pat
 
     def call(name, cancel):
         try:
-            with native_profile(owned, cancel, deadline=deadline(), share=permit):
+            with native_profile(owned, cancel, deadline=deadline(), shared=True):
                 outcomes[name] = "entered"
         except (AdmissionCancelled, AdmissionTimeout):
             outcomes[name] = "gave up"
@@ -166,10 +167,10 @@ def test_a_cleanup_failure_inside_a_shared_hold_still_blocks_the_profile(tmp_pat
     operations = tmp_path / "operations"
     private_directory(operations)
     with pytest.raises(AgentFailure, match="AGENT_CLEANUP_FAILED"):
-        with native_profile(owned, threading.Event(), deadline=deadline(), operations_root=operations, share="import"):
+        with native_profile(owned, threading.Event(), deadline=deadline(), operations_root=operations, shared=True):
             raise AgentFailure("AGENT_CLEANUP_FAILED")
     with pytest.raises(AdmissionBlocked):
-        with native_profile(owned, threading.Event(), deadline=deadline(), share="import"):
+        with native_profile(owned, threading.Event(), deadline=deadline(), shared=True):
             pytest.fail("a blocked profile admitted a shared call")
 
 
@@ -187,3 +188,16 @@ def test_profile_cleanup_marker_requires_its_own_verified_operation_root(tmp_pat
     assert not recover_profile(owned, operations)
     with native_profile(owned, threading.Event(), deadline=deadline()):
         pass
+
+
+def test_a_call_cannot_join_a_shared_hold_after_a_blocked_marker(tmp_path):
+    owned, cancel = profile(tmp_path / "native-profile"), threading.Event()
+    with native_profile(owned, cancel, deadline=deadline(), shared=True, operations_root=tmp_path):
+        # Another call of the hold failed cleanup, as `_owned` records it.
+        (owned.root / BLOCKED).write_text("{}")
+        with pytest.raises(AdmissionBlocked):
+            with native_profile(owned, cancel, deadline=deadline(), shared=True, operations_root=tmp_path):
+                pytest.fail("a call joined the hold beside a process that may live")
+    # The refused call left the hold, so the last one out still released the lock.
+    (owned.root / BLOCKED).unlink()
+    assert profile_free(owned)

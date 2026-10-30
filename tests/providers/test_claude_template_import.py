@@ -29,6 +29,7 @@ async def test_the_generic_import_publishes_through_the_claude_cli_stream(tmp_pa
     # The probe is cached after the first three blocks, which start together; nothing signs in or out.
     assert calls.count(["--version"]) <= 3 and not any(args[:1] == ["auth"] and args[1] != "status" for args in calls)
 
-    _scripted, scripted_result, scripted, _originals = await generic_import(tmp_path / "scripted", "F10")
+    # The relay runs three calls at once, so the projects block is outlined (D117); the scripted import must too.
+    _scripted, scripted_result, scripted, _originals = await generic_import(tmp_path / "scripted", "F10", concurrency=3)
     assert spent_calls(scripted_result) == spent_calls(result)
     assert document(fixture.current()) == document(scripted)

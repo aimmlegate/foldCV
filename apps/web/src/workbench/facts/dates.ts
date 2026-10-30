@@ -17,8 +17,9 @@ export function datePrecision(text: string): DatePrecision {
   return /^\d{4}$/.test(text) ? "year" : /^\d{4}-\d{2}$/.test(text) ? "month" : /^\d{4}-\d{2}-\d{2}$/.test(text) ? "day" : "text";
 }
 
-export function changePrecision(text: string, precision: DatePrecision): string {
-  if (precision === "text") return text;
+/** `source` is the fact's raw text: "text" shows that, never the normalized date. */
+export function changePrecision(text: string, precision: DatePrecision, source = ""): string {
+  if (precision === "text") return source || text;
   const current = datePrecision(text);
   if (current === "text") return "";
   const length = precision === "year" ? 4 : precision === "month" ? 7 : 10;

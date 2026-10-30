@@ -7,12 +7,13 @@ from .rich_dependencies import placements
 from .rich_fields import inline_groups, working_field
 from .template_panel_creation import _mapping
 from .template_preparation_panel import drop_empty_titles, field_occurrence, restore_view, sibling_lists, view_title
-from .templates.focus import focus_durations
+from .templates.focus import catalog_for, focus_durations, remembered_icon, row_icon, row_name
 from .templates.materialize_nodes import fallback_style, literal, locale_text, reference
+from .templates.presentation_plan import focus_row
 from .templates.projection import pointer_tokens
 from .technology_experience import whole_years_text
 
-FOCUS_OPERATIONS = {'add_to_focus', 'remove_from_focus', 'move_focus'}
+FOCUS_OPERATIONS = {'add_to_focus', 'remove_from_focus', 'move_focus', 'set_focus_icon'}
 
 
 def focus_view(package):
@@ -71,6 +72,14 @@ def focus_only(project):
     return frozenset(section.props.record_id for _items, section in rows) - shown
 
 
+def focus_full(project):
+    """Whether the Focus rows reached the most the template's view takes."""
+    view = focus_view(project.template_package)[0]
+    limit = view.content_schema.get('maxItems')
+    technologies = {record.id for record in project.facts.records if record.kind == 'technology'}
+    return limit is not None and len(focus_rows(project.document, view.id, technologies)) >= limit
+
+
 def _detail_content(package, view, index, instance, record, experience_key, computed, allocator, slot):
     """The experience line: the stated value bound to its field, else the time the technology's jobs span; None hides it."""
     node = view.view.nodes[index]
@@ -86,7 +95,7 @@ def _is_name(block, record_id, name_key):
         for span in block.content)
 
 
-def _add(workspace, candidate, command, allocator, technologies):
+def _add(workspace, candidate, command, allocator, technologies, remembered):
     package = candidate.template_package
     view, index, name_key, experience_key = focus_view(package)
     record = technologies.get(command.record_id)
@@ -95,6 +104,8 @@ def _add(workspace, candidate, command, allocator, technologies):
     rows = focus_rows(candidate.document, view.id, technologies)
     if any(section.props.record_id == record.id for _items, section in rows):
         raise ValueError('FOCUS_DUPLICATE')
+    if focus_full(candidate):
+        raise ValueError('FOCUS_FULL')
     node = view.view.nodes[index]
     locale = package.definition.template.default_locale
     instance = allocator.allocate('template-instance', ['panel-focus-instance', record.id])
@@ -112,9 +123,11 @@ def _add(workspace, candidate, command, allocator, technologies):
     detail_ref, detail = _detail_content(package, view, index, instance, record, experience_key, computed, allocator, 'detail')
     if detail:
         children.append(paragraph('panel-focus-detail', detail_ref, detail))
+    # The icon the user chose before for this name comes along (D122).
+    icon = remembered_icon(catalog_for(package), remembered, record.display.raw_text) if remembered is not None else None
     section = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-focus-section', record.id]),
-        revision=1, props={'recordId': record.id}, content=[], children=children, provenance=[],
-        presentation=reference(package, view.id, fallback_style(view), instance))
+        revision=1, props={'recordId': record.id, **({'icon': icon} if icon else {})}, content=[], children=children,
+        provenance=[], presentation=reference(package, view.id, fallback_style(view), instance))
     if rows:
         items, last = rows[-1]
         items.insert(items.index(last) + 1, section)
@@ -160,6 +173,69 @@ def _move(candidate, command, technologies):
     return section if [value.id for value in items] != before else None
 
 
+def _set_icon(candidate, command, technologies):
+    """The row's icon: one of the template's icons, or "" for the template's own choice. False when it stays."""
+    view = focus_view(candidate.template_package)[0]
+    sections = [section for _items, section in focus_rows(candidate.document, view.id, technologies)
+        if section.props.record_id == command.record_id]
+    if not sections:
+        raise ValueError('FOCUS_SCOPE_INVALID')
+    icon = command.values['icon'] or None
+    if icon is not None and icon not in catalog_for(candidate.template_package).files:
+        raise ValueError('FOCUS_ICON_UNKNOWN')
+    if all(section.props.icon == icon for section in sections):
+        return False
+    for section in sections:
+        section.props.icon = icon
+    return True
+
+
+def chosen_icons(project):
+    """Section id to (chosen icon or None, technology name) of each Focus row; empty without one Focus view."""
+    try:
+        view = focus_view(project.template_package)[0]
+    except ValueError:
+        return {}
+    technologies = {record.id: record for record in project.facts.records if record.kind == 'technology'}
+    return {section.id: (section.props.icon, technologies[section.props.record_id].display.raw_text)
+        for _items, section in focus_rows(project.document, view.id, technologies)}
+
+
+def icon_choices(project, remembered=None):
+    """The facts panel's icon search (D122): each icon of the project's template with its names, and per Focus row
+    record the icon the template chooses itself and the one remembered for the row's name; and the PNG assets these
+    name, for the asset route."""
+    package = project.template_package
+    catalog = catalog_for(package)
+    names = {}
+    for name, icon in catalog.aliases.items():
+        names.setdefault(icon, []).append(name)
+    icons = [{'id': icon, 'names': sorted(names.get(icon, [])), 'sha256': asset.sha256}
+        for icon, asset in sorted(catalog.files.items())]
+    assets, rows = list(catalog.files.values()), {}
+    for block in project.document.blocks():
+        row = focus_row(block, package.recipe)
+        if not row or block.props.record_id is None:
+            continue
+        automatic = row_icon(package, project.facts, row, catalog)
+        if automatic is not None:
+            assets.append(automatic[1])
+        rows[block.props.record_id] = {
+            'automatic': {'id': automatic[0], 'sha256': automatic[1].sha256} if automatic is not None else None,
+            'remembered': remembered_icon(catalog, remembered, row_name(package, project.facts, row))}
+    return {'schemaVersion': 1, 'icons': icons, 'rows': rows}, assets
+
+
+def icon_changes(before, after):
+    """(name, icon or None) of each Focus row whose chosen icon a commit changed, as later rows should take it: a pick,
+    its Undo or Redo, or a reset to the template's own choice. Rows added or removed change nothing."""
+    if before is None or after is None:
+        return []
+    old = chosen_icons(before)
+    return [(name, icon) for identifier, (icon, name) in chosen_icons(after).items()
+        if identifier in old and old[identifier][0] != icon]
+
+
 def experience_text(package, text):
     """The panel's years field: a bare number is whole years, written as the template's language writes them."""
     text = text.strip()
@@ -200,14 +276,51 @@ def show_experience(candidate, updated, allocator):
             section.children.append(kept)
 
 
-def prepare_focus(workspace, command, allocator):
-    """(candidate project, steps) of one Focus row command, or None when it changes nothing."""
+def refresh_durations(workspace, candidate, facts, allocator):
+    """A computed Focus line follows the jobs (D105). The line is known by its text: a row without stated experience whose
+    line still reads what the jobs gave before takes what they give now. A line the user wrote stays, and a row they
+    cleared stays empty."""
+    try:
+        view, index, name_key, experience_key = focus_view(candidate.template_package)
+    except ValueError:
+        return
+    as_of, package = workspace.formatting_as_of, candidate.template_package
+    if as_of is None:
+        return
+    locale = package.definition.template.default_locale
+    old, new = focus_durations(workspace.project.facts, as_of, locale), focus_durations(facts, as_of, locale)
+    records = {record.id: record for record in facts.records if record.kind == 'technology'}
+    for _items, section in focus_rows(candidate.document, view.id, records):
+        identifier = section.props.record_id
+        name = next((at for at, block in enumerate(section.children) if _is_name(block, identifier, name_key)), None)
+        stated = working_field(records[identifier], experience_key) if experience_key else None
+        if old.get(identifier) == new.get(identifier) or name is None or stated is not None and stated.raw_text.strip():
+            continue
+        line = section.children[name + 1] if name + 1 < len(section.children) else None
+        if line is None and identifier not in old and identifier in new:
+            ref, content = _detail_content(package, view, index, section.children[name].presentation.template_instance_id,
+                records[identifier], None, new[identifier], allocator, ['computed', section.id])
+            section.children.append(TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block',
+                ['panel-focus-computed', section.id]), revision=1, props={}, children=[], provenance=[], presentation=ref, content=content))
+        elif line is not None and [getattr(span, 'text', None) for span in line.content] == [old.get(identifier)]:
+            if identifier in new:
+                line.content[0].text = new[identifier]
+            else:
+                section.children.remove(line)
+
+
+def prepare_focus(workspace, command, allocator, remembered=None):
+    """(candidate project, steps) of one Focus row command, or None when it changes nothing. `remembered`: the icons
+    the user chose before (`remembered_catalog`), which an added row takes."""
     project = workspace.project
     technologies = {record.id: record for record in project.facts.records if record.kind == 'technology'}
     candidate = project.model_copy(deep=True)
     steps = []
     if command.operation == 'add_to_focus':
-        _add(workspace, candidate, command, allocator, technologies)
+        _add(workspace, candidate, command, allocator, technologies, remembered)
+    elif command.operation == 'set_focus_icon':
+        if not _set_icon(candidate, command, technologies):
+            return None
     elif command.operation == 'remove_from_focus':
         _remove(candidate, command, technologies)
     elif command.operation == 'move_focus':

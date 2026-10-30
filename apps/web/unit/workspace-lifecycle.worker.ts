@@ -63,6 +63,8 @@ mock.module(file("../src/projects/api.ts"), { namedExports: {
   deleteProject: async (id: string) => { events.push(`delete:${id}`); if (holdDelete) await pending.promise; return { cleanupStatus }; },
   catalogFlag: async (id: string, archived: boolean) => { events.push(`catalog-flag:${id}:${archived}`); },
 } });
+if (scenario === "import-restart") initialStates.set(TEMPLATE, { response: { workspace: { projectId: "T", title: "T", project: null,
+  preDraft: { templateOperations: [] } }, identity: null }, connection: {} });
 if (scenario === "export-refresh-failed") {
   initialStates.set(TEMPLATE, { response: opened("A").response, connection: { response: opened("A").response,
     exportDocx: async () => ({ blob: new Blob(["docx"]), attemptId: "attempt" }) } });
@@ -107,7 +109,13 @@ function invoke(): Promise<unknown> {
     default: throw new Error(`Unknown action ${action}`);
   }
 }
-if (importing) {
+if (scenario === "import-restart") {
+  // A pre-draft without an operation: its options are gone, so nothing starts until the user states them again.
+  assert.equal(await hook.resumeTemplate(), false);
+  assert.deepEqual(events, []);
+  assert.equal(await hook.resumeTemplate({ allowTextRewrite: false, effort: "high" }), true);
+  assert.deepEqual(events, ["tasks:T", "import:start:false:high"]);
+} else if (importing) {
   type Followed = ReadonlyMap<string, { task: { state: string; error: string | null } }>;
   const followed = () => stateWrites.get(IMPORTS)?.at(-1) as Followed | undefined;
   await hook.process(new File(["synthetic"], "cv.txt"), { allowTextRewrite: false, effort: "high" }, "second-one-column");
@@ -132,7 +140,7 @@ if (importing) {
     gate.resolve(); events.length = 0;
     assert.equal(await hook.remove("T"), true);
     // The service refuses to delete a project whose import runs, so the import stops first.
-    assert.deepEqual(events.slice(0, 2), ["import:cancel", "delete:T"]);
+    assert.deepEqual(events.filter(event => event !== "catalog").slice(0, 2), ["import:cancel", "delete:T"]);
     assert.equal(followed()?.get("T"), undefined);
   } else throw new Error(`Unknown scenario ${scenario}`);
 } else if (wait) {

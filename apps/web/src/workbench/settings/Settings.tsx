@@ -1,10 +1,10 @@
 import { errorMessage } from "../../errors/messages";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { ConnectionWorkflow, type ConnectionView } from "../../connection/workflow";
+import { ConnectionWorkflow, modelGroups, type ConnectionView } from "../../connection/workflow";
 import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
 import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
-import { Connection } from "./Connection";
+import { Connections } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
@@ -31,15 +31,16 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
       selectRewrite: saveRewriteModelRequest, selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
-        await workflow.select(model);
-        if (workflow.view.error || workflow.view.snapshot.selectedModel !== model) throw new Error("MODEL_SAVE_FAILED");
+        if (!await workflow.select(model)) throw new Error("MODEL_SAVE_FAILED");
         return model;
       } }, setState);
   });
-  useEffect(() => { void controller.load(); void workflow.peek(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
-  // Settings stays mounted behind the editor, whose rewrite popover saves the same rewrite choices.
-  useEffect(() => { if (open) void controller.refreshPreferences(); }, [open, controller]);
+  useEffect(() => { void controller.load(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
+  // Settings stays mounted behind the editor, whose rewrite popover and assistant panel save the same choices, and a
+  // connection check can end while it is away.
+  useEffect(() => { if (open) { void controller.refreshPreferences(); void controller.refreshAssistant(); void workflow.peek(); } }, [open, controller, workflow]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
+  const groups = modelGroups(view.snapshot);
   const draftActions = <>{!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
     <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить</Button>
       <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
@@ -60,19 +61,22 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
         {current.message && <p className="notice" role="status">{current.message}</p>}
         {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
       </div>
-      {section === "model" && <><Connection view={view} workflow={workflow} model={current.draft.model} change={value => controller.change("model", value)} disabled={current.saving} selectionDisabled={!current.preferences}
-          switchDisabled={busy || dirty} providerChanged={() => void controller.reloadChoices()} />
-        <ModelSelect id="rewrite-model-select" label="Модель правки текста" value={current.draft.rewriteModel} models={view.snapshot.models}
+      {section === "model" && <><Connections view={view} workflow={workflow} disabled={current.saving} />
+        <div className="uir-assistant-options"><h3>Обработка и правка текста</h3>
+        <ModelSelect id="model-select" label="Модель обработки" value={current.draft.model} groups={groups}
+          disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
+          change={value => { if (value) controller.change("model", value); }} />
+        <ModelSelect id="rewrite-model-select" label="Модель правки текста" value={current.draft.rewriteModel} groups={groups}
           defaultLabel="Как модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
           change={value => controller.change("rewriteModel", value)} />
         <ReasoningSelect value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.rewriteModel ?? current.draft.model ?? ""]}
           disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady || !(current.draft.rewriteModel ?? current.draft.model)}
-          change={value => controller.change("reasoning", value)} />
+          change={value => controller.change("reasoning", value)} /></div>
         <div className="uir-assistant-options"><h3>Импорт резюме</h3>
-          <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} models={view.snapshot.models}
+          <ModelSelect id="import-model-select" label="Модель импорта" value={current.draft.importModel} groups={groups}
             defaultLabel="Как модель обработки" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("importModel", value)} />
-          <ModelSelect id="fallback-model-select" label="Резервная модель" value={current.draft.fallbackModel} models={view.snapshot.models}
+          <ModelSelect id="fallback-model-select" label="Резервная модель" value={current.draft.fallbackModel} groups={groups}
             defaultLabel="Нет" disabled={busy || !current.preferences || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("fallbackModel", value)} />
           <p className="small muted">Повторит блок, если основная модель не справится.</p>
@@ -80,7 +84,7 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
         <div className="uir-assistant-options"><h3>Помощник</h3><div className="switch-line"><label htmlFor="assistant-enabled">Включить помощника</label>
           <input className="switch" id="assistant-enabled" aria-label="Включить помощника" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
             onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></div>
-          <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} models={view.snapshot.models}
+          <ModelSelect id="assistant-model-select" label="Модель помощника" value={current.draft.agentModel} groups={groups}
             defaultLabel="Выберите модель" disabled={busy || !current.assistant || view.pending || !view.snapshot.metadataReady}
             change={value => controller.change("agentModel", value)} />
           <ReasoningSelect id="assistant-reasoning" label="Рассуждения помощника" value={current.draft.agentEffort}

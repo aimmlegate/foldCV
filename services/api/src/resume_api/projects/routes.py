@@ -11,10 +11,10 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.models.projects import (ClipboardCaptureRequestV1, DeleteRequestV1, EditRequestV1,
-    HistoryRequestV1, ProjectCheckRequestV1, RenameRequestV1, RewritePreviewRequestV1, RewriteCancelRequestV1)
+    HistoryRequestV1, RenameRequestV1, RewritePreviewRequestV1, RewriteCancelRequestV1)
 from packages.resume_core.project_limits import ARCHIVE_BYTES
 
-from . import check, clipboard, editing, images, rewrite, sources
+from . import clipboard, editing, focus_icons, images, rewrite, sources
 from .archive import ArchiveDownload, export_archive, import_archive
 from .errors import ProjectFailure, mount_errors
 from .exports import ExportCommand, ExportRetry
@@ -77,10 +77,6 @@ def mount_projects_v2(app, service):
     async def capture(project_id: str, payload: ClipboardCaptureRequestV1):
         return model_reply(await asyncio.to_thread(clipboard.capture, service, project_id, payload))
 
-    @app.post(PREFIX + '/{project_id}/check')
-    async def check_project(project_id: str, payload: ProjectCheckRequestV1):
-        return model_reply(await asyncio.to_thread(check.run, service, project_id, payload))
-
     @app.post(PREFIX + '/{project_id}/rewrite/preview')
     async def preview_rewrite(project_id: str, payload: RewritePreviewRequestV1):
         return model_reply(await rewrite.preview(service, project_id, payload))
@@ -141,6 +137,10 @@ def mount_projects_v2(app, service):
     @app.get(PREFIX + '/{project_id}/tasks')
     async def tasks(project_id: str):
         return json_reply({'schemaVersion': 1, 'tasks': await asyncio.to_thread(service.imports.statuses, project_id)})
+
+    @app.get(PREFIX + '/{project_id}/focus-icons')
+    async def focus_icon_choices(project_id: str):
+        return json_reply(await asyncio.to_thread(focus_icons.choices, service, project_id))
 
     @app.get(PREFIX + '/{project_id}/images/{sha}')
     async def image(project_id: str, sha: str):

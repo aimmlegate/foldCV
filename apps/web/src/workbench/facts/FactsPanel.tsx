@@ -2,7 +2,7 @@ import type { OrderDocument } from "../../rich/technology-order";
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
-import { panelSupport, type PanelCommand, type TechnologyTarget } from "../../rich/v7-panel";
+import { panelSupport, type PanelCommand, type PanelPlan, type TechnologyTarget } from "../../rich/v7-panel";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
@@ -10,36 +10,40 @@ import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { dateText } from "./dates";
 import { FocusYears, type FocusEntry } from "./FocusYears";
+import { FocusIconDialog } from "./FocusIconDialog";
+import type { FocusIconChoices } from "../../projects/api";
 import { OperationStatus } from "../ui/OperationStatus";
-import type { PlacedRemarks } from "../../rich/remarks";
-import { CheckFooter, RemarkSections, type CheckState } from "./RemarkSections";
 
-function summary(record: RecordValue): [string, string] {
+function summary(record: RecordValue, periods: readonly string[]): [string, string] {
   if (record.kind === "candidate") return [record.name.rawText || "Кандидат", [record.title.rawText, record.location.rawText].filter(Boolean).join("\n")];
-  if (record.kind === "employment") return [record.employer.rawText || "Без названия", [record.role.rawText,
-    ...record.periods.map(period => `${dateText(period.start) || "?"} — ${period.present.value ? "по настоящее время" : dateText(period.end) || "?"}`)].filter(Boolean).join("\n")];
+  if (record.kind === "employment") return [record.employer.rawText || "Без названия", [record.role.rawText, ...periods].filter(Boolean).join("\n")];
   if (record.kind === "education") return [record.institution.rawText || "Без названия", [record.qualification.rawText, record.specialty.rawText, dateText(record.completion)].filter(Boolean).join("\n")];
   if (record.kind === "language") return [record.language.rawText || "Без названия", record.level.rawText];
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
-export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, technologyTargets = [], submit, pending, paused, hidden,
-  close, focusRequest = null, onFocused, remarks, showBlock = () => {}, check }: {
+export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, focusIcons = null, technologyTargets = [], plan = {}, submit,
+  pending, paused, hidden, close, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
+  /** Loads the template's icons for a Focus row's icon search; null when the template has none to choose from. */
+  focusIcons?: (() => Promise<FocusIconChoices>) | null;
   /** Records only Focus rows show; the technology lists leave them out. */
   focusOnly?: ReadonlySet<string>;
   /** Where Python can show a new technology; a list without one offers no adding. */
   technologyTargets?: readonly TechnologyTarget[];
+  plan?: PanelPlan;
   hidden: boolean; close: () => void;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
-  /** Remarks by resume section, with the place each one names in the document. */
-  remarks?: PlacedRemarks; showBlock?: (blockId: string) => void;
-  check?: { state: CheckState; run: () => void };
+  /** Where each group's section is in the resume, by record kind; a group without one offers no jump. */
+  anchors?: ReadonlyMap<string, string>; showBlock?: (blockId: string) => void;
 }) {
   const panel = useRef<HTMLElement>(null);
   const [target, setTarget] = useState<FactTarget | null>(null), [error, setError] = useState<string | null>(null);
+  // The row whose icon is being chosen; the dialog closes when the row goes, as after an Undo.
+  const [iconRow, setIconRow] = useState<string | null>(null);
+  const iconEntry = focusIcons ? focusEntries.find(entry => entry.recordId === iconRow) : undefined;
   // One command at a time: the editor takes the next one only after Python's answer to this one is shown.
   const busy = paused || pending.length > 0;
   const groups: Kind[] = ["candidate", "employment", "technology", "education", "language"];
@@ -56,6 +60,10 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     });
     return () => cancelAnimationFrame(frame);
   }, [focusRequest, hidden, onFocused]);
+  const editTechnology = (recordId: string) => {
+    const record = facts.records.find(value => value.id === recordId);
+    if (record) setTarget({ kind: "technology", record });
+  };
   async function apply(command: PanelCommand) {
     setError(null);
     try { await submit(command); }
@@ -76,27 +84,30 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
           {issue.page ? `, стр. ${issue.page}` : ""}</li>)}</ul>
         <p>Сверьте с исходником и исправьте вручную.</p></details>}
     </div>}
-    {groups.map(kind => <details className="fact-group" key={kind} data-group={kind} open={kind !== "claim"}>
+    {groups.map(kind => {
+      const anchor = anchors?.get(kind);
+      return <div className="fact-group-frame" key={kind}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
-      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={recordId => {
-          const record = facts.records.find(value => value.id === recordId);
-          if (record) setTarget({ kind: "technology", record });
-        }} />
-        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} focusRecordId={focusRequest?.recordId}
-          targets={technologyTargets.filter(target => target.jobId === null)} excluded={focusOnly} /></>
+      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null} />
+        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
+          targets={technologyTargets.filter(target => target.jobId === null)} lines={plan.technologyLines} excluded={focusOnly} /></>
         : facts.records.filter(record => record.kind === kind).map(record => {
-          const [name, sub] = summary(record);
+          const [name, sub] = summary(record, plan.jobs?.[record.id]?.periods ?? []);
           return <div key={record.id}><div className="fact-row" data-fact-id={record.id}>
             <button className="fact-edit" disabled={busy} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
               {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
             {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={busy} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
-          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} focusRecordId={focusRequest?.recordId}
-            targets={technologyTargets.filter(target => target.jobId === record.id)} excluded={focusOnly} />}</div>;
+          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
+            targets={technologyTargets.filter(target => target.jobId === record.id)} lines={plan.technologyLines} excluded={focusOnly} />}</div>;
         })}
       {panelSupport.add.has(kind) && <button className="text-button fact-add" disabled={busy}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
-    </details>)}
-    {remarks && <RemarkSections remarks={remarks} show={showBlock} />}
-    {check && <CheckFooter state={check.state} run={check.run} disabled={paused} />}
-  </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply} />}</>;
+    </details>
+      {/* Beside the summary, not inside it: a click inside a summary also folds the group. */}
+      {anchor && <button type="button" className="icon fact-group-jump" aria-label={`Показать в резюме: ${labels[kind]}`} title="Показать в резюме"
+        onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}</div>;
+    })}
+  </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply}
+      unshown={target.record ? plan.unshownFields?.[target.record.id] : undefined} addPeriod={Boolean(target.record && plan.jobs?.[target.record.id]?.addPeriod)} />}
+    {iconEntry && focusIcons && <FocusIconDialog entry={iconEntry} load={focusIcons} submit={apply} close={() => setIconRow(null)} />}</>;
 }

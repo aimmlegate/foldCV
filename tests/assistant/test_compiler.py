@@ -101,6 +101,29 @@ def test_employment_and_period_creation_use_the_template_view_and_undo_as_one_ac
     assert snapshot(repository.read(workspace.project_id)) == before
 
 
+def test_a_period_takes_its_dates_and_refuses_an_unknown_value(tmp_path):
+    from tests.templates.test_panel_creation import employment_workspace, owner
+    workspace, sources = employment_workspace()
+    job = owner(workspace).props.record_id
+    repository = stored(tmp_path, workspace, sources)
+    commit(repository, workspace.project_id, ops({'op': 'create_fact', 'kind': 'period', 'jobId': job,
+        'values': {'start': '2020', 'end': '2021'}}))
+    record = next(value for value in repository.read(workspace.project_id).project.facts.records if value.id == job)
+    assert (record.periods[-1].start.raw_text, record.periods[-1].end.raw_text) == ('2020', '2021')
+    with pytest.raises(CompileFailure) as refused:
+        compile_ops(workspace, ops({'op': 'create_fact', 'kind': 'period', 'jobId': job, 'values': {'title': 'x'}}),
+            action_id=ACTION, occupied=set(), response_for=response_for_workspace)
+    assert refused.value.code == 'ASSISTANT_OP_REFUSED'
+
+
+def test_target_id_is_for_a_technology():
+    workspace, _sources = GOLDEN['scoped']
+    with pytest.raises(CompileFailure) as refused:
+        compile_ops(workspace, ops({'op': 'create_fact', 'kind': 'employment', 'targetId': 'line', 'values': {'employer': 'A'}}),
+            action_id=ACTION, occupied=set(), response_for=response_for_workspace)
+    assert refused.value.code == 'ASSISTANT_OP_INVALID'
+
+
 def test_other_fact_kinds_have_no_creation_path_on_v7():
     workspace, _sources = GOLDEN['scoped']
     with pytest.raises(CompileFailure) as refused:

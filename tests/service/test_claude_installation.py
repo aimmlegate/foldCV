@@ -120,9 +120,9 @@ def app_with(tmp_path, slot):
 
 
 async def switch_to_claude(client):
-    state = (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()
+    state = (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).json()
     assert state["provider"] == "claude_cli"
-    missing = (await client.post("/v1/host/status", json={})).json()
+    missing = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
     assert missing["state"] == "cli_missing" and missing["installation"]["state"] == "idle"
     assert missing["providers"][1]["installed"] is False
     return missing
@@ -134,15 +134,16 @@ async def test_install_from_settings_connects_without_a_restart(binary, tmp_path
     app = app_with(tmp_path, bind_stand_in(slot, slot.profile.executable))
     async with client_session(app) as client:
         await switch_to_claude(client)
+        # Codex stays on next to Claude; this fixture has no managed Codex install.
         refused = await client.post("/v1/host/install", json={"provider": "codex_cli"})
-        assert refused.status_code == 409 and refused.json()["error"]["code"] == "PROVIDER_INACTIVE"
+        assert refused.status_code == 409 and refused.json()["error"]["code"] == "INSTALL_NOT_AVAILABLE"
         installed = (await client.post("/v1/host/install", json={"provider": "claude_cli"})).json()
         assert installed["state"] == "unchecked" and installed["installation"]["state"] == "ready"
         executable = slot.installation.executable
         (executable.parent / "fixture.json").write_text(json.dumps({"case": "valid", "value": {}}))
-        connected = (await client.post("/v1/host/status", json={})).json()
+        connected = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
         assert connected["state"] == "connected" and connected["providers"][1]["installed"] is True
-        assert (await client.post("/v1/host/install", json={})).status_code == 409
+        assert (await client.post("/v1/host/install", json={"provider": "claude_cli"})).status_code == 409
 
 
 @pytest.mark.asyncio
@@ -151,8 +152,8 @@ async def test_the_installed_binary_is_still_qualified_by_its_signature(binary, 
     assert slot.rebind is bind_claude
     async with client_session(app_with(tmp_path, slot)) as client:
         await switch_to_claude(client)
-        assert (await client.post("/v1/host/install", json={})).json()["installation"]["state"] == "ready"
+        assert (await client.post("/v1/host/install", json={"provider": "claude_cli"})).json()["installation"]["state"] == "ready"
         # The unsigned stand-in fails the publisher check, so Settings offers the install again.
-        status = (await client.post("/v1/host/status", json={})).json()
+        status = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
         assert status["state"] == "unsupported_version" and status["installation"]["available"]
     assert not (slot.installation.executable.parent / "audit.jsonl").exists()

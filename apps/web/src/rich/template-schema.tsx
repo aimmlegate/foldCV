@@ -23,3 +23,7 @@ export const templateSchema = BlockNoteSchema.create({ blockSpecs: schema.blockS
   inlineContentSpecs: { ...defaultInlineContentSpecs, templateField, manualScope, boundLink } });
 allowRichCodeStyles(templateSchema);
 allowRichColors(templateSchema);
+
+/** BlockNote features the session has no operation for: their input rules and shortcuts would only be refused. */
+export const disabledExtensions = ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts",
+  "bullet-list-item-shortcuts", "numbered-list-item-shortcuts", "divider-block-shortcuts"];

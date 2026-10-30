@@ -7,7 +7,9 @@ from .rich_fields import builtin_cell_values, inline_groups, set_text, working_f
 from .rich_mutations import locate, parent_items, subtree
 from .template_builtin_admission import unknown
 from .template_identity import _bound_root
-from .template_panel_values import period_endpoint
+from .template_panel_lines import period_fields, period_words
+from .template_panel_values import written_dates
+from .template_preparation_panel import restore_view
 from .templates.compiler import canonical
 from .templates.materialize_nodes import fallback_style, locale_text, reference
 from .templates.projection import pointer_tokens
@@ -149,13 +151,15 @@ def _values(command, period_id, *, employment):
 def _blocks(package, view, semantic, record, period, indexes, instance, allocator, context=None):
     blocks = []
     locale = package.definition.template.default_locale
+    separator, ongoing_label = period_words(package)
     for index in indexes:
         node = view.view.nodes[index]
         keys = node_fields(view, semantic, node, period.id)
-        if not keys:
+        ongoing = False
+        if node.type == 'period' and keys:
+            keys, ongoing = period_fields(period, ongoing_label)
+        if not keys and not ongoing:
             continue
-        if node.type == 'period':
-            keys = [keys[0], keys[2] if period_endpoint(period) == 'present' else keys[1]]
         ref = reference(package, view.id, node.style, instance, node_index=index)
         if context is not None:
             ref.overrides = context.presentation.overrides.model_copy(deep=True)
@@ -165,7 +169,7 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
             content.append(PresentedText(type='text', text=prefix, styles={}, presentation=ref))
         for position, key in enumerate(keys):
             if position:
-                content.append(PresentedText(type='text', text='–' if node.type == 'period' else node.separator,
+                content.append(PresentedText(type='text', text=separator if node.type == 'period' else node.separator,
                     styles={}, presentation=ref))
             root = allocator.allocate('occurrence', ['panel-occurrence', record.id, period.id, index, position, key])
             content.append(FieldOccurrence(type='fact_field',
@@ -173,6 +177,9 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
                 recordId=record.id, fieldKey=key, cellId=field_key(record.id, key), occurrenceId=root,
                 complete=True, presentation=ref, text=working_field(record, key).raw_text,
                 styles={}, syncedFactRevision=working_field(record, key).revision))
+        if ongoing:
+            content += [PresentedText(type='text', text=text, styles={}, presentation=ref)
+                for text in [*([separator] if keys else []), ongoing_label]]
         label = locale_text(node.label, locale)
         if label:
             blocks.append(TemplateParagraphBlock(type='paragraph',
@@ -199,15 +206,20 @@ def create_employment(workspace, operation, allocator):
     period = _period(allocator, record_id)
     record = EmploymentRecord(id=record_id, kind='employment', revision=1, origin='user', userCorrected=True,
         evidence=[], employer=unknown(), role=unknown(), periods=[period])
-    for key, value in _values(command, period.id, employment=True).items():
+    values = _values(command, period.id, employment=True)
+    for key, value in values.items():
         set_text(record, key, value)
+    written_dates(before.facts, None, record, set(values))
     _report_cells(before, record, allocator)
     candidate = before.model_copy(deep=True)
     regions = {region.id: region for region in candidate.document.regions}
+    parent, after = None, None
     if operation.placement_context is None:
         region = _unique([value for value in regions.values() if value.role == view.placement.region],
             'employment region missing')
-        parent, after = region.id, region.blocks[-1].id if region.blocks else None
+        shown = [block for block in region.blocks if block.presentation is not None and block.presentation.view_key == view.id]
+        if shown:
+            parent, after = region.id, shown[-1].id
     else:
         parent, after = operation.placement_context.placement.parent_id, operation.placement_context.placement.after_id
         cursor, seen = parent, set()
@@ -231,8 +243,45 @@ def create_employment(workspace, operation, allocator):
     section = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-employment-section', record_id]),
         revision=1, props={'recordId': record_id}, content=[], children=children, provenance=[],
         presentation=reference(before.template_package, view.id, fallback_style(view), instance))
-    _insert(candidate.document, [section], parent, after)
+    if parent is not None:
+        _insert(candidate.document, [section], parent, after)
+    # The view's last job was removed, and its title with it: both come back where the import puts the view.
+    elif not restore_view(candidate.document, before.template_package, view, [section], allocator, 'employment'):
+        raise ValueError('employment region missing')
     return candidate, [{'kind': 'put_record', 'beforeRevision': None, 'record': record.model_dump(by_alias=True)}]
+
+
+def _period_sections(project, record_id, options):
+    """The sections of one view of `options` that show only this job: the place a new period can go."""
+    return [block for block in project.document.blocks() if isinstance(block, SectionBlock)
+        and block.props.record_id in {None, record_id} and block.presentation.view_key in options
+        and section_records(project, block) == {record_id}
+        and all(value.record_id == record_id for value in block.provenance if value.kind == 'working_owner')]
+
+
+def _period_nodes(view, semantic, period_id):
+    return [index for index, node in enumerate(view.view.nodes)
+        if node.type == 'period' and node_fields(view, semantic, node, period_id)]
+
+
+def period_jobs(project):
+    """The jobs a new period has a place for; the panel offers no period to the others, such as a job in a compressed
+    list. The same checks as `create_period` without a placement context."""
+    options = {}
+    for view, semantic in view_options(project):
+        options.setdefault(view.id, []).append((view, semantic))
+    found = set()
+    for record in project.facts.records:
+        sections = _period_sections(project, record.id, options) if record.kind == 'employment' else []
+        if len(sections) != 1 or len(options[sections[0].presentation.view_key]) != 1:
+            continue
+        view, semantic = options[sections[0].presentation.view_key][0]
+        try:
+            if len(_period_nodes(view, semantic, 'period')) == 1:
+                found.add(record.id)
+        except ValueError:
+            continue
+    return found
 
 
 def create_period(workspace, operation, allocator):
@@ -245,10 +294,7 @@ def create_period(workspace, operation, allocator):
     options = {}
     for view, semantic in view_options(before):
         options.setdefault(view.id, []).append((view, semantic))
-    sections = [block for block in before.document.blocks() if isinstance(block, SectionBlock)
-        and block.props.record_id in {None, original.id} and section_records(before, block) == {original.id}
-        and all(value.record_id == original.id for value in block.provenance if value.kind == 'working_owner')
-        and block.presentation.view_key in options]
+    sections = _period_sections(before, original.id, options)
     if operation.placement_context is not None:
         sections = [block for block in sections if block.id == operation.placement_context.placement.parent_id
             and context.id in {value.id for value in subtree(block)}]
@@ -259,11 +305,12 @@ def create_period(workspace, operation, allocator):
     updated = original.model_copy(deep=True)
     period = _period(allocator, original.id)
     updated.periods.append(period)
-    for key, value in _values(command, period.id, employment=False).items():
+    values = _values(command, period.id, employment=False)
+    for key, value in values.items():
         set_text(updated, key, value)
+    written_dates(before.facts, original, updated, set(values))
     _report_cells(before, updated, allocator)
-    indexes = [index for index, node in enumerate(view.view.nodes)
-        if node.type == 'period' and node_fields(view, semantic, node, period.id)]
+    indexes = _period_nodes(view, semantic, period.id)
     if context is not None and context.presentation.node_index in indexes:
         indexes = [context.presentation.node_index]
     index = _unique(indexes, 'period creation needs one compatible captured node')

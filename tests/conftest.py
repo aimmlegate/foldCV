@@ -20,7 +20,8 @@ def free_inference_permit():
     yield
     from resume_api.inference_admission import INFERENCE
     with INFERENCE.condition:
-        INFERENCE.owned, INFERENCE.reservation, INFERENCE.blocked = False, None, False
+        INFERENCE.shared, INFERENCE.exclusive, INFERENCE.blocked = 0, False, False
+        INFERENCE.reservations.clear()
         INFERENCE._notify()
 
 

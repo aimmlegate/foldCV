@@ -11,6 +11,7 @@ from resume_api.app import create_app
 from resume_api.cli.profile import VERSION
 from resume_api.connection import Metadata, Quota
 from tests.projects.support import source_blobs
+from tests.support.foundation import ForbiddenContentProvider
 from tests.templates.storage_fixtures import workspace
 
 ORIGIN = "http://127.0.0.1:39281"
@@ -37,6 +38,8 @@ def make_app(tmp_path: Path, **options):
     (dist / "index.html").write_text("<html>synthetic shell</html>", encoding="utf-8")
     (dist / "asset.js").write_text("safe asset", encoding="utf-8")
     options.setdefault("data_root", tmp_path / "data")
+    if not {"experimental_profile", "provider_slots"} & options.keys():
+        options.setdefault("content_provider", ForbiddenContentProvider())
     return create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist, **options)
 
 

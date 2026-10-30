@@ -8,9 +8,10 @@ import threading
 import pytest
 
 from resume_api.lifecycle import OperationFiles
-from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport
+from resume_api.providers import claude_cli
+from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport, Probe
 from resume_api.providers.content import ContentFailure
-from resume_api.providers.preflight import TTL_SECONDS, PreflightCache, preflight_key
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, TTL_SECONDS, PreflightCache, preflight_key
 from tests.providers.fixtures import fake, request
 
 
@@ -129,3 +130,39 @@ def test_credential_identity_changes_when_a_missing_file_becomes_a_dangling_link
     before = preflight_key(cli, None, None)
     (tmp_path / "auth.json").symlink_to(tmp_path / "missing")
     assert preflight_key(cli, None, None) != before
+
+
+@pytest.mark.parametrize("seconds", [3600, 5])
+def test_qualification_inside_a_model_call_stays_bounded_on_codex(fake, seconds):
+    cli, root, *_rest = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli), clock=lambda: 100.0)
+    reached = []
+
+    def probe(_files, _cancel, *, deadline):
+        reached.append(deadline)
+        return Probe("fixture", "chatgpt", True, ())
+
+    def list_models(_files, _cancel, *, deadline, reasoning):
+        reached.append(deadline)
+        return ("gpt-6-luna",)
+
+    provider.probe, provider.list_models = probe, list_models
+    with OperationFiles(root).open() as files:
+        provider.preflight(files, threading.Event(), "gpt-6-luna", deadline=100.0 + seconds)
+    assert reached == [100.0 + min(seconds, QUALIFICATION_SECONDS)] * 2
+
+
+@pytest.mark.parametrize("seconds", [3600, 5])
+def test_qualification_inside_a_model_call_stays_bounded_on_claude(fake, seconds):
+    cli, root, *_rest = fake
+    provider = claude_cli.ClaudeCliProvider(cli, fixture_transport=claude_cli.FixtureTransport(cli), clock=lambda: 100.0)
+    reached = []
+
+    def probe(_files, _cancel, *, deadline):
+        reached.append(deadline)
+        return claude_cli.Probe("2.1.308", "supported", "claude.ai", None, True, {"claude-sonnet-5-5": None})
+
+    provider.probe = probe
+    with OperationFiles(root).open() as files:
+        provider.preflight(files, threading.Event(), "claude-sonnet-5-5", deadline=100.0 + seconds)
+    assert reached == [100.0 + min(seconds, QUALIFICATION_SECONDS)]

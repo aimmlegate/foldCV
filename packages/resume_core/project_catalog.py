@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import logging
 import os
 import threading
 
@@ -10,7 +11,9 @@ from pydantic import Field
 from . import host
 from .models.contracts import Wire
 from .project_store import ProjectStoreFailure, owned_file, strict_json
-from .storage import atomic_write, locked_root
+from .storage import StorageFailure, atomic_write, locked_root
+
+LOG = logging.getLogger(__name__)
 
 
 class CatalogEntry(Wire):
@@ -52,8 +55,19 @@ class ProjectCatalog:
     def _read(self):
         if not self.path.exists() and not self.path.is_symlink():
             return CatalogState()
-        owned_file(self.path, 4 * 1024 * 1024)
-        return CatalogState.model_validate(strict_json(self.path.read_bytes()))
+        try:
+            owned_file(self.path, 4 * 1024 * 1024)
+            return CatalogState.model_validate(strict_json(self.path.read_bytes()))
+        except (StorageFailure, OSError, ValueError, RecursionError) as error:
+            # Only recency and flags live here: a damaged file costs those, never the projects.
+            LOG.warning('catalog unreadable, treated as empty: %s', type(error).__name__)
+            return CatalogState()
+
+    def _write(self, raw):
+        try:
+            atomic_write(self.path, raw)
+        except (StorageFailure, OSError):
+            raise ProjectStoreFailure("PROJECT_SAVE_FAILED") from None
 
     def _owned(self, identifier):
         entry = next((entry for entry in self.storage.registry().entries if entry.project_id == identifier), None)
@@ -82,7 +96,7 @@ class ProjectCatalog:
             if read_only is not None and entry.read_only != read_only:
                 entry.read_only = read_only
                 entry.access_revision += 1
-            atomic_write(self.path, state.model_dump_json(by_alias=True).encode())
+            self._write(state.model_dump_json(by_alias=True).encode())
             return entry.model_copy(deep=True)
 
     @contextmanager
@@ -118,7 +132,7 @@ class ProjectCatalog:
             raw = state.model_dump_json(by_alias=True).encode()
             if len(raw) > 4 * 1024 * 1024:
                 raise ProjectStoreFailure("PROJECT_TOO_LARGE")
-            atomic_write(self.path, raw)
+            self._write(raw)
 
     def reserve_action(self, key, value):
         # The reservation also holds space for a terminal result at the byte limit.
@@ -136,4 +150,4 @@ class ProjectCatalog:
             raw = state.model_dump_json(by_alias=True).encode()
             if len(raw) > 4 * 1024 * 1024:
                 raise ProjectStoreFailure("PROJECT_TOO_LARGE")
-            atomic_write(self.path, raw)
+            self._write(raw)

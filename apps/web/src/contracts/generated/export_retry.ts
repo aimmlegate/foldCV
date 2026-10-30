@@ -1,5 +1,5 @@
 export type Editortoken = string;
 
-export interface ProjectCheckRequestV1 {
+export interface ExportRetry {
   editorToken: Editortoken;
 }

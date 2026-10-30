@@ -10,7 +10,7 @@ import pytest
 
 from packages.resume_core.reasoning import ModelReasoning
 from resume_api.connection import Metadata, Quota
-from resume_api.projects.import_progress import import_progress, quiet_limit
+from resume_api.projects.import_progress import import_progress, phase_of, quiet_limit
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import CatalogAdapter, app_client, operation_of, upload
 
@@ -95,6 +95,20 @@ def test_an_import_is_stalled_after_a_silence_longer_than_its_time_limit_or_past
     assert progress(busy, 3830, admitted_at=at(5))['stalled'] is True
 
 
+def test_the_publication_phase_starts_with_assembly_and_its_bound_only_reports_a_stall():
+    # The document is assembled before the finalization record is saved; that time showed as model work with an hour
+    # of allowed silence, so a stuck assembly never looked stalled. Nothing stops the run at the bound.
+    calls = (attempt('task-identity', 'initial', 10, 30, 'completed'),)
+    value = operation(*calls, results=['task-identity', 'task-projects', 'task-project-window'])
+    assembling = progress(value, 40, admitted_at=at(5))
+    assert (assembling['phase'], assembling['done'], assembling['quietLimitSeconds']) == ('publication', 3, 218)
+    assert progress(value, 30 + 219, admitted_at=at(5))['stalled'] is True
+    running = operation(*calls, results=['task-identity'])
+    assert progress(running, 40, admitted_at=at(5))['phase'] == 'processing'
+    assert phase_of('processing', SimpleNamespace(state='processing', tasks=[], task_results=[])) == 'processing'
+    assert phase_of('queued', value) == 'queued' and phase_of('processing', None) == 'processing'
+
+
 def test_a_queued_import_is_quiet_from_the_last_queue_movement_and_ignores_old_records():
     value = operation(attempt('task-projects', 'initial', -86400, -86390, 'timed_out'))
     queued = progress(value, 3000, stage='queued', queued_at=at(0), queue_moved_at=at(2000))
@@ -143,7 +157,7 @@ async def task_of(client, project, identifier):
 
 
 @pytest.mark.asyncio
-async def test_a_second_project_imports_queued_behind_the_first_and_both_finish(tmp_path):
+async def test_a_second_project_imports_beside_the_first_and_both_finish(tmp_path):
     provider = GatedProvider()
     async with app_client(tmp_path, call_cap=4, provider=provider, adapter=GatedAdapter()) as (client, app):
         first = (await upload(client)).json()['workspace']['projectId']
@@ -155,16 +169,16 @@ async def test_a_second_project_imports_queued_behind_the_first_and_both_finish(
         assert (held['phase'], held['done'], held['total'], held['current']) == ('processing', 0, 1, ['PROJECTS'])
         assert held['events'][0]['text'] == 'Извлекаем данные: «PROJECTS»' and held['stalled'] is False
         assert held['lastModelAt'] is not None
-        # The start reply of the waiting import returns at once instead of timing out after 30 s.
-        queued = await start(client, second, 'import-b')
-        assert queued.status_code == 202 and queued.json()['stage'] == 'queued', queued.text
-        waiting = await task_of(client, second, queued.json()['id'])
-        assert waiting['state'] == 'running' and waiting['detail']['progress']['phase'] == 'queued'
+        # D121: the second import does not queue behind the first; both model calls run at once.
+        beside = await start(client, second, 'import-b')
+        assert beside.status_code == 202 and beside.json()['stage'] == 'processing', beside.text
+        await until(lambda: len(provider.efforts) == 2)
+        assert (await task_of(client, second, beside.json()['id']))['detail']['progress']['phase'] == 'processing'
         # One import per project: a second start on the running project is refused.
         again = await start(client, first, 'import-a2')
         assert again.status_code == 409 and again.json()['error']['code'] == 'REQUEST_IN_PROGRESS'
         provider.gate.set()
-        for project, reply in ((first, running), (second, queued)):
+        for project, reply in ((first, running), (second, beside)):
             runner = app.state.projects.imports.runners.get(reply.json()['id'])
             if runner is not None:
                 await runner

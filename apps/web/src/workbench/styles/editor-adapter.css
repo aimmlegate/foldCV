@@ -135,6 +135,9 @@
 .uir-timeline > details > button { background: none; border: 0; color: var(--accent); text-align: left; padding: 5px 0; font-size: 10px; }
 .uir-period-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .uir-assistant-options { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+/* D119: one card per provider; each keeps its own switch and connection. */
+.provider-card { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.provider-card .switch-line { margin: 0; }
 .demo-file-row > span { min-width: 0; overflow-wrap: anywhere; }
 .uir-chat-active-bar { display: flex; align-items: center; padding-right: 12px; }
 .uir-chat-active-bar .chat-launcher { min-width: 0; }
@@ -196,6 +199,21 @@
 .focus-years-row > button:hover:not(:disabled) { background: #d8e5c9; color: #56723f; }
 .focus-years-row > button:focus-visible { outline-offset: 0; }
 .focus-years-row > button svg { width: 12px; height: 12px; }
+/* D122: the row's icon opens the icon search; the row gets a column for it. */
+.focus-years-row.with-icon { grid-template-columns: 18px 24px minmax(0, 1fr) 56px 24px 24px; }
+.focus-years-row > button.focus-icon { padding: 2px; }
+.focus-years-row > button.focus-icon img { width: 20px; height: 20px; object-fit: contain; }
+.focus-icon-empty { display: block; width: 16px; height: 16px; border: 1px dashed #b9c6a8; border-radius: 3px; }
+.focus-icon-search input { width: 100%; padding: 8px 10px; }
+.focus-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 300px; overflow: auto;
+  margin: 12px 0 4px; }
+.focus-icon-grid button { display: grid; justify-items: center; align-content: start; gap: 6px; min-width: 0; padding: 10px 4px 8px;
+  border: 1px solid transparent; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
+.focus-icon-grid button:hover:not(:disabled) { border-color: #d1dbc3; background: #f0f5e8; }
+.focus-icon-grid button[aria-pressed="true"] { border-color: #9cb282; background: #e6eedb; }
+.focus-icon-grid img { width: 32px; height: 32px; object-fit: contain; }
+.focus-icon-grid .focus-icon-empty { width: 30px; height: 30px; }
+.focus-icon-grid span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-small); }
 .technology-note { display: block; margin: 4px 0 8px; color: var(--muted); line-height: 1.5; }
 .technology-group { display: grid; gap: 4px; margin: 6px 0; color: var(--muted); }
 .technology-group select { min-width: 0; padding: 6px; }

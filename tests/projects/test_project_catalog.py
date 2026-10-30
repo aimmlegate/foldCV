@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from packages.resume_core.project_repository import ProjectRepository
 from packages.resume_core.project_store import ProjectStoreFailure
 from tests.projects.support import Editor, source_blobs, v2_app
 from tests.templates.storage_fixtures import workspace as papers
@@ -106,10 +107,78 @@ def test_cleanup_is_retryable_and_an_unrelated_file_never_becomes_a_delete_targe
         result = delete(client, FIRST)
         assert result['deleted'] and result['cleanupStatus'] == 'failed'
         assert extra.read_text() == 'Keep until inspected' and FIRST not in entries(client)
+        # The project's own files go at once: only the unknown file and the marker that lets a retry finish stay.
+        assert {path.name for path in directory.iterdir()} == {extra.name, '.project-identity.json'}
         assert client.post('/v2/projects/' + FIRST + '/open', json={}).json()['error']['code'] == 'PROJECT_DELETED'
         assert client.get('/v2/projects/' + OTHER).json()['workspace']['projectId'] == OTHER
         extra.unlink()
         assert delete(client, FIRST)['cleanupStatus'] == 'complete' and not directory.exists()
+
+
+@pytest.mark.parametrize('status', ['pending', 'failed'])
+def test_the_next_start_finishes_a_deletion_that_did_not_complete(tmp_path, status):
+    with v2_app(tmp_path, projects()) as (client, application):
+        repository = application.state.projects.repository
+        directory = repository.open(FIRST).directory
+        if status == 'pending':
+            # The service stopped between the tombstone and the removal.
+            repository.close(FIRST)
+            repository.store.tombstone(FIRST)
+            repository.sessions.pop(FIRST)
+        else:
+            extra = directory / 'unknown-user-file.txt'
+            extra.write_text('Removed by the user later')
+            assert delete(client, FIRST)['cleanupStatus'] == 'failed'
+            extra.unlink()
+    restarted = ProjectRepository(tmp_path / 'data')
+    restarted.start()
+    assert not directory.exists()
+    entry = next(item for item in restarted.store.registry().entries if item.project_id == FIRST)
+    assert entry.tombstoned and entry.cleanup_status == 'complete'
+
+
+@pytest.mark.parametrize('damage', ['text', 'mode', 'folder'])
+def test_a_damaged_catalog_costs_only_flags_and_a_working_page_keeps_its_token(tmp_path, damage):
+    with v2_app(tmp_path, projects()) as (client, application):
+        editor = Editor(client, FIRST)
+        path = application.state.projects.repository.store.root / 'catalog.json'
+        if damage == 'folder':
+            path.unlink()
+            path.mkdir()
+        elif damage == 'mode':
+            path.chmod(0o644)
+        else:
+            path.write_bytes(b'{broken')
+        assert set(entries(client)) == {FIRST, OTHER}
+        assert client.post('/v2/projects/' + OTHER + '/open', json={}).status_code == 200
+        editor.call('post', '/rename', {'editorToken': editor.token, 'baseRevision': editor.revision, 'title': 'Kept'})
+        assert Editor(client, FIRST).response['workspace']['title'] == 'Kept'
+
+
+def test_a_catalog_write_failure_on_a_flag_is_a_public_code(tmp_path):
+    with v2_app(tmp_path, projects()) as (client, application):
+        path = application.state.projects.repository.store.root / 'catalog.json'
+        path.mkdir()
+        refused = client.post('/v2/projects/' + FIRST + '/catalog/archive', json={})
+        assert refused.status_code == 503 and refused.json()['error']['code'] == 'PROJECT_SAVE_FAILED'
+
+
+def test_a_damaged_registry_gives_open_the_code_the_listing_gives(tmp_path):
+    with v2_app(tmp_path, projects()) as (client, application):
+        repository = application.state.projects.repository
+        repository.close(FIRST)
+        repository.store.registry_path.write_bytes(b'{broken')
+        for reply in (client.get('/v2/projects'), client.post('/v2/projects/' + FIRST + '/open', json={})):
+            assert reply.status_code == 503 and reply.json()['error']['code'] == 'PROJECT_LOAD_FAILED'
+
+
+def test_a_damaged_registry_does_not_stop_the_service_from_starting(tmp_path):
+    with v2_app(tmp_path, projects()) as (_client, application):
+        path = application.state.projects.repository.store.registry_path
+    path.write_bytes(b'{broken')
+    with v2_app(tmp_path) as (client, _application):
+        assert client.get('/v2/projects').json()['error']['code'] == 'PROJECT_LOAD_FAILED'
+    assert path.read_bytes() == b'{broken'
 
 
 def test_catalog_flags_never_follow_a_project_symlink(tmp_path):

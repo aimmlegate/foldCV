@@ -7,7 +7,7 @@ import json
 import re
 from typing import Literal
 
-from .dates import partial_date
+from .dates import source_date
 from .models.rich_document import FactFieldSpan, ImageBlock, TableBlock
 from .models.rich_facts import WorkingField
 from .models.template_facts import ExtensionRecord
@@ -122,10 +122,8 @@ def parse_date(text):
     # Retain precise ISO values; a sole year with a language suffix keeps year precision.
     if re.fullmatch(r"\d{4}\s*(?:г\.?|year)?", value, re.I):
         value = value[:4]
-    try:
-        return partial_date(value)
-    except (ValueError, TypeError):
-        return None
+    found = source_date(value)
+    return found[0] if found is not None else None
 
 
 def set_text(record, key, text):

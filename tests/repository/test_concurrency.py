@@ -210,3 +210,15 @@ def test_cleanup_removes_temporary_files_left_in_blob_folders(tmp_path):
     leftover.chmod(0o600)
     entry = repo.delete(PROJECT)
     assert entry.cleanup_status == 'complete' and not directory.exists()
+
+
+def test_a_write_left_in_images_by_a_crash_does_not_stop_the_sweep(tmp_path):
+    repo = repository(tmp_path)
+    folder = repo.open(PROJECT).directory / 'images'
+    folder.mkdir(mode=0o700)
+    (folder / '.foldcv-write-abc').write_bytes(b'partial')
+    orphan = folder / ('a' * 64 + '.png')
+    orphan.write_bytes(b'unreferenced')
+    orphan.chmod(0o600)
+    assert repo.sweep_assets(PROJECT) == [orphan.name]
+    assert list(folder.iterdir()) == []

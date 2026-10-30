@@ -278,8 +278,10 @@ activity view (stage, elapsed time, saved discoveries, and `detail.progress` fro
 `projects/import_progress.py`: steps, recent model calls, the last event times and the
 stall check). Nothing there is durable.
 
-- Imports of several projects run at once; they share the one inference permit, so a
-  later one waits with stage `queued` and its start reply returns at once. The client
+- Imports of several projects run at once, beside rewrites and assistant turns on either
+  provider (D121): each holds a shared inference permit. Only a sign-in, CLI install or
+  connection check holds the exclusive one; an import started then waits with stage
+  `queued` and its start reply returns at once. The client
   (`workbench/import/tracker.ts`) follows each project's task without blocking the
   workspace. A run is stalled when no event arrives for longer than the longest model
   call (180 s) plus cleanup and 60 s, or when it outlives its captured time limits.
@@ -288,8 +290,8 @@ stall check). Nothing there is durable.
 
 - Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a
-  task that holds one inference permit. The start answers 202 at once; an import
-  queued behind another one or an assistant turn shows stage `waiting`, and the
+  task that holds one shared inference permit. The start answers 202 at once; an import
+  queued behind a sign-in or connection check shows stage `waiting`, and the
   client counts its time limit from the end of that wait. Checkpoints and publication
   are `repository.replace` with the revision of the snapshot the pipeline computed
   from; on `REVISION_CONFLICT` the pipeline re-bases or fails the task. The

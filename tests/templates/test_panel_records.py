@@ -7,6 +7,8 @@ import json
 import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
+from packages.resume_core.models.template_document import FieldOccurrence
+from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_dependencies import placements
 from packages.resume_core.rich_fields import field_key
 from packages.resume_core.templates.materialize_nodes import literal
@@ -32,6 +34,13 @@ def imported(tmp_path_factory):
 @pytest.fixture
 def before(imported):
     return imported.model_copy(deep=True)
+
+
+@pytest.fixture(scope='module')
+def ongoing(tmp_path_factory):
+    _fixture, result, workspace, _originals = asyncio.run(generic_import(tmp_path_factory.mktemp('panel-ongoing'), 'F04'))
+    assert result.state == 'published'
+    return workspace
 
 
 def request(before, operation, *, record_id=None, kind=None, job_id=None, values=None, line=None, target=None,
@@ -241,7 +250,8 @@ def test_clearing_the_general_list_keeps_focus_and_each_group_takes_technologies
 
 def test_a_technology_in_focus_and_in_a_group_is_renamed_and_added_back_on_its_own(before):
     grouped, focus = shown_in(before, 'programming'), shown_in(before, 'focus')
-    assert editor_plan(before.project)['focusPanel'] == {'records': [focus]}
+    # The Generic pack's icons can be chosen for a row (D122).
+    assert editor_plan(before.project)['focusPanel'] == {'records': [focus], 'icons': True}
     after, _result = applied(before, request(before, 'edit', record_id=grouped, values={'display': 'PYTHON'}))
     assert lines(after, 'programming') == ['PYTHON, Perl'] and lines(after, 'focus') == ['Python', '3 years']
     after, _result = applied(before, request(before, 'edit', record_id=focus, values={'display': 'python'}))
@@ -289,3 +299,238 @@ def test_removing_a_labelled_job_line_takes_its_label_and_adding_brings_one_back
     added, _result = applied(cleared, request(cleared, 'add', kind='technology', job_id=job.id, values={'display': 'Kafka'},
         target=section, identifier='records-kafka'))
     assert lines(added, 'projects')[2:4] == ['Стек:', 'Kafka'] and lines(added, 'projects').count('Стек:') == 1
+
+
+def job(workspace, name=None):
+    return next(value for value in workspace.project.facts.records if value.kind == 'employment'
+        and (name is None or value.employer.raw_text == name))
+
+
+def period_blocks(workspace, name='Current Systems'):
+    section = next(block for block in workspace.project.document.blocks() if block.type == 'section'
+        and block.props.record_id == job(workspace, name).id)
+    return [block for block in section.children if block.presentation.node_index == 1]
+
+
+def period_lines(workspace, name='Current Systems'):
+    return [''.join(part.text for part in block.content) for block in period_blocks(workspace, name)]
+
+
+def period_edit(workspace, name='Current Systems', **values):
+    target = job(workspace, name)
+    return request(workspace, 'edit', record_id=target.id, identifier=f'period-edit-{workspace.project_revision}', values={
+        f'period:{target.periods[0].id}:{key}': value for key, value in values.items()})
+
+
+def test_ending_a_current_job_binds_its_end_in_the_formats_place_and_back(ongoing):
+    before = ongoing.model_copy(deep=True)
+    assert period_lines(before) == ['2020 – по настоящее время']
+    ended, result = applied(before, period_edit(before, present='', end='2024-05'))
+    assert period_lines(ended) == ['2020 – 2024']
+    period = job(ended, 'Current Systems').periods[0]
+    assert period.end.value.month == 5
+    assert [span.field_key for span in period_blocks(ended)[0].content if isinstance(span, FieldOccurrence)] == [
+        f'period:{period.id}:start', f'period:{period.id}:end']
+    assert undone(before, ended, result)
+    back, _ = applied(ended, period_edit(ended, present='по настоящее время'))
+    assert period_lines(back) == ['2020 – по настоящее время']
+    assert job(back, 'Current Systems').periods[0].present.value is True
+
+
+def test_clearing_the_current_mark_without_an_end_leaves_the_start_alone(ongoing):
+    before = ongoing.model_copy(deep=True)
+    after, _ = applied(before, period_edit(before, present=''))
+    assert period_lines(after) == ['2020']
+    filled, _ = applied(after, period_edit(after, end='2021'))
+    assert period_lines(filled) == ['2020 – 2021']
+
+
+def test_a_label_alone_becomes_the_end_and_a_period_without_a_line_gets_one(ongoing):
+    before = ongoing.model_copy(deep=True)
+    cleared, _ = applied(before, period_edit(before, start=''))
+    assert period_lines(cleared) == ['по настоящее время']
+    ended, _ = applied(cleared, period_edit(cleared, present='', end='2024'))
+    assert period_lines(ended) == ['2024']
+    empty, _ = applied(ended, period_edit(ended, end=''))
+    assert period_lines(empty) == []
+    again, _ = applied(empty, period_edit(empty, present='по настоящее время'))
+    assert period_lines(again) == ['по настоящее время']
+    section = next(block for block in again.project.document.blocks() if block.type == 'section'
+        and block.props.record_id == job(again, 'Current Systems').id)
+    assert section.children[1] == period_blocks(again)[0]
+
+
+def test_an_authored_period_line_stays_and_an_endpoint_it_cannot_show_is_refused(ongoing):
+    before = ongoing.model_copy(deep=True)
+    period_blocks(before)[0].content[-1].text = 'и работаю сейчас'
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    with pytest.raises(ValueError, match='PANEL_ACTION_UNSUPPORTED'):
+        prepare_edit(response(before), period_edit(before, present='', end='2024'))
+    after, _ = applied(before, period_edit(before, start='2019'))
+    assert period_lines(after) == ['2019 – и работаю сейчас']
+
+
+def test_an_edited_date_takes_its_siblings_pattern_and_facts_read_the_same(before):
+    after, _ = applied(before, period_edit(before, 'Example Labs', start='2020-04'))
+    assert period_lines(after, 'Example Labs') == ['04.2020 – 11.2023']
+    period = job(after, 'Example Labs').periods[0]
+    assert (period.start.raw_text, period.start.value.month) == ('04.2020', 4)
+    jobs = editor_plan(after.project)['jobs']
+    assert jobs[period_owner(after, 'Example Labs')]['periods'] == ['04.2020 – 11.2023']
+    assert jobs[period_owner(after, 'Old Systems')]['periods'] == ['2006 – 2008']
+
+
+def period_owner(workspace, name):
+    return job(workspace, name).id
+
+
+def test_removing_a_jobs_only_period_takes_its_line(before):
+    target = job(before, 'Example Labs')
+    command = request(before, 'remove_period', record_id=target.id)
+    command.operations[0].command.period_id = target.periods[0].id
+    after, result = applied(before, command)
+    assert period_lines(after, 'Example Labs') == []
+    assert undone(before, after, result)
+
+
+def test_a_new_job_lands_after_its_view_with_the_formats_dates(before):
+    after, result = applied(before, request(before, 'add', kind='employment', values={'employer': 'New Co', 'role': 'Dev',
+        'start': '2024-01', 'end': '', 'present': 'по настоящее время'}))
+    blocks = after.project.document.regions[2].blocks
+    old = {block.id for block in before.project.document.regions[2].blocks}
+    at = next(index for index, block in enumerate(blocks) if block.id not in old)
+    assert blocks[at - 1].presentation.view_key == 'projects' and blocks[at + 1].presentation.view_key == 'other_projects'
+    assert period_lines(after, 'New Co') == ['01.2024 – по настоящее время']
+    assert undone(before, after, result)
+    closed, _ = applied(before, request(before, 'add', kind='employment', values={'employer': 'Old Co', 'start': '2010', 'end': ''}))
+    assert period_lines(closed, 'Old Co') == ['2010']
+
+
+def test_a_job_after_its_view_went_brings_the_title_back_where_the_import_puts_it(before):
+    region = before.project.document.regions[2]
+    gone = {block.id for top in region.blocks if top.presentation.view_key == 'projects' for block in [top, *top.children]}
+    region.blocks = [block for block in region.blocks if block.id not in gone]
+    for row in before.project.import_coverage:
+        row.block_ids = [identifier for identifier in row.block_ids if identifier not in gone]
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    after, _ = applied(before, request(before, 'add', kind='employment', values={'employer': 'New Co'}))
+    assert main_views(after).index('projects') == 1 and main_views(after)[2] == 'other_projects'
+    assert lines(after, 'projects')[0] == 'New Co'
+
+
+def test_a_field_with_no_occurrence_joins_the_line_of_its_node(before):
+    language = record(before, 'language')
+    after, result = applied(before, request(before, 'edit', record_id=language.id, values={'level': 'B2'}))
+    assert lines(after, 'languages') == ['English B2']
+    assert undone(before, after, result)
+    education = record(before, 'education')
+    after, _ = applied(before, request(before, 'edit', record_id=education.id, values={'specialty': 'CS', 'completion': '2019'}))
+    assert lines(after, 'education') == ['Example Institute', '2019', 'CS']
+
+
+def test_a_field_before_a_shown_part_goes_first_and_a_new_line_keeps_the_prefix(before):
+    target = job(before, 'Example Labs')
+    line = next(block for block in before.project.document.blocks() if block.presentation is not None
+        and block.presentation.view_key == 'projects' and block.presentation.node_index == 0)
+    line.content = [line.content[2]]
+    role = next(block for block in before.project.document.blocks() if block.presentation is not None
+        and block.presentation.view_key == 'projects' and block.presentation.node_index == 4)
+    section = next(block for block in before.project.document.blocks() if block.type == 'section' and line in block.children)
+    section.children.remove(role)
+    for row in before.project.import_coverage:
+        row.block_ids = [identifier for identifier in row.block_ids if identifier != role.id]
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    after, _ = applied(before, request(before, 'edit', record_id=target.id, values={'employer': 'Renamed', 'role': 'lead'}))
+    assert lines(after, 'projects')[0] == 'Renamed — Queue Platform'
+    assert 'Роль: lead' in lines(after, 'projects')
+
+
+def test_the_plan_leaves_out_fields_without_a_place_and_periods_a_job_cannot_take(before):
+    plan = editor_plan(before.project)
+    candidate, old, labs = record(before, 'candidate'), job(before, 'Old Systems'), job(before, 'Example Labs')
+    assert plan['unshownFields'] == {candidate.id: ['location'], old.id: ['role']}
+    assert plan['jobs'][labs.id]['addPeriod'] is True and 'addPeriod' not in plan['jobs'][old.id]
+    command = request(before, 'add_period', record_id=old.id)
+    with pytest.raises(ValueError):
+        prepare_edit(response(before), command)
+    assert prepare_edit(response(before), request(before, 'add_period', record_id=labs.id)).mutation is not None
+
+
+def test_the_plan_names_the_lines_a_move_stays_in(before):
+    lined = editor_plan(before.project)['technologyLines']
+    names = {value.id: value.display.raw_text for value in before.project.facts.records if value.kind == 'technology'}
+    assert [[names[identifier] for identifier in line] for line in lined] == [['Python', 'PostgreSQL', 'Docker'], ['Python', 'Perl']]
+
+
+def prose(before, name):
+    """A paragraph of its own text around a technology, as a same-project semantic paste leaves it."""
+    target = record(before, 'technology', name, job=False)
+    block = next(value for value in before.project.document.blocks() if value.presentation is not None
+        and value.presentation.view_key == 'summary' and value.type == 'paragraph')
+    ref = block.presentation
+    block.content = [literal('Ten years of ', ref), FieldOccurrence(type='fact_field', bindingId='prose-fragment',
+        bindingRootId='prose', recordId=target.id, fieldKey='display', cellId=field_key(target.id, 'display'),
+        occurrenceId='prose', complete=True, presentation=ref, text=name, styles={},
+        syncedFactRevision=target.display.revision), literal(' in production at scale.', ref)]
+    return WorkspaceV7.model_validate(before.model_dump(by_alias=True)), target
+
+
+def test_removing_a_technology_named_in_authored_prose_is_refused_and_keeps_the_prose(before):
+    before, target = prose(before, 'Perl')
+    with pytest.raises(ValueError, match='PANEL_LINE_SHARED'):
+        prepare_edit(response(before), request(before, 'remove', record_id=target.id))
+    assert lines(before, 'summary') == ['Ten years of Perl in production at scale.']
+
+
+def compressed(before):
+    """Three jobs in the compressed line, as the materializer joins several."""
+    middle = job(before, 'Old Systems')
+    extra = [middle.model_copy(deep=True), middle.model_copy(deep=True)]
+    for value, identifier, name in zip(extra, ('record-old-a', 'record-old-b'), ('Older A', 'Older B')):
+        value.id, value.employer.raw_text, value.employer.value = identifier, name, name
+        value.periods[0].id = 'period-' + identifier
+    before.project.facts.records.extend(extra)
+    block = next(value for value in before.project.document.blocks() if value.presentation is not None
+        and value.presentation.view_key == 'other_projects' and value.type == 'paragraph')
+    span, ref = block.content[0], block.presentation
+    def shown(value):
+        return span.model_copy(update={'binding_id': 'fragment-' + value.id, 'binding_root_id': 'root-' + value.id,
+            'occurrence_id': 'root-' + value.id, 'record_id': value.id, 'cell_id': field_key(value.id, 'employer'),
+            'text': value.employer.raw_text}, deep=True)
+    block.content = [shown(extra[0]), literal(', ', ref), span, literal(', ', ref), shown(extra[1])]
+    return WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+
+
+def test_removing_a_job_from_a_joined_line_takes_its_separator_and_the_last_takes_the_title(before):
+    before = compressed(before)
+    after, result = applied(before, request(before, 'remove', record_id=job(before, 'Old Systems').id))
+    assert lines(after, 'other_projects') == ['Older A, Older B']
+    assert undone(before, after, result)
+    after, _ = applied(after, request(after, 'remove', record_id=job(after, 'Older A').id, identifier='remove-a'))
+    assert lines(after, 'other_projects') == ['Older B']
+    after, _ = applied(after, request(after, 'remove', record_id=job(after, 'Older B').id, identifier='remove-b'))
+    assert 'other_projects' not in views(after)
+
+
+def test_a_computed_focus_line_follows_job_dates_and_technologies(before):
+    docker = shown_in(before, 'infrastructure')
+    added, _ = applied(before, request(before, 'add_to_focus', record_id=docker))
+    assert focus_detail(added, 'Docker') == '4 года'
+    moved, result = applied(added, period_edit(added, 'Example Labs', start='2010-03'))
+    assert focus_detail(moved, 'Docker') == '14 лет'
+    assert undone(added, moved, result)
+    # The stated experience of the imported row is no computed line, and the user's own text stays.
+    assert focus_detail(moved, 'Python') == '3 years'
+    line = next(block for block in added.project.document.blocks() if block.presentation is not None
+        and block.presentation.view_key == 'focus' and ''.join(getattr(part, 'text', '') for part in block.content) == '4 года')
+    line.content[0].text = 'давно'
+    typed = WorkspaceV7.model_validate(added.model_dump(by_alias=True))
+    kept, _ = applied(typed, period_edit(typed, 'Example Labs', start='2010-03'))
+    assert focus_detail(kept, 'Docker') == 'давно'
+
+
+def focus_detail(workspace, name):
+    rows = {lines_of[0]: lines_of[1:] for lines_of in ([''.join(getattr(part, 'text', '') for part in child.content)
+        for child in block.children] for block in workspace.project.document.blocks()
+        if block.type == 'section' and block.presentation is not None and block.presentation.view_key == 'focus')}
+    return rows[name][0]

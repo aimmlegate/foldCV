@@ -15,6 +15,8 @@ PROJECT_CEILING_BYTES = PROJECT_MEGABYTES[2] * MIB
 # An archive keeps its earlier allowance for sources, images and the package next to the project file.
 ARCHIVE_EXPANDED_BYTES = PROJECT_CEILING_BYTES + 44 * MIB
 ARCHIVE_BYTES = ARCHIVE_EXPANDED_BYTES + 4 * MIB
+# Every archive entry but the project file. An import history file is refused above it, so each one fits an archive.
+ARCHIVE_ENTRY_BYTES = 32 * MIB
 # Background storage holds a full copy of the project file during each save, plus history.
 BACKGROUND_FACTOR = 2
 GLOBAL_PROJECTS = 8
@@ -26,6 +28,8 @@ FINALIZATION_CEILING_SECONDS = FINALIZATION_BASE_SECONDS + SAVE_SECONDS_PER_MEGA
 # One encoded undo inverse, and the DOCX render worker threads.
 INVERSE_BYTES = 512 * 1024
 RENDER_WORKERS = 2
+# A rewrite instruction; a saved Rules preset is sent as one, so it has to fit.
+REWRITE_INSTRUCTION_CHARS = 8000
 
 
 @dataclass
@@ -34,7 +38,8 @@ class UserLimits:
     project_megabytes: int = PROJECT_MEGABYTES[0]
 
 
-# The service applies saved Settings here at startup and after each save.
+# The service applies saved Settings here at startup and after each save. Production runs one app per process; a second
+# create_app in a process replaces the first app's limits, which tests/settings/test_limits.py records.
 USER_LIMITS = UserLimits()
 
 

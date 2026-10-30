@@ -9,6 +9,7 @@ import threading
 import pytest
 
 from packages.resume_core.models.template_render import TemplateRendererIdentity, TemplateSnapshotIdentity
+from packages.resume_core.project_repository import EXPORT_ATTEMPTS, ProjectRepository, blob_path
 from packages.resume_core.template_import import digest
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
@@ -119,3 +120,76 @@ def test_an_export_waits_for_the_project_lock_off_the_event_loop_and_a_cancelled
         pins, result = asyncio.run(scenario())
         assert freed == [True] and pins == 0 and result.artifact == DOCX
         assert [task['state'] for task in service.tasks.list(PROJECT)] == ['failed', 'succeeded']
+
+
+def exported(client, editor):
+    # A recorded export moves the project revision, so each export names the current snapshot.
+    snapshot = client.get('/v2/projects/' + PROJECT).json()['snapshot']
+    reply = client.post('/v2/projects/' + PROJECT + '/export', json={'schemaVersion': 1, 'editorToken': editor.token,
+        'snapshot': snapshot})
+    assert reply.status_code == 200, reply.text[:400]
+    return reply.headers['X-FoldCV-Export-Attempt']
+
+
+def test_repeated_exports_keep_one_capture_and_one_docx_so_the_project_file_stops_growing(tmp_path):
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        service = application.state.projects
+        service.exports._renderer, service.exports.render = RENDERER, render
+        editor = Editor(client, PROJECT)
+        directory = service.repository.open(PROJECT).directory
+        attempts = [exported(client, editor)]
+        once = (directory / 'workspace.json').stat().st_size
+        attempts += [exported(client, editor) for _index in range(EXPORT_ATTEMPTS + 4)]
+        saved = service.repository.read(PROJECT)
+        assert [value.attempt_id for value in saved.project.export_inputs] == [attempts[-1]]
+        assert [value.id for value in saved.project.renders] == [attempts[-1]]
+        assert [value.id for value in saved.project.exports] == attempts[-EXPORT_ATTEMPTS:]
+        assert [path.name for path in (directory / 'renders').iterdir()] == [blob_path(directory, 'renders', attempts[-1]).name]
+        # Only the ids of the kept records, and the bounded attempt and replay lists, can change the size.
+        assert (directory / 'workspace.json').stat().st_size < once + 2 * 1024 * (EXPORT_ATTEMPTS + 4)
+        again = client.post('/v2/projects/' + PROJECT + '/exports/' + attempts[-1] + '/retry', json={'editorToken': editor.token})
+        assert again.status_code == 200 and again.content == DOCX
+        gone = client.post('/v2/projects/' + PROJECT + '/exports/' + attempts[0] + '/retry', json={'editorToken': editor.token})
+        assert gone.status_code == 409 and gone.json()['error']['code'] == 'IMPORT_EXPORT_ATTEMPT_UNKNOWN'
+
+
+def test_validation_cost_does_not_depend_on_past_exports_and_a_saved_backlog_is_trimmed(tmp_path, monkeypatch):
+    from packages.resume_core.models import template_workspace
+    from tests.projects.test_edit_routes import typing
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        service = application.state.projects
+        service.exports._renderer, service.exports.render = RENDERER, render
+        editor = Editor(client, PROJECT)
+        exported(client, editor)
+        repository = service.repository
+        directory = repository.open(PROJECT).directory
+        current = repository.read(PROJECT)
+        # A project saved before the limit: many captures, render records and DOCX files.
+        backlog = current.model_copy(deep=True)
+        project = backlog.project
+        for index in range(5):
+            identifier = 'export-old-' + str(index)
+            project.exports.insert(0, project.exports[-1].model_copy(update={'id': identifier}))
+            capture = project.export_inputs[-1].model_copy(update={'attempt_id': identifier})
+            project.export_inputs.insert(0, capture)
+            project.renders.insert(0, project.renders[-1].model_copy(update={'id': identifier}))
+            path = blob_path(directory, 'renders', identifier)
+            path.write_bytes(DOCX)
+            path.chmod(0o600)
+        target = directory / 'workspace.json'
+        target.write_bytes(backlog.model_dump_json(by_alias=True).encode())
+        target.chmod(0o600)
+        assert len(repository.read(PROJECT).project.export_inputs) == 6
+        validated, seen = template_workspace.validated_with_history, []
+
+        def counting(workspace):
+            seen.append(len(workspace.project.export_inputs))
+            return validated(workspace)
+
+        monkeypatch.setattr(template_workspace, 'validated_with_history', counting)
+        editor = Editor(client, PROJECT)
+        editor.edit(typing(editor, 'Human', 'after-backlog'))
+        assert seen == [1] and len(repository.read(PROJECT).project.renders) == 1
+        repository.close(PROJECT)
+        assert len(list((directory / 'renders').iterdir())) == 1
+        assert len(ProjectRepository(tmp_path / 'data').read(PROJECT).project.export_inputs) == 1

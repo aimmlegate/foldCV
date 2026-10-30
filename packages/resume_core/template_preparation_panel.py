@@ -2,29 +2,21 @@
 
 from .models.rich_document import FactFieldSpan
 from .models.template_authoring import BuiltinPanel, DeleteEntity
-from .models.template_document import BoundLink, FieldOccurrence, PresentedText, TemplateHeadingBlock
+from .models.template_document import BoundLink, PresentedText, TemplateHeadingBlock, TemplateSectionBlock
 from .rich_fields import field_key, inline_groups, occurrences, set_text, working_field
 from .template_anchors import anchor_steps
 from .template_facts import delete_subject
-from .template_panel_values import period_endpoint, period_field_id
+from .template_panel_lines import block_node, node_labels, show_fields, sibling_lists, sync_period_lines, template_literal
+from .template_panel_values import field_occurrence, period_endpoint, period_field_id, written_dates
 from .template_preparation_blocks import changed_block_steps
-from .template_preparation_common import allocator_for, finish_preparation, prepared_response, validate_preparation
+from .template_preparation_common import allocator_for, finish_preparation, next_facts, prepared_response, validate_preparation
 from .templates.materialize_nodes import literal, locale_text, reference
 
 # Panel refusals the user can act on; the edit route answers with these codes instead of a generic rejection.
 PANEL_REFUSALS = frozenset({'PANEL_ACTION_UNSUPPORTED', 'PANEL_LINE_SHARED', 'PANEL_OWNER_INVALID', 'TECHNOLOGY_DUPLICATE',
     'TECHNOLOGY_NAME_REQUIRED', 'TECHNOLOGY_GROUP_REQUIRED', 'TECHNOLOGY_LINE_MISSING', 'TECHNOLOGY_MOVE_INVALID',
-    'TECHNOLOGY_TARGET_MISSING', 'FOCUS_DUPLICATE', 'FOCUS_SCOPE_INVALID', 'FOCUS_VIEW_MISSING'})
-
-
-def sibling_lists(document):
-    """Each list of sibling blocks: a region's blocks and every block's children."""
-    def visit(items):
-        yield items
-        for block in items:
-            yield from visit(block.children)
-    for region in document.regions:
-        yield from visit(region.blocks)
+    'TECHNOLOGY_TARGET_MISSING', 'FOCUS_DUPLICATE', 'FOCUS_FULL', 'FOCUS_SCOPE_INVALID', 'FOCUS_VIEW_MISSING',
+    'FOCUS_ICON_UNKNOWN'})
 
 
 def view_title(block, view=None):
@@ -70,13 +62,20 @@ def restore_view(document, package, view, blocks, allocator, kind):
     return True
 
 
-def field_occurrence(allocator, kind, record, key, ref, *seed):
-    """A complete bound occurrence of one record field, with ids from the panel's allocation seeds."""
-    value = working_field(record, key)
-    root = allocator.allocate('occurrence', [f'panel-{kind}-occurrence', record.id, *seed])
-    return FieldOccurrence(type='fact_field', bindingId=allocator.allocate('fragment', [f'panel-{kind}-fragment', root]),
-        bindingRootId=root, recordId=record.id, fieldKey=key, cellId=field_key(record.id, key), occurrenceId=root,
-        complete=True, presentation=ref, text=value.raw_text, styles={}, syncedFactRevision=value.revision)
+def _drop_joined_entries(project, removed):
+    """Removed records leave list lines with their separators; returns the lines left empty, with their labels."""
+    emptied = set()
+    for block in project.document.blocks():
+        node = block_node(project.template_package, block)
+        if node is None or node.type not in {'join_items', 'tags'} or not isinstance(block.content, list):
+            continue
+        prefix, entries, trailing = _split_technology_line(block.content, _joined_entry)
+        kept = [entry for entry in entries if entry[0] not in removed]
+        if len(kept) != len(entries):
+            block.content[:] = _join_technology_line(prefix, kept, trailing)
+            if not kept and not block.children and line_is_list(project.template_package, block):
+                emptied.add(block.id)
+    return emptied | node_labels(project, emptied)
 
 
 def _delete_entity(workspace, record_id, revision, action_id):
@@ -90,10 +89,11 @@ def _delete_entity(workspace, record_id, revision, action_id):
     remaining = {value.id for value in [*facts.records, *facts.extensions] if getattr(value, 'active', True)}
     removed = records.keys() - remaining
     candidate = project.model_copy(deep=True)
+    emptied = _drop_joined_entries(candidate, removed)
     views = set()
     def prune(items):
         for block in list(items):
-            if getattr(block.props, 'record_id', None) in removed:
+            if getattr(block.props, 'record_id', None) in removed or block.id in emptied:
                 views.add(block.presentation.view_key if block.presentation is not None else None)
                 items.remove(block)
                 continue
@@ -105,6 +105,9 @@ def _delete_entity(workspace, record_id, revision, action_id):
                         raise ValueError('semantic link deletion needs its dedicated adapter')
                 content[:] = [span for span in content if not isinstance(span, FactFieldSpan) or span.record_id not in removed]
             block.provenance = [value for value in block.provenance if getattr(value, 'record_id', None) not in removed]
+            if isinstance(block, TemplateSectionBlock) and not block.children and not block.content \
+                    and block.presentation is not None and block.presentation.view_key in views:
+                items.remove(block)
     for region in candidate.document.regions:
         prune(region.blocks)
     # A job's technology in Focus takes its row; the Focus title goes with the last one.
@@ -205,7 +208,18 @@ def _display_entry(span):
     return isinstance(span, FactFieldSpan) and span.field_key == 'display' and getattr(span, 'complete', True)
 
 
-def _split_technology_line(content):
+def _joined_entry(span):
+    return isinstance(span, FactFieldSpan) and getattr(span, 'complete', True)
+
+
+def line_is_list(package, block):
+    """Whether a line's literals are only what its node writes: its prefix and separators, not authored wording."""
+    node = block_node(package, block)
+    words = (locale_text(node.prefix, package.definition.template.default_locale), node.separator) if node is not None else ()
+    return all(template_literal(span.text, *words) for span in block.content if isinstance(span, PresentedText))
+
+
+def _split_technology_line(content, entry=_display_entry):
     """A tags line is a fixed prefix, then one entry per technology, then a trailing tail.
     The nodes between entries are the separator that travels with the following entry."""
     prefix, entries, bucket, spans, record = [], [], [], [], None
@@ -215,12 +229,12 @@ def _split_technology_line(content):
             entries.append((record, bucket, spans))
             bucket, spans, record = [], [], None
     for span in content:
-        if _display_entry(span) and (record is None or record == span.record_id):
+        if entry(span) and (record is None or record == span.record_id):
             if record is None:
                 record = span.record_id
             spans.append(span)
             continue
-        if _display_entry(span):
+        if entry(span):
             flush()
             record, spans = span.record_id, [span]
             continue
@@ -322,8 +336,11 @@ def _employment_change(workspace, command, allocator, action_id):
         return None
     for key in selected:
         set_text(updated, key, command.values[key])
+    written_dates(workspace.project.facts, original, updated, selected)
     candidate = workspace.project.model_copy(deep=True)
     _patch_displays(workspace.project, candidate, original, updated, selected, removed_periods, allocator)
+    sync_period_lines(workspace.project, candidate, original, updated, selected, removed_periods, allocator)
+    show_fields(candidate, updated, {key for key in selected if not key.startswith('period:')}, allocator)
     steps = [{'kind': 'put_record', 'beforeRevision': original.revision, 'record': updated.model_dump(by_alias=True)}]
     for cell, scope_id in workspace.project.facts.builtin_manual_scopes.items():
         if cell in {field_key(original.id, key) for key in selected} or any(
@@ -333,7 +350,7 @@ def _employment_change(workspace, command, allocator, action_id):
     return candidate, steps
 
 
-def prepare_panel_edit(response, request, *, occupied=None):
+def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
     validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
@@ -353,7 +370,7 @@ def prepare_panel_edit(response, request, *, occupied=None):
         records = {value.id: value.kind for value in workspace.project.facts.records}
         kind = records.get(command.record_id) if command.record_id is not None else command.record_kind
         if command.operation in FOCUS_OPERATIONS:
-            prepared = prepare_focus(workspace, command, allocator)
+            prepared = prepare_focus(workspace, command, allocator, remembered)
         elif command.operation == 'add' and command.record_kind == 'technology':
             prepared = add_technology(workspace.project, operation, allocator)
         elif command.operation in {'edit', 'remove', 'clear_technologies'} and kind not in {None, 'employment'}:
@@ -368,10 +385,7 @@ def prepare_panel_edit(response, request, *, occupied=None):
         elif command.operation in {'add', 'add_period'}:
             from .template_panel_creation import create_employment, create_period
             create = create_employment if command.operation == 'add' else create_period
-            candidate, steps = create(workspace, operation, allocator)
-            tree, replacements = changed_block_steps(workspace.project.document, candidate.document)
-            steps += tree + [value.model_dump(by_alias=True) for value in anchor_steps(workspace.project, replacements)]
-            return finish_preparation(response, request, allocator, steps, candidate, kind='panel')
+            prepared = create(workspace, operation, allocator)
         else:
             prepared = _employment_change(workspace, command, allocator, request.capture.action_id)
         if prepared is None:
@@ -379,6 +393,9 @@ def prepare_panel_edit(response, request, *, occupied=None):
         candidate, steps = prepared
     else:
         raise ValueError('panel preparation needs a panel or entity operation')
+    if steps:
+        from .template_panel_focus import refresh_durations
+        refresh_durations(workspace, candidate, next_facts(response, request, steps), allocator)
     tree, replacements = changed_block_steps(workspace.project.document, candidate.document)
     steps += tree + [value.model_dump(by_alias=True) for value in anchor_steps(workspace.project, replacements)]
     return finish_preparation(response, request, allocator, steps, candidate, kind='panel')

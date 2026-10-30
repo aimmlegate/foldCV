@@ -22,14 +22,14 @@ from .errors import ProjectFailure
 
 
 class ExportCommand(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     schema_version: Literal[1] = Field(alias='schemaVersion')
     snapshot: TemplateSnapshotIdentity
     editor_token: str = Field(alias='editorToken', min_length=1)
 
 
 class ExportRetry(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, strict=True, extra='forbid')
     editor_token: str = Field(alias='editorToken', min_length=1)
 
 
@@ -105,7 +105,7 @@ class ExportService:
             docxSha256=digest, docxSize=len(artifact), docxPath='renders/' + attempt.id + '.docx')
         with session.lock:
             # The record changes no undoable key, so it goes on the current workspace: commits made during the render
-            # stay, and the attempt keeps the snapshot it rendered.
+            # stay, and the attempt keeps the snapshot it rendered. The commit keeps only the latest capture and render.
             current = session.workspace
             updated = current.model_copy(deep=True)
             updated.project.exports.append(attempt)
@@ -114,6 +114,7 @@ class ExportService:
             self.projects.repository.replace(session.project_id, base_revision=current.project_revision, workspace=updated,
                 reason='export', blobs=[('renders', attempt.id, artifact, digest)], client_mutation_id='export-' + attempt.id,
                 request_sha256=hashlib.sha256(attempt.id.encode()).hexdigest())
+            self.projects.repository.sweep_renders(session.project_id)
         return ExportResult(attempt, prepared.captured.snapshot, artifact)
 
 
@@ -168,7 +169,7 @@ async def production_render(request, *, temp_root, worker_slot, renderer, cleanu
         cleanup_error(error)
         raise ProjectFailure(error.code, 503) from None
     except RenderFailure as error:
-        raise ProjectFailure(error.code, 422) from None
+        raise ProjectFailure(error.code, 422, **error.details) from None
     except asyncio.TimeoutError:
         raise ProjectFailure('RENDER_FAILED', 422) from None
     finally:

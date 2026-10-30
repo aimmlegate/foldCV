@@ -18,9 +18,10 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import zlib
 import certifi
 
+from packages.resume_core import agent_limits as limits
 from packages.resume_core.host import WINDOWS, Confined
 from packages.resume_core.assistant_store import AgentFailure, identity, timestamp
-from packages.resume_core.models.agent import AgentWebSource
+from packages.resume_core.models.agent import AgentWebSource, wire_bytes
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles, SpikeError, python_worker, safe_environment
 
@@ -186,6 +187,17 @@ def fetch_page(url, *, resolver=socket.getaddrinfo, connector=PinnedConnection, 
     except (OSError, ValueError, zlib.error, http.client.HTTPException):
         raise AgentFailure("AGENT_SOURCE_UNAVAILABLE") from None
     raise AgentFailure("AGENT_SOURCE_UNAVAILABLE")
+
+
+def bind_run(source, run_id):
+    """The source with its run's id. The fetch measured a shorter placeholder id, and a saved source over the limit would
+    refuse every later read of its conversation."""
+    bound = source.model_copy(update={"run_id": run_id})
+    excess = len(wire_bytes(bound)) - limits.SOURCE_BYTES
+    if excess > 0:
+        # A character is at least one byte, so one cut is enough.
+        bound.text, bound.truncated = bound.text[:-excess], True
+    return AgentWebSource.model_validate(bound.model_dump(mode="json", by_alias=True))
 
 
 class PublicFetcher:

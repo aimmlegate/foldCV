@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { needsCheck } from "../src/rich/fact-fields";
+import { needsCheck, offeredFields, type RecordValue } from "../src/rich/fact-fields";
 
 test("fact warnings distinguish current labels and registry misses from unresolved source values", () => {
   const known = (rawText: string) => ({ rawText, value: rawText, status: "known" });
@@ -13,4 +13,20 @@ test("fact warnings distinguish current labels and registry misses from unresolv
   const technology = { kind: "technology", display: known("Custom source skill"), canonicalId: unresolved("Custom source skill") };
   assert.equal(needsCheck(technology), false);
   assert.equal(needsCheck({ ...technology, display: unresolved("Unclear skill?") }), true);
+});
+
+test("text the user typed is never a value to check", () => {
+  const typed = { rawText: "Sample Labs", value: null, status: "unresolved", userCorrected: true };
+  assert.equal(needsCheck(typed), false);
+  assert.equal(needsCheck({ kind: "employment", employer: typed }), false);
+  const present = { rawText: "н.в.", value: true, status: "known" };
+  assert.equal(needsCheck({ present, end: { rawText: "скоро", value: null, status: "unresolved", userCorrected: true } }), false);
+  assert.equal(needsCheck({ ...typed, userCorrected: false }), true);
+});
+
+test("the dialog leaves out fields the document has no place for", () => {
+  const value = (rawText: string) => ({ rawText, value: rawText, status: "known", revision: 1, pendingRawText: null, userCorrected: false });
+  const candidate = { id: "person", kind: "candidate", name: value("Alex"), title: value("Engineer"), location: value("Berlin") } as unknown as RecordValue;
+  assert.deepEqual(offeredFields(candidate).map(field => field.key), ["name", "title", "location"]);
+  assert.deepEqual(offeredFields(candidate, ["location"]).map(field => field.key), ["name", "title"]);
 });

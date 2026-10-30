@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+import threading
 
 from ..dates import month_bounds, union_months
 from ..rich_fields import records_by_id, working_field
@@ -86,6 +87,44 @@ def icon_catalog(package):
     return IconCatalog(normalized, canonical, files)
 
 
+_CATALOGS, _CATALOG_LOCK = {}, threading.Lock()
+
+
+def catalog_for(package):
+    """`icon_catalog` decoded once for the latest few packages: the Generic pack is 6.8 MB. Replies, edits and the
+    icon search run in worker threads. A catalog captured unreadable has no icons, so its rows stay text only; new
+    packages refuse it at compile."""
+    with _CATALOG_LOCK:
+        found = _CATALOGS.get(package.package_hash)
+    if found is None:
+        try:
+            found = icon_catalog(package)
+        except ValueError:
+            found = IconCatalog()
+        with _CATALOG_LOCK:
+            _CATALOGS[package.package_hash] = found
+            while len(_CATALOGS) > 4:
+                _CATALOGS.pop(next(iter(_CATALOGS)))
+    return found
+
+
+def remembered_catalog(remembered):
+    """The icons the user chose before (D122), by normalized name and by the catalog technology a name resolves to;
+    the later choice wins. Its `find` matches a row name as the template's own names do."""
+    canonical = {}
+    for name, icon in remembered.items():
+        identifier = resolve_technology(name).canonical_id
+        if identifier is not None:
+            canonical[identifier] = icon
+    return IconCatalog(dict(remembered), canonical)
+
+
+def remembered_icon(catalog, remembered, name):
+    """The icon remembered for a row name when this package has it; None keeps the package's own choice."""
+    found = remembered.find(name) if remembered is not None and name else None
+    return found if found is not None and found in catalog.files else None
+
+
 def name_keys(definition, view_key, node):
     """Cell keys of the field a Focus node shows as its name, builtin mappings included."""
     block = next(value for value in definition.blocks if value.id == view_key)
@@ -160,10 +199,12 @@ def _initial_png(font_bytes, letter):
     return output.getvalue()
 
 
-def row_icon(package, facts, row, catalog=None):
-    """The icon a Focus row shows as (key, PNG asset): the catalog's, else the template's placeholder; None shows text
-    only. Editor and DOCX use this one decision."""
+def row_icon(package, facts, row, catalog=None, chosen=None):
+    """The icon a Focus row shows as (key, PNG asset): the one the user chose for it (D122), else the catalog's, else
+    the template's placeholder; None shows text only. Editor and DOCX use this one decision."""
     catalog = icon_catalog(package) if catalog is None else catalog
+    if chosen is not None and chosen in catalog.files:
+        return chosen, catalog.files[chosen]
     name = row_name(package, facts, row)
     found = catalog.find(name) if name is not None else None
     if found is not None:
@@ -187,8 +228,8 @@ def duration_text(months, locale):
 
 def focus_durations(facts, as_of, locale):
     """Technology record id to the time the jobs listing that technology span (D104: the user chose durations counted
-    from projects when the CV states none). Overlaps count once, an ongoing job runs to the formatting date, and a
-    period without a known start or end is left out; partial dates count the middle of their range."""
+    from projects when the CV states none). Overlaps count once, no job counts past the formatting date, an ongoing job
+    runs to it, and a period without a known start or end is left out; partial dates count the middle of their range."""
     jobs = {record.id: record for record in facts.records if record.kind in {'employment', 'subproject'}}
     groups, owners = {}, {}
     for record in facts.records:
@@ -209,7 +250,7 @@ def focus_durations(facts, as_of, locale):
             if period.present.status == 'known' and period.present.value is True:
                 end = (now, now)
             elif period.end.status == 'known' and period.end.value is not None:
-                end = month_bounds(period.end.value)
+                end = tuple(min(value, now) for value in month_bounds(period.end.value))
             else:
                 continue
             start = month_bounds(period.start.value)

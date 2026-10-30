@@ -52,6 +52,78 @@ def test_source_pdf_inside_an_unexpected_archive_is_blocked():
     assert "embedded source PDF" in inspect("docs/snapshot.zip", stream.getvalue(), {})
 
 
+WORKSPACE = {"project": {"sources": [{"units": [{"text": "Candidate"}]}], "facts": {"records": []}}}
+RESUME = "Candidate\nprivate-contact@resume.local\nExperience\nEducation\n"
+
+
+def zipped(members):
+    stream = BytesIO()
+    with ZipFile(stream, "w") as archive:
+        for name, value in members.items():
+            archive.writestr(name, value)
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize("path", ["docs/backup.foldcv.bak", "docs/gui/handoffs/X/export.bin"])
+def test_a_workspace_inside_an_archive_of_any_name_is_blocked(path):
+    assert "resume workspace or source dump" in inspect(path, zipped({"workspace.json": json.dumps(WORKSPACE)}), {})
+
+
+def test_a_source_document_inside_an_archive_of_any_name_is_blocked():
+    assert "embedded source document" in inspect("docs/backup.bak", zipped({"sources/cv.docx": "content"}), {})
+
+
+def test_synthetic_archives_keep_their_workspaces():
+    assert not inspect("tests/fixtures/synthetic/archive.zip", zipped({"workspace.json": json.dumps(WORKSPACE)}), {})
+
+
+def test_workspace_lines_are_blocked_in_any_text_file():
+    lines = (json.dumps({"event": "start"}) + "\n" + json.dumps(WORKSPACE) + "\n").encode()
+    for path in ["docs/gui/handoffs/X/run.jsonl", "docs/gui/handoffs/X/service.log", "docs/dump"]:
+        assert "resume workspace or source dump" in inspect(path, lines, {})
+
+
+def test_a_workspace_without_sources_is_not_a_source_dump():
+    lines = json.dumps({"sources": [], "facts": {"records": []}}).encode()
+    assert not inspect("docs/gui/handoffs/X/tools.jsonl", lines, {})
+
+
+@pytest.mark.parametrize("path", ["docs/gui/handoffs/X/dump.yaml", "docs/preview.html", "docs/export.csv", "docs/notes"])
+def test_contact_resume_text_is_blocked_in_any_text_file(path):
+    assert "resume text with contact details" in inspect(path, RESUME.encode(), {})
+
+
+@pytest.mark.parametrize("number", ["+7 (916) 765-43-21", "+44 20 7946 0958", "8 (916) 765-43-21"])
+def test_resume_text_with_only_a_phone_number_is_blocked(number):
+    text = f"Candidate\n{number}\nExperience\nEducation\n".encode()
+    assert "resume text with contact details" in inspect("docs/notes/import.txt", text, {})
+
+
+@pytest.mark.parametrize("value", ["+7 (999) 123-45-67", "+1 555 0100 1234", "+7 (999) 111", "id 89161234098",
+                                   "+@pytest.mark.asyncio"])
+def test_sample_numbers_ids_and_diff_decorators_are_not_contacts(value):
+    assert not inspect("docs/change.patch", f"Experience\nEducation\n{value}\n".encode(), {})
+
+
+def test_source_files_keep_their_sample_contacts_but_not_known_identities():
+    assert not inspect("docs/check.py", RESUME.encode(), {})
+    assert "known candidate contact" in inspect("docs/check.py", RESUME.encode(),
+                                                {"emails": ["private-contact@resume.local"]})
+
+
+@pytest.mark.parametrize("path", ["docs/notes.bin", "docs/page", "docs/scan.txt"])
+def test_a_pdf_is_blocked_by_its_content_under_any_name(path):
+    assert "source PDF" in inspect(path, b"%PDF-1.7 private source", {})
+    assert not inspect("tests/fixtures/synthetic/" + path, b"%PDF-1.7 synthetic source", {})
+
+
+@pytest.mark.parametrize("path", ["docs/candidate.odt", "docs/originals.tar", "docs/originals.tar.gz", "docs/originals.tgz",
+                                  "docs/originals.tar.bz2", "docs/originals.tar.xz", "docs/log.gz", "docs/originals.7z"])
+def test_document_and_archive_formats_the_guard_cannot_read_are_blocked(path):
+    assert private_path(path)
+    assert not private_path("tests/fixtures/synthetic/" + path)
+
+
 def test_contact_resume_text_is_blocked_without_any_local_candidate_list():
     text = b"Candidate\nprivate-contact@resume.local\nExperience\nEducation\n"
     assert "resume text with contact details" in inspect("notes/import.txt", text, {})

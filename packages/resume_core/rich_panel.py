@@ -29,9 +29,14 @@ class RichPanelRequest(Wire):
             "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordKind"]},
         "else": {"if": {"properties": {"operation": {"enum": ["add_to_focus", "remove_from_focus"]}}, "required": ["operation"]},
             "then": {"properties": {"recordId": {"type": "string"}, "recordKind": {"enum": [None, "technology"]},
-                "jobId": {"type": "null"}, "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordId"]}},
+                "jobId": {"type": "null"}, "periodId": {"type": "null"}, "values": {"maxProperties": 0}}, "required": ["recordId"]},
+            # A Focus row's icon: one of the template's icons, or "" for the template's own choice (D122).
+            "else": {"if": {"properties": {"operation": {"const": "set_focus_icon"}}, "required": ["operation"]},
+                "then": {"properties": {"recordId": {"type": "string"}, "recordKind": {"enum": [None, "technology"]},
+                    "jobId": {"type": "null"}, "periodId": {"type": "null"},
+                    "values": {"required": ["icon"], "maxProperties": 1}}, "required": ["recordId"]}}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
@@ -51,6 +56,10 @@ class RichPanelRequest(Wire):
             raise ValueError("TECHNOLOGY_MOVE_INVALID")
         if self.operation in {"add_to_focus", "remove_from_focus"} and (self.record_id is None
                 or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
+            raise ValueError("FOCUS_SCOPE_INVALID")
+        if self.operation == "set_focus_icon" and (self.record_id is None or self.record_kind not in {None, "technology"}
+                or self.job_id is not None or self.period_id is not None or set(self.values) != {"icon"}
+                or len(self.values["icon"]) > 128):
             raise ValueError("FOCUS_SCOPE_INVALID")
         if self.operation == "clear_technologies" and (self.record_kind != "technology" or self.record_id is not None
                 or self.period_id is not None or self.values):

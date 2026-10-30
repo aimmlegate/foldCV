@@ -334,3 +334,34 @@ async def test_with_three_calls_at_once_the_projects_block_runs_in_groups_and_sh
         (issue.code, issue.rule_id) for issue in whole_workspace.project.import_issues]
     # The outline and its review, then one call and one review per group, replace the block's call and review.
     assert spent_calls(result) == spent_calls(whole) - 2 + 2 + 2 * groups
+
+
+@pytest.mark.asyncio
+async def test_an_old_job_without_a_company_stays_in_the_document(tmp_path):
+    table = TABLES['F10'](True)
+    table['projects'][0][0]['company'] = None
+    _fixture, _result, workspace, _originals = await generic_import(tmp_path, 'F10', rewrite=True, table=table)
+    shown = views(workspace)
+    assert 'other_projects' not in shown and '2006 – 2008' in shown['projects']
+
+
+@pytest.mark.asyncio
+async def test_an_generic_repair_without_item_refs_keeps_one_record_per_job_and_technology(tmp_path):
+    def wrap(script):
+        def wrapped(request, value):
+            reply = script(request, value)
+            if value.get('slot') != 'primary_repair':
+                return reply
+            for job in reply['payload']:
+                job['results'] = []
+            return {'schemaVersion': 3, 'payload': reply['payload'], 'discoveries': None, 'fields': [], 'lineage': None, 'relations': None}
+        return wrapped
+    _fixture, result, workspace, _originals = await generic_import(tmp_path, 'F10', wrap=wrap)
+    assert 'primary_repair' in [attempt.slot for attempt in result.attempts]
+    records = workspace.project.facts.records
+    assert sorted(record.employer.raw_text for record in records if record.kind == 'employment') == ['Example Labs', 'Old Systems']
+    owned = [(record.job_id, record.display.raw_text) for record in records if record.kind == 'technology' and record.job_id]
+    assert len(owned) == len(set(owned)) == 4
+    text = '\n'.join(getattr(part, 'text', '') for block in workspace.project.document.blocks() for part in block.content)
+    assert text.count('Example Labs') == 1 and 'Old Systems, Old Systems' not in text
+    assert not result.issues

@@ -32,8 +32,10 @@ from resume_api.cli.profiles import claude  # noqa: E402
 from resume_api.launcher import claude_slot  # noqa: E402
 from resume_api.lifecycle import OperationFiles, SpikeError  # noqa: E402
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy  # noqa: E402
+from tools.claude_mp00 import separate_data_root  # noqa: E402
 
-DATA = Path.home() / "Library/Application Support/FoldCV"
+# Set from --data-root, never the app's store.
+DATA = None
 EVIDENCE = ROOT / "docs/gui/handoffs/MULTI-PROVIDER/mp05"
 LEDGER = ROOT / "docs/gui/handoffs/MULTI-PROVIDER/native-attempts.json"
 # Sonnet at its catalog default effort, which an import captures.
@@ -229,8 +231,8 @@ async def run_import(args) -> None:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=origin,
                                      headers={"Origin": origin}, timeout=120) as client:
             assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
-            assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
-            status = (await client.post("/v1/host/status", json={})).json()
+            assert (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).status_code == 200
+            status = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
             if status["state"] != "connected" or MODEL not in status["models"]:
                 raise SystemExit("Claude is not connected: " + status["state"])
             selected = await client.post("/v1/host/select", json={"model": MODEL})
@@ -373,8 +375,8 @@ async def assistant_only(args) -> None:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=wrapped), base_url=origin,
                                      headers={"Origin": origin}, timeout=120) as client:
             assert (await client.post("/v1/session/exchange", json={"secret": secret})).status_code == 200
-            assert (await client.post("/v1/host/select-provider", json={"provider": "claude_cli"})).json()["provider"] == "claude_cli"
-            status = (await client.post("/v1/host/status", json={})).json()
+            assert (await client.post("/v1/host/enable", json={"provider": "claude_cli", "enabled": True})).status_code == 200
+            status = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
             if status["state"] != "connected" or MODEL not in status["models"]:
                 raise SystemExit("Claude is not connected: " + status["state"])
             await run_assistant(client, directory.name, refused)
@@ -382,7 +384,9 @@ async def assistant_only(args) -> None:
 
 
 def main() -> None:
+    global DATA
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data-root", type=Path, required=True, help="a folder apart from the app's data root")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("schemas")
     canary_run = commands.add_parser("canary")
@@ -393,6 +397,7 @@ def main() -> None:
     importing.add_argument("--assistant", action="store_true", help="then MP06a-1 on the imported project")
     commands.add_parser("assistant").add_argument("root", help="the /private/tmp root of an earlier import")
     args = parser.parse_args()
+    DATA = separate_data_root(args.data_root)
     if args.command == "import":
         asyncio.run(run_import(args))
     elif args.command == "assistant":

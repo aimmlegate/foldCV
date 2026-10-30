@@ -2,7 +2,6 @@
   "additionalProperties": false,
   "properties": {
     "editorToken": {
-      "maxLength": 128,
       "minLength": 1,
       "title": "Editortoken",
       "type": "string"
@@ -11,6 +10,6 @@
   "required": [
     "editorToken"
   ],
-  "title": "ProjectCheckRequestV1",
+  "title": "ExportRetry",
   "type": "object"
 }

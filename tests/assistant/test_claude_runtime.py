@@ -180,6 +180,13 @@ async def test_a_sign_in_that_stays_refused_fails_after_the_second_run(tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_a_call_past_the_shared_limit_leaves_the_model_its_answer(tmp_path):
+    result, *_rest = await run(tmp_path, "many_calls")
+    assert (result.state, result.error) == ("completed", None) and result.tool_calls == limits.TOOL_CALLS + 1
+    assert result.text == "Лимит вызовов исчерпан, вот ответ."
+
+
+@pytest.mark.asyncio
 async def test_missing_usage_stays_unknown(tmp_path):
     result, events, *_rest = await run(tmp_path, "no_usage")
     assert result.state == "completed" and result.usage is None

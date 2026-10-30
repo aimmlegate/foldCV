@@ -13,6 +13,8 @@ from packages.resume_core.templates.loading import CONFIG_BYTES
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import TemplateStore, bundled_folder
 
+from .template_reasons import reason_text
+
 REVISION_TAKEN = "эта версия уже сохранена с другим содержимым; измените template.revision"
 ID_CHANGED = "template.id менять нельзя, укажите «{}»"
 
@@ -30,9 +32,8 @@ def summary(package):
         'packageHash': package.package_hash}
 
 
-def flags(package, bundled):
-    """`bundled`: the app ships this id; `edited`: the current version is not the shipped one."""
-    return {'bundled': bundled is not None, 'edited': bundled is None or package.package_hash != bundled.package_hash}
+def original(package):
+    return package.original_format, base64.b64decode(package.original_base64)
 
 
 class TemplateConfig:
@@ -41,16 +42,21 @@ class TemplateConfig:
 
     def catalog(self):
         default_id, templates = self.store.templates()
-        return {'defaultId': default_id, 'templates': [{**summary(package), **flags(package, bundled)}
+        return {'defaultId': default_id, 'templates': [{**summary(package), **self.flags(package, bundled)[1]}
             for package, bundled in templates]}
+
+    def flags(self, package, bundled):
+        """(format and bytes of the text saved last, flags). `bundled`: the app ships this id; `edited`: the current
+        version is not the shipped one, in its definition or its text."""
+        shipped = bundled is not None and package.package_hash == bundled.package_hash
+        # The same package may have been captured from an older, longer text; show the bundled file's current form.
+        source = self.store.saved_original(package) or original(bundled if shipped else package)
+        return source, {'bundled': bundled is not None, 'edited': not shipped or source != original(bundled)}
 
     def read(self, template_id):
         package, bundled = self.store.versions(template_id)
-        state = flags(package, bundled)
-        # The same package may have been captured from an older, longer text; show the bundled file's current form.
-        source = package if state['edited'] else bundled
-        return {'schemaVersion': 1, 'package': summary(package), 'format': source.original_format,
-            'text': base64.b64decode(source.original_base64).decode('utf-8'), **state}
+        (text_format, text), state = self.flags(package, bundled)
+        return {'schemaVersion': 1, 'package': summary(package), 'format': text_format, 'text': text.decode('utf-8'), **state}
 
     def compile(self, template_id, text):
         """Return (package, None) or (None, error). Assets keep the current package's bytes; new paths read the bundled
@@ -60,9 +66,10 @@ class TemplateConfig:
         try:
             package = compile_bytes(text.encode('utf-8'), bundled_folder(template_id), original_format='yaml', assets=captured)
         except SchemaFailure as error:
-            return None, {'path': error.path, 'message': error.reason}
+            return None, {'path': error.path, 'message': reason_text(error.reason)}
         except (ValueError, UnicodeError) as error:
-            return None, {'path': '/', 'message': str(error).splitlines()[0] if str(error) else type(error).__name__}
+            first = str(error).splitlines()[0] if str(error) else ''
+            return None, {'path': '/', 'message': reason_text(first)}
         if package.id != template_id:
             return None, {'path': '/template/id', 'message': ID_CHANGED.format(template_id)}
         # The bundled revision names the bundled bytes even before the store records them.
@@ -82,7 +89,7 @@ class TemplateConfig:
         package, error = self.compile(template_id, text)
         if error is not None:
             return None, {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
-        self.store.save(package)
+        self.store.save(package, keep_text=True)
         return self.read(template_id), None
 
     def reset(self, template_id):

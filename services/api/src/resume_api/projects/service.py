@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+import logging
 import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
 from packages.resume_core.project_catalog import ProjectCatalog
-from packages.resume_core.project_repository import RepositoryFailure, decode_project
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_api import TemplateProjectResponseV1, verify_response, verifying
+from packages.resume_core.template_panel_focus import icon_changes
+from packages.resume_core.templates.focus import remembered_catalog
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
 
 from .errors import ProjectFailure
 
 RESPONSES_KEPT = 4
+LOG = logging.getLogger(__name__)
 
 
 def response_for_workspace(workspace, *, generation=None):
@@ -34,10 +38,12 @@ def history_state(session):
 
 
 class ProjectService:
-    def __init__(self, repository, *, tasks=None, catalog=None):
+    def __init__(self, repository, *, tasks=None, catalog=None, icons=None):
         self.repository = repository
         self.tasks = tasks or TaskRegistry()
         self.catalog = catalog or ProjectCatalog(repository.store)
+        # The Focus icons the user chose (D122, a FocusIconStore); None keeps none.
+        self.icons = icons
         self.lock = threading.Lock()
         # Built once per committed workspace object, for the latest few projects; a hit is verified again under
         # FOLDCV_VERIFY (D108).
@@ -68,6 +74,22 @@ class ProjectService:
                 self.responses.popitem(last=False)
             self.identities[project_id] = (response.identity.title, response.identity.subtitle)
         return response
+
+    def remembered_icons(self):
+        """The Focus icons the user chose before, as rows added later look them up; None when none are kept."""
+        names = self.icons.load() if self.icons is not None else {}
+        return remembered_catalog(names) if names else None
+
+    def remember_icons(self, before, after):
+        """Later rows take the icon the user picked, took back with Undo or Redo, or reset (D122)."""
+        changes = icon_changes(before.project, after.project) if self.icons is not None else []
+        if not changes:
+            return
+        try:
+            self.icons.update(changes)
+        except (OSError, StorageFailure):
+            # The edit is saved either way; only the choice for later rows is lost.
+            pass
 
     def require_writable(self, project_id):
         if self.catalog.get(project_id).read_only:
@@ -101,15 +123,7 @@ class ProjectService:
         # workspace is never changed in place, and an evicted session has none, so its file is read.
         workspace = session.workspace if session is not None else None
         if workspace is None:
-            directory = self.repository._directory(project_id)
-            try:
-                workspace = decode_project(directory, (directory / 'workspace.json').read_bytes())
-            except ProjectStoreFailure as error:
-                raise RepositoryFailure(error.code) from None
-            except StorageFailure:
-                raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
-            except (OSError, ValueError, RecursionError):
-                raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
+            workspace, _key = self.repository._read_file(self.repository._directory(project_id), project_id)
         identity = display_identity(workspace)
         value = (identity.title, identity.subtitle)
         with self.lock:
@@ -119,11 +133,14 @@ class ProjectService:
     def open(self, project_id):
         """A fresh editor token (the previous page's token is replaced), the response, history and running tasks."""
         session = self.repository.open(project_id)
-        token = session.open_editor()
         try:
             self.catalog.update(project_id, opened=True)
         except ProjectStoreFailure as error:
-            raise RepositoryFailure(error.code) from None
+            if error.code != 'PROJECT_SAVE_FAILED':
+                raise RepositoryFailure(error.code) from None
+            # Only the recency is lost, and a page's token stays until the open can go ahead.
+            LOG.warning('last opened time not saved')
+        token = session.open_editor()
         with session.lock:
             workspace = session.workspace
             history = history_state(session)
@@ -137,8 +154,7 @@ class ProjectService:
         session = self.repository.open(project_id)
         self.require_writable(project_id)
         with session.lock:
-            if request.editor_token is not None:
-                session.require_editor(request.editor_token)
+            session.require_editor(request.editor_token)
             renamed = session.workspace.model_copy()
             renamed.title, renamed.title_manually_set = request.title.strip(), True
             self.repository.replace(project_id, base_revision=request.base_revision, workspace=renamed, reason='rename')

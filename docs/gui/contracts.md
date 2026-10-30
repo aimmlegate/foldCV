@@ -10,11 +10,12 @@ field or meaning needs a new version, with no implicit fallback.
 
 ## Contract list
 
-`CONTRACTS` in `tools/generate_contracts.py`, 65 models at `405b9d06`:
+`CONTRACTS` in `tools/generate_contracts.py`, 69 models:
 
 | Group | Contracts |
 |---|---|
 | Project routes (`models/projects.py`, `PROJECT_CONTRACTS`) | `history_state_v1`, `task_status_v1`, `project_open_result_v1`, `edit_request_v1`, `edit_result_v1`, `history_request_v1`, `clipboard_capture_request_v1`, `revision_conflict_v1`, `rename_request_v1`, `delete_request_v1`, `rewrite_preview_request_v1`, `rewrite_cancel_request_v1` |
+| Project route bodies the service modules define (`resume_api/projects`) | `import_command`, `export_command`, `export_retry`, `archive_download` |
 | Template editing and project files | `template_project_response_v1`, `template_edit_preparation_v1`, `template_clipboard_capture_v1`, `template_rewrite_preview_v1`, `template_snapshot_identity`, `rich_document_v2`, `workspace_v7`, `archive_manifest_v7`, `template_import_v1` (import operation sidecar), `template_render_request_v1` (render worker input), `template_definition`, `template_package` |
 | V6 parts the V7 models are built from and the client still types | `working_facts`, `rich_document_v1`, `rich_panel_request` |
 | Assistant (`models/assistant.py`, `ASSISTANT_CONTRACTS`) | `assistant_error_v1`, `assistant_run_request_v2`, `assistant_run_v1`, `assistant_conversation_v1`, `assistant_conversation_list_v1`, `assistant_messages_v1`, `assistant_events_v1`, `assistant_change_proposal_v1`, `assistant_change_proposal_list_v1`, `assistant_apply_request_v1`, `assistant_apply_result_v1`, `assistant_skill_list_v1`, `propose_changes_v1`, `publish_findings_v1`, `assistant_capabilities_v1`, `assistant_file_v1` |

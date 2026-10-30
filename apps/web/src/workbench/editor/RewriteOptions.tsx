@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { preferencesRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
-import { ConnectionWorkflow, type ConnectionSnapshot } from "../../connection/workflow";
+import { ConnectionWorkflow, modelGroups, type ConnectionSnapshot } from "../../connection/workflow";
 import { isReasoningEffort } from "../../connection/reasoning";
 import type { Preferences } from "../../contracts/generated/preferences";
 import { errorMessage } from "../../errors/messages";
 import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSelect";
+import { ModelOptions } from "../settings/ModelSelect";
 
 type Saved = Pick<Preferences, "selectedRewriteModel" | "rewriteReasoningEffort">;
 export type RewriteSettings = { catalog: ConnectionSnapshot | null; saved: Saved | null; saving: boolean; error: string;
@@ -34,7 +35,7 @@ export function useRewriteSettings(open: boolean): RewriteSettings {
 }
 
 export function RewriteOptions({ settings, disabled }: { settings: RewriteSettings; disabled: boolean }) {
-  const { catalog, saved } = settings, models = catalog?.models ?? [];
+  const { catalog, saved } = settings;
   const chosen = saved?.selectedRewriteModel ?? null, model = chosen ?? catalog?.selectedModel ?? null;
   const reasoning = model ? catalog?.modelReasoning?.[model] : undefined, supported = reasoning?.supported ?? [];
   // A saved level this model lacks runs at the model's default, so the default is what is shown.
@@ -45,8 +46,7 @@ export function RewriteOptions({ settings, disabled }: { settings: RewriteSettin
       <select className="model-select" id="rewrite-panel-model" value={chosen ?? ""} disabled={off}
         onChange={event => settings.chooseModel(event.currentTarget.value || null)}>
         <option value="">{catalog?.selectedModel ? `Модель обработки · ${catalog.selectedModel}` : "Модель обработки"}</option>
-        {(chosen && !models.includes(chosen) ? [chosen, ...models] : models).map(name =>
-          <option key={name} value={name} disabled={!models.includes(name)}>{name}{models.includes(name) ? "" : " · недоступна"}</option>)}
+        <ModelOptions groups={modelGroups(catalog)} value={chosen} />
       </select></div>
     <div><label htmlFor="rewrite-panel-effort">Рассуждения</label>
       <select className="model-select" id="rewrite-panel-effort" value={effort ?? ""} disabled={off || !supported.length}
