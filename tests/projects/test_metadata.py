@@ -1,5 +1,7 @@
 """Rename and archive flags update the registry and write no journal line (plan SR04)."""
 
+import pytest
+
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 
@@ -34,3 +36,20 @@ def test_rename_and_archive_flags_do_not_journal(tmp_path):
         current = service.repository.read(PROJECT)
         assert current.formatting_as_of.year == 2026 and current.formatting_as_of.month == 1
         assert journal_bytes(service.repository) == before
+
+
+@pytest.mark.parametrize('token', [{}, {'editorToken': None}, {'editorToken': ''}], ids=['absent', 'null', 'empty'])
+def test_rename_needs_an_editor_token(tmp_path, token):
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        editor = Editor(client, PROJECT)
+        reply = editor.refused('post', '/rename', {**token, 'baseRevision': editor.revision, 'title': 'Taken over'}, 422)
+        assert reply['error']['code'] == 'INVALID_REQUEST'
+        assert application.state.projects.repository.read(PROJECT).title != 'Taken over'
+
+
+def test_a_replaced_page_cannot_rename(tmp_path):
+    with v2_app(tmp_path, [papers()]) as (client, _application):
+        stale = Editor(client, PROJECT)
+        Editor(client, PROJECT)
+        reply = stale.refused('post', '/rename', {'editorToken': stale.token, 'baseRevision': stale.revision, 'title': 'Late'}, 409)
+        assert reply['error']['code'] == 'EDITOR_REPLACED'

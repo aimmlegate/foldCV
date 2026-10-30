@@ -154,8 +154,7 @@ class ProjectService:
         session = self.repository.open(project_id)
         self.require_writable(project_id)
         with session.lock:
-            if request.editor_token is not None:
-                session.require_editor(request.editor_token)
+            session.require_editor(request.editor_token)
             renamed = session.workspace.model_copy()
             renamed.title, renamed.title_manually_set = request.title.strip(), True
             self.repository.replace(project_id, base_revision=request.base_revision, workspace=renamed, reason='rename')

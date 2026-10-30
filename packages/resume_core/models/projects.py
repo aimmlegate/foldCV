@@ -107,7 +107,7 @@ class RevisionConflictV1(Wire):
 
 
 class RenameRequestV1(Wire):
-    editor_token: str | None = Field(default=None, max_length=128)
+    editor_token: str = Field(min_length=1, max_length=128)
     base_revision: Revision
     title: str = Field(min_length=1, max_length=200)
 
