@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import { templateSchema } from "../src/rich/template-schema";
+import { disabledExtensions, templateSchema } from "../src/rich/template-schema";
 import { selectedBlocks, textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { templateSheet } from "../src/rich/v7-presentation";
@@ -581,4 +582,14 @@ test("N04/CT08: the mounted sheet reads the second template's columns, type and 
     assert.ok(body && sheet.css.includes(`[data-fcv-style="${body}"]`) && /font-size: 11pt/.test(sheet.css));
     assert.equal(sheet.logo, null);
   } finally { session.close(); await value.close(); }
+});
+
+test("no BlockNote input rule is left that the session would only refuse", () => {
+  const editor = BlockNoteEditor.create({ schema: templateSchema, disableExtensions: disabledExtensions });
+  assert.deepEqual([...editor.extensions].filter(([, extension]) => extension.inputRules?.length).map(([key]) => key), []);
+});
+
+test("an empty region offers no control without a saved operation", () => {
+  const source = readFileSync(new URL("../src/rich/editor-schema.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /<button|addText/u);
 });

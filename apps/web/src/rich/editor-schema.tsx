@@ -1,18 +1,11 @@
 import { BlockNoteSchema, defaultBlockSpecs, defaultInlineContentSpecs, parseDefaultProps } from "@blocknote/core";
 import { createReactBlockSpec, createReactInlineContentSpec } from "@blocknote/react";
-import { createContext, useContext } from "react";
 import { image } from "./Image";
 import { allowRichCodeStyles, allowRichColors } from "./styles";
 
-export const EditorActions = createContext<{ addText: (id: string) => void }>({ addText: () => {} });
 const region = createReactBlockSpec({ type: "region", content: "none", propSchema: {
   role: { default: "main", values: ["header", "sidebar", "main"] },
-} }, { render: function RegionMarker({ block }) {
-  const { addText } = useContext(EditorActions);
-  const label = block.props.role === "header" ? "шапку" : block.props.role === "sidebar" ? "левую колонку" : "основной текст";
-  return <div className="cv-region-marker" contentEditable={false}>{!block.children.length &&
-    <button type="button" className="uir-empty-region" aria-label={`Добавить текст в ${label}`} onClick={() => addText(block.id)}>Добавить текст</button>}</div>;
-} });
+} }, { render: () => <div className="cv-region-marker" contentEditable={false} /> });
 const section = createReactBlockSpec({ type: "section", content: "inline", propSchema: {
   recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] }, manualOrder: { default: false },
   textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
