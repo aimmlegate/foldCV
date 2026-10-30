@@ -77,7 +77,11 @@ class ProjectStore:
                 raise ProjectStoreFailure("PROJECT_NOT_FOUND")
             private_directory(directory)
         owned_file(marker, 4096)
-        if strict_json(marker.read_bytes()) != {"version": 1, "projectId": id}:
+        try:
+            identity = strict_json(marker.read_bytes())
+        except (ValueError, RecursionError):
+            raise StorageFailure("UNSAFE_STORAGE") from None
+        if identity != {"version": 1, "projectId": id}:
             raise StorageFailure("UNSAFE_STORAGE")
         return directory
 

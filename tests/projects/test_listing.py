@@ -1,6 +1,8 @@
 """GET /v2/projects and the response cache: one unreadable project is an error entry, an unloaded session lists its
 heading from the file, and responses are kept for the four latest projects only."""
 
+import json
+
 import pytest
 
 from packages.resume_core.project_repository import ProjectRepository, blob_path
@@ -34,6 +36,34 @@ def test_one_unreadable_project_is_an_error_entry_and_the_others_keep_their_head
         assert value['errors'] == [{'projectId': FIRST, 'errorCode': code}]
         entries = {entry['projectId']: entry for entry in value['entries']}
         assert set(entries) == {FIRST, OTHER} and entries[OTHER]['title'] == other['identity']['title']
+
+
+@pytest.mark.parametrize(('damage', 'code'), [('marker', 'PROJECT_UNSAFE_STORAGE'), ('package', 'PROJECT_LOAD_FAILED'),
+    ('assets', 'PROJECT_LOAD_FAILED'), ('history', 'PROJECT_LOAD_FAILED'), ('symlink', 'PROJECT_UNSAFE_STORAGE')])
+def test_a_damaged_project_is_listed_as_unopenable_and_open_gives_the_same_code(tmp_path, damage, code):
+    with v2_app(tmp_path, projects()) as (_client, application):
+        directory = application.state.projects.repository.open(FIRST).directory
+    target = directory / 'workspace.json'
+    if damage == 'marker':
+        (directory / '.project-identity.json').write_bytes(b'not json')
+    elif damage == 'symlink':
+        outside = tmp_path / 'outside.json'
+        outside.write_bytes(target.read_bytes())
+        target.unlink()
+        target.symlink_to(outside)
+    else:
+        value = json.loads(target.read_bytes())
+        if damage == 'history':
+            value['project']['importHistory'] = 5
+        else:
+            value['project']['templatePackage'] = 'text' if damage == 'package' else {'assets': 5}
+        target.write_text(json.dumps(value))
+    with v2_app(tmp_path) as (client, _application):
+        value = listed(client)
+        assert value['errors'] == [{'projectId': FIRST, 'errorCode': code}]
+        assert {entry['projectId'] for entry in value['entries']} == {FIRST, OTHER}
+        opened = client.post('/v2/projects/' + FIRST + '/open', json={})
+        assert opened.status_code == 503 and opened.json()['error']['code'] == code
 
 
 def test_an_unloaded_session_lists_its_heading_from_the_file(tmp_path):

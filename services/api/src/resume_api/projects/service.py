@@ -7,7 +7,7 @@ import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
 from packages.resume_core.project_catalog import ProjectCatalog
-from packages.resume_core.project_repository import RepositoryFailure, decode_project
+from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.project_store import ProjectStoreFailure
 from packages.resume_core.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
@@ -121,15 +121,7 @@ class ProjectService:
         # workspace is never changed in place, and an evicted session has none, so its file is read.
         workspace = session.workspace if session is not None else None
         if workspace is None:
-            directory = self.repository._directory(project_id)
-            try:
-                workspace = decode_project(directory, (directory / 'workspace.json').read_bytes())
-            except ProjectStoreFailure as error:
-                raise RepositoryFailure(error.code) from None
-            except StorageFailure:
-                raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
-            except (OSError, ValueError, RecursionError):
-                raise RepositoryFailure('PROJECT_LOAD_FAILED') from None
+            workspace, _key = self.repository._read_file(self.repository._directory(project_id), project_id)
         identity = display_identity(workspace)
         value = (identity.title, identity.subtitle)
         with self.lock:

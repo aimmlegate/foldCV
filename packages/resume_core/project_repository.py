@@ -71,6 +71,13 @@ def stored_owners(data):
     return [owner for owner in (data.get('project'), data.get('preDraft')) if isinstance(owner, dict)] if isinstance(data, dict) else []
 
 
+def stored_assets(owner):
+    """The asset rows of a stored package. A wrong shape gives none here and fails model validation after."""
+    package = owner.get('templatePackage')
+    assets = package.get('assets') if isinstance(package, dict) else None
+    return assets if isinstance(assets, list) else []
+
+
 def inline_history(data) -> bool:
     """A version 7 file written before D104 keeps import records or asset bytes in the workspace JSON."""
     if not isinstance(data, dict) or data.get('schemaVersion') != 7:
@@ -78,7 +85,7 @@ def inline_history(data) -> bool:
     project = data.get('project')
     return (isinstance(project, dict) and 'templateOperations' in project) or any(
         isinstance(asset, dict) and 'bytesBase64' in asset
-        for owner in stored_owners(data) for asset in ((owner.get('templatePackage') or {}).get('assets') or []))
+        for owner in stored_owners(data) for asset in stored_assets(owner))
 
 
 def history_blobs(workspace):
@@ -126,16 +133,17 @@ def load_stored_data(directory, raw, *, history=False):
     from .templates.models import asset_text, remember_asset
     data = strict_json(raw)
     for owner in stored_owners(data):
-        for asset in ((owner.get('templatePackage') or {}).get('assets') or []):
+        for asset in stored_assets(owner):
             digest = asset.get('sha256') if isinstance(asset, dict) else None
             if isinstance(digest, str) and 'bytesBase64' not in asset and asset_text(digest) is None:
                 path = blob_path(directory, 'template-assets', digest)
                 owned_file(path, 20 * 1024 * 1024)
                 remember_asset(digest, base64.b64encode(path.read_bytes()).decode('ascii'))
     project = data.get('project') if isinstance(data, dict) else None
-    if history and isinstance(project, dict) and project.get('importHistory') and 'templateOperations' not in project:
+    references = project.get('importHistory') if isinstance(project, dict) else None
+    if history and references and isinstance(references, list) and 'templateOperations' not in project:
         project['templateOperations'] = [strict_json(read_history_file(directory, ref.get('sha256')))
-            for ref in project['importHistory'] if isinstance(ref, dict)]
+            for ref in references if isinstance(ref, dict)]
     return data
 
 
@@ -159,24 +167,24 @@ def externalize_history(store, *, moved=None):
             target = directory / 'workspace.json'
             if not target.is_file() or target.is_symlink():
                 continue
-            owned_file(target)
-            raw = target.read_bytes()
             try:
+                owned_file(target, WORKSPACE_BYTES)
+                raw = target.read_bytes()
                 if not inline_history(strict_json(raw)):
                     continue
                 workspace = WorkspaceV7.model_validate(load_stored_data(directory, raw))
-            except (ValueError, RecursionError):
-                # An unreadable file stays as it is; opening that project reports it, the service still starts.
+                for kind, identifier, blob, _checksum in history_blobs(workspace):
+                    path = blob_path(directory, kind, identifier)
+                    if not path.exists():
+                        atomic_write(path, blob)
+                slim = rich_snapshot_bytes(workspace)
+                if moved is not None:
+                    moved(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
+                atomic_write(target, slim)
+                result.append(workspace.project_id)
+            except (ProjectStoreFailure, StorageFailure, OSError, ValueError, RecursionError):
+                # One bad file stays as it is; opening that project reports it, the service still starts.
                 continue
-            for kind, identifier, blob, _checksum in history_blobs(workspace):
-                path = blob_path(directory, kind, identifier)
-                if not path.exists():
-                    atomic_write(path, blob)
-            slim = rich_snapshot_bytes(workspace)
-            if moved is not None:
-                moved(workspace.project_id, hashlib.sha256(raw).hexdigest(), hashlib.sha256(slim).hexdigest())
-            atomic_write(target, slim)
-            result.append(workspace.project_id)
         return result
 
 
