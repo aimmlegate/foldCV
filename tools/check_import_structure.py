@@ -17,7 +17,16 @@ from packages.resume_core.extraction.parser import extract
 from packages.resume_core.sources import canonical_source
 
 
+def require_private_output(path):
+    """Extracted CV text stays out of the repository, apart from its ignored private folders."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(ROOT) and not any(resolved.is_relative_to(ROOT / name) for name in (".private", "experiments")):
+        raise SystemExit(f"{path} is inside the repository: use .private/, experiments/ or a folder outside it")
+
+
 def check(args):
+    require_private_output(args.views)
+    require_private_output(args.summary)
     report = []
     args.views.mkdir(parents=True, exist_ok=True)
     for case in json.loads(args.inputs.read_text()):
