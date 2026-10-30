@@ -15,6 +15,8 @@ PROJECT_CEILING_BYTES = PROJECT_MEGABYTES[2] * MIB
 # An archive keeps its earlier allowance for sources, images and the package next to the project file.
 ARCHIVE_EXPANDED_BYTES = PROJECT_CEILING_BYTES + 44 * MIB
 ARCHIVE_BYTES = ARCHIVE_EXPANDED_BYTES + 4 * MIB
+# Every archive entry but the project file. An import history file is refused above it, so each one fits an archive.
+ARCHIVE_ENTRY_BYTES = 32 * MIB
 # Background storage holds a full copy of the project file during each save, plus history.
 BACKGROUND_FACTOR = 2
 GLOBAL_PROJECTS = 8

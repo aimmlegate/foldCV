@@ -29,8 +29,8 @@ import threading
 from .models.rich_workspace import RichMutationReplay
 from .models.template_workspace import WorkspaceV7
 from .project_journal import JournalStale, ProjectJournal, apply as apply_payloads, snapshot
-from .project_limits import project_file_bytes
-from .project_store import ProjectStore, ProjectStoreFailure, owned_file, strict_json
+from .project_limits import ARCHIVE_ENTRY_BYTES, project_file_bytes
+from .project_store import SAFE_ID, ProjectStore, ProjectStoreFailure, owned_file, strict_json
 from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from .storage import StorageFailure, atomic_write, locked_root, private_directory
 
@@ -627,7 +627,8 @@ class ProjectRepository:
             raw = rich_snapshot_bytes(after)
         except ProjectStoreFailure as error:
             raise RepositoryFailure(error.code) from None
-        if len(raw) > project_file_bytes():
+        # D096: a lowered setting blocks growth; an edit that keeps or shrinks the file always saves.
+        if len(raw) > project_file_bytes() and len(raw) > session.file_key[1]:
             raise RepositoryFailure('PROJECT_TOO_LARGE')
         loaded = bool(after.project is not None and after.project.template_operations)
         try:
@@ -698,9 +699,12 @@ class ProjectRepository:
         for kind, identifier, blob, checksum in blobs:
             path = blob_path(directory, kind, identifier)
             if kind == 'history':
+                # Each one has to fit an archive entry, and D104 keeps these files out of the Settings budget.
+                if len(blob) > ARCHIVE_ENTRY_BYTES:
+                    raise RepositoryFailure('PROJECT_TOO_LARGE')
                 remember_history(checksum, blob)
             if path.exists() or path.is_symlink():
-                owned_file(path, DOCX_BYTES if kind == 'renders' else 32 * 1024 * 1024)
+                owned_file(path, DOCX_BYTES if kind == 'renders' else ARCHIVE_ENTRY_BYTES)
                 if hashlib.sha256(path.read_bytes()).hexdigest() != checksum:
                     raise RepositoryFailure('ARTIFACT_BYTES_MISMATCH' if kind == 'renders' else 'SOURCE_BYTES_MISMATCH')
             else:

@@ -4,6 +4,7 @@ import hashlib
 
 import pytest
 
+from packages.resume_core.project_limits import ARCHIVE_ENTRY_BYTES
 from packages.resume_core.project_repository import RepositoryFailure, blob_path
 from tests.repository.support import PROJECT, edit, repository, text_of
 
@@ -70,3 +71,41 @@ def test_revisions_move_forward_and_memory_matches_the_file(tmp_path):
     current = repo.read(PROJECT)
     assert outcome.revision == current.project_revision == 2 and current.document_revision == 1
     assert ProjectRepository(tmp_path / 'data').read(PROJECT) == current
+
+
+def test_a_history_file_above_an_archive_entry_is_refused_before_it_is_written(tmp_path):
+    repo = repository(tmp_path)
+    directory = tmp_path / 'data/projects' / PROJECT
+    record = b'x' * (ARCHIVE_ENTRY_BYTES + 1)
+    digest = hashlib.sha256(record).hexdigest()
+    with pytest.raises(RepositoryFailure) as refused:
+        repo._write_blobs(directory, [('history', digest, record, digest)])
+    assert refused.value.code == 'PROJECT_TOO_LARGE' and not blob_path(directory, 'history', digest).exists()
+    fits = record[:ARCHIVE_ENTRY_BYTES]
+    digest = hashlib.sha256(fits).hexdigest()
+    repo._write_blobs(directory, [('history', digest, fits, digest)])
+    repo._write_blobs(directory, [('history', digest, fits, digest)])
+    assert blob_path(directory, 'history', digest).stat().st_size == ARCHIVE_ENTRY_BYTES
+
+
+def test_a_larger_history_file_written_before_the_limit_does_not_block_deletion(tmp_path):
+    repo = repository(tmp_path)
+    directory = tmp_path / 'data/projects' / PROJECT
+    path = blob_path(directory, 'history', 'a' * 64)
+    path.parent.mkdir(mode=0o700, exist_ok=True)
+    path.write_bytes(b'x' * (ARCHIVE_ENTRY_BYTES + 1))
+    path.chmod(0o600)
+    assert repo.delete(PROJECT).cleanup_status == 'complete' and not directory.exists()
+
+
+def test_a_lowered_size_setting_blocks_growth_and_allows_a_smaller_project(tmp_path, monkeypatch):
+    repo = repository(tmp_path)
+    edit(repo, 'x' * 4000, identifier='long')
+    size = (tmp_path / 'data/projects' / PROJECT / 'workspace.json').stat().st_size
+    monkeypatch.setattr('packages.resume_core.project_repository.project_file_bytes', lambda: size - 2000)
+    with pytest.raises(RepositoryFailure) as refused:
+        edit(repo, 'x' * 5000, identifier='longer')
+    assert refused.value.code == 'PROJECT_TOO_LARGE'
+    edit(repo, 'x' * 3000, identifier='shorter')
+    assert text_of(repo.read(PROJECT)) == 'x' * 3000
+    assert (tmp_path / 'data/projects' / PROJECT / 'workspace.json').stat().st_size < size
