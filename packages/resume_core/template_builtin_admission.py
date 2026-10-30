@@ -60,6 +60,10 @@ def admitted_field(raw, destination):
         'revision': 1, 'pendingRawText': None, 'userCorrected': False}
 
 
+class WithheldOwner(ValueError):
+    """The owner a new record needs was not admitted: the record waits with it, the block's other values stay."""
+
+
 def owner_values(record_id, operation, facts, declarations, relations):
     from .template_capture import item_identities
     records = {record.id: record for record in facts.records}
@@ -83,7 +87,9 @@ def owner_values(record_id, operation, facts, declarations, relations):
         return target, None
     if kind(target) == 'subproject':
         job = owner(target) or getattr(records.get(target), 'job_id', None)
-        if job is None or kind(job) != 'employment':
+        if job is None:
+            raise WithheldOwner('subproject requires its admitted employment owner')
+        if kind(job) != 'employment':
             raise ValueError('subproject requires its admitted employment owner')
         return job, target
     raise ValueError('incompatible canonical builtin owner')
@@ -99,14 +105,22 @@ def make_builtin_candidate(operation, allocation, declaration, fields, payload, 
         raise ValueError('builtin replacement changes canonical type')
     kind = declaration.builtin_kind
     if previous is None:
+        if not any(allocation.canonical_fields[field.field_key].cell_id in admitted_cells
+                and not empty_value(payload_value(payload, field.pointer)) for field in fields):
+            return None, set()
         data = {'id': allocation.record_id, 'revision': 1, 'origin': 'source', 'evidence': [],
             'userCorrected': False, 'kind': kind}
         data.update({name: unknown() for name in FIELDS[kind]})
         if kind in {'employment', 'subproject'}:
             data['periods'] = []
         if kind in {'claim', 'technology', 'subproject'}:
-            job, project = owner_values(allocation.record_id, operation, facts, declarations, relations)
-            if kind == 'subproject' and (job is None or project is not None):
+            try:
+                job, project = owner_values(allocation.record_id, operation, facts, declarations, relations)
+            except WithheldOwner:
+                return None, set()
+            if kind == 'subproject' and job is None:
+                return None, set()
+            if kind == 'subproject' and project is not None:
                 raise ValueError('new subproject needs a direct employment owner')
             data['jobId'] = job
             if kind != 'subproject':
