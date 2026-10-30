@@ -18,7 +18,7 @@ from pydantic import BaseModel, ValidationError
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.inference_admission import INFERENCE, AdmissionTimeout, AdmissionBlocked
+from resume_api.inference_admission import INFERENCE, AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
 from resume_api.rewrite_timing import add_phase, measure
 from packages.resume_core.text_rewrite import PlainTextReply
@@ -35,6 +35,7 @@ from resume_api.cli.qualification import QualificationError, missing_flags
 
 
 MODEL = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z")
+PLAN = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 MAX_SCHEMA = 65_536
 MAX_RESULT = 65_536
 MAX_DEPTH = 32
@@ -400,6 +401,8 @@ class CodexCliProvider:
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+        except AdmissionCancelled:
+            raise ContentFailure("CANCELLED", cleanup_verified=True, dispatch_witness={"neverDispatched": True}) from None
 
     @contextmanager
     def _profile_owner(self, cancel, operations_root):

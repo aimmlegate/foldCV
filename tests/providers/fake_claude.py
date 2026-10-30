@@ -53,7 +53,7 @@ if args == ["auth", "status", "--json"]:
     signed_out = case in {"logged_out", "login_code"} and not (base / "signed-in").exists()
     status = {"loggedIn": not signed_out and case != "api_key", "authMethod": "claude.ai",
               "apiProvider": "firstParty", "configDirectory": os.environ.get("CLAUDE_CONFIG_DIR", "/fixture"),
-              "subscriptionType": "max"}
+              "subscriptionType": config.get("subscription", "max")}
     if signed_out:
         status.update(authMethod="none", subscriptionType=None)
     if case == "api_key":

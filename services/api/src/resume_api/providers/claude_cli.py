@@ -21,11 +21,11 @@ from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.profiles import claude as profile_rules
 from resume_api.cli.profiles.claude import ClaudeCliProfile, ClaudeProfileError
-from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionTimeout
+from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers import claude_catalog
-from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
+from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -244,7 +244,8 @@ class ClaudeCliProvider:
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock)
         self.model_started = None
-        self.process = ProcessRunner(self.executable, clock=clock, launch=profile.launch if profile else None)
+        self.process = ProcessRunner(self.executable, clock=clock, launch=profile.launch if profile else None,
+                                     workdir=getattr(profile, "workdir", None))
 
     @property
     def native(self) -> bool:
@@ -286,8 +287,19 @@ class ClaudeCliProvider:
         try:
             raw, _ = self._run(files, ("--version",), end, cancel)
             version = qualification.Version.parse(raw.decode("utf-8", "strict"))
-            raw_help, _ = self._run(files, ("--help",), end, cancel)
         except (ProcessExit, UnicodeError, qualification.QualificationError):
+            raise ContentFailure("CLI_UNSUPPORTED") from None
+        try:
+            return self._qualified(files, cancel, end, version)
+        except ContentFailure as error:
+            error.version = str(version) if len(str(version)) <= 80 else None
+            raise
+
+    def _qualified(self, files: OperationFiles, cancel: threading.Event, end: float,
+                   version: qualification.Version) -> Probe:
+        try:
+            raw_help, _ = self._run(files, ("--help",), end, cancel)
+        except ProcessExit:
             raise ContentFailure("CLI_UNSUPPORTED") from None
         status = profile_rules.COMPATIBILITY.status(version)
         if status in {"unsupported", "broken"}:
@@ -313,7 +325,9 @@ class ClaudeCliProvider:
         if self.profile is not None and (not isinstance(configured, str)
                                          or Path(configured).resolve() != self.profile.config_dir.resolve()):
             raise ContentFailure("CLI_PROFILE_UNSAFE")
-        plan = body.get("subscriptionType") if isinstance(body.get("subscriptionType"), str) else None
+        subscription = body.get("subscriptionType")
+        # The client refuses a whole reply over a plan outside this pattern; a plan label is not worth that.
+        plan = subscription if isinstance(subscription, str) and PLAN.fullmatch(subscription) else None
         return Probe(str(version), status, method, plan, True, claude_catalog.reasoning_for(version))
 
     def preflight(self, files, cancel, model, *, deadline, effort=None) -> Probe:
@@ -364,6 +378,8 @@ class ClaudeCliProvider:
                     return self._generate(request, files, cancel)
         except AdmissionBlocked:
             raise ContentFailure("PROCESS_CLEANUP_FAILED") from None
+        except AdmissionCancelled:
+            raise ContentFailure("CANCELLED", cleanup_verified=True, dispatch_witness={"neverDispatched": True}) from None
 
     @contextmanager
     def _profile_owner(self, cancel, operations_root):

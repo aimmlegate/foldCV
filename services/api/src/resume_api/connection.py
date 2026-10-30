@@ -7,7 +7,6 @@ import math
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import threading
 import time
@@ -16,13 +15,12 @@ from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import MODEL, strict_json
+from resume_api.providers.codex_cli import MODEL, PLAN, strict_json
 from resume_api.cli.profile import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
 
 
 MAX_MODELS = 100
-PLAN = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
 
 
 class ConnectionFailure(Exception):

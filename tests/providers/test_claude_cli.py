@@ -285,17 +285,28 @@ def test_connection_reports_catalog_plan_and_no_quota_source(fake):
     assert not any(entry["generation"] for entry in audit())
 
 
-@pytest.mark.parametrize(("case", "code", "extra"), [
-    ("logged_out", "LOGIN_REQUIRED", {}), ("api_key", "API_KEY_MODE", {}),
-    ("valid", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}),
+@pytest.mark.parametrize(("case", "code", "extra", "version"), [
+    ("logged_out", "LOGIN_REQUIRED", {}, "2.1.308"), ("api_key", "API_KEY_MODE", {}, "2.1.308"),
+    ("valid", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}, "2.1.200"),
+    ("valid", "UNSUPPORTED_VERSION", {"version": "no version here"}, None),
 ])
-def test_connection_states(fake, case, code, extra):
+def test_connection_states_name_the_version_the_cli_reported(fake, case, code, extra, version):
     cli, root, _directory, configure, _audit = fake
     configure(case, **extra)
     with pytest.raises(ConnectionFailure) as raised:
         with OperationFiles(root).open() as files:
             ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)).inspect(files, threading.Event())
-    assert raised.value.code == code
+    assert raised.value.code == code and raised.value.version == version
+
+
+@pytest.mark.parametrize(("subscription", "plan"), [("max", "max"), ("team_premium", "team_premium"), ("Claude Max", None),
+                                                    ("x" * 41, None), (7, None), (None, None)])
+def test_only_a_plan_the_client_accepts_is_reported(fake, subscription, plan):
+    cli, root, _directory, configure, _audit = fake
+    configure(subscription=subscription)
+    with OperationFiles(root).open() as files:
+        metadata = ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)).inspect(files, threading.Event())
+    assert metadata.plan == plan
 
 
 def test_login_runs_the_cli_sign_in_only_when_signed_out(fake):
@@ -395,6 +406,15 @@ def test_prepare_refuses_the_users_own_config_and_foreign_directories(tmp_path, 
     (tmp_path / "foreign").mkdir()
     with pytest.raises(rules.ClaudeProfileError):
         rules.ClaudeCliProfile(tmp_path / "foreign", Path("/bin/echo"), home=tmp_path / "home").prepare()
+
+
+def test_every_call_of_a_profile_runs_in_one_private_working_directory(tmp_path):
+    profile = rules.ClaudeCliProfile(tmp_path / "profile", Path("/bin/echo"), home=tmp_path / "home")
+    provider = ClaudeCliProvider(Path("/bin/echo"), profile=profile)
+    assert provider.process.workdir == profile.workdir == profile.root / "cwd"
+    profile.prepare()
+    assert profile.workdir.is_dir() and profile.workdir.stat().st_mode & 0o777 == 0o700
+    assert profile.environment(tmp_path)["TMPDIR"] == str(tmp_path / "tmp")
 
 
 def test_wipe_keeps_only_the_config_file_and_credentials(tmp_path):
