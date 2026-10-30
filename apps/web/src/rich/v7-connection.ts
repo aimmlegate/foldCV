@@ -89,8 +89,10 @@ export class ProjectEditorConnection {
     return this.reopening;
   }
 
+  /** The saved state; a read that an edit overtook is older than the adopted reply and leaves it in place. */
   async read(): Promise<TemplateProjectResponseV1> {
-    this.response = await v2Request<TemplateProjectResponseV1>(this.path(""), "GET", undefined, this.fetcher);
+    const response = await v2Request<TemplateProjectResponseV1>(this.path(""), "GET", undefined, this.fetcher);
+    if (response.workspace.projectRevision >= this.response.workspace.projectRevision) this.response = response;
     return this.response;
   }
 

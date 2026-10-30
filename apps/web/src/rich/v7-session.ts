@@ -153,6 +153,8 @@ export class TemplateEditorSession {
     const current = await this.connection.read();
     // Input typed meanwhile meets the newer revision itself and is translated again there.
     if (this.queue.template.pending.length) return;
+    // An edit committed while this read was on its way: its reply is newer than the read.
+    if (current.workspace.projectRevision < this.queue.template.durable.workspace.projectRevision) return;
     this.queue.template.adoptDurable(current);
     await this.reproject();
   }

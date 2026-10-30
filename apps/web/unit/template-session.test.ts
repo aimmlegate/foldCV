@@ -10,6 +10,7 @@ import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";
 import { TemplateEditorSession, type TemplateEditor } from "../src/rich/v7-session";
 import { projectClient, harness, type Harness, type Traffic } from "./support/template-harness";
+import { blockStart, paragraphs, refused, response, saved, scripted, select, settled, type, type Reply, type Wire } from "./support/scripted-project";
 
 function storage(): Storage {
   const values = new Map<string, string>();
@@ -246,4 +247,27 @@ test("an outside canonical advance (export record) is adopted; later saves and d
     await session.navigateAway();
     assert.equal(session.mode, "detached");
   } finally { session.close(); await value.close(); }
+});
+test("a late read in refresh does not take a newer edit back", async () => {
+  let release = () => {}, reading = false;
+  const late = response([{ id: "a", text: "aaa" }], 1);
+  const { session, editor } = await scripted(late, async (_path, request) => {
+    if (request) return saved(response([{ id: "a", text: "aaaZ" }], 2), request.clientMutationId);
+    if (!reading) return { status: 200, body: late };
+    await new Promise<void>(resolve => { release = resolve; });
+    return { status: 200, body: late };
+  });
+  try {
+    reading = true;
+    const refreshing = session.refresh();
+    await settled();
+    type(editor, "Z", blockStart(editor, "a") + 3);
+    await session.flush();
+    await settled();
+    assert.equal(session.queue.template.durable.workspace.projectRevision, 2);
+    release();
+    await refreshing;
+    assert.equal(session.queue.template.durable.workspace.projectRevision, 2);
+    assert.deepEqual(paragraphs(editor), ["a=aaaZ"]);
+  } finally { session.close(); }
 });
