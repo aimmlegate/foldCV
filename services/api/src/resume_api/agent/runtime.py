@@ -641,7 +641,8 @@ def owned_host_windows(files, *, require_host, host):
             return False
 
     try:
-        owned = [pid for pid in winjob.job_pids(files.process) if pid != files.process.pid]
+        owned = [pid for pid in winjob.job_pids(files.process)
+                 if pid != files.process.pid and not winjob.console_host(pid)]
         if (require_host and not owned) or not all(same(winjob.image(pid)) for pid in owned):
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         if winjob.listening_pids() & {files.process.pid, *owned}:

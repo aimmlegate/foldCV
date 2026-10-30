@@ -93,7 +93,10 @@ async def test_foreign_and_unsafe_markers_do_not_block_a_new_service(tmp_path):
     linked_intent = root / (".cleanup-intent-op-" + "c" * 32 + ".json")
     linked_intent.symlink_to(private)
     fifo_intent = root / (".cleanup-intent-op-" + "d" * 32 + ".json")
-    os.mkfifo(fifo_intent)
+    if hasattr(os, "mkfifo"):
+        os.mkfifo(fifo_intent)
+    else:
+        fifo_intent.mkdir()  # Windows has no FIFO; a directory is the other non-file entry.
     oversized_intent = root / (".cleanup-intent-op-" + "e" * 32 + ".json")
     oversized_intent.write_text("x" * 257)
     async with signed_in(make_app(tmp_path, connection_adapter=HealthyConnection())) as client:

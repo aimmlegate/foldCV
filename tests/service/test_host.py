@@ -129,7 +129,8 @@ def test_stopping_a_worker_ends_what_it_started(tmp_path):
             assert time.monotonic() < deadline
             time.sleep(0.05)
         pid = int(grandchild.read_text())
-        assert sorted(winjob.job_pids(process)) == sorted([process.pid, pid])
+        others = set(winjob.job_pids(process)) - {process.pid, pid}
+        assert {process.pid, pid} <= set(winjob.job_pids(process)) and all(map(winjob.console_host, others))
         assert winjob.image(pid) and Path(winjob.image(pid)).name.lower() == PYTHON.name.lower()
         files.stop_worker()
     assert not host.process_alive(pid)

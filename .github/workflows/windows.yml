@@ -42,6 +42,9 @@ jobs:
       # No venv: a Windows venv's python.exe only starts the real interpreter as its child, which the jobs refuse.
       - name: Python environment
         run: python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+      - name: Template definition diagnostic
+        continue-on-error: true
+        run: python tools\desktop\template_diff.py
       - name: Windows tests
         run: >
           python -m pytest -q -p no:cacheprovider -rfE

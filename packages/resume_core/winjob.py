@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+import os
 import socket
 import subprocess
 import time
@@ -203,8 +204,18 @@ def stop(process: subprocess.Popen, *, timeout: float = 1.5) -> bool:
         job.close()
 
 
+def console_host(pid: int) -> bool:
+    """Windows adds the conhost.exe of a console program to the program's job; it is not counted by the limit."""
+    path = image(pid)
+    console = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "conhost.exe")
+    try:
+        return path is not None and os.path.samefile(path, console)
+    except OSError:
+        return False
+
+
 def job_pids(process: subprocess.Popen) -> list[int]:
-    """Every process in the child's job, the child included."""
+    """Every process in the child's job, the child and console hosts included."""
     job: Job | None = getattr(process, "foldcv_job", None)
     if job is None or job.handle is None:
         raise OSError("The process has no job")
