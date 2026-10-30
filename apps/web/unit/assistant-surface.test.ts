@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { plainActivity } from "../src/workbench/assistant/activity";
-import { modelChoices } from "../src/workbench/assistant/model-choices";
+import { choiceGroups, modelChoices } from "../src/workbench/assistant/model-choices";
 
 test("activity titles drop markdown marks and keep the words", () => {
   assert.equal(plainActivity("**Кратко** про `резюме`"), "Кратко про резюме");
@@ -23,4 +23,14 @@ test("a saved model is unavailable only when a ready catalog lists other models"
   assert.deepEqual(modelChoices("saved", catalog, false), [{ model: "saved", state: "unverified" }, ...catalog]);
   assert.deepEqual(modelChoices("saved", catalog, true), [{ model: "saved", state: "unavailable" }, ...catalog]);
   assert.deepEqual(modelChoices("", catalog, true), catalog);
+});
+
+test("the composer groups models by provider as Settings does; one provider stays a plain list", () => {
+  const codex = { model: "gpt-6-luna", state: "verified", provider: "Codex" }, claude = { model: "claude-opus-5-5", state: "unverified", provider: "Claude" };
+  const second = { model: "gpt-6-sol", state: "unverified", provider: "Codex" };
+  assert.deepEqual(choiceGroups([codex, claude, second]), [{ label: "Codex", choices: [codex, second] }, { label: "Claude", choices: [claude] }]);
+  assert.deepEqual(choiceGroups([codex, second]), [{ label: null, choices: [codex, second] }]);
+  const saved = { model: "saved", state: "unavailable" };
+  assert.deepEqual(choiceGroups([saved, codex, claude]), [{ label: null, choices: [saved] }, { label: "Codex", choices: [codex] }, { label: "Claude", choices: [claude] }]);
+  assert.deepEqual(choiceGroups([]), [{ label: null, choices: [] }]);
 });

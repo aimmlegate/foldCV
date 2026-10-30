@@ -87,6 +87,19 @@
           "title": "Op",
           "type": "string"
         },
+        "targetId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targetid"
+        },
         "values": {
           "additionalProperties": {
             "type": "string"

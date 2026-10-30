@@ -13,7 +13,7 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import ValidationError
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_compiler import CompileFailure
+from packages.resume_core.assistant_compiler import CompileFailure, find_record, target_text
 from packages.resume_core.assistant_store import AgentFailure, identity
 from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, AgentFinding
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
@@ -23,6 +23,7 @@ from packages.resume_core.rich_fields import inline_groups
 from packages.resume_core.rich_mutations import inline_text, utf16_slice
 
 from resume_api.agent.mcp import PrivateMcp
+from resume_api.agent.web import bind_run
 from resume_api.projects.errors import ProjectFailure
 
 from . import context
@@ -121,7 +122,9 @@ class ToolSession(PrivateMcp):
             phrase inside one span; insert_blocks {afterBlockId or parentId, blocks:[{kind,text,level?}]};
             delete_blocks {blockIds}; move_block {blockId, afterBlockId or parentId}; format_block {blockId, kind?,
             level?, alignment?, textColor?, backgroundColor?}; update_fact {recordId, field, value}; create_fact
-            {kind, values, jobId?}; delete_fact {recordId}. history {direction} and action {action: rename,
+            {kind, values, jobId?, targetId?}: kind employment (values employer, role, start, end, present), period
+            (jobId; values start, end, present) or technology (values display; jobId for a job's line; targetId when a
+            refusal lists several lines); delete_fact {recordId}. history {direction} and action {action: rename,
             formatting_date, archive, restore or delete; value?; targetId?} are proposals of their own. One call carries
             at most 64 KiB of JSON and 100 ops; split a larger edit into several proposals over different blocks."""
             return await self.call('propose_changes', lambda: self.propose(request))
@@ -206,7 +209,7 @@ class ToolSession(PrivateMcp):
             raise AgentFailure('AGENT_SOURCE_LIMIT')
         self.fetches += 1
         source = await self.service.fetcher.fetch(AgentFetchRequest(url=url), self.fetch_cancel)
-        source.run_id = self.control.run_id
+        source = bind_run(source, self.control.run_id)
         excerpt, clipped = context.clip(source.text, 12000)
         value = source.model_dump(mode='json', by_alias=True)
         value.pop('text')
@@ -240,8 +243,14 @@ class ToolSession(PrivateMcp):
         for item in request.findings:
             if not set(item.source_ids) <= known:
                 raise AgentFailure('AGENT_EVIDENCE_INVALID')
-            stored.append(AgentFinding(id=identity('finding'), runId=self.control.run_id, severity=item.severity,
-                message=item.message, anchors=[self.anchor(target) for target in item.targets], sourceIds=item.source_ids))
+            anchors = [self.anchor(target) for target in item.targets]
+            try:
+                stored.append(AgentFinding(id=identity('finding'), runId=self.control.run_id, severity=item.severity,
+                    message=item.message, anchors=anchors, sourceIds=item.source_ids))
+            except ValidationError:
+                raise context.refusal('AGENT_CALL_TOO_LARGE', f'One finding with its quoted targets may take at most '
+                    f'{limits.FINDING_BYTES} bytes; give shorter ranges with start and end, or split it into several '
+                    'findings.') from None
         return Stored({'findingIds': [finding.id for finding in stored]},
             lambda: self.service.write(self.service.record_findings, self.control, stored))
 
@@ -257,10 +266,10 @@ class ToolSession(PrivateMcp):
             text = ''.join(inline_text(span) for span in spans)
             stamp = dependency(self.pinned, 'block', block.id)
         else:
-            record = next((value for value in project.facts.records if value.id == target.record_id), None)
+            record, _extension = find_record(self.pinned, target.record_id)
             if record is None:
                 raise AgentFailure('AGENT_EVIDENCE_INVALID')
-            text = context.record_text(self.pinned, record.id)
+            text = target_text(self.pinned, record.id)
             stamp = dependency(self.pinned, 'record', record.id)
         maximum = len(text.encode('utf-16-le')) // 2
         start = target.start or 0

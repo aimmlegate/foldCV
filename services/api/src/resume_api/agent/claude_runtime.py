@@ -201,8 +201,6 @@ class MessagesStreamSession:
                     continue
                 self.calls[identifier] = name
                 self.result.tool_calls += 1
-                if self.result.tool_calls > limits.TOOL_CALLS:
-                    raise AgentFailure("AGENT_TOOL_LIMIT")
                 self.publish("tool.started", {"callId": public_id(identifier), "name": name[len(PREFIX):],
                                               "error": None})
             elif kind == "thinking":

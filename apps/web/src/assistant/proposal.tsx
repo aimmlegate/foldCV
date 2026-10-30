@@ -25,6 +25,11 @@ export function proposalTitle(value: Proposal): string {
   return "Изменения в резюме";
 }
 
+/** A history entry with no text, such as a change of form only, has nothing to compare. */
+function shownChanges(value: Proposal): Proposal["preview"] {
+  return value.kind === "history" ? value.preview.filter(change => change.before || change.after) : value.preview;
+}
+
 export function ProposalPreview({ value, busy, applying, stale, allowEdits, apply, discard }: {
   value: Proposal; busy: boolean; applying: boolean; stale: boolean; allowEdits: boolean; apply: () => void; discard: () => void;
 }) {
@@ -41,7 +46,7 @@ export function ProposalPreview({ value, busy, applying, stale, allowEdits, appl
     <h3 ref={heading} tabIndex={-1}>{stale && value.state === "draft" ? "Правки устарели" : states[value.state]}</h3>
     <p>{title}</p>
     {value.summary && <p>{value.summary}</p>}
-    {value.kind !== "history" && value.preview.map((change, index) => <details key={`${change.target}:${String(index)}`} open className="chat-proposal-change">
+    {shownChanges(value).map((change, index) => <details key={`${change.target}:${String(index)}`} open className="chat-proposal-change">
       <summary>{effects[change.label] ?? "Изменение"} · {index + 1}</summary>
       <div className="chat-proposal-comparison"><div><h4>Было</h4><pre>{change.before || "Нет"}</pre></div>
         <div><h4>Станет</h4><pre>{change.after || "Нет"}</pre></div></div>

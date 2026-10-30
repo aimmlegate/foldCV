@@ -112,6 +112,13 @@ if case in {"auth", "quota"}:
 if case == "big":
     say("x" * (70 * 1024))
 
+if case == "many_calls":
+    # More calls than the shared limit: the MCP layer refuses the extra one and the model still answers.
+    emit({"type": "assistant", "parent_tool_use_id": None, "message": {"role": "assistant", "model": model, "content": [
+        {"type": "tool_use", "id": f"toolu_{index}", "name": "mcp__foldcv__read_resume", "input": {}} for index in range(65)]}})
+    say("Лимит вызовов исчерпан, вот ответ.")
+    result(result="Лимит вызовов исчерпан, вот ответ.")
+    sys.exit(0)
 say("Читаю резюме.")
 tool = "Bash" if case == "builtin" else "mcp__foldcv__read_resume"
 emit({"type": "assistant", "parent_tool_use_id": None, "message": {"role": "assistant", "model": model, "content": [
