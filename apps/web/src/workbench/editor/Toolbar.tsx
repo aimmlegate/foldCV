@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "../ui/Icon";
+import { shortcut } from "../ui/shortcut";
 
 export type ToolbarCommand = "undo" | "redo" | "bold" | "italic" | "underline" | "list" | "numbered" | "rewrite" | "facts";
 type TextStyle = "p" | "h2" | "h3";
@@ -13,7 +14,7 @@ export function Toolbar({ command, textStyle, factsVisible, canUndo, canRedo, se
 }) {
   return <div className="editor-toolbar" role="toolbar" aria-label="Форматирование">
     <div className="formatting-tools">
-    <div className="tool-group"><button type="button" className="tool" aria-label="Отменить" title="Отменить (⌘Z)" disabled={!canUndo} onMouseDown={event => event.preventDefault()} onClick={() => command("undo")}><Icon name="undo" /></button><button type="button" className="tool" aria-label="Повторить" title="Повторить (⇧⌘Z)" disabled={!canRedo} onMouseDown={event => event.preventDefault()} onClick={() => command("redo")}><Icon name="redo" /></button></div>
+    <div className="tool-group"><button type="button" className="tool" aria-label="Отменить" title={`Отменить (${shortcut("Z")})`} disabled={!canUndo} onMouseDown={event => event.preventDefault()} onClick={() => command("undo")}><Icon name="undo" /></button><button type="button" className="tool" aria-label="Повторить" title="Повторить (⇧⌘Z)" disabled={!canRedo} onMouseDown={event => event.preventDefault()} onClick={() => command("redo")}><Icon name="redo" /></button></div>
     <span className="tool-divider" />
     <select className="toolbar-select" aria-label="Стиль текста" value={style} disabled={!blocks} onChange={event => {
       const value = event.currentTarget.value;
