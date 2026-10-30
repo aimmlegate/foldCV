@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjacentTechnology, documentTechnologies } from "../src/rich/technology-order";
+import { adjacentTechnology, documentTechnologies, lineMates } from "../src/rich/technology-order";
 import { facts, technology } from "./support/facts";
 
 test("keyboard moves work at both edges and can place an item last", () => {
@@ -21,4 +21,15 @@ test("facts follow authored main text order while Focus stays separate", () => {
   const document = { regions: [{ role: "main", blocks: [focus, paragraph] }] };
   assert.deepEqual(documentTechnologies(value, document, null).map(record => record.display.rawText), ["Docker", "SQL", "Python"]);
   assert.deepEqual(value.records.filter(record => record.kind === "technology").map(record => record.display.rawText), ["SQL", "Python", "Docker"]);
+});
+
+test("a move reaches only the technologies of its own line, in list order", () => {
+  const lines = [["python", "perl"], ["postgres", "redis", "kafka"]];
+  const ids = ["python", "perl", "postgres", "redis", "kafka", "alone"];
+  assert.deepEqual(lineMates(lines, ids, "perl"), ["python", "perl"]);
+  assert.deepEqual(lineMates(lines, ids, "redis"), ["postgres", "redis", "kafka"]);
+  assert.deepEqual(lineMates(lines, ids, "alone"), []);
+  assert.equal(adjacentTechnology(lineMates(lines, ids, "perl"), "perl", 1), undefined);
+  assert.equal(adjacentTechnology(lineMates(lines, ids, "postgres"), "postgres", -1), undefined);
+  assert.deepEqual(lineMates(lines, ["perl", "python"], "python"), ["perl", "python"]);
 });

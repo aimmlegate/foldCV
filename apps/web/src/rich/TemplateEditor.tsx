@@ -279,7 +279,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
             focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
-            technologyTargets={shown.presentation?.editor?.technologyTargets ?? []}
+            technologyTargets={shown.presentation?.editor?.technologyTargets ?? []} plan={shown.presentation?.editor ?? {}}
             hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }}
             anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
         </fieldset>

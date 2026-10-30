@@ -26,6 +26,10 @@ export function fields(record: RecordValue): Field[] {
   return [...result, ...(record.kind === "employment" ? record.periods.map((period, index) => ({ key: `period:${period.id}:present`,
     label: `Работаю сейчас ${index + 1}`, text: period.present.rawText, checked: period.present.value === true })) : [])];
 }
+/** The record's fields the dialog offers: those the document shows or has a place for. */
+export function offeredFields(record: RecordValue, unshown: readonly string[] = []): Field[] {
+  return fields(record).filter(field => !unshown.includes(field.key));
+}
 export function title(record: RecordValue): string {
   if (record.kind === "employment") return record.employer.rawText || "Без названия";
   if (record.kind === "technology") return record.display.rawText || "Без названия";
