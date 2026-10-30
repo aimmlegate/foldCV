@@ -28,6 +28,8 @@ FINALIZATION_CEILING_SECONDS = FINALIZATION_BASE_SECONDS + SAVE_SECONDS_PER_MEGA
 # One encoded undo inverse, and the DOCX render worker threads.
 INVERSE_BYTES = 512 * 1024
 RENDER_WORKERS = 2
+# A rewrite instruction; a saved Rules preset is sent as one, so it has to fit.
+REWRITE_INSTRUCTION_CHARS = 8000
 
 
 @dataclass

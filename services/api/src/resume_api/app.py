@@ -667,7 +667,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def rules_failure(error: RulesFailure):
         status = 409 if error.code == "RULES_STALE" else 422 if error.code in {
-            "RULES_PRESETS_REQUIRED", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
+            "RULES_PRESETS_REQUIRED", "RULES_PRESET_TOO_LONG", "RULES_TOO_LARGE", "RULES_INVALID_TEXT"} else 500
         payload = RulesSettingsError.model_validate({
             "error": {"code": error.code, "retryable": False, "stage": "rules"},
             "requiredHeadings": list(PRESET_HEADINGS.values()) if error.code == "RULES_PRESETS_REQUIRED" else [],
