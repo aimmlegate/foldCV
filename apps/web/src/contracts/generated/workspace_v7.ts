@@ -4,6 +4,7 @@ export type Day = number | null;
 export type Month = number | null;
 export type Precision = "year" | "month" | "day";
 export type Year = number;
+export type Changedblockids = string[];
 export type Clientmutationid = string;
 export type Requestsha256 = string;
 export type Resultingrevision = number;
@@ -1967,9 +1968,20 @@ export interface PartialDate {
   year: Year;
 }
 export interface RichMutationReplay {
+  changedBlockIds?: Changedblockids;
   clientMutationId: Clientmutationid;
+  createdBlocks?: Createdblocks;
+  createdIds?: Createdids;
   requestSha256: Requestsha256;
   resultingRevision: Resultingrevision;
+}
+export interface Createdblocks {
+  [k: string]: string[];
+}
+export interface Createdids {
+  [k: string]: {
+    [k: string]: string;
+  };
 }
 export interface RichPreDraftV2 {
   facts: WorkingFactsV2;

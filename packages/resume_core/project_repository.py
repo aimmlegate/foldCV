@@ -38,6 +38,9 @@ REPLAY_WINDOW = 200
 CLIPBOARD_CAPTURES = 20
 OPEN_SESSIONS = 3
 REPLACED_TOKENS = 16
+# Past this many ids an edit's replay row keeps none: a split, the one reply a client depends on, names a few.
+REPLAY_DETAIL_IDS = 64
+EXPORT_ATTEMPTS = 20
 LOG = logging.getLogger(__name__)
 BLOB_KINDS = {'sources': '.bin', 'history': '.bin', 'template-assets': '.bin', 'renders': '.docx'}
 
@@ -436,7 +439,8 @@ class ProjectRepository:
     def _seeded(workspace):
         from .template_preparation_ids import existing_ids
         replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
-            row.resulting_revision, 'edit', replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
+            row.resulting_revision, 'edit', details={'created_ids': row.created_ids, 'created_blocks': row.created_blocks,
+            'changed_block_ids': row.changed_block_ids}, replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
         return replays, existing_ids(workspace)
 
     def _evict(self, *, keep):
@@ -613,7 +617,7 @@ class ProjectRepository:
         replay = list(before.mutation_replay)
         if client_mutation_id is not None:
             replay.append(RichMutationReplay(clientMutationId=client_mutation_id, requestSha256=request_sha256,
-                resultingRevision=after.project_revision))
+                resultingRevision=after.project_revision, **_replay_details(details)))
         after.mutation_replay = replay[-REPLAY_WINDOW:]
         try:
             after = validated_with_history(after)
@@ -893,6 +897,25 @@ def _stored(directory, raw, after, loaded):
 def _digest(workspace):
     from .templates.compiler import canonical
     return hashlib.sha256(canonical(workspace)).hexdigest()
+
+
+def _latest_export(project):
+    """A retry needs the latest capture and a download the latest DOCX, so an export replaces the one before it in the
+    project file. Runs on every commit: this also trims a project saved with many."""
+    attempts = project.exports[-EXPORT_ATTEMPTS:]
+    if len(project.export_inputs) <= 1 and len(project.renders) <= 1 and len(attempts) == len(project.exports):
+        return project
+    named = {attempt.id for attempt in attempts}
+    return project.model_copy(update={'exports': attempts, 'renders': project.renders[-1:],
+        'export_inputs': [value for value in project.export_inputs[-1:] if value.attempt_id in named]})
+
+
+def _replay_details(details):
+    """The parts of an edit's reply a retry after a restart repeats; `action` and the like stay out."""
+    ids, blocks, changed = details.get('created_ids') or {}, details.get('created_blocks') or {}, details.get('changed_block_ids') or []
+    if len(changed) + sum(map(len, ids.values())) + sum(map(len, blocks.values())) > REPLAY_DETAIL_IDS:
+        return {}
+    return {'createdIds': ids, 'createdBlocks': blocks, 'changedBlockIds': changed}
 
 
 def _created(details):

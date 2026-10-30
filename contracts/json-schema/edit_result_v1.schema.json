@@ -10063,10 +10063,40 @@
     "RichMutationReplay": {
       "additionalProperties": false,
       "properties": {
+        "changedBlockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Changedblockids",
+          "type": "array"
+        },
         "clientMutationId": {
           "minLength": 1,
           "title": "Clientmutationid",
           "type": "string"
+        },
+        "createdBlocks": {
+          "additionalProperties": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Createdblocks",
+          "type": "object"
+        },
+        "createdIds": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Createdids",
+          "type": "object"
         },
         "requestSha256": {
           "pattern": "^[a-f0-9]{64}$",
