@@ -608,5 +608,6 @@ def capture_finalization(operation, project, now, *, id_factory=identity):
         return previous.model_copy(deep=True)
     if project.template_package.package_hash != operation.capture.package_hash:
         raise RepositoryFailure('DEPENDENCY_CHANGED')
+    # expiresAt is a record only: nothing stops a publication at it, the progress report shows a slow one as stalled.
     return FinalizationCandidate(id=id_factory('finalization'), authorizationId=current.id, **values,
         candidateHash=digest(values), startedAt=now, expiresAt=expiry(now, operation.capture.policy.finalization_seconds))

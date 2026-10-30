@@ -20,7 +20,7 @@ from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelle
 from .errors import ProjectFailure
 from .exports import pinned
 from .fold import ahead, sidecar_store
-from .import_progress import import_progress
+from .import_progress import import_progress, phase_of
 
 LOG = logging.getLogger(__name__)
 # A cancelled model call ends within seconds (its process group is stopped); the wait at shutdown and sign-out.
@@ -263,7 +263,7 @@ class ImportService:
             # Only an admitted task moves between processing and publication; the runner owns the earlier stages.
             stage = None
             if task.stage in {'processing', 'publication'}:
-                stage = 'publication' if operation is not None and operation.state == 'finalizing' else 'processing'
+                stage = phase_of(task.stage, operation)
             self.projects.tasks.update(task.id, stage=stage, detail=details)
         return self.projects.tasks.list(project_id)
 
