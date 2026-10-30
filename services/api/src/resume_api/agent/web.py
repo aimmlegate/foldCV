@@ -8,8 +8,8 @@ from html.parser import HTMLParser
 import http.client
 import ipaddress
 import json
+import os
 from pathlib import Path
-import resource
 import socket
 import ssl
 import sys
@@ -18,6 +18,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import zlib
 import certifi
 
+from packages.resume_core.host import WINDOWS, Confined
 from packages.resume_core.assistant_store import AgentFailure, identity, timestamp
 from packages.resume_core.models.agent import AgentWebSource
 from resume_api.cli.process_runner import ProcessRunner
@@ -199,8 +200,9 @@ class PublicFetcher:
             module = Path(__file__).resolve()
             def launch(executable, args, operation):
                 environment = safe_environment(operation)
-                environment["PYTHONPATH"] = str(module.parents[5]) + ":" + str(module.parents[2])
-                return executable, args, environment
+                environment["PYTHONPATH"] = str(module.parents[5]) + os.pathsep + str(module.parents[2])
+                # Windows: the job takes RLIMIT_CPU's place.
+                return Confined(executable, cpu_seconds=3) if WINDOWS else executable, args, environment
             try:
                 with OperationFiles(self.root).open() as files:
                     executable, arguments = python_worker("public-fetch", "-m", "resume_api.agent.web")
@@ -224,7 +226,10 @@ class PublicFetcher:
 
 
 def worker_main() -> int:
-    resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
+    if not WINDOWS:
+        import resource
+
+        resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
     try:
         request = json.loads(sys.stdin.buffer.read(8193))
         value = {"source": fetch_page(request["url"]).model_dump(mode="json", by_alias=True)}

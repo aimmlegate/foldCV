@@ -3,7 +3,6 @@
 import argparse
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-import fcntl
 import json
 import math
 import os
@@ -18,6 +17,7 @@ import threading
 import time
 import uuid
 
+from packages.resume_core import host
 from .profile import (
     FIXTURE_PROFILE, GAPS, REAL_PROFILE, REQUIRED_FLAGS, exec_arguments, overrides,
 )
@@ -78,6 +78,8 @@ def provider_error(raw: str, code: str | None = None) -> str:
 
 def safe_environment(directory: Path) -> dict[str, str]:
     # Native auth remains CLI-owned. All other inherited runtime overrides vanish.
+    if host.WINDOWS:
+        return host.windows_environment(directory / "tmp", Path.home())
     env = {"PATH": os.defpath, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8"}
     if "HOME" in os.environ:
         env["HOME"] = os.environ["HOME"]
@@ -117,11 +119,7 @@ def _write_cleanup_intent(root: Path, identifier: str, owner: str) -> Path:
         output.write(raw)
         output.flush()
         os.fsync(output.fileno())
-    directory_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
+    host.sync_directory(root)
     return marker
 
 
@@ -136,7 +134,7 @@ def cleanup_intent_ids(root: Path, *, owner: str = OWNER) -> set[str]:
         if match is None or marker.is_symlink():
             continue
         try:
-            descriptor = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            descriptor = os.open(marker, os.O_RDONLY | host.O_NOFOLLOW | host.O_NONBLOCK | host.O_BINARY)
             try:
                 info = os.fstat(descriptor)
                 if not stat.S_ISREG(info.st_mode) or info.st_size == 0 or info.st_size > 256:
@@ -174,7 +172,7 @@ def _remove_owned_directory(root: Path, directory: Path, identifier: str, owner:
             pass
         raise SpikeError("CLEANUP_FAILED") from None
     try:
-        shutil.rmtree(directory)
+        host.remove_tree(directory)
         marker.unlink()
     except OSError:
         raise SpikeError("CLEANUP_FAILED") from None
@@ -193,7 +191,7 @@ def operation(root: Path, *, owner: str = OWNER):
     preserve = False
     try:
         lock = (directory / ".lock").open("xb")
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        host.lock(lock.fileno())
         (directory / ".owner").write_text(json.dumps({"owner": owner, "id": identifier}))
         for name in ("tmp", "cache", "data", "state", "logs"):
             (directory / name).mkdir(mode=0o700)
@@ -214,6 +212,9 @@ def operation(root: Path, *, owner: str = OWNER):
         raise SpikeError("TEMP_FAILED") from None
     finally:
         try:
+            if lock and host.WINDOWS:
+                # Windows cannot delete an open file; one service owns its operations root.
+                lock.close()
             if not preserve:
                 _remove_owned_directory(root, directory, identifier, owner)
         finally:
@@ -250,7 +251,7 @@ def reap_owned(root: Path, *, owner: str = OWNER) -> int:
                 continue
             with lock_path.open("rb") as lock:
                 try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    host.lock(lock.fileno(), blocking=False)
                 except BlockingIOError:
                     continue
                 worker = path / ".worker"
@@ -272,6 +273,8 @@ def reap_owned(root: Path, *, owner: str = OWNER) -> int:
                             continue
                     except SpikeError:
                         continue
+                if host.WINDOWS:
+                    lock.close()
                 _remove_owned_directory(root, path, path.name[3:], owner)
                 count += 1
         except (OSError, SpikeError):
@@ -280,6 +283,9 @@ def reap_owned(root: Path, *, owner: str = OWNER) -> int:
 
 
 def group_members(group_id):
+    if host.WINDOWS:
+        # A worker's job ends with the service that started it; only the worker itself can be left.
+        return [group_id] if host.process_alive(group_id) else []
     try:
         inventory = subprocess.run(
             ["/bin/ps", "-axo", "pid=,pgid=,stat="], capture_output=True, timeout=1,
@@ -294,6 +300,14 @@ def group_members(group_id):
 
 
 def stop_group(process):
+    if host.WINDOWS:
+        from packages.resume_core import winjob
+        try:
+            if not winjob.stop(process):
+                raise SpikeError("PROCESS_CLEANUP_FAILED")
+        except (OSError, subprocess.TimeoutExpired):
+            raise SpikeError("PROCESS_CLEANUP_FAILED") from None
+        return
     try:
         for sig in (signal.SIGTERM, signal.SIGKILL):
             try:

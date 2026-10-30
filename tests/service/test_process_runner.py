@@ -18,7 +18,7 @@ def run(root, source, **options):
 
 
 def test_large_agent_frames_do_not_enlarge_default_metadata_frames(tmp_path):
-    source = "import sys;sys.stdout.write('x'*70000+'\\n')"
+    source = "import sys;sys.stdout.buffer.write(b'x'*70000+b'\\n')"
     with pytest.raises(SpikeError, match="OUTPUT_TOO_LARGE|INVALID_RESULT"):
         run(tmp_path / "old", source, on_line=lambda _raw: None)
     frames = []

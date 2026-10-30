@@ -1,4 +1,4 @@
-"""Opt-in, pinned macOS CLI environment for the personal experiment."""
+"""Opt-in, pinned CLI environment for the personal experiment: sandbox-exec on macOS, a Job Object on Windows."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 
+from packages.resume_core import host
 from resume_api.cli import profile as codex
 from resume_api.cli.profile import overrides
 from resume_api.cli.qualification import QualificationError, require_publisher
@@ -32,9 +33,10 @@ def use_system_certificates() -> None:
     """Point every CLI launch of this process at the system PEM bundle; TLS checks stay on.
 
     The macOS app needs it: native trust discovery failed the CLI token exchange on a macOS 14 Mac (2026-10-20).
+    On Windows the CLI reads the Windows certificate store itself.
     """
     global _system_certificates
-    _system_certificates = True
+    _system_certificates = not host.WINDOWS
 
 
 def system_certificates() -> str:
@@ -58,8 +60,7 @@ def _safe_directory(path: Path, *, create: bool) -> Path:
         raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
     if create:
         absolute.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if (not absolute.is_dir() or stat.S_IMODE(absolute.stat().st_mode) != 0o700
-            or absolute.stat().st_uid != os.getuid()):
+    if not absolute.is_dir() or not host.private_mode(absolute.stat(), 0o700) or not host.owned(absolute.stat()):
         raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
     return absolute.resolve(strict=True)
 
@@ -107,15 +108,17 @@ class ExperimentalCliProfile:
         _safe_directory(self.root, create=True)
         marker = self.root / MARKER
         if not marker.exists():
-            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | host.O_NOFOLLOW | host.O_BINARY, 0o600)
+            with os.fdopen(descriptor, "w", encoding="ascii", newline="\n") as stream:
                 stream.write("foldcv-cli-experiment-v1\n")
         if (marker.is_symlink() or marker.read_text(encoding="ascii") != "foldcv-cli-experiment-v1\n"
-                or marker.stat().st_uid != os.getuid() or stat.S_IMODE(marker.stat().st_mode) != 0o600):
+                or not host.owned(marker.stat()) or not host.private_mode(marker.stat(), 0o600)):
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
         _safe_directory(self.home, create=True)
         _safe_directory(self.codex_home, create=True)
         _safe_directory(self.workdir, create=True)
+        if host.WINDOWS:
+            return
         sandbox = Path("/usr/bin/sandbox-exec")
         if not sandbox.is_file() or not os.access(sandbox, os.X_OK):
             raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
@@ -159,9 +162,18 @@ class ExperimentalCliProfile:
             "(deny process-exec)",
             "(allow process-exec (literal " + _literal(self.executable) + "))",
         ]
-        if args and args[0] == "login" and args != ("login", "status"):
+        if self.signs_in(args):
             operations.append('(allow process-exec (literal "/usr/bin/open"))')
         return "\n".join(operations)
+
+    @staticmethod
+    def signs_in(args: tuple[str, ...]) -> bool:
+        """The browser sign-in, the one run that may open another program."""
+        return bool(args) and args[0] == "login" and args != ("login", "status")
+
+    def children(self, args: tuple[str, ...]) -> int:
+        """Windows: the other processes a run may start inside its job."""
+        return 0
 
     def exec_arguments(self, operation: Path, model: str) -> tuple[str, ...]:
         return (
@@ -180,6 +192,10 @@ class ExperimentalCliProfile:
         owned = _safe_directory(operation, create=False)
         for name in ("tmp", "cache", "data", "state", "logs"):
             _safe_directory(owned / name, create=False)
+        if host.WINDOWS:
+            # No sandbox-exec on Windows: the job forbids other programs, but file access stays unrestricted.
+            env = {**host.windows_environment(owned / "tmp", self.home), "CODEX_HOME": str(self.codex_home)}
+            return host.Confined(executable, children=self.children(args), breakaway=self.signs_in(args)), args, env
         env = {"PATH": os.defpath, "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8",
                "HOME": str(self.home), "CODEX_HOME": str(self.codex_home),
                "TMPDIR": str(owned / "tmp"), "XDG_CACHE_HOME": str(owned / "cache"),

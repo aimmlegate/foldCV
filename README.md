@@ -20,6 +20,16 @@ python.org Python 3.13, and writes to `output/foldcv-macos-<version>-<commit>/`.
 `~/Library/Application Support/FoldCV Desktop`, apart from the browser service's `FoldCV` root. The signature is ad
 hoc: on another Mac, allow the app once in System Settings → Privacy & Security.
 
+## Windows app
+
+`tools/build-windows-zip.sh` builds the portable `FoldCV-Local-<version>-win-x64.zip` on a Mac in one step (Node 22,
+python.org Python 3.13): the frontend, the python.org embeddable Python with the service's Windows wheels, and the
+Electron window. The `Windows` workflow builds the same zip on a Windows runner and checks it there (helper, both CLIs,
+app start). Unpack the zip anywhere and run `FoldCV Local.exe`; there is no installer. Data stays in
+`%LOCALAPPDATA%\FoldCV Desktop`, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed:
+Windows SmartScreen asks once (More info → Run anyway). Codex and Claude run in a Job Object that lets them start no
+other program and ends them with the app; unlike the macOS sandbox it does not limit which files they read or write.
+
 ## Setup
 
 ```sh

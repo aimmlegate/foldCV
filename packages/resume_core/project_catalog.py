@@ -7,6 +7,7 @@ import threading
 
 from pydantic import Field
 
+from . import host
 from .models.contracts import Wire
 from .project_store import ProjectStoreFailure, owned_file, strict_json
 from .storage import atomic_write, locked_root
@@ -104,11 +105,7 @@ class ProjectCatalog:
             if synchronize and self.path.exists():
                 with self.path.open("rb") as stream:
                     os.fsync(stream.fileno())
-                descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-                try:
-                    os.fsync(descriptor)
-                finally:
-                    os.close(descriptor)
+                host.sync_directory(self.root)
             return {key: json.loads(value) for key, value in state.actions.items()}
 
     def record_action(self, key, value):

@@ -65,6 +65,6 @@ HELPER=$("$VENV/bin/python" tools/desktop/build_helper.py "$WORK/helper" | tail 
 step "App and DMG"
 # An earlier build of the same version and commit is replaced.
 rm -rf "$OUTPUT"
-(cd apps/desktop && node scripts/package.mjs "$HELPER" "$OUTPUT")
+(cd apps/desktop && node scripts/package-macos.mjs "$HELPER" "$OUTPUT")
 print -P "%BDone:%b $OUTPUT"
 print "SHA-256 $(node -p "require('$OUTPUT/build-info.json').dmgSha256")"

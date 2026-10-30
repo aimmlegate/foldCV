@@ -1,4 +1,4 @@
-"""The macOS app's service entry (`resume_api.desktop`), its CLI trust and the frozen helper's worker modes.
+"""The desktop app's service entry (`resume_api.desktop`), its CLI trust and the frozen helper's worker modes.
 
 The live service runs in a child process; curl talks to it outside the Python socket guard."""
 
@@ -7,16 +7,17 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import select
+import queue
 import subprocess
 import sys
+import threading
 
 import pytest
 
 from resume_api import desktop, launcher, lifecycle
 from resume_api.cli import distribution, experimental_profile
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
-from resume_api.cli.installation import ClaudeInstallation
+from resume_api.cli.installation import ClaudeInstallation, curl as system_curl
 from resume_api.cli.profiles import claude
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,12 +30,13 @@ def private_root(tmp_path: Path) -> Path:
 
 
 def curl(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["/usr/bin/curl", "--silent", "--show-error", "--max-time", "5", *args],
+    return subprocess.run([str(system_curl()), "--silent", "--show-error", "--max-time", "5", *args],
                           text=True, capture_output=True, timeout=10)
 
 
 def test_workers_run_their_scripts_from_source_and_helper_modes_when_frozen(monkeypatch):
-    assert lifecycle.python_worker("extract", "/w/worker.py") == (Path(sys.executable), ("/w/worker.py",))
+    utf8 = ("-X", "utf8") if lifecycle.host.WINDOWS else ()
+    assert lifecycle.python_worker("extract", "/w/worker.py") == (Path(sys.executable), (*utf8, "/w/worker.py"))
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     assert lifecycle.python_worker("public-fetch", "-m", "resume_api.agent.web") == (Path(sys.executable),
                                                                                      ("public-fetch",))
@@ -42,7 +44,7 @@ def test_workers_run_their_scripts_from_source_and_helper_modes_when_frozen(monk
 
 @pytest.mark.parametrize("arguments", [[], ["nope"], ["extract", "extra"], ["serve"], ["serve", "relative/root"]])
 def test_the_helper_refuses_unknown_modes_and_arguments(arguments):
-    result = subprocess.run([sys.executable, "packaging/macos/helper_entry.py", *arguments], cwd=ROOT,
+    result = subprocess.run([sys.executable, "packaging/helper_entry.py", *arguments], cwd=ROOT,
                             capture_output=True, timeout=60)
     assert result.returncode == 64
 
@@ -61,6 +63,10 @@ def test_the_service_keeps_the_last_port_while_it_is_free(tmp_path):
     assert moved != port and (root / desktop.PORT_FILE).read_text() == f"{moved}\n"
 
 
+macos_trust = pytest.mark.skipif(sys.platform == "win32", reason="the macOS certificate fix")
+
+
+@macos_trust
 def test_cli_launches_use_the_system_certificates_only_when_the_app_asks(tmp_path, monkeypatch):
     monkeypatch.setattr(experimental_profile, "_system_certificates", False)
     monkeypatch.setattr(ExperimentalCliProfile, "prepare", lambda _self: None)
@@ -75,6 +81,7 @@ def test_cli_launches_use_the_system_certificates_only_when_the_app_asks(tmp_pat
         "/private/etc/ssl/cert.pem")
 
 
+@macos_trust
 @pytest.mark.parametrize("content", [None, "not a system file"])
 def test_a_missing_or_user_owned_certificate_file_stops_the_launch(tmp_path, monkeypatch, content):
     pem = tmp_path / "cert.pem"
@@ -83,6 +90,13 @@ def test_a_missing_or_user_owned_certificate_file_stops_the_launch(tmp_path, mon
     monkeypatch.setattr(experimental_profile, "SYSTEM_CA", pem)
     with pytest.raises(ExperimentalProfileError, match="CLI_CA_UNAVAILABLE"):
         experimental_profile.system_certificates()
+
+
+def test_windows_cli_launches_keep_their_own_certificate_store(monkeypatch):
+    monkeypatch.setattr(experimental_profile, "_system_certificates", False)
+    monkeypatch.setattr(experimental_profile.host, "WINDOWS", True)
+    experimental_profile.use_system_certificates()
+    assert experimental_profile._system_certificates is False
 
 
 def test_the_app_uses_only_the_runtimes_it_installs(tmp_path, monkeypatch):
@@ -108,15 +122,16 @@ def test_the_service_serves_the_page_and_stops_when_its_shell_closes_stdin(tmp_p
                                    start_new_session=True)
         assert process.stdin is not None and process.stdout is not None and process.stderr is not None
         try:
-            ready, _, _ = select.select([process.stdout], [], [], 30)
-            assert ready, "desktop service readiness timed out"
-            line = process.stdout.readline()
+            # select() cannot wait on a pipe on Windows.
+            lines: queue.Queue[str] = queue.Queue()
+            threading.Thread(target=lambda: lines.put(process.stdout.readline()), daemon=True).start()
+            line = lines.get(timeout=30)
             assert line, process.stderr.read()
             started = json.loads(line)
             origin, secret = started["origin"], started["secret"]
             assert curl(origin + "/").stdout == "<p>synthetic shell</p>"
             jar = str(tmp_path / "cookies")
-            exchange = curl("-o", "/dev/null", "-w", "%{http_code}", "-c", jar, "-X", "POST", "-H", "Origin: " + origin,
+            exchange = curl("-o", os.devnull, "-w", "%{http_code}", "-c", jar, "-X", "POST", "-H", "Origin: " + origin,
                             "-H", "Content-Type: application/json", "--data", json.dumps({"secret": secret}),
                             origin + "/v1/session/exchange")
             assert exchange.stdout == "200"

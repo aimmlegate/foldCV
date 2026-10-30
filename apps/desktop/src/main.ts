@@ -1,16 +1,19 @@
-import { app, BrowserWindow, dialog, Menu, screen, session, shell, type MenuItemConstructorOptions, type Session,
-  type WebContents } from "electron";
-import { isAbsolute, join } from "node:path";
+import { app, BrowserWindow, dialog, Menu, screen, session, shell, type BrowserWindowConstructorOptions,
+  type MenuItemConstructorOptions, type Session, type WebContents } from "electron";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { startHelper, type Helper } from "./helper.js";
+import { dataRoot, helperCommand, helperEnvironment } from "./platform.js";
 import { appUrl, externalUrl } from "./policy.js";
 
+const mac = process.platform === "darwin";
 // The service data, the CLI profile and Chromium's own storage share the root of the 0.1 builds; QA runs may set
 // FOLDCV_DESKTOP_ROOT to another absolute path.
-const override = process.env["FOLDCV_DESKTOP_ROOT"];
-const root = override && isAbsolute(override) ? override : join(app.getPath("appData"), "FoldCV Desktop");
-const log = join(root, "logs/helper.log");
+const root = dataRoot(process.platform, process.env, app.getPath("appData"));
+const log = join(root, "logs", "helper.log");
 app.setPath("userData", join(root, "electron"));
 app.setAppLogsPath(join(root, "logs"));
+if (process.platform === "win32") app.setAppUserModelId("invalid.foldcv.local");
 
 let helper: Helper | null = null, stopping: Promise<void> | null = null, finished = false;
 
@@ -50,17 +53,21 @@ function guard(contents: WebContents, origin: string): void {
 }
 
 function menu(): Menu {
-  return Menu.buildFromTemplate([{ role: "appMenu" }, { role: "fileMenu" }, { role: "editMenu" },
-    { label: "View", submenu: [{ role: "reload" }, { type: "separator" }, { role: "resetZoom" }, { role: "zoomIn" },
-      { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] },
-    { role: "windowMenu" }]);
+  const view: MenuItemConstructorOptions = { label: "View", submenu: [{ role: "reload" }, { type: "separator" },
+    { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, { type: "separator" }, { role: "togglefullscreen" }] };
+  // The app and window menus exist on macOS only; on Windows the menu bar hides until Alt.
+  return Menu.buildFromTemplate(mac ? [{ role: "appMenu" }, { role: "fileMenu" }, { role: "editMenu" }, view,
+    { role: "windowMenu" }] : [{ role: "fileMenu" }, { role: "editMenu" }, view]);
 }
+
+// macOS: no title bar, the window buttons over the page corner. Windows: the native frame.
+const frame: BrowserWindowConstructorOptions = mac
+  ? { titleBarStyle: "hidden", trafficLightPosition: { x: 16, y: 12 } } : { autoHideMenuBar: true };
 
 function createWindow(origin: string): BrowserWindow {
   const area = screen.getPrimaryDisplay().workAreaSize;
   const window = new BrowserWindow({ width: Math.min(1440, area.width), height: Math.min(960, area.height),
-    minWidth: 800, minHeight: 600, show: false, title: "FoldCV", titleBarStyle: "hidden",
-    trafficLightPosition: { x: 16, y: 12 }, backgroundColor: "#eae9e2",
+    minWidth: 800, minHeight: 600, show: false, title: "FoldCV", ...frame, backgroundColor: "#eae9e2",
     webPreferences: { preload: join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true,
       nodeIntegration: false, webSecurity: true, webviewTag: false, devTools: false, navigateOnDragDrop: false } });
   guard(window.webContents, origin);
@@ -107,8 +114,8 @@ async function start(): Promise<void> {
   await app.whenReady();
   Menu.setApplicationMenu(menu());
   try {
-    helper = await startHelper(join(process.resourcesPath, "../Helpers/FoldCV Helper.app/Contents/MacOS/foldcv-helper"),
-      root, log);
+    helper = await startHelper(helperCommand(process.platform, process.resourcesPath, root),
+      helperEnvironment(process.platform, process.env, homedir()), log);
   } catch {
     await fatal("Не удалось запустить FoldCV.");
     return;

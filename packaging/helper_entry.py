@@ -1,12 +1,13 @@
-"""The one executable of the frozen macOS helper: the service and the workers it starts as modes of itself."""
+"""Entry of the desktop helper: the frozen macOS executable, whose workers are modes of itself, and the script the
+embedded Python runs on Windows, whose workers run as scripts."""
 
 from pathlib import Path
 import sys
 
-# The service compiles nothing into the signed bundle.
+# The service compiles nothing into the signed bundle or the unpacked zip.
 sys.dont_write_bytecode = True
 if not getattr(sys, "frozen", False):
-    source = Path(__file__).resolve().parents[2]
+    source = Path(__file__).resolve().parents[1]
     sys.path[:0] = [str(source), str(source / "services/api/src")]
 
 

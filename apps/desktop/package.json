@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "package": "node scripts/package.mjs"
+    "package:macos": "node scripts/package-macos.mjs",
+    "package:windows": "node scripts/package-windows.mjs"
   },
   "devDependencies": {
     "@electron/fuses": "2.1.3",

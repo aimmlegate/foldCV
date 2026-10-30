@@ -17,7 +17,7 @@ import signal
 import threading
 import time
 
-from packages.resume_core import agent_limits as limits
+from packages.resume_core import agent_limits as limits, host
 from packages.resume_core.agent_progress import PublicProgress
 from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentUsage
@@ -354,7 +354,8 @@ class ClaudeAgentRuntime:
                     operation_path = files.path
                     (files.path / "tmp").mkdir(mode=0o700, exist_ok=True)
                     config = files.path / "mcp.json"
-                    descriptor = os.open(config, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                    descriptor = os.open(config, os.O_WRONLY | os.O_CREAT | os.O_EXCL | host.O_NOFOLLOW
+                                         | host.O_BINARY, 0o600)
                     with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                         # The token stays in the environment; the file names only the variable.
                         json.dump({"mcpServers": {SERVER: {"type": "http", "url": value.url, "timeout": 20000,
@@ -365,7 +366,8 @@ class ClaudeAgentRuntime:
                     runner = ProcessRunner(self.executable, launch=self.launch(value.token), clock=elapsed)
 
                     def interrupt():
-                        if files.process is not None and files.process.poll() is None:
+                        # A Windows child has no console to send Ctrl+C to; the grace runs out and the job ends.
+                        if not host.WINDOWS and files.process is not None and files.process.poll() is None:
                             os.killpg(files.process.pid, signal.SIGINT)
 
                     def before_cleanup():

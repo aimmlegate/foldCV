@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { createWriteStream, mkdirSync, renameSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { finished } from "node:stream/promises";
+import type { HelperCommand } from "./platform.js";
 
 /** Where the page is served and the one-time secret that opens its session. */
 export type Endpoint = { origin: string; secret: string };
@@ -34,11 +34,13 @@ function openLog(path: string): NodeJS.WritableStream {
   return createWriteStream(path, { flags: "a", mode: 0o600 });
 }
 
-/** Start `<executable> serve <root>`; resolves when the service reports its endpoint. Its stderr goes to `log`. */
-export function startHelper(executable: string, root: string, log: string, timeout = 120_000): Promise<Helper> {
-  const child = spawn(executable, ["serve", root], { stdio: ["pipe", "pipe", "pipe"], env: {
-    PATH: "/usr/bin:/bin:/usr/sbin:/sbin", HOME: homedir(), LANG: "en_US.UTF-8",
-    ...(process.env["TMPDIR"] ? { TMPDIR: process.env["TMPDIR"] } : {}) } });
+/** Start the helper's `serve <root>` command; resolves when the service reports its endpoint. Its stderr goes to
+ * `log`. */
+export function startHelper(command: HelperCommand, environment: Record<string, string>, log: string,
+  timeout = 120_000): Promise<Helper> {
+  // No console window on Windows; the service's own workers start without one too.
+  const child = spawn(command.executable, command.args, { stdio: ["pipe", "pipe", "pipe"], env: environment,
+    windowsHide: true });
   const output = openLog(log);
   child.stderr.pipe(output);
   child.stdin.on("error", () => { /* The helper may be gone already; `exited` reports it. */ });

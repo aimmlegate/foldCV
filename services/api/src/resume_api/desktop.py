@@ -1,4 +1,4 @@
-"""Serve FoldCV for the macOS app: its Electron shell starts this process and opens the page it serves.
+"""Serve FoldCV for the desktop app (macOS and Windows): its Electron shell starts this process and opens the page.
 
 The shell passes the data root as the only argument. When the service listens, it writes one JSON line with the
 origin and the startup secret to stdout. Closing stdin, or SIGTERM, stops it.
@@ -17,6 +17,7 @@ import time
 
 import uvicorn
 
+from packages.resume_core import host
 from packages.resume_core.storage import atomic_write, private_directory
 from .app import create_app
 from .cli.experimental_profile import installed_profile, use_system_certificates
@@ -42,8 +43,10 @@ def listen(root: Path) -> socket.socket:
         preferred = 0
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        # Connections of the last run may still hold the port in TIME_WAIT.
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Connections of the last run may still hold the port in TIME_WAIT. On Windows the option would also let
+        # this socket share a port that another one listens on, and TIME_WAIT does not block the bind there.
+        if not host.WINDOWS:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             listener.bind(("127.0.0.1", preferred if 1024 <= preferred <= 65535 else 0))
         except OSError:

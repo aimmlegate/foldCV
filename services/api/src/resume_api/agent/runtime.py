@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 import json
 import inspect
+import os
 from pathlib import Path
 import subprocess
 import threading
@@ -15,6 +16,7 @@ from typing import Callable, Protocol
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.host import WINDOWS
 from packages.resume_core.models.agent import AgentUsage
 from packages.resume_core.storage import StorageFailure
 from resume_api.cli.experimental_profile import ExperimentalProfileError
@@ -613,6 +615,8 @@ class CodexAgentRuntime:
 
     @staticmethod
     def check_owned_host(files, *, require_host=True, host=CODE_MODE_HOST):
+        if WINDOWS:
+            return owned_host_windows(files, require_host=require_host, host=host)
         rows = subprocess.check_output(["/bin/ps", "-axo", "pid=,ppid=,command="], text=True, timeout=2)
         children = [row.strip().split(None, 2) for row in rows.splitlines()]
         owned = [parts for parts in children if len(parts) == 3 and int(parts[1]) == files.process.pid]
@@ -624,6 +628,27 @@ class CodexAgentRuntime:
         if listeners.returncode != 1 or listeners.stdout.strip():
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         return tuple(int(parts[0]) for parts in owned)
+
+
+def owned_host_windows(files, *, require_host, host):
+    """check_owned_host on Windows: the app server's job holds only the code-mode host, and none of them listens."""
+    from packages.resume_core import winjob
+
+    def same(image):
+        try:
+            return image is not None and os.path.samefile(image, host)
+        except OSError:
+            return False
+
+    try:
+        owned = [pid for pid in winjob.job_pids(files.process) if pid != files.process.pid]
+        if (require_host and not owned) or not all(same(winjob.image(pid)) for pid in owned):
+            raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
+        if winjob.listening_pids() & {files.process.pid, *owned}:
+            raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
+    except OSError:
+        raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED") from None
+    return tuple(owned)
 
 
 class ScriptedAgentRuntime:

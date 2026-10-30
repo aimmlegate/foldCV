@@ -17,6 +17,7 @@ import logging
 import os
 from pathlib import Path
 
+from . import host
 from .storage import StorageFailure, atomic_write, private_directory
 from .template_local_history import values
 
@@ -319,7 +320,8 @@ class ProjectJournal:
                 'at': self._now(), 'reason': 'gap'})
         try:
             private_directory(self.path.parent)
-            descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+            descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | host.O_NOFOLLOW | host.O_BINARY,
+                                 0o600)
             try:
                 os.write(descriptor, b''.join(json.dumps(item, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
                     + b'\n' for item in lines))

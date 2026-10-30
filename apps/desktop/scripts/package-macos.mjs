@@ -1,5 +1,5 @@
 // Package the macOS app around a built helper, sign it ad hoc and wrap it in a DMG.
-// Usage: node scripts/package.mjs <FoldCV Helper.app> <new output directory>
+// Usage: node scripts/package-macos.mjs <FoldCV Helper.app> <new output directory>
 import { flipFuses, FuseV1Options, FuseVersion } from "@electron/fuses";
 import { packager } from "@electron/packager";
 import { build } from "esbuild";
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const desktop = fileURLToPath(new URL("../", import.meta.url)), root = resolve(desktop, "../..");
 const [helperArgument, outputArgument] = process.argv.slice(2);
-if (!helperArgument?.endsWith(".app") || !outputArgument) throw new Error("Usage: package.mjs <FoldCV Helper.app> <output directory>");
+if (!helperArgument?.endsWith(".app") || !outputArgument) throw new Error("Usage: package-macos.mjs <FoldCV Helper.app> <output directory>");
 const helper = resolve(helperArgument), output = resolve(outputArgument);
 if (existsSync(output)) throw new Error("The output directory must not exist yet");
 const { version, devDependencies } = JSON.parse(await readFile(join(desktop, "package.json"), "utf8"));

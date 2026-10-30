@@ -1,13 +1,13 @@
 """Cancellable cross-process ownership of the application-owned native profile."""
 
 from contextlib import contextmanager
-import fcntl
 import json
 import os
 import re
 import threading
 import time
 
+from packages.resume_core import host
 from packages.resume_core.project_store import owned_file, strict_json
 from packages.resume_core.storage import StorageFailure, private_file, atomic_write
 from .inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
@@ -18,11 +18,7 @@ SHARED = ".foldcv-shared-server-v1"
 
 
 def process_alive(pid):
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
+    return host.process_alive(pid)
 
 
 class SharedOwnership:
@@ -85,17 +81,13 @@ def recover_profile(profile, operations_root):
         if has_blocked_owned(operations_root) or shared in records and shared_operations_pending(operations_root):
             return True
         path = profile.root / ".foldcv-inference.lock"
-        descriptor = os.open(path, os.O_RDWR | os.O_NOFOLLOW)
+        descriptor = os.open(path, os.O_RDWR | host.O_NOFOLLOW | host.O_BINARY)
         try:
             private_file(path)
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            host.lock(descriptor, blocking=False)
             for path in records:
                 path.unlink()
-            directory = os.open(profile.root, os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            host.sync_directory(profile.root)
         finally:
             os.close(descriptor)
         return False
@@ -107,7 +99,7 @@ def _acquire(profile, cancel, deadline, blocking):
     """Open the profile lock file and take its exclusive lock; the returned descriptor holds it."""
     profile.prepare()
     path = profile.root / ".foldcv-inference.lock"
-    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | host.O_NOFOLLOW | host.O_BINARY, 0o600)
     try:
         private_file(path)
         if path.stat().st_nlink != 1:
@@ -120,7 +112,7 @@ def _acquire(profile, cancel, deadline, blocking):
             if time.monotonic() >= deadline:
                 raise AdmissionTimeout()
             try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                host.lock(descriptor, blocking=False)
             except BlockingIOError:
                 if not blocking:
                     raise AdmissionTimeout() from None
@@ -131,7 +123,7 @@ def _acquire(profile, cancel, deadline, blocking):
                     if (profile.root / marker).exists() or (profile.root / marker).is_symlink():
                         raise AdmissionBlocked()
             except BaseException:
-                fcntl.flock(descriptor, fcntl.LOCK_UN)
+                host.unlock(descriptor)
                 raise
             return descriptor
     except BaseException:
@@ -141,7 +133,7 @@ def _acquire(profile, cancel, deadline, blocking):
 
 def _release(descriptor):
     try:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        host.unlock(descriptor)
     finally:
         os.close(descriptor)
 
@@ -242,8 +234,4 @@ def shared_profile(profile, cancel, *, deadline, operations_root):
         if has_blocked_owned(operations_root) or shared_operations_pending(operations_root):
             raise SpikeError("CLEANUP_FAILED")
         marker.unlink()
-        directory = os.open(profile.root, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        host.sync_directory(profile.root)

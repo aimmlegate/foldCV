@@ -44,9 +44,12 @@ Define ports for `Extractor`, `ContentProvider`, `DocumentRenderer`,
 `CliRuntime`, and `HostBridge`. The browser must not import Electron APIs,
 spawn processes, read arbitrary filesystem paths, or receive provider secrets.
 The macOS app (`apps/desktop`) is an Electron window that starts the same service,
-frozen with PyInstaller (`packaging/macos/helper_entry.py`, `resume_api.desktop`), and
+frozen with PyInstaller (`packaging/helper_entry.py`, `resume_api.desktop`), and
 loads the page it serves; the page needs no Electron API. Workers run as modes of the
-frozen helper. Build: `tools/build-macos-dmg.sh` (README).
+frozen helper. Build: `tools/build-macos-dmg.sh` (README). The Windows zip runs the
+service on the python.org embeddable Python instead (`tools/desktop/build_windows_helper.py`);
+its workers run as scripts, each process in its own Job Object (`packages/resume_core/winjob.py`,
+`host.py`). Build: `tools/build-windows-zip.sh` or the `Windows` workflow.
 A remote deployment keeps the data contracts but needs an explicit execution
 decision: a protected local companion for the user's CLI, or a different approved
 provider adapter. A shared server cannot use a CLI installed on the user's laptop

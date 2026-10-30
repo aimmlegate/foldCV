@@ -129,5 +129,14 @@ def test_a_failed_operation_stops_the_worker_group_and_removes_its_directory(tmp
 
 def test_an_unsupported_host_fails_clearly(monkeypatch):
     monkeypatch.setattr(lifecycle.sys, "platform", "linux")
-    with pytest.raises(RuntimeError, match="macOS arm64 only"):
+    with pytest.raises(RuntimeError, match="macOS arm64 and Windows x64 only"):
+        lifecycle.require_supported_host()
+
+
+def test_windows_runs_on_x64_only(monkeypatch):
+    monkeypatch.setattr(lifecycle.host, "WINDOWS", True)
+    monkeypatch.setattr(lifecycle.platform, "machine", lambda: "AMD64")
+    lifecycle.require_supported_host()
+    monkeypatch.setattr(lifecycle.platform, "machine", lambda: "ARM64")
+    with pytest.raises(RuntimeError, match="Windows x64 only"):
         lifecycle.require_supported_host()

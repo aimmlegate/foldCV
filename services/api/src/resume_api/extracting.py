@@ -6,8 +6,8 @@ import asyncio
 import json
 from pathlib import Path
 import re
-import subprocess
 
+from packages.resume_core import host
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.extraction.parser import MAX_SOURCE
 
@@ -17,6 +17,8 @@ WORKER = Path(__file__).resolve().parents[4] / "packages/resume_core/extraction/
 MAX_BODY = MAX_SOURCE + 8192
 MAX_RESULT = 4 * 1024 * 1024
 MAX_RSS_KB = 512 * 1024
+# Windows has no RLIMIT_AS for the worker to set; its job caps the committed memory instead.
+COMMIT_LIMIT = 768 * 1024 * 1024
 BOUNDARY = re.compile(rb"^[A-Za-z0-9'()+_,./:=?-]{1,70}$")
 ALLOWED_ERRORS = frozenset({"EXTRACT_EMPTY", "INPUT_TOO_LARGE", "EXTRACT_ENCODING", "EXTRACT_UNSUPPORTED",
                            "EXTRACT_MALFORMED", "EXTRACT_ENCRYPTED", "EXTRACT_PAGE_LIMIT", "EXTRACT_TEXT_LIMIT",
@@ -68,13 +70,8 @@ def parse_one_part(body: bytes, content_type: str, *, maximum=MAX_SOURCE) -> tup
     return data, name, pasted
 
 
-def _rss_kb(pid: int) -> int | None:
-    try:
-        result = subprocess.run(("/bin/ps", "-o", "rss=", "-p", str(pid)), capture_output=True,
-                                timeout=0.5, check=False, text=True)
-        return int(result.stdout.strip()) if result.returncode == 0 and result.stdout.strip().isdigit() else None
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return None
+def _rss_kb(process) -> int | None:
+    return host.resident_kb(process)
 
 
 async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFiles) -> ExtractResult:
@@ -83,10 +80,12 @@ async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFile
     workspace = files.path
     (workspace / "source.bin").write_bytes(data)
     (workspace / "extract-input.json").write_text(json.dumps({"name": name, "pasted": pasted}, ensure_ascii=False), encoding="utf-8")
-    process = files.spawn(*python_worker("extract", str(WORKER)), capture=False)
+    executable, arguments = python_worker("extract", str(WORKER))
+    process = files.spawn(host.Confined(executable, memory=COMMIT_LIMIT) if host.WINDOWS else executable, arguments,
+                          capture=False)
     try:
         while process.poll() is None:
-            rss = await asyncio.to_thread(_rss_kb, process.pid)
+            rss = await asyncio.to_thread(_rss_kb, process)
             if rss is None and process.poll() is None:
                 files.stop_worker()
                 raise UploadFailure("EXTRACT_MONITOR_UNAVAILABLE")

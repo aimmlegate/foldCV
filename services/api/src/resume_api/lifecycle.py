@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 
+from packages.resume_core import host
 from resume_api.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_owned as spike_reap_owned, safe_environment, stop_group, strict_json
 
 
@@ -31,13 +32,18 @@ def tune_garbage_collector() -> tuple[int, int, int]:
 
 
 def python_worker(mode: str, *arguments: str) -> tuple[Path, tuple[str, ...]]:
-    """Run a worker on this interpreter, or as one mode of the frozen macOS helper, which has no scripts to run."""
-    return Path(sys.executable), (mode,) if getattr(sys, "frozen", False) else arguments
+    """Run a worker on this interpreter, or as one mode of the frozen macOS helper, which has no scripts to run.
+    Windows workers run in UTF-8 mode like the service there; otherwise open() would use the ANSI code page."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable), (mode,)
+    return Path(sys.executable), (("-X", "utf8") if host.WINDOWS else ()) + arguments
 
 
 def require_supported_host() -> None:
+    if host.WINDOWS and platform.machine() == "AMD64":
+        return
     if sys.platform != "darwin" or platform.machine() != "arm64":
-        raise RuntimeError("Local service process cleanup supports macOS arm64 only")
+        raise RuntimeError("Local service process cleanup supports macOS arm64 and Windows x64 only")
 
 
 def reap_owned(root: Path) -> int:
@@ -74,20 +80,26 @@ class OperationFiles:
         self.closed = False
         self.cleanup_failed = False
 
-    def spawn(self, executable: Path, arguments: tuple[str, ...], *, capture: bool = True,
+    def spawn(self, executable: Path | host.Confined, arguments: tuple[str, ...], *, capture: bool = True,
               environment: dict[str, str] | None = None, cwd: Path | None = None) -> subprocess.Popen[bytes]:
-        """Start one test worker with an ambiguous crash marker before Popen. cwd defaults to the operation directory."""
+        """Start one test worker with an ambiguous crash marker before Popen. cwd defaults to the operation directory.
+        On Windows the worker runs in its own Job Object (`host.Confined` sets its limits; plain paths start none)."""
         if self.closed or self.path is None or self.process is not None:
             raise RuntimeError("Operation has no free worker slot")
         marker = self.path / ".worker"
         marker.write_text('{"state":"spawning"}', encoding="utf-8")
+        options = {"cwd": cwd if cwd is not None else self.path,
+                   "env": environment if environment is not None else safe_environment(self.path),
+                   "stdin": subprocess.PIPE if capture else subprocess.DEVNULL,
+                   "stdout": subprocess.PIPE if capture else subprocess.DEVNULL,
+                   "stderr": subprocess.PIPE if capture else subprocess.DEVNULL, "shell": False}
         try:
-            process = subprocess.Popen([str(executable), *arguments], cwd=cwd if cwd is not None else self.path,
-                                       env=environment if environment is not None else safe_environment(self.path),
-                                       stdin=subprocess.PIPE if capture else subprocess.DEVNULL,
-                                       stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-                                       stderr=subprocess.PIPE if capture else subprocess.DEVNULL,
-                                       start_new_session=True, shell=False)
+            if host.WINDOWS:
+                from packages.resume_core import winjob
+                limits = executable if isinstance(executable, host.Confined) else host.Confined(executable)
+                process = winjob.spawn([str(limits.program), *arguments], limits, **options)
+            else:
+                process = subprocess.Popen([str(executable), *arguments], start_new_session=True, **options)
         except Exception:
             marker.unlink(missing_ok=True)
             raise

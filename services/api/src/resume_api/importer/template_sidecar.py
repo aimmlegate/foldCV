@@ -11,6 +11,7 @@ import json
 import os
 import re
 
+from packages.resume_core import host
 from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_import import ImportOperation
@@ -23,17 +24,9 @@ PROGRESS = {'reserved': 0, 'dispatch_started': 1, 'outcome_unknown': 2, 'returne
 
 def _private_directory(path):
     path.mkdir(mode=0o700, exist_ok=True)
-    if path.is_symlink() or not path.is_dir() or path.stat().st_uid != os.getuid():
+    if path.is_symlink() or not path.is_dir() or not host.owned(path.stat()):
         raise RepositoryFailure('JOB_STORE_UNAVAILABLE')
     os.chmod(path, 0o700)
-
-
-def _fsync_directory(path):
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
 class OperationSidecar:
@@ -56,14 +49,14 @@ class OperationSidecar:
         if len(raw) > WORKSPACE_CEILING_BYTES:
             raise RepositoryFailure('JOB_STORAGE_FULL')
         temporary = target.with_name(target.name + '.tmp')
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | host.O_NOFOLLOW | host.O_BINARY, 0o600)
         try:
             with os.fdopen(descriptor, 'wb') as stream:
                 stream.write(raw)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, target)
-            _fsync_directory(target.parent)
+            host.replace(temporary, target)
+            host.sync_directory(target.parent)
         except OSError:
             raise RepositoryFailure('OUTCOME_UNKNOWN') from None
 
@@ -71,14 +64,14 @@ class OperationSidecar:
         """(project revision, operation, facts) of the sidecar, or None when the import has none."""
         target = self.path(project, operation_id)
         try:
-            descriptor = os.open(target, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+            descriptor = os.open(target, os.O_RDONLY | host.O_NOFOLLOW | host.O_BINARY)
         except FileNotFoundError:
             return None
         except OSError:
             raise RepositoryFailure('JOB_STORE_UNAVAILABLE') from None
         with os.fdopen(descriptor, 'rb') as stream:
             status = os.fstat(stream.fileno())
-            if status.st_nlink != 1 or status.st_uid != os.getuid() or status.st_mode & 0o077:
+            if status.st_nlink != 1 or not host.owned(status) or host.shared_mode(status):
                 raise RepositoryFailure('JOB_STORE_UNAVAILABLE')
             raw = stream.read(WORKSPACE_CEILING_BYTES + 1)
         try:

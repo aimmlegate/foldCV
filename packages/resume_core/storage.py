@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-import fcntl
 import os
 from pathlib import Path
-import stat
 import tempfile
+
+from . import host
 
 
 class StorageFailure(Exception):
@@ -23,16 +23,16 @@ def private_directory(path: Path) -> Path:
     if any(parent.is_symlink() for parent in (path, *path.parents)):
         raise StorageFailure("UNSAFE_STORAGE")
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if not path.is_dir() or path.stat().st_uid != os.getuid():
+    if not path.is_dir() or not host.owned(path.stat()):
         raise StorageFailure("UNSAFE_STORAGE")
     path.chmod(0o700)
     return path
 
 
 def private_file(path: Path) -> None:
-    if path.is_symlink() or not path.is_file() or path.stat().st_uid != os.getuid():
+    if path.is_symlink() or not path.is_file() or not host.owned(path.stat()):
         raise StorageFailure("UNSAFE_STORAGE")
-    if stat.S_IMODE(path.stat().st_mode) != 0o600:
+    if not host.private_mode(path.stat(), 0o600):
         raise StorageFailure("UNSAFE_STORAGE")
 
 
@@ -42,13 +42,13 @@ def locked_root(root: Path, name: str):
     path = root / name
     if path.is_symlink():
         raise StorageFailure("UNSAFE_STORAGE")
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | host.O_NOFOLLOW | host.O_BINARY, 0o600)
     try:
         private_file(path)
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        host.lock(fd)
         yield
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        host.unlock(fd)
         os.close(fd)
 
 
@@ -64,13 +64,9 @@ def atomic_write(path: Path, content: bytes, *, after_replace=None) -> None:
             output.write(content)
             output.flush()
             os.fsync(output.fileno())
-        os.replace(temp, path)
+        host.replace(temp, path)
         if after_replace is not None:
             after_replace()
-        directory = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        host.sync_directory(path.parent)
     finally:
         temp.unlink(missing_ok=True)

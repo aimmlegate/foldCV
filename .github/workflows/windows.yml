@@ -1,0 +1,115 @@
+name: Windows
+
+# The portable Windows zip, built and checked where it runs. tools/build-windows-zip.sh builds the same zip on a Mac.
+on:
+  push:
+    branches: [desktop/windows-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zip:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }};${{ github.workspace }}\services\api\src
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/desktop/package-lock.json
+      - name: Python environment
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+      - name: Windows tests
+        run: >
+          .venv\Scripts\python -m pytest -q -p no:cacheprovider -rfE
+          tests/service/test_host.py tests/service/test_process_runner.py tests/service/test_desktop.py
+          tests/service/test_lifecycle.py tests/service/test_extract_worker.py tests/repository
+          tests/projects/test_export.py tests/projects/test_project_catalog.py
+      - name: Web frontend
+        working-directory: apps/web
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund --loglevel=error
+          npm run build
+      - name: Desktop shell
+        working-directory: apps/desktop
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund --loglevel=error
+          npm run typecheck
+          npm test
+      - name: Helper and zip
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $helper = .venv\Scripts\python tools\desktop\build_windows_helper.py "$env:RUNNER_TEMP\helper-work" | Select-Object -Last 1
+          node apps\desktop\scripts\package-windows.mjs $helper output\windows
+          Expand-Archive (Get-ChildItem output\windows\*.zip).FullName "$env:RUNNER_TEMP\app"
+      - name: Helper smoke check with both CLIs
+        run: .venv\Scripts\python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\FoldCV Local\resources\helper" --cli
+      - name: App start and close
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'
+          $env:FOLDCV_DESKTOP_ROOT = $root
+          $app = Start-Process -FilePath "$env:RUNNER_TEMP\app\FoldCV Local\FoldCV Local.exe" -PassThru
+          $port = Join-Path $root 'desktop-port'
+          $deadline = (Get-Date).AddMinutes(3)
+          while (-not (Test-Path $port)) {
+            if ((Get-Date) -gt $deadline -or $app.HasExited) { throw 'The helper did not start' }
+            Start-Sleep -Seconds 1
+          }
+          $page = Invoke-WebRequest "http://127.0.0.1:$((Get-Content $port).Trim())/" -UseBasicParsing
+          if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') { throw 'The page is not served' }
+          Start-Sleep -Seconds 15
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+            [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save("$env:RUNNER_TEMP\app-window.png")
+          } catch { Write-Warning "No screenshot: $_" }
+          $app.Refresh()
+          if ($app.CloseMainWindow()) {
+            # Closing the window quits the app, which stops the helper through its stdin.
+            if (-not $app.WaitForExit(60000)) { Stop-Process -Id $app.Id -Force; throw 'The app did not close' }
+          } else {
+            # Without a visible desktop: killing the app must still end the helper (its job kills on close).
+            Write-Warning 'No main window to close; ending the app process'
+            Stop-Process -Id $app.Id -Force
+          }
+          Start-Sleep -Seconds 2
+          $left = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "$env:RUNNER_TEMP\app\*" }
+          Get-Content (Join-Path $root 'logs\helper.log') -Tail 40
+          if ($left) { $left | Format-List Name, ProcessId, ExecutablePath; throw 'Processes of the app are left running' }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: foldcv-windows
+          if-no-files-found: ignore
+          path: |
+            output/windows/*.zip
+            output/windows/build-info.json
+            ${{ runner.temp }}/app-window.png
+            ${{ runner.temp }}/foldcv-root/logs/*.log

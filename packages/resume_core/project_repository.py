@@ -26,6 +26,7 @@ import re
 import secrets
 import threading
 
+from . import host
 from .models.rich_workspace import RichMutationReplay
 from .models.template_workspace import WorkspaceV7
 from .project_journal import JournalStale, ProjectJournal, apply as apply_payloads, snapshot
@@ -396,10 +397,10 @@ class ProjectRepository:
         path = directory / 'workspace.json'
         try:
             owned_file(path, WORKSPACE_BYTES)
-            descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+            descriptor = os.open(path, os.O_RDONLY | host.O_NOFOLLOW | host.O_BINARY)
             with os.fdopen(descriptor, 'rb') as stream:
                 before = os.fstat(stream.fileno())
-                if before.st_nlink != 1 or before.st_uid != os.getuid() or before.st_mode & 0o077:
+                if before.st_nlink != 1 or not host.owned(before) or host.shared_mode(before):
                     raise StorageFailure('UNSAFE_STORAGE')
                 raw = stream.read(WORKSPACE_BYTES + 1)
                 after = os.fstat(stream.fileno())

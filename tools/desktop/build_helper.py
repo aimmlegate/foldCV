@@ -35,7 +35,7 @@ def spec(work: Path, version: str) -> str:
     return f"""from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 datas = {datas!r} + [item for name in {METADATA!r} for item in copy_metadata(name)]
 hidden = collect_submodules("packages") + collect_submodules("resume_api") + {list(HIDDEN)!r}
-a = Analysis([{str(ROOT / "packaging/macos/helper_entry.py")!r}], pathex=[{str(ROOT)!r}, {str(ROOT / "services/api/src")!r}],
+a = Analysis([{str(ROOT / "packaging/helper_entry.py")!r}], pathex=[{str(ROOT)!r}, {str(ROOT / "services/api/src")!r}],
     datas=datas, hiddenimports=hidden, excludes=["tkinter", "pytest", "tests", "tools"],
     module_collection_mode={{"packages": "pyz+py", "resume_api": "pyz+py"}}, noarchive=False)
 pyz = PYZ(a.pure)
