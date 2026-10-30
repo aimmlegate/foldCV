@@ -198,16 +198,18 @@ export function useResumeWorkspace() {
       } finally { reads.current.cancelSelection(capture); }
     }, "Открываем резюме");
   }
-  async function resumeTemplate() {
+  /** Continues the saved operation; without one only the choices the user just made can start the import. */
+  async function resumeTemplate(options?: ImportOptions) {
     const workspace = template?.response.workspace;
-    const operation = workspace?.preDraft?.templateOperations.at(-1);
     if (!workspace) return false;
+    const projectId = workspace.projectId, operation = workspace.preDraft?.templateOperations.at(-1);
+    const begin = operation ? () => resumeImport(projectId, operation.id)
+      : options ? () => startImport(projectId, { clientRequestId: crypto.randomUUID(), ...options }) : null;
+    if (!begin) return false;
     return action(async () => {
-      const tasks = await projectTasks(workspace.projectId);
+      const tasks = await projectTasks(projectId);
       const running = tasks.find(task => task.kind === "import" && task.state === "running");
-      const task = running ?? (operation ? await resumeImport(workspace.projectId, operation.id)
-        : await startImport(workspace.projectId, { clientRequestId: crypto.randomUUID(), allowTextRewrite: true, effort: null }));
-      tracker.current?.track(workspace.projectId, task, workspace.title);
+      tracker.current?.track(projectId, running ?? await begin(), workspace.title, options);
     }, "Продолжаем импорт");
   }
   /** The file becomes a V7 pre-draft and its import starts; the action ends there, so other resumes, Settings and more

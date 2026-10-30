@@ -7,6 +7,7 @@ import { useResumeWorkspace } from "./useResumeWorkspace";
 import { History } from "./layout/History";
 import { Header } from "./layout/Header";
 import { SourceForm } from "./import/SourceForm";
+import { PreDraft } from "./import/PreDraft";
 import { TaskProgress } from "./import/TaskProgress";
 import { TaskNotices } from "./import/TaskNotices";
 import { sourceSummary } from "./import/progress";
@@ -90,10 +91,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "template_progress" && shownImport && <TaskProgress entry={shownImport} source={sourceSummary(shown)} busy={busy}
           stop={() => importActions.stop(shownImport.projectId)} retry={() => importActions.retry(shownImport.projectId)}
           close={() => importActions.dismiss(shownImport.projectId)} open={() => importActions.reopen(shownImport.projectId)} />}
-        {view === "pre_draft" && <section className="progress-screen"><div className="progress-content">
-          <h2>Импорт не завершён</h2><p>Готовые шаги сохранены.</p>
-          <button type="button" disabled={busy} onClick={() => void workspace.resumeTemplate()}>Продолжить импорт</button>
-        </div></section>}
+        {view === "pre_draft" && <PreDraft key={template?.response.workspace.projectId} ask={!template?.response.workspace.preDraft?.templateOperations.length}
+          busy={busy} connection={connection?.snapshot ?? null} resume={options => void workspace.resumeTemplate(options)} />}
         {workspace.loading && <div className="workspace-loading"><OperationStatus label="Открываем резюме" timed /></div>}
         {view === "editor" && template?.response.workspace.project && <TemplateEditor key={`${template.response.workspace.projectId}:${workspace.openingEpoch}`}
           initial={template.response} connection={template.connection}
