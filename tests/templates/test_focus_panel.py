@@ -28,7 +28,7 @@ from tests.templates.test_transactions import authorization
 FOCUS = [('Python', '10 months'), ('SQL', None), ('UnknownTool', '7 weeks')]
 
 
-def technology_package(missing_icon='initial', label=None):
+def technology_package(missing_icon='initial', label=None, max_items=None):
     """The synthetic Focus view bound to the technology builtin, as the Generic template binds it; a label shows before
     each row's name."""
     config = view_package().definition.model_dump(mode='json', by_alias=True)
@@ -38,12 +38,14 @@ def technology_package(missing_icon='initial', label=None):
     config['style']['focus']['missing_icon'] = missing_icon
     if label is not None:
         next(value for value in config['blocks'] if value['id'] == 'focus')['view']['nodes'][0]['label'] = label
+    if max_items is not None:
+        next(value for value in config['blocks'] if value['id'] == 'focus')['content_schema']['maxItems'] = max_items
     return compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
 
 
-async def imported(tmp_path, focus=FOCUS, missing_icon='initial', label=None):
+async def imported(tmp_path, focus=FOCUS, missing_icon='initial', label=None, max_items=None):
     src, raw = employment_source('F06')
-    fixture = EmploymentFixture(tmp_path, captured=technology_package(missing_icon, label), src=src, original_bytes=raw,
+    fixture = EmploymentFixture(tmp_path, captured=technology_package(missing_icon, label, max_items), src=src, original_bytes=raw,
         scripted=scripted(src, focus, [{'name': 'Portfolio', 'url': 'https://example.org'}]), cap=8, fallback=False)
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.publication.state == 'saved'
@@ -249,3 +251,17 @@ def test_an_unreadable_font_leaves_a_row_without_a_placeholder():
     broken = package.model_copy(update={'package_hash': 'f' * 64, 'assets': [asset.model_copy(update={'bytes_base64':
         base64.b64encode(b'not a font').decode()}) if asset.id == font else asset for asset in package.assets]})
     assert initial_icon(broken, row, 'Zig') is None
+
+
+@pytest.mark.asyncio
+async def test_a_row_past_the_views_limit_is_refused_and_the_plan_says_it_is_full(tmp_path):
+    before = await imported(tmp_path, max_items=3)
+    assert editor_plan(before.project)['focusPanel']['full'] is True
+    sql = technology(before, 'SQL')
+    open_row, result = applied(before, panel(before, 'remove_from_focus', sql.id))
+    assert 'full' not in editor_plan(open_row.project)['focusPanel']
+    assert 'full' in editor_plan(undone(before, open_row, result).project)['focusPanel']
+    view = next(value for value in open_row.project.template_package.definition.blocks if value.id == 'focus')
+    view.content_schema['maxItems'] = 2
+    with pytest.raises(ValueError, match='FOCUS_FULL'):
+        prepare_edit(response(open_row), panel(open_row, 'add_to_focus', sql.id, identifier='focus-past-limit'))

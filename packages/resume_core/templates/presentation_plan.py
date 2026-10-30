@@ -163,14 +163,15 @@ def editor_plan(project):
         'blocks': blocks, 'fonts': sorted(face for face in used if face is not None), 'icons': icons}
     if files:
         plan['iconFiles'] = files
-    from ..template_panel_focus import focus_only
-    from ..template_panel_records import technology_targets
+    from ..template_panel_focus import focus_full, focus_only
+    from ..template_panel_records import panel_plan, technology_targets
     targets = [value.model_dump(mode='json', by_alias=True) for value in technology_targets(project)]
     if targets:
         plan['technologyTargets'] = targets
+    plan.update(panel_plan(project))
     only = focus_only(project)
     if only is not None:
-        plan['focusPanel'] = {'records': sorted(only)}
+        plan['focusPanel'] = {'records': sorted(only), **({'full': True} if focus_full(project) else {})}
         # A row's icon can be chosen from the template's icons (D122); a template without them offers no choice.
         try:
             icons = bool(catalog_for(package).files)

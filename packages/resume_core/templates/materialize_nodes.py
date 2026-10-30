@@ -37,6 +37,12 @@ def locale_text(values, locale):
     return values.get(locale, '')
 
 
+def period_format(package):
+    """The template's one declared period format: its separator and localized ongoing label; None without one."""
+    return next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
+        for value in package.definition.operations if value.kind == 'format_period'), None)
+
+
 def fallback_style(declaration):
     if declaration.view.fallback_style is not None:
         return declaration.view.fallback_style
