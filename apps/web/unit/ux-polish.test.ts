@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { changePrecision, datePrecision, dateText } from "../src/workbench/facts/dates";
 import { technologyCatalog, technologySuggestions } from "../src/workbench/facts/technology-catalog";
@@ -25,10 +26,17 @@ test("refining date precision requires a choice and never invents a month or day
   assert.equal(changePrecision("2024-02-29", "month"), "2024-02");
   assert.equal(changePrecision("около 2020", "text"), "около 2020");
   assert.equal(changePrecision("около 2020", "year"), "");
+  assert.equal(changePrecision("2019-03", "text", "март 2019"), "март 2019", "«Как в исходнике» keeps the source text");
+  assert.equal(changePrecision("2019-03", "text", ""), "2019-03", "a new date has no source text to return to");
   assert.equal(datePrecision("2020-02-01"), "day");
   assert.equal(datePrecision("2020"), "year");
   assert.equal(datePrecision("2020-02"), "month");
   assert.equal(datePrecision("весна 2020"), "text");
+});
+
+test("a resume opens at the 125 % of the readability rule, set in one place", () => {
+  const styles = new URL("../src/workbench/styles/", import.meta.url), css = readFileSync(new URL("comparison-workspace.css", styles), "utf8");
+  assert.equal(css.match(/--document-zoom\s*:\s*1\.25\s*;/gu)?.length, 1);
 });
 
 test("the embedded catalog spans major technical roles and contains no case duplicates", () => {

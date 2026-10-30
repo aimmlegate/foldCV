@@ -281,24 +281,11 @@ export function useResumeWorkspace() {
       await templateEditor.current?.refresh().catch(() => {});
     }, "Сохраняем изменения");
   }
-  async function renameTemplate(title: string) {
-    const next = title.trim();
-    if (!next) return false;
-    return action(async current => {
-      const connection = template?.connection;
-      if (!connection) return;
-      await templateEditor.current?.flush();
-      if (!current()) return;
-      await connection.rename(next);
-      if (!current()) return;
-      await templateEditor.current?.refresh();
-    }, "Переименовываем резюме");
-  }
   const importActions = {
     stop: (id: string) => void tracker.current?.stop(id), retry: (id: string) => void tracker.current?.retry(id),
     dismiss: (id: string) => tracker.current?.dismiss(id), reopen: (id: string) => void reopenImported(id),
   };
   return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects,
     error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, settings, setSettings,
-    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, renameTemplate, dismissError };
+    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
 }

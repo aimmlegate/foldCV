@@ -13,6 +13,11 @@ import type { FocusEntry } from "./FocusYears";
 /** `id` is what a click saves: an icon, or "" for the template's own choice, whose `url` is null when it shows none. */
 type Option = { id: string; label: string; url: string | null; icon: string };
 
+/** Enter acts on a search only: with an empty one the first suggestion would reset a chosen icon. */
+export function enterOption<T>(query: string, options: readonly T[]): T | undefined {
+  return query.trim() ? options[0] : undefined;
+}
+
 /** A Focus row's icon from its template's icons (D122), found by name: the whole list is never shown. The choice is
  * saved with the document and given to rows of the same technology added later. */
 export function FocusIconDialog({ entry, load, submit, close }: { entry: FocusEntry; load: () => Promise<FocusIconChoices>;
@@ -51,7 +56,7 @@ export function FocusIconDialog({ entry, load, submit, close }: { entry: FocusEn
   }
   const options: Option[] = query.trim() ? found.map(icon => ({ id: icon.id, label: icon.label, url: assetUrl(icon), icon: icon.id })) : suggestions;
   return <Dialog open close={() => { if (!busy) close(); }} title={`Иконка: ${entry.display}`}>
-    <form className="focus-icon-search" onSubmit={event => { event.preventDefault(); if (options[0]) void choose(options[0].id); }}>
+    <form className="focus-icon-search" onSubmit={event => { event.preventDefault(); const option = enterOption(query, options); if (option) void choose(option.id); }}>
       <input ref={input} type="search" aria-label="Найти иконку" placeholder="Например: postgres, react, docker" value={query}
         disabled={busy} onChange={event => setQuery(event.target.value)} />
     </form>

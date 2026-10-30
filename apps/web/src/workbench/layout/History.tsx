@@ -1,17 +1,30 @@
 import { useState } from "react";
+import { errorMessage } from "../../errors/messages";
 import type { ProjectList, ProjectListEntry } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { historyGroups } from "./history-groups";
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection }: {
+/** The refusal shows here: behind this modal dialog the notification badge cannot be reached. */
+export function DeleteDialog({ open, busy, error, close, confirm }: { open: boolean; busy: boolean; error: string; close: () => void; confirm: () => void }) {
+  return <Dialog open={open} close={close} title="Удалить резюме?">
+    <p className="dialog-copy">Резюме и его файлы будут удалены навсегда.</p>
+    {error && <p className="notice warning" role="alert">{errorMessage(error)}</p>}
+    <div className="dialog-actions">
+      <Button disabled={busy} onClick={close}>Отмена</Button><Button variant="danger" busy={busy} busyLabel="Удаляем…" onClick={confirm}>Удалить</Button>
+    </div>
+  </Dialog>;
+}
+
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection, error }: {
   projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   archive: (id: string, archived: boolean) => Promise<boolean>;
-  openFile: () => void; settings: () => void; connection: string;
+  openFile: () => void; settings: () => void; connection: string; error: string;
 }) {
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null), [refused, setRefused] = useState(false);
+  const closeDelete = () => { setDeleting(null); setRefused(false); };
   const [archiveOpen, setArchiveOpen] = useState(false);
   const { current, archived } = historyGroups(projects?.entries ?? []);
   const row = (item: ProjectListEntry) => {
@@ -50,10 +63,8 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
       <div className="connection-mini"><span className="dot" /><span>{connection}</span></div>
       <button className="history-settings" disabled={busy} onClick={settings}><Icon name="settings" />Настройки<Icon name="chevron" /></button>
     </footer>
-    <Dialog open={deleting !== null} close={() => setDeleting(null)} title="Удалить резюме?">
-      <p className="dialog-copy">Резюме и его файлы будут удалены навсегда.</p><div className="dialog-actions">
-        <Button disabled={busy} onClick={() => setDeleting(null)}>Отмена</Button><Button variant="danger" busy={busy} busyLabel="Удаляем…" onClick={() => { if (deleting) void remove(deleting).then(done => { if (done) setDeleting(null); }); }}>Удалить</Button>
-      </div>
-    </Dialog>
+    <DeleteDialog open={deleting !== null} busy={busy} error={refused ? error : ""} close={closeDelete} confirm={() => {
+      if (deleting) { setRefused(false); void remove(deleting).then(done => { if (done) closeDelete(); else setRefused(true); }); }
+    }} />
   </aside>;
 }

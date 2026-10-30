@@ -67,12 +67,11 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}>
     <History projects={projects} activeId={shown?.workspace.projectId ?? null} busy={busy} collapse={() => setCollapsed(true)}
       fresh={() => { void fresh(); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings}
-      connection={connectionSummary(connection?.snapshot ?? null)} />
+      connection={connectionSummary(connection?.snapshot ?? null)} error={error} />
     <section className="main-area">
       <Header title={settings ? "Настройки" : shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме")}
         subtitle={settings ? "FoldCV" : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={!settings && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
-        rename={!settings && template ? title => { void workspace.renameTemplate(title); } : undefined}
         retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" ? () => void action(async current => { await templateEditor.current?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
         activity={<NotificationCenter />} />
       <NotificationSection count={Number(!!error && !fileMode)}>
