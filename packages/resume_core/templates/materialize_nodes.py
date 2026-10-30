@@ -173,7 +173,10 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
         else:
             raise ValueError('template materializer primitive is not implemented: ' + node.type)
         visible = parts(selected, ref)
-        if not visible:
+        # An ongoing period without a start still shows its label.
+        ongoing_label = (locale_text(period_format['ongoingLabel'], locale)
+            if node.type == 'period' and period_format and current else None)
+        if not visible and not ongoing_label:
             continue
         if label:
             block([literal(label, ref)], ref, suffix='label')
@@ -190,7 +193,7 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
             if position:
                 content.append(literal(separator, ref))
             content.append(part)
-        if node.type == 'period' and period_format and current:
-            content += [literal(separator, ref), literal(locale_text(period_format['ongoingLabel'], locale), ref)]
+        if ongoing_label:
+            content += [*([literal(separator, ref)] if visible else []), literal(ongoing_label, ref)]
         block(content, ref, [field for field, _part in visible])
     return blocks, displayed
