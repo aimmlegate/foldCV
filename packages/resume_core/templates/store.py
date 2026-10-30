@@ -207,10 +207,24 @@ class TemplateStore:
                 if existing.package_hash != package.package_hash: raise SchemaFailure("/store", "package identity mismatch")
             else:
                 atomic_write(path, canonical(package))
+            # The hash leaves the original text out (D106), so a change of comments or form is this same package; the
+            # text saved last stays beside it.
+            atomic_write(path.parent / "original.json",
+                canonical({"format":package.original_format,"base64":package.original_base64}))
             registry[identity] = package.package_hash
             atomic_write(registry_path, canonical(registry))
             current[package.id] = package.package_hash
             self._write(package.id if default else default_id, current)
+
+    def saved_original(self, package: TemplatePackage):
+        """(format, bytes) of the text saved last for the current version `package`; None when the store has none."""
+        path = self.root / package.package_hash / "original.json"
+        if self._pointer()[1].get(package.id) != package.package_hash or not path.exists(): return None
+        stored = self._read(path)
+        try:
+            return stored["format"], base64.b64decode(stored["base64"], validate=True)
+        except (KeyError, TypeError, ValueError):
+            return None
 
     def activate(self, package: TemplatePackage) -> None:
         """Save the package and make its id the default for new imports."""

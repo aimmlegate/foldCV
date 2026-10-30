@@ -168,8 +168,9 @@ def test_captured_nested_human_claim_without_sidecar_stays_with_current_owner_as
 
 
 @pytest.mark.parametrize('explicit_style', [False, True])
-def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit_style):
+def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit_style, monkeypatch):
     import json
+    from packages.resume_core.templates import compiler
     from packages.resume_core.templates.compiler import compile_bytes
     from packages.resume_core.templates.store import BUNDLED_TEMPLATE
     from tests.templates.pipeline_fixtures import setup_operation
@@ -177,6 +178,8 @@ def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit
     config['blocks'][0]['view']['nodes'] = []
     if not explicit_style:
         config['blocks'][0]['view'].pop('fallback_style')
+        # New packages refuse this view; one already stored still reaches the materializer.
+        monkeypatch.setattr(compiler, 'check_runs', lambda _definition: None)
     package = compile_bytes(json.dumps(config).encode(), BUNDLED_TEMPLATE.parent, original_format='json')
     src, _raw = employment_source()
     operation, _command, _package, _source, facts = setup_operation(captured=package, src=src)

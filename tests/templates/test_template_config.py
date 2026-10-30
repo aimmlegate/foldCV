@@ -1,13 +1,18 @@
 """Settings template editor: read, check, save and reset the YAML of each template, and choose the default one."""
 
 import ast
+import base64
 import json
 from pathlib import Path
 import shutil
 
 import pytest
+import yaml
 
-from packages.resume_core.templates.compiler import compile_template
+from packages.resume_core.templates import focus
+from packages.resume_core.templates.compiler import compile_bytes, compile_template
+from packages.resume_core.templates.models import StoredTemplatePackage
+from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore
 from resume_api.template_config import ID_CHANGED, REVISION_TAKEN, TemplateConfig
 from resume_api.template_reasons import FALLBACK, FAMILIES, PREFIXES, REASONS, reason_text
@@ -196,3 +201,121 @@ async def test_routes_save_and_reset_one_template_and_keep_the_default_until_it_
             reply = await client.request(method, path, json=body)
             assert (reply.status_code, reply.json()['error']['code']) == (404, 'TEMPLATE_NOT_FOUND'), path
         assert (await client.get('/v1/rich/template-import')).json()['defaultId'] == SECOND
+
+
+def edited(change, revision='9.0.2'):
+    config = yaml.safe_load(BUNDLED_TEXT)
+    config['template']['revision'] = revision
+    change(config)
+    return yaml.safe_dump(config, allow_unicode=True, sort_keys=False)
+
+
+def block(config, identifier):
+    return next(value for value in config['blocks'] if value['id'] == identifier)
+
+
+def operation(config, identifier):
+    return next(value for value in config['operations'] if value['id'] == identifier)
+
+
+def logo_as_catalog(config):
+    config['style']['focus']['icon_catalog'] = config['style']['header']['logo']['asset']
+
+
+def unknown_operation(config):
+    config['operations'].append({'id': 'keep', 'kind': 'preserve_stated_text', 'parameters': {}, 'inputs': ['source:all']})
+
+
+def skills_without_their_groups(config):
+    operation(config, 'technical-skills')['inputs'] = ['projects']
+
+
+def derived_from_another_operation(config):
+    block(config, 'other_projects')['operation'] = 'source-periods'
+
+
+def compact_on_another_field(config):
+    config['content_definitions']['names'] = {'names': 'texts'}
+    compact = block(config, 'other_projects')
+    compact.update(schema='names', facts={'other_projects': ['names/*=items.*']})
+    compact['view']['nodes'][0]['field'] = '/names'
+
+
+def view_without_a_style(config):
+    block(config, 'location')['view'] = {'title': {'ru': 'X'}, 'nodes': []}
+
+
+def anyof_true(config):
+    next(value for value in config['fact_types'] if value['id'] == 'identity')['fields']['name'] = {'anyOf': [True]}
+
+
+@pytest.mark.parametrize(('change', 'path', 'fragment'), [
+    (logo_as_catalog, '/style/focus/icon_catalog', 'unreadable'),
+    (unknown_operation, '/operations/keep', 'registered'),
+    (skills_without_their_groups, '/operations/technical-skills', 'inputs'),
+    (derived_from_another_operation, '/blocks/other_projects/operation', 'partition_employment'),
+    (compact_on_another_field, '/blocks/other_projects/view', '/items'),
+    (view_without_a_style, '/blocks/location/view', 'fallback_style'),
+    (anyof_true, '/name', 'anyOf'),
+])
+def test_check_reports_what_every_import_would_refuse_or_lose_with_its_location(tmp_path, change, path, fragment):
+    config = TemplateConfig(tmp_path)
+    result = config.check(GENERIC, edited(change))
+    assert (result['valid'], result['error']['path']) == (False, path) and fragment in result['error']['message']
+    assert config.save(GENERIC, edited(change))[1]['error'] == result['error']
+    assert not (tmp_path / 'template-packages').exists()
+
+
+def test_stored_packages_keep_opening_without_the_new_package_checks(tmp_path, monkeypatch):
+    # Only compile_bytes refuses these; verification of a stored package never runs the checks.
+    from packages.resume_core.templates import compiler
+    from packages.resume_core.templates.store import verify_package
+    monkeypatch.setattr(compiler, 'check_runs', lambda _definition: None)
+    package = compile_bytes(edited(unknown_operation).encode(), BUNDLED_TEMPLATE.parent)
+    monkeypatch.undo()
+    assert verify_package(package) is package
+
+
+def test_an_empty_asset_is_refused_at_compile(tmp_path):
+    (tmp_path / 'empty.txt').write_bytes(b'')
+    captured = {asset.path: base64.b64decode(asset.bytes_base64) for asset in compile_template(BUNDLED_TEMPLATE).assets}
+    raw = edited(lambda config: config['assets'].update(nothing={'path': 'empty.txt'})).encode()
+    with pytest.raises(SchemaFailure, match='/assets/empty.txt: asset is empty'):
+        compile_bytes(raw, tmp_path, assets=captured)
+    assert all(StoredTemplatePackage.model_validate(compile_template(BUNDLED_TEMPLATE)).assets)
+
+
+def test_a_text_only_change_is_what_save_returns_and_reset_drops_it(tmp_path):
+    config, commented = TemplateConfig(tmp_path), BUNDLED_TEXT + '\n# my note\n'
+    saved, refused = config.save(GENERIC, commented)
+    assert refused is None and saved['text'] == commented
+    assert saved['package']['packageHash'] == compile_template(BUNDLED_TEMPLATE).package_hash
+    # The text differs from the shipped one, so Reset stays offered.
+    assert saved['edited'] is True and config.read(GENERIC) == saved
+    assert next(item for item in config.catalog()['templates'] if item['id'] == GENERIC)['edited'] is True
+    assert config.reset(GENERIC)['text'] == BUNDLED_TEXT
+    assert config.read(GENERIC)['edited'] is False
+
+
+def test_saving_the_same_package_again_keeps_the_latest_text_of_a_custom_version(tmp_path):
+    config, first = TemplateConfig(tmp_path), revised(BUNDLED_TEXT)
+    assert config.save(GENERIC, first)[0]['text'] == first
+    assert config.save(GENERIC, first + '# second\n')[0]['text'] == first + '# second\n'
+    # Text saved before this store kept one beside the package reads from the package itself.
+    package, _bundled = config.store.versions(GENERIC)
+    (config.store.root / package.package_hash / 'original.json').unlink()
+    assert config.read(GENERIC)['text'] == first
+
+
+@pytest.mark.asyncio
+async def test_a_catalog_captured_unreadable_leaves_focus_rows_as_text(tmp_path, monkeypatch):
+    from packages.resume_core.templates.presentation_plan import editor_plan
+    from tests.templates.test_focus_icons import published
+    _fixture, workspace, _originals = await published(tmp_path)
+    def unreadable(_package):
+        raise ValueError('focus icon catalog is unreadable')
+    monkeypatch.setattr(focus, '_CATALOGS', {})
+    monkeypatch.setattr(focus, 'icon_catalog', unreadable)
+    plan = editor_plan(workspace.project)
+    rows = [entry['focus'] for entry in plan['blocks'].values() if 'focus' in entry]
+    assert rows and all(row['icon'] is None for row in rows) and 'icons' not in plan.get('focusPanel', {})

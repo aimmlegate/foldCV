@@ -16,6 +16,13 @@ function readable(value: string): boolean {
     && !/(?:\/(?:Users|private|tmp|home|var|etc|opt|usr)\/|[A-Za-z]:\\|(?:^|\n)\s*at\s+\S|Traceback|Error:|https?:\/\/)/u.test(value);
 }
 
+/** A refused export names its fragment, because the refused character may be one nobody can see. */
+function fragmentNote(error: unknown): string {
+  const body = typeof error === "object" && error !== null && "body" in error ? error.body : null;
+  const fragment = typeof body === "object" && body !== null && "fragment" in body ? body.fragment : null;
+  return typeof fragment === "string" && fragment ? ` Фрагмент: «${fragment}».` : "";
+}
+
 /** Translate only at presentation boundaries; callers keep the original error for recovery. */
 export function errorMessage(error: unknown, fallback = defaultErrorMessage): string {
   let value: string | null = typeof error === "string" ? error : null;
@@ -26,7 +33,7 @@ export function errorMessage(error: unknown, fallback = defaultErrorMessage): st
   }
   if (value) {
     const known = knownErrorMessage(value);
-    if (known) return known;
+    if (known) return known + fragmentNote(error);
     if (/Failed to fetch|NetworkError|Load failed|fetch failed|ECONNREFUSED/u.test(value)) return catalog.messages.connection;
     if (readable(value)) return value;
   }

@@ -172,10 +172,6 @@ def editor_plan(project):
     if only is not None:
         plan['focusPanel'] = {'records': sorted(only)}
         # A row's icon can be chosen from the template's icons (D122); a template without them offers no choice.
-        try:
-            icons = bool(catalog_for(package).files)
-        except ValueError:
-            icons = False
-        if icons:
+        if catalog_for(package).files:
             plan['focusPanel']['icons'] = True
     return plan

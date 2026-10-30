@@ -23,7 +23,7 @@ from ..templates.materialize_nodes import reference
 from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts
 from .captured_layout import BodyGeometry, CapturedMetrics, half_points, native_units
-from .captured_styles import CapturedStyleResolver, authored_spans, resize_run
+from .captured_styles import CapturedStyleResolver, authored_spans, resize_run, visible_text
 from .rich_docx import Writer, element, fill
 from .template import RenderFailure
 
@@ -139,7 +139,13 @@ class CapturedWriter:
         self.links = {}
         self.paragraphs = {}
         self.logo = None
+        # The block in work, so that a refusal can name it.
+        self.block = None
+
+    def prepare(self):
+        request = self.request
         for block in request.document.blocks():
+            self.block = block
             if block.type not in BLOCKS or block.type == 'section' and block.props.presentation == 'focus':
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             resolved_node(self.resolver, block.presentation)
@@ -153,14 +159,15 @@ class CapturedWriter:
             actual, links = [], []
             for span, link in authored_spans(block):
                 resolved_node(self.resolver, span.presentation or block.presentation)
-                if not span.text:
+                text = visible_text(span.text)
+                if not text:
                     continue
                 style = self.resolver.run(block, span)
                 chip = chip_background(block, span, self.recipe) if link is None else None
                 if chip is not None:
                     style = replace(style, background=style.background or chip, chip=True)
                 self.remember(style)
-                actual.append((span.text, style))
+                actual.append((text, style))
                 links.append(link)
             for index in range(1, len(actual) - 1):
                 (_before, left), (text, style), (_after, right) = actual[index - 1:index + 2]
@@ -175,6 +182,7 @@ class CapturedWriter:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             if not actual and emitted:
                 self.remember(self.generated(block, ''))
+        self.block = None
         self.rows, self.icons, self.placed = {}, {}, []
         catalog = None
         for block in request.document.blocks():
@@ -224,6 +232,7 @@ class CapturedWriter:
         return run
 
     def paragraph(self, container, block, *, header=False, depth=0, sequence=None):
+        self.block = block
         paragraph = container.add_paragraph()
         height, alignment = self.paragraphs[block.id]
         props = paragraph._p.get_or_add_pPr()
@@ -280,6 +289,7 @@ class CapturedWriter:
                 hyperlink.set(qn('r:id'), paragraph.part.relate_to(target, RELATIONSHIP_TYPE.HYPERLINK, is_external=True))
                 paragraph._p.append(hyperlink)
             hyperlink.append(run._r)
+        self.block = None
         return paragraph
 
     def list_marker(self, paragraph, block, inset, depth, sequence):
@@ -407,7 +417,7 @@ class CapturedWriter:
             for child in self.header_blocks(block):
                 if not self.runs[child.id]:
                     continue
-                refs = [span.presentation or child.presentation for span, _link in authored_spans(child) if span.text]
+                refs = [span.presentation or child.presentation for span, _link in authored_spans(child) if visible_text(span.text)]
                 if self.header_fallback(child, refs):
                     top, designed = first, last
                 else:
@@ -582,8 +592,21 @@ class CapturedWriter:
                 props[:] = sorted(props, key=lambda child: table_order.get(child.tag, len(table_order)))
 
 
+def located(block):
+    """What an export refusal says about its place: the block, and the text the user can find it by."""
+    if block is None:
+        return {}
+    spans = authored_spans(block) if isinstance(block.content, list) else ()
+    return {'blockId': block.id, 'fragment': ' '.join(''.join(getattr(span, 'text', None) or '' for span, _link in spans).split())[:60]}
+
+
 def render_captured_docx(request, workspace):
     request = TemplateRenderRequestV1.model_validate(request.model_dump(mode='json', by_alias=True))
     if request.renderer != renderer_identity():
         raise RenderFailure('RENDERER_MISMATCH')
-    return CapturedWriter(request).render(workspace)
+    writer = CapturedWriter(request)
+    try:
+        writer.prepare()
+        return writer.render(workspace)
+    except RenderFailure as error:
+        raise RenderFailure(error.code, located(writer.block)) from None
