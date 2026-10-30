@@ -6,11 +6,12 @@ import uuid
 from packages.resume_core.models.template_import import LaunchOwner
 from packages.resume_core.template_import import CleanupProof, digest
 from ..lifecycle import OperationFiles
-from ..providers.content import ContentFailure
+from ..providers.content import ContentFailure, outcome_state
 
 
 # The running job's inference permit; set by the template job runtime around one pipeline run.
 JOB_PERMIT = contextvars.ContextVar('template_job_permit', default=None)
+UNDISPATCHED_OUTCOMES = frozenset({'transport_failure', 'cancelled', 'timed_out'})
 
 
 class ProviderTemplateTransport:
@@ -54,9 +55,10 @@ class ProviderTemplateTransport:
             if error.code == 'BUSY' and error.dispatch_witness is None:
                 # Admission refused before any process started: nothing was dispatched.
                 raise ContentFailure('BUSY', cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None
-            if (error.code in {'INPUT_TOO_LARGE', 'INVALID_INPUT', 'MODEL_DENIED'} and error.dispatch_witness is None
-                    and files.process is None and not files.cleanup_failed):
-                # The provider refused the request before starting a process (LIVE-04: an oversized review).
+            # A provider sets its witness as it starts a process, so without one the request was refused before any
+            # (LIVE-04: an oversized review). A reply or a failed cleanup says otherwise.
+            if (error.dispatch_witness is None and error.raw_return is None and files.process is None
+                    and not files.cleanup_failed and outcome_state(error.code) in UNDISPATCHED_OUTCOMES):
                 raise ContentFailure(error.code, cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None
             raise
         except Exception:
