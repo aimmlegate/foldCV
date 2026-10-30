@@ -232,6 +232,23 @@ test("the rewrite model saves before its level, which must be one that model rep
   assert.equal(h.server.preferences.rewriteReasoningEffort, "high"); assert.deepEqual(h.controller.dirty, []);
 });
 
+test("reopened Settings adopts a model chosen in the assistant panel, so its next save is not a conflict", async () => {
+  const h = setup(); await h.controller.load();
+  Object.assign(h.server.assistant, { revision: 5, enabled: true, selectedAgentModel: "panel-model", reasoningEffort: "high" });
+  await h.controller.refreshAssistant();
+  assert.equal(h.controller.state.draft.agentModel, "panel-model"); assert.equal(h.controller.state.draft.agentEffort, "high");
+  assert.deepEqual(h.controller.dirty, []);
+  h.controller.change("agentEffort", "low"); await h.controller.save();
+  assert.deepEqual(h.controller.dirty, []); assert.equal(h.server.assistant.revision, 6);
+  // An unsaved edit stays, on the new revision.
+  h.controller.change("agentModel", "local-choice");
+  h.server.assistant.revision = 8;
+  await h.controller.refreshAssistant();
+  assert.equal(h.controller.state.draft.agentModel, "local-choice");
+  await h.controller.save();
+  assert.equal(h.server.assistant.selectedAgentModel, "local-choice");
+});
+
 test("reopened Settings shows rewrite choices saved in the popover and keeps its own unsaved edits", async () => {
   const h = setup(); await h.controller.load();
   h.controller.change("importModel", "model-c");

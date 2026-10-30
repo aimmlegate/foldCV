@@ -4,6 +4,7 @@ import { register } from "node:module";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ConnectionWorkflow, type ConnectionView, type ProviderEntry } from "../src/connection/workflow";
 import { capabilities, settings, view } from "./support/assistant";
 
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);
@@ -12,6 +13,7 @@ const { DeleteDialog } = await import("../src/workbench/layout/History");
 const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
 const { Composer } = await import("../src/workbench/assistant/Composer");
+const { Connections } = await import("../src/workbench/settings/Connection");
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -65,4 +67,31 @@ test("the composer marks a saved model the service refused, in the reply the ser
     draft: () => {}, flags: () => {}, model: () => {}, send: () => {}, stop: () => {}, clear: () => {}, settings: () => {} }));
   assert.match(composer("AGENT_MODEL_UNAVAILABLE"), /saved · недоступна/u);
   assert.ok(!composer("AGENT_CONNECTION_UNAVAILABLE").includes("недоступна"), "another refusal says nothing about the model");
+});
+
+const provider: ProviderEntry = { kind: "claude_cli", display: "Claude", subscription: "Claude", publisher: "Anthropic", loginCode: true, installed: true,
+  enabled: true, state: "login_required", version: null, versionStatus: null, plan: null, models: [], metadataReady: false,
+  quota: { state: "unknown", usedPercent: null, resetsAt: null } };
+function connections(entry: ProviderEntry | null, changes: Partial<ConnectionView> = {}): string {
+  const workflow = new ConnectionWorkflow(() => {}), { view: empty } = workflow;
+  const snapshot = entry ? { ...empty.snapshot, provider: entry.kind, providers: [entry] } : empty.snapshot;
+  return renderToStaticMarkup(createElement(Connections, { view: { ...empty, snapshot, ...changes }, workflow, disabled: false }));
+}
+
+test("a failed read of the connection offers a retry instead of waiting for ever", () => {
+  assert.match(connections(null), /Проверяем подключение/u);
+  const failed = connections(null, { readFailed: true });
+  assert.ok(!failed.includes("Проверяем подключение"));
+  assert.match(failed, /role="alert"/u); assert.match(failed, /Повторить/u);
+});
+
+test("the error of a provider that is off shows on its card", () => {
+  const card = connections({ ...provider, enabled: false }, { activity: { claude_cli: { pending: false, detaching: false, error: "PROVIDER_INACTIVE" } } });
+  assert.match(card, /role="alert"/u);
+  assert.match(card, /провайдер выключен/u);
+});
+
+test("a provider that is on says that sign-in and install stop model work (D119)", () => {
+  assert.match(connections(provider), /останавливают работу моделей/u);
+  assert.ok(!connections({ ...provider, enabled: false }).includes("останавливают работу моделей"), "nothing to stop on a provider that is off");
 });

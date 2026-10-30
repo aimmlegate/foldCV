@@ -12,7 +12,9 @@ export function Connections({ view, workflow, disabled }: { view: ConnectionView
   const { snapshot } = view;
   return <><h3>Провайдеры</h3>
     <p>Включите провайдеров, через которых работает FoldCV. Модели всех включённых провайдеров можно выбрать ниже.</p>
-    {snapshot.provider === null && <p className="small muted" role="status">Проверяем подключение…</p>}
+    {snapshot.provider === null && !view.readFailed && <p className="small muted" role="status">Проверяем подключение…</p>}
+    {view.readFailed && <div className="settings-actions"><p className="notice error" role="alert">Не удалось прочитать состояние подключения.</p>
+      <Button className="small" onClick={() => void workflow.peek()}>Повторить</Button></div>}
     {snapshot.providers.map(entry => <ProviderCard key={entry.kind} entry={entry} activity={view.activity[entry.kind]}
       experimental={snapshot.experimentalMode} workflow={workflow} disabled={disabled} />)}
   </>;
@@ -63,10 +65,11 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
         <Button type="submit" className="small" disabled={disabled || !loginCodePattern.test(code.trim())}>Отправить код</Button>
         {codeSent && <p className="small muted" role="status">Код передан. Дождитесь завершения входа.</p>}
       </form>}
-      {activity?.error && <p className="notice error" role="alert">{errorMessage(activity.error)}</p>}
+      <p className="small muted">Вход, установка и отключение останавливают работу моделей: идущий импорт, правка или ответ помощника прервутся.</p>
       {experimental ? <p className="settings-disclosure">Текст уходит в {publisher}, действуют её правила хранения. {display} может сохранять
         запросы и ответы. Вход остаётся после отключения.</p>
         : <p className="settings-disclosure">Обработка недоступна в текущем режиме подключения.</p>}
     </>}
+    {activity?.error && <p className="notice error" role="alert">{errorMessage(activity.error)}</p>}
   </div>;
 }

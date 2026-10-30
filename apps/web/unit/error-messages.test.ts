@@ -106,12 +106,21 @@ test("save status and installation render descriptions without error codes in vi
   assert.ok(!installation.includes("download_failed")); assert.match(installation, /скачать/u);
 });
 
+test("installation failures of any provider never name another one", () => {
+  for (const error of ["busy", "unsafe_directory", "unsupported_platform", "download_failed", "checksum_failed", "invalid_package", "install_failed"] as const) {
+    const card = renderToStaticMarkup(createElement(Installation, { value: { available: true, state: "failed",
+      version: "0.0.0", downloadedBytes: 0, totalBytes: 1, error }, display: "Claude" }));
+    assert.ok(!card.includes("Codex"), error);
+  }
+  for (const code of ["INSTALL_NOT_AVAILABLE", "LOGIN_NOT_AVAILABLE"]) assert.ok(!knownErrorMessage(code)?.includes("Codex"), code);
+});
+
 test("save failures, pending work and import warnings keep distinct meanings", () => {
   assert.match(errorMessage("DRAFT_STORAGE_FAILED"), /сохранить черновик/u);
   assert.match(errorMessage("DRAFT_STORAGE_FULL"), /объём хранения/u);
   assert.match(errorMessage("OUTCOME_UNKNOWN"), /не подтверждено/u);
   assert.match(errorMessage("BUSY"), /другое действие/u);
-  assert.match(errorMessage("busy"), /Codex/u);
+  assert.match(errorMessage("busy"), /другая работа/u);
   assert.match(errorMessage("IMAGE_INVALID"), /добавить или прочитать/u);
   assert.match(errorMessage("IMAGE"), /не распознано как текст/u);
   assert.match(errorMessage("IMPORT_CONTENT_RECOVERED"), /восстановлена/u);
