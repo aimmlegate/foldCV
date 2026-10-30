@@ -250,9 +250,9 @@ def anyof_true(config):
 
 
 @pytest.mark.parametrize(('change', 'path', 'fragment'), [
-    (logo_as_catalog, '/style/focus/icon_catalog', 'unreadable'),
-    (unknown_operation, '/operations/keep', 'registered'),
-    (skills_without_their_groups, '/operations/technical-skills', 'inputs'),
+    (logo_as_catalog, '/style/focus/icon_catalog', 'не читается'),
+    (unknown_operation, '/operations/keep', 'не зарегистрирована'),
+    (skills_without_their_groups, '/operations/technical-skills', 'входы'),
     (derived_from_another_operation, '/blocks/other_projects/operation', 'partition_employment'),
     (compact_on_another_field, '/blocks/other_projects/view', '/items'),
     (view_without_a_style, '/blocks/location/view', 'fallback_style'),

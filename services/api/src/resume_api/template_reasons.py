@@ -132,6 +132,16 @@ REASONS = {
     # Pydantic's messages for the template model.
     'Field required': 'обязательное поле',
     'Extra inputs are not permitted': 'лишнее поле',
+    # Checks run at compile for a new package (review fix round 2026-10-30).
+    'operation is not registered or its inputs do not let it run': 'операция не зарегистрирована или её входы не дают ей выполниться',
+    'compact block must show the list /items': 'компактный блок должен показывать список /items',
+    'derived block needs the partition_employment operation that names it compact':
+        'производному блоку нужна операция partition_employment, которая назначает его компактным',
+    'a view without nodes needs fallback_style': 'виду без элементов нужен fallback_style',
+    'asset is empty': 'файл пустой',
+    'anyOf branches must be schema objects': 'ветки anyOf должны быть схемами-объектами',
+    'focus icon catalog is unreadable': 'каталог иконок Focus не читается',
+    'focus icon catalog names an unknown icon': 'каталог иконок Focus ссылается на неизвестную иконку',
 }
 
 # A reason with a value from the template after its fixed start.
