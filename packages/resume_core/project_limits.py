@@ -36,7 +36,8 @@ class UserLimits:
     project_megabytes: int = PROJECT_MEGABYTES[0]
 
 
-# The service applies saved Settings here at startup and after each save.
+# The service applies saved Settings here at startup and after each save. Production runs one app per process; a second
+# create_app in a process replaces the first app's limits, which tests/settings/test_limits.py records.
 USER_LIMITS = UserLimits()
 
 
