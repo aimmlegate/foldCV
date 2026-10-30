@@ -14,14 +14,13 @@
 For all project-owned `.ts` and `.tsx` files, including tests and generated
 contracts, follow [.cursor/rules/frontend-standards.mdc](.cursor/rules/frontend-standards.mdc).
 The confirmed stack is React, TypeScript, Radix Primitives, and Tailwind.
-Read [docs/gui/implementation-plan.md](docs/gui/implementation-plan.md) before
-implementing a GUI slice.
 
-## Development orchestration
+## Local-only files
 
-Follow [.cursor/rules/development-orchestration.mdc](.cursor/rules/development-orchestration.mdc)
-for model roles and external review quota handling. Keep deferred reviews in
-[the review backlog](docs/gui/handoffs/external-review-backlog.md).
+Plans, handoffs, prompts, reviews and research stay local and never go to Git; see
+[the policy](docs/gui/git-data-policy.md). They exist only in the main checkout, under
+`docs/gui/`. Keep new ones there and do not force-add them. Read
+`docs/gui/implementation-plan.md` there before implementing a GUI slice.
 
 ## Shared memory
 

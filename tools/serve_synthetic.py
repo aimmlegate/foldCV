@@ -290,6 +290,7 @@ class LiveBudget:
         if self.used() >= self.limit:
             return RuntimeResult(state='failed', error='AGENT_QUOTA')
         # Charged before the start, so an unknown outcome still counts.
+        self.ledger.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger.open('a') as handle:
             handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model,
                 'message': json.loads(value.prompt.split('\n', 1)[1])['message'][:200]}, ensure_ascii=False) + '\n')

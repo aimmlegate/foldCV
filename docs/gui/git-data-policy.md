@@ -26,3 +26,15 @@ Keep originals in private local storage. Published history replacement needs
 explicit approval and an exact force-with-lease against the previously verified
 remote tip. Host caches and old clones require separate handling; a successful
 history rewrite alone does not prove those copies are erased.
+
+## Local-only project files
+
+Plans, handoffs, prompts, review records, research notes, reports and the design
+prototype are not published. `.gitignore` excludes `docs/gui/*`, `reports/`,
+`research_notes/` and `design/future-editor/*`, and lists the published documents and
+`design/future-editor/visual/` as exceptions. To publish a new document, add it to
+that list.
+
+These files exist only in the main checkout, so new clones and worktrees do not have
+them. Git does not protect ignored files. Checking out an older commit and returning
+deletes the files that commit tracked, and `git clean -x` deletes all of them.

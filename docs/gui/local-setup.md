@@ -4,9 +4,8 @@ This source checkout is verified on **macOS 26.6.2 arm64** (Apple M1 Pro,
 32 GiB RAM). Other macOS versions, Windows, Linux, other chips, and packaged
 installers have not been tested. The local app can import, edit, review, render,
 export and reopen projects without a Codex CLI. The default launch keeps real
-normalization, drafting and rewriting closed by [D004](automation/decisions.md).
-The separate personal experiment below is an explicit opt-in under
-[D034](automation/decisions.md).
+normalization, drafting and rewriting closed. The separate personal experiment
+below is an explicit opt-in.
 
 ## Setup
 
@@ -55,7 +54,7 @@ or copy its auth file. The observed installed CLI is `0.162.0-alpha.17.2`; the
 reviewed profile pins `0.162.0-alpha.2`, so this host remains manual-ready.
 An explicit executable may be passed with `--codex-executable` or the
 `FOLDCV_CODEX_EXECUTABLE` environment variable. Neither changes global CLI
-configuration. CLI login availability would not open D004 by itself.
+configuration. CLI login availability does not open model work by itself.
 
 ## Personal CLI experiment
 

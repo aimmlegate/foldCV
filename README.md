@@ -1,27 +1,69 @@
 # FoldCV
 
-Command-line skill: original file → complete archive → selected resume JSON → fixed Generic PDF.
+Local resume editor. It imports a PDF, DOCX, TXT or Markdown resume, extracts its
+facts into a template, lets you edit and rewrite the text, and exports DOCX.
+
+Projects stay on your computer in `~/Library/Application Support/FoldCV`. Model work
+runs through your own Codex or Claude CLI sign-in. FoldCV has no server of its own
+and uses no API keys.
+
+## Run from source
+
+Verified on macOS arm64 with Python 3.13 and Node 22.14.
+
+```sh
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+npm --prefix apps/web ci
+npm --prefix apps/web run build
+bash tools/install-local-renderer.sh
+.venv/bin/python tools/run-local.py --experimental-cli
+```
+
+The launcher starts one local service on `127.0.0.1` and opens the browser. Stop it
+with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
+[local setup](docs/gui/local-setup.md) for details.
+
+## Repository
+
+| Path | Contents |
+| --- | --- |
+| `apps/web` | React and TypeScript frontend |
+| `services/api` | FastAPI local service, CLI providers, import and assistant |
+| `packages/resume_core` | Project storage, templates and DOCX rendering |
+| `contracts` | Generated JSON Schemas and contract examples |
+| `templates` | Bundled resume templates |
+| `design/future-editor/visual` | Visual layer used by the frontend |
+| `skills/format-resume` | Command-line skill and its assets |
+| `tools` | Launcher, checks and benchmarks |
+| `tests` | Python test suites |
+
+## Documentation
+
+- [Architecture](docs/gui/architecture.md): service, storage, API, CLI adapter and rendering.
+- [Contracts](docs/gui/contracts.md): versioned JSON contracts and their generation.
+- [Local setup](docs/gui/local-setup.md): setup, launcher modes and CLI sign-in.
+- [Testing](docs/gui/testing.md): suites, budgets, GUI checks and the benchmark.
+- [Resume data in Git](docs/gui/git-data-policy.md): what may be committed.
+- [Dependency notices](docs/gui/local-dependency-notices.md): third-party licenses.
+
+## Tests
+
+```sh
+PYTHONPATH=services/api/src .venv/bin/python -m pytest -q -p no:cacheprovider
+```
+
+## Command-line skill
+
+Original file → complete archive → selected resume JSON → fixed Generic PDF.
 
 The supplied outputs define the layout, not the candidate's facts. The skill
 handles extraction and rewriting; Python checks preservation and renders the
-layout. No provider API or model benchmark is implemented yet.
-
-The local browser MVP is implemented and opens the recovery editor by default.
-It supports direct editing, selection rewrites, local/portable projects and DOCX.
-Read [the manual-use guide](docs/gui/mvp-manual.md) for launch and connection steps.
-The recovery run is accepted with review debt; native CLI quality/usage/retention,
-Word and clean-host checks remain pending.
-
-## Setup
+layout.
 
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-```
-
-## Run
-
-```sh
 .venv/bin/python skills/format-resume/scripts/archive.py INPUT.pdf experiments/case --as-of 2026-10-10
 ```
 
@@ -42,7 +84,7 @@ The render command runs the archive checks before writing a version 2 PDF.
 For another presentation, create a new view from the full archive, never from
 the shortened PDF. Keep each accepted archive version with its matching view.
 
-## Preservation and checks
+### Preservation and checks
 
 - Keep original bytes, full page text, stable source units, all employment, and
   sourced technology catalogs, including details excluded from the PDF.
@@ -68,7 +110,7 @@ Experience estimates describe project exposure, not continuous full-time use.
 .venv/bin/python -m pytest -q -p no:cacheprovider skills/format-resume/tests
 ```
 
-## Current command-line skill scope
+### Scope
 
 - PDF with extractable text, TXT, and Markdown inputs. Other formats and scans
   need a separate extraction or OCR step.
@@ -78,8 +120,3 @@ Experience estimates describe project exposure, not continuous full-time use.
 - Source-linked candidate statements and a separate review list.
 - Private data and generated files stay in ignored `experiments/`, `tmp/`, and
   `output/` folders. The reusable skill contains no candidate records.
-
-The latest trial is in `experiments/luna-batch-02/`, with PDFs under
-`output/pdf/luna-v2/`. Earlier trials remain intact. These examples informed the
-rules and received editorial corrections, so they are not a held-out quality
-benchmark. Private artifacts are not committed.
