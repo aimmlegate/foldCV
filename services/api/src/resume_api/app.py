@@ -429,6 +429,16 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     def import_selected_provider():
         return preferred_provider("selected_import_model")
 
+    def unavailable_code(field):
+        """Why the model chosen in `field` cannot run: a known exhausted plan is named, because "connect a model" sent
+        the user to Settings for nothing (D104)."""
+        stored = stored_preferences()
+        kind = catalog().get((getattr(stored, field) if stored else None) or processing_model())
+        # Without a chosen model, the plan is named when every provider that is on has used it up.
+        exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
+        return ("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted" for item in exhausted)
+                else "CONNECTION_REQUIRED")
+
     from packages.resume_core.project_repository import ProjectRepository
     from .projects.exports import ExportService, production_render
     from .projects.fold import register_import_fold
@@ -448,7 +458,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         **({"clock": clock} if clock is not None else {}))
     app.state.intake = intake
     rewrite = TemplateRewrite(lambda: preferred_provider("selected_rewrite_model"), preferences=preferences_store,
-        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of)
+        temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of,
+        unavailable=lambda: unavailable_code("selected_rewrite_model"))
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
     mount_projects_v2(app, projects)
 
@@ -490,14 +501,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         from packages.resume_core.template_import import digest as capture_digest
         selected = import_selected_provider()
         if selected is None:
-            # A known exhausted plan is named as such; "connect a model" sent the user to Settings for nothing (D104).
-            stored = stored_preferences()
-            kind = catalog().get((stored.selected_import_model if stored else None) or processing_model())
-            # Without a chosen model, the plan is named when every provider that is on has used it up.
-            exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
-            raise ProjectFailure("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted"
-                                                                        for item in exhausted)
-                                 else "CONNECTION_REQUIRED", 409)
+            raise ProjectFailure(unavailable_code("selected_import_model"), 409)
         provider, model = selected
         reasoning = reasoning_of(model)
         if effort is not None and (reasoning is None or effort not in reasoning.supported):
