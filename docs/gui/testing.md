@@ -141,7 +141,8 @@ cd apps/web && npm run build && cd ../..
 - `--live-assistant` runs the assistant on the real Codex sign-in (`cli-experiment`, used in
   place) with synthetic projects in the temp root. Every start is charged before it runs to
   `docs/gui/handoffs/SIMPLIFY/logs/sr08-live-ledger.jsonl`, and starts past the allowance are
-  refused. Only with an explicit user allowance.
+  refused. Rewrites are refused and `--template-call-cap` is not accepted, because the ledger
+  does not count them. Only with an explicit user allowance.
 - stdout prints the origin and the one-shot URL; the secret is only in `<root>/launch.json`.
 - Check lists: A editing (SR03), B assistant (SR05), C import, export and files (SR04) in the
   simplification plan.

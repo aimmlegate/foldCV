@@ -32,6 +32,7 @@ from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
 from resume_api.app import ProviderSlot, create_app
 from resume_api.cli.installation import ClaudeInstallation
 from resume_api.connection import Metadata, Quota
+from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
 
@@ -277,8 +278,8 @@ class LiveBudget:
     """Counts native assistant starts in a ledger kept across restarts and refuses any start past the limit."""
     native = True
 
-    def __init__(self, runtime, ledger, limit):
-        self.runtime, self.ledger, self.limit = runtime, ledger, limit
+    def __init__(self, runtime_for, ledger, limit):
+        self.runtime_for, self.ledger, self.limit = runtime_for, ledger, limit
         self.calls = []
 
     def used(self):
@@ -293,14 +294,30 @@ class LiveBudget:
             handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model,
                 'message': json.loads(value.prompt.split('\n', 1)[1])['message'][:200]}, ensure_ascii=False) + '\n')
         self.calls.append(value.model)
-        result = await self.runtime.run(value, cancel, emit)
+        result = await self.runtime_for(value.model).run(value, cancel, emit)
         with OUTCOMES.open('a') as handle:
             handle.write(json.dumps({'at': datetime.now(timezone.utc).isoformat(), 'model': value.model, 'state': result.state,
                 'error': result.error, 'toolCalls': result.tool_calls, 'text': (result.text or '')[:600]}, ensure_ascii=False) + '\n')
         return result
 
 
+def install_live_limits(app, ledger, limit):
+    """Every assistant start goes through one budget, whichever provider runs the model. The budget does not count
+    rewrites, so they are refused here, before a native process starts."""
+    assistant = app.app.state.assistant
+    budget = LiveBudget(assistant.runtime_for, ledger, limit)
+    assistant.runtime = budget
+    assistant.runtime_for = lambda model: None if budget.runtime_for(model) is None else budget
+
+    async def refused(*_args):
+        raise ProjectFailure('CONNECTION_REQUIRED', 409)
+    app.app.state.projects.rewrite_text = refused
+    return budget
+
+
 async def main(args):
+    if args.live_assistant and args.template_call_cap is not None:
+        raise ValueError('--template-call-cap is refused with --live-assistant: the live budget does not count imports')
     root = args.root.resolve()
     # --reopen restarts on a root this tool created (isolation.json present), keeping its store.
     if root.parent != Path('/private/tmp') or not root.name.startswith('foldcv-') or \
@@ -324,9 +341,8 @@ async def main(args):
         from resume_api.cli.experimental_profile import installed_profile
         profile = installed_profile(LIVE_PROFILE)
         app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
-            experimental_profile=profile, template_import_call_cap=args.template_call_cap)
-        runtime = LiveBudget(app.app.state.assistant.runtime, LEDGER, LIVE_LIMIT)
-        app.app.state.assistant.runtime = runtime
+            experimental_profile=profile)
+        runtime = install_live_limits(app, LEDGER, LIVE_LIMIT)
     else:
         with patch('resume_api.app.ConnectionAdapter', side_effect=AssertionError('native connection')), \
              patch('resume_api.app.CodexCliProvider', side_effect=AssertionError('native content')), \
@@ -352,7 +368,7 @@ async def main(args):
     info = {'schemaVersion': 1, 'root': str(root), 'dataRoot': str(data), 'operationRoot': str(operations), 'origin': origin,
         'ownedServicePid': os.getpid(), 'buildDirectory': str(dist), 'projects': identifiers,
         'providers': {'connection': 'native' if args.live_assistant else 'ScriptedConnection',
-            'content': 'native' if args.live_assistant else 'ScriptedContent',
+            'content': 'refused' if args.live_assistant else 'ScriptedContent',
             'agent': 'CodexAgentRuntime (LiveBudget)' if args.live_assistant else 'ScriptedAgentRuntime',
             'web': 'PublicFetcher' if args.live_assistant else 'StoredWeb'},
         'experimentalProfile': 'cli-experiment (in place)' if args.live_assistant else None,
@@ -364,7 +380,8 @@ async def main(args):
 
     def diagnostics():
         return {**info, 'callCounts': {'connection': len(connection.calls), 'content': len(content.calls),
-            'agent': len(runtime.calls), 'web': len(web.calls), 'nativeStarts': 0},
+            'agent': len(runtime.calls), 'web': len(web.calls),
+            'nativeStarts': len(runtime.calls) if args.live_assistant else 0},
             'revisions': {identifier: repository.read(identifier).project_revision for identifier in identifiers}}
 
     @app.app.get('/v1/synthetic/diagnostics')
