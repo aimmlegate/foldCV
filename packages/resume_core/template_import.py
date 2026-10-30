@@ -11,6 +11,7 @@ from .templates.compiler import canonical, dependency_order, sha256
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
 GENERATION_SLOTS = frozenset({'initial', 'primary_repair', 'fallback_repair'})
+REPAIR_SLOTS = frozenset({'primary_repair', 'fallback_repair'})
 # D117: the outline of a block that extracts its entries on their own, and the review of that outline.
 OUTLINE_SLOTS = frozenset({'outline', 'outline_review'})
 IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
@@ -276,6 +277,22 @@ def spent_calls(operation):
     return sum(attempt.state != 'released' for attempt in operation.attempts)
 
 
+def owed_reviews(operation, *, excluding=None):
+    """Repairs still waiting for their review, each holding one call of the cap: a repair counts only after its review.
+    A refused repair goes unreviewed and an ended task owes nothing."""
+    ended = {task.id for task in operation.tasks if task.state in TERMINAL_TASKS}
+    reviewed, owed = set(), 0
+    for attempt in reversed(operation.attempts):
+        if attempt.state == 'released' or attempt.task_id in ended or attempt.task_id == excluding:
+            continue
+        if attempt.slot in {'review', 'replacement_review'}:
+            reviewed.add(attempt.task_id)
+        elif attempt.slot in REPAIR_SLOTS and attempt.task_id not in reviewed and attempt.outcome in {None, 'completed'}:
+            reviewed.add(attempt.task_id)
+            owed += 1
+    return owed
+
+
 def cleanup_verified(operation):
     return all(attempt.cleanup.state == 'verified' for attempt in operation.attempts)
 
@@ -294,7 +311,10 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     if (any(attempt.state not in {'released', *IN_FLIGHT} and attempt.cleanup.state != 'verified' for attempt in result.attempts)
             or len(in_flight) >= result.capture.policy.concurrency or any(attempt.task_id == task_id for attempt in in_flight)):
         raise TemplateImportFailure('IMPORT_CLEANUP_UNKNOWN')
-    if spent_calls(result) >= result.capture.policy.call_cap:
+    # A repair takes its review's call with its own, in this one transition: parallel blocks saw the same free calls.
+    needed = 2 if slot in REPAIR_SLOTS else 1
+    held = owed_reviews(result, excluding=task_id if slot in {'review', 'replacement_review'} else None)
+    if spent_calls(result) + held + needed > result.capture.policy.call_cap:
         raise TemplateImportFailure('IMPORT_CALL_CAP')
     prior = [attempt for attempt in result.attempts if attempt.task_id == task_id and attempt.state != 'released']
     if slot in GENERATION_SLOTS:
