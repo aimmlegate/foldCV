@@ -21,6 +21,7 @@ from resume_api.app import create_app
 from resume_api.cli import distribution
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.connection import Metadata, Quota
+from resume_api.inference_admission import INFERENCE
 from resume_api.providers.codex_cli import CodexCliProvider
 from resume_api.providers.content import ContentResult, ReportedUsage
 from tests.service.app_fixtures import add_project
@@ -187,7 +188,12 @@ async def test_a_generation_finished_after_detach_is_refused_but_a_refresh_keeps
         assert await asyncio.to_thread(started.wait, 5)
         side = asyncio.create_task(client.post("/v1/host/" + ("detach" if action == "detach" else "status"), json={}))
         if action == "refresh":
-            assert (await side).json()["state"] == "connected"
+            # The check queues behind the rewrite (D121) and runs once it ends.
+            for _ in range(500):
+                if INFERENCE.waiting:
+                    break
+                await asyncio.sleep(0.01)
+            assert not side.done()
         else:
             for _ in range(500):
                 if (await client.get("/v1/settings/connection")).json()["state"] == "detached":
@@ -195,6 +201,8 @@ async def test_a_generation_finished_after_detach_is_refused_but_a_refresh_keeps
                 await asyncio.sleep(0.01)
         release.set()
         reply = await pending
+        if action == "refresh":
+            assert (await side).json()["state"] == "connected"
         assert reply.status_code == expected, reply.text[:300]
         if action == "detach":
             assert reply.json()["error"]["code"] == "CANCELLED"
