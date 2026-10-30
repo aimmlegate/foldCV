@@ -78,8 +78,13 @@ def test_sidecar_cannot_take_another_items_same_shaped_field():
 
 def test_application_identity_collisions_and_rebound_discovery_keys_fail():
     value = reply()
-    with pytest.raises(ValueError, match='identities collide'):
+    # One id for everything fails inside the first item: HandleAllocation refuses a repeated cell id.
+    with pytest.raises(ValueError, match='duplicate allocated cell'):
         allocate(value, id_factory=lambda _prefix: 'reused')
+    # Distinct cells with one item handle pass that check and collide across the two items.
+    serial = count()
+    with pytest.raises(ValueError, match='identities collide'):
+        allocate(value, id_factory=lambda prefix: 'reused' if prefix == 'item' else prefix + '-' + str(next(serial)))
     allocated = allocate(value)
     value.payload[0].pop('journal')
     with pytest.raises(ValueError, match='reused with different'):
