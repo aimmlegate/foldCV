@@ -1,0 +1,21 @@
+/* Draggable panel edges; the grip shows on hover and on keyboard focus. */
+.panel-handle { position: absolute; z-index: 16; touch-action: none; }
+.panel-handle[data-axis="x"] { cursor: col-resize; width: 9px; }
+.panel-handle[data-axis="y"] { cursor: row-resize; height: 9px; }
+.panel-handle::after { content: ""; position: absolute; border-radius: 3px; background: var(--accent); opacity: 0; }
+.panel-handle[data-axis="x"]::after { top: calc(50% - 23px); left: 3px; width: 3px; height: 46px; }
+.panel-handle[data-axis="y"]::after { left: calc(50% - 23px); top: 3px; width: 46px; height: 3px; }
+.panel-handle:hover::after, .panel-handle:focus-visible::after, .panel-handle[data-resizing="true"]::after { opacity: 1; }
+.panel-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.facts-handle { top: 47px; bottom: 40px; right: calc(min(var(--facts-width, 300px), 100% - 16px) + 4px); }
+.history { position: relative; }
+.history-handle { top: 0; bottom: 0; right: -4px; }
+.app-shell[data-history-sized] .history { width: var(--history-width); }
+.chat-handle { top: -4px; left: 0; right: 0; }
+#agent-chat-host.chat-open { height: min(var(--chat-height, 320px), 100% - 140px); }
+@media (max-width: 600px) {
+  .history { position: absolute; }
+  .history-handle, .chat-handle { display: none; }
+  .app-shell[data-history-sized] .history { width: 220px; }
+  #agent-chat-host.chat-open { height: min(70dvh, 620px); }
+}

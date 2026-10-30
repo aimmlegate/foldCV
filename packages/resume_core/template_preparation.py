@@ -205,6 +205,11 @@ def _guard_links(content, selected, operation):
         cursor += length
 
 
+def _technology_names(workspace, fields):
+    records = {record.id for record in workspace.project.facts.records if record.kind == 'technology'}
+    return [span for span in fields if span.record_id in records and span.field_key == 'display']
+
+
 def prepare_text_edit(response, request, *, operation=None, replacement=None, occupied=None):
     workspace = response.workspace
     validate_preparation(response, request)
@@ -253,6 +258,9 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
             and (isinstance(operation, SetMarks) or utf16_slice(text, selected.start, selected.end) == operation.text)):
         return prepared(None, response.model_copy(deep=True))
     structural_paste = replacement is not None and replacement.same_text
+    if (isinstance(operation, ReplaceText) and not structural_paste and fields and not direct and not operation.text.strip()
+            and _technology_names(workspace, fields)):
+        raise ValueError('TECHNOLOGY_NAME_EMPTY')
     if isinstance(operation, ReplaceText) and not structural_paste and (scope_ranges or fields and not direct):
         from .template_preparation_scopes import scope_edit_steps
         steps, candidate = scope_edit_steps(workspace, operation, allocator, content, fields, scope_ranges, bound,
@@ -274,6 +282,8 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
             'content': [part.model_dump(by_alias=True) for part in inserted], 'flankBindings': flanks.entries}]
         if isinstance(operation, ReplaceText) and fields and not structural_paste:
             raw = _raw_occurrence(candidate.document, bound)
+            if not raw.strip() and _technology_names(workspace, fields):
+                raise ValueError('TECHNOLOGY_NAME_EMPTY')
             steps += human_cell_steps(workspace, sorted({_identity(span)[0] for span in fields}), raw,
                 request.capture.action_id, [original.id], allocator)
             copies = _detach_copies(candidate.document, bound)

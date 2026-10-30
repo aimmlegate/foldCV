@@ -171,7 +171,9 @@ def panel_plan(project):
     lines = [identifiers for _block, _container, content, _owner in technology_lines(project)
         if len(identifiers := [entry[0] for entry in _split_technology_line(content)[1]]) > 1
         and len(identifiers) == len(set(identifiers))]
-    return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('technologyLines', lines)) if value}
+    from .template_panel_creation import addable_kinds
+    return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('technologyLines', lines),
+        ('addKinds', addable_kinds(project))) if value}
 
 
 def _view_position(project, view):

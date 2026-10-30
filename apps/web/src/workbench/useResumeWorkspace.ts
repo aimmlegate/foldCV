@@ -7,6 +7,7 @@ import { importBody } from "../rich/import-source";
 import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, projectTasks, resumeImport, startImport,
   type ImportOptions, type ProjectList } from "../projects/api";
 import { ProjectApiFailure, type ProjectEditorConnection } from "../rich/v7-connection";
+import { deliverFile, type Delivery } from "./files/delivery";
 import { openEditor } from "./open-editor";
 import { WorkspaceReads, type ReadCapture } from "./read-capture";
 import type { ImportEntry } from "./import/progress";
@@ -257,13 +258,9 @@ export function useResumeWorkspace() {
     }, "Открываем файл");
   }
   async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string)) {
-    const deliver = (blob: Blob, name: string) => {
-      const url = URL.createObjectURL(blob), anchor = document.createElement("a");
-      anchor.href = url; anchor.download = name;
-      anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    };
     const fallback = kind === "export" ? "resume.docx" : "project.foldcv";
-    return action(async () => {
+    const outcome: { delivery: Delivery | null } = { delivery: null };
+    const finished = await action(async () => {
       const capture = reads.current.begin(kind);
       if (!capture) throw new Error("Сначала откройте резюме.");
       await templateEditor.current?.flush();
@@ -275,11 +272,15 @@ export function useResumeWorkspace() {
       // The editor token and the flushed revision go with the file.
       const blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv();
       if (!reads.current.current(kind, capture)) return;
-      deliver(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
+      const delivered = deliverFile(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
       // Refresh adopts the export record. The file is already delivered, so a failed refresh is not this action's error:
       // the editor reports its own save problems, and queued input meets the new revision itself.
       await templateEditor.current?.refresh().catch(() => {});
+      stage("Сохраняем файл");
+      outcome.delivery = await delivered;
+      if (outcome.delivery.state === "failed") throw new Error("FILE_SAVE_FAILED");
     }, "Сохраняем изменения");
+    return finished ? outcome.delivery : null;
   }
   const importActions = {
     stop: (id: string) => void tracker.current?.stop(id), retry: (id: string) => void tracker.current?.retry(id),

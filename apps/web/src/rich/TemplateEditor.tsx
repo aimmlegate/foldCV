@@ -2,7 +2,7 @@ import { createExtension } from "@blocknote/core";
 import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { ProjectApiFailure, type ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
@@ -19,6 +19,8 @@ import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
+import { parseZoom, readZoom, saveZoom, useFittedZoom, zoomLevels } from "../workbench/editor/document-zoom";
+import { PanelHandle, readPanelSize, savePanelSize } from "../workbench/ui/PanelHandle";
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
 import { markable } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
@@ -39,6 +41,7 @@ export type TemplateEditorHandle = { background: boolean; flush: () => Promise<T
   captureSelection: () => AssistantSelection | null;
   focusFinding: (anchor: AssistantFinding["anchors"][number]) => boolean };
 type ShownBlock = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["document"]["regions"][number]["blocks"][number];
+const factsWidths = { fallback: 300, minimum: 240, maximum: 560 };
 
 function blockRevisions(response: TemplateProjectResponseV1): Map<string, number> {
   const revisions = new Map<string, number>();
@@ -60,6 +63,10 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // The verified state shown in the editor: facts and issues are read from it, never from editor content.
   const [shown, setShown] = useState(initial);
   const [factsVisible, setFactsVisible] = useState(false);
+  const [factsWidth, setFactsWidth] = useState(() => readPanelSize("facts", factsWidths.minimum, factsWidths.maximum) ?? factsWidths.fallback);
+  function changeFactsWidth(value: number | null) { setFactsWidth(value ?? factsWidths.fallback); savePanelSize("facts", value); }
+  const [zoomChoice, setZoomChoice] = useState(readZoom);
+  const paperScroll = useRef<HTMLDivElement>(null);
   // The fact row a finding points at, until the panel has shown it.
   const [factFocus, setFactFocus] = useState<{ recordId: string } | null>(null);
   const factFocused = useCallback(() => setFactFocus(null), []);
@@ -91,6 +98,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   callbacks.current = { onStatus, onShown };
   // The compiled presentation of the verified state; decorations read the latest one.
   const sheet = useMemo(() => templateSheet(shown), [shown]);
+  // The page is drawn in points; CSS pixels are 96 to 72 of them.
+  const fitted = useFittedZoom(paperScroll, (sheet?.presentation.recipe.style.page.width ?? 596) * 96 / 72);
+  const zoom = zoomChoice === "fit" ? fitted : zoomChoice;
   const presented = useRef<TemplateSheet | null>(sheet);
   presented.current = sheet;
   const presentation = useMemo(() => templatePresentationPlugin(() => presented.current), []);
@@ -245,6 +255,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }
   const state = session.queue.template.state, styles = editor.getActiveStyles(), textBlocks = session.textBlocks();
   const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
+  const plan = shown.presentation?.editor;
+  const heavier = textBlocks.length === 0 || textBlocks.some(block => {
+    const entry = plan?.blocks[block.id], faces = entry && plan?.styles[entry.style]?.faces;
+    return !faces || faces.bold !== faces.regular;
+  });
   // Selection changes re-render the editor; Focus and the group anchors are read again only when the shown state changes.
   const focus = useMemo(() => shown.workspace.project ? focusFacts(shown.workspace.project, shown.presentation)
     : { entries: [], options: [], only: new Set<string>(), icons: false }, [shown]);
@@ -276,14 +291,19 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       {/* The layout host: the facts panel floats over the document. */}
       <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
-        close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace">
+        close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace" data-facts={factsVisible ? "open" : "closed"}
+        style={{ "--facts-width": `${String(factsWidth)}px`, "--document-zoom": String(zoom) } as CSSProperties}>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={session.rewriteSource() !== null}
             style={blockStyle(textBlocks[0])} canUndo={session.canUndo} canRedo={session.canRedo}
-            blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)}
+            blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)} bold={heavier}
             active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,
               list: listed("bullet_list"), numbered: listed("numbered_list") }}
-            remarks={marks && (marks.cells.size > 0 || marks.blocks.size > 0) ? marking : null} />
+            remarks={marks && (marks.cells.size > 0 || marks.blocks.size > 0) ? marking : null}
+            layoutControls={<div className="layout-controls"><select className="toolbar-select" aria-label="Масштаб листа" value={String(zoomChoice)}
+              onChange={event => { const next = parseZoom(event.currentTarget.value); setZoomChoice(next); saveZoom(next); }}>
+              <option value="fit">По ширине</option>{zoomLevels.map(level => <option key={level} value={String(level)}>{level * 100}%</option>)}
+            </select></div>} />
         </fieldset>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
           <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
@@ -292,7 +312,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
             hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
             anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
         </fieldset>
-        <div className="paper-scroll" onKeyDownCapture={linkShortcut}>
+        {factsVisible && <PanelHandle className="facts-handle" label="Ширина панели фактов" axis="x" sign={-1} value={factsWidth} minimum={factsWidths.minimum}
+          maximum={factsWidths.maximum} change={changeFactsWidth} reset={() => changeFactsWidth(null)} />}
+        <div className="paper-scroll" ref={paperScroll} onKeyDownCapture={linkShortcut}>
           <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
             data-history-position={session.history.position} data-history-length={session.history.length}>
             {sheet && <style>{sheet.css}</style>}

@@ -12,7 +12,7 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type Tem
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, technologyLines, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { serverRewriteStage, type RewriteStage } from "./rewrite-progress";
@@ -188,9 +188,10 @@ export class TemplateEditorSession {
     }
   }
 
-  private refuse(reason: string): void {
+  private refuse(reason: string, code = "V7_INPUT_UNSUPPORTED"): void {
     console.warn(`V7 input refused: ${reason}`);
-    this.port.warning(errorMessage("V7_INPUT_UNSUPPORTED"));
+    // Enter or Backspace on a chip line just does nothing: the keys offer no action there.
+    if (reason !== technologyLines) this.port.warning(errorMessage(code));
   }
 
   private filter(transaction: Transaction): boolean {
@@ -198,7 +199,7 @@ export class TemplateEditorSession {
     if (!transaction.docChanged || this.projecting || transaction.getMeta(projectionMeta)) return true;
     if (this.closed || this.navigating || this.pendingNavigation || this.panelBusy || !this.writable) return false;
     const result = extractOperations(transaction);
-    if (result.kind === "unsupported") { this.refuse(result.reason); return false; }
+    if (result.kind === "unsupported") { this.refuse(result.reason, result.code); return false; }
     if (result.operations.length) this.stash.set(transaction, result.operations);
     return true;
   }

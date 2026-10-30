@@ -3,6 +3,7 @@
 from .models.template_import import EvidenceOption
 from .template_completion import stating, stating_words
 from .template_import import digest
+from .template_source_cleanup import clean_source_wording
 from .templates.compiler import canonical
 
 
@@ -37,6 +38,11 @@ def display_raw_input(review, field, raw):
     if (review.allow_text_rewrite or not isinstance(raw, str) or not raw.strip()
             or field.pointer not in review.semantic_context.get('sourceWordingPointers', [])):
         return display_text(raw)
+    return clean_source_wording(source_wording(review, field, raw), field.pointer)
+
+
+def source_wording(review, field, raw):
+    """The exact source text a value cites, or the input its effective cells hold."""
     if field.evidence:
         offered = ([(option.span, option.text) for option in review.evidence] if review.schema_version == 2
             else [(span, review.source_texts[digest(span)]) for span in review.source_spans])

@@ -32,7 +32,8 @@ export function offeredFields(record: RecordValue, unshown: readonly string[] = 
 }
 export function title(record: RecordValue): string {
   if (record.kind === "employment") return record.employer.rawText || "Без названия";
-  if (record.kind === "technology") return record.display.rawText || "Без названия";
+  // Text typed over several technologies waits in pendingRawText and leaves rawText empty.
+  if (record.kind === "technology") return record.display.rawText || record.display.pendingRawText || "Без названия";
   if (record.kind === "education") return record.institution.rawText || "Без названия";
   if (record.kind === "language") return record.language.rawText || "Без названия";
   if (record.kind === "claim") return record.value.rawText || "Новый факт";

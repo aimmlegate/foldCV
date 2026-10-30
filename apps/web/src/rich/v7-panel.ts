@@ -10,11 +10,10 @@ export type TechnologyTarget = EditorTechnologyTarget;
 
 /** What Python's plan says the panel shows and offers (D113): each job's periods as the document writes them and whether it
  * can take another, the fields with no place in the document, and the technologies that share a line. */
-export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines">;
+export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines" | "addKinds">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
-export const panelSupport: { add: ReadonlySet<string>; remove: ReadonlySet<string> } = {
-  add: new Set(["employment"]),
+export const panelSupport: { remove: ReadonlySet<string> } = {
   remove: new Set(["employment", "technology", "education", "language"]),
 };
 
@@ -55,6 +54,10 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
     if (command.periodId || values) return null;
     return [{ operation: "clear_technologies", recordKind: "technology", jobId: command.jobId ?? null, recordId: null, periodId: null,
       values: {} }];
+  }
+  if ((kind === "education" || kind === "language") && command.operation === "add") {
+    if (command.recordId || command.jobId || command.periodId || !values) return null;
+    return [{ operation: "add", recordKind: kind, values }];
   }
   if (kind !== undefined && kind !== null && editedKinds.has(kind)) {
     if (!command.recordId || command.jobId || command.periodId) return null;

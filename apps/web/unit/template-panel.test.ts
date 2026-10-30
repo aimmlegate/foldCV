@@ -48,9 +48,13 @@ test("only what Python saves is forwarded: technology add, removal and clearing,
   assert.deepEqual(panelCommandsV7({ operation: "remove", recordId: "school" }, kinds), [{ operation: "remove", recordId: "school" }]);
   assert.deepEqual(panelCommandsV7({ operation: "edit", recordId: "note", values: { value: "Led a team" } }, kinds),
     [{ operation: "edit", recordId: "note", values: { value: "Led a team" } }]);
-  // No adapter: a candidate or claim removal, adding an education item, a claim or a technology with other values.
+  assert.deepEqual(panelCommandsV7({ operation: "add", recordKind: "education", values: { institution: "School" } }, kinds),
+    [{ operation: "add", recordKind: "education", values: { institution: "School" } }]);
+  assert.deepEqual(panelCommandsV7({ operation: "add", recordKind: "language", values: { language: "French" } }, kinds),
+    [{ operation: "add", recordKind: "language", values: { language: "French" } }]);
+  // No adapter: a candidate or claim removal, adding a claim or a technology with other values, an item without values.
   for (const command of [{ operation: "remove", recordId: "person" }, { operation: "remove", recordId: "note" },
-    { operation: "add", recordKind: "education", values: { institution: "School" } }, { operation: "add", recordKind: "claim", values: { value: "x" } },
+    { operation: "add", recordKind: "education" }, { operation: "add", recordKind: "claim", values: { value: "x" } },
     { operation: "add", recordKind: "technology", values: { display: "Go", experience: "3" } }, { operation: "edit", recordId: "person", values: {} },
     { operation: "edit", recordId: "school", jobId: "job", values: { institution: "School" } }] as const)
     assert.equal(panelCommandsV7(command, kinds), null, JSON.stringify(command));
@@ -226,7 +230,7 @@ test("a technology rename saves through Python; an action without an adapter is 
     const renamed = records().find(item => item.id === technology.id);
     assert.ok(renamed?.kind === "technology");
     assert.equal(renamed.display.rawText, "Go");
-    await assert.rejects(session.panel({ operation: "add", recordKind: "language", values: { language: "French" } }), /PANEL_ACTION_UNSUPPORTED/);
+    await assert.rejects(session.panel({ operation: "add", recordKind: "claim", values: { value: "x" } }), /PANEL_ACTION_UNSUPPORTED/);
     // Python's refusal keeps its code for the panel's text, and the editor takes the next command.
     await assert.rejects(session.panel({ operation: "edit", recordId: technology.id, values: { display: "  " } }),
       (error: unknown) => error instanceof ProjectApiFailure && error.code === "TECHNOLOGY_NAME_REQUIRED" && error.status === 422);

@@ -11,6 +11,7 @@
 @import "./reference-document.css";
 @import "./original-source.css";
 @import "./comparison-workspace.css";
+@import "./panel-handles.css";
 @import "./operation-feedback.css";
 @import "./assistant-commands.css";
 @import "./assistant-proposals.css";

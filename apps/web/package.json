@@ -7,7 +7,7 @@
     "contracts:check": "../../.venv/bin/python ../../tools/check_contract_drift.py",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test:state": "node --import tsx --test --experimental-test-coverage --test-coverage-include='**/src/assistant/*.ts' --test-coverage-include='**/src/rich/*.ts' unit/*.test.ts",
+    "test:state": "node --import tsx --test --test-timeout=120000 --experimental-test-coverage --test-coverage-include='**/src/assistant/*.ts' --test-coverage-include='**/src/rich/*.ts' unit/*.test.ts",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build"
   },

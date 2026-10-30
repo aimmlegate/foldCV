@@ -1,6 +1,7 @@
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Icon } from "../ui/Icon";
+import { PanelHandle } from "../ui/PanelHandle";
 import { Composer, type ComposerProps } from "./Composer";
 import { Transcript } from "./Transcript";
 import { currentActivity } from "./activity";
@@ -8,9 +9,10 @@ import { Elapsed, OperationStatus, Spinner } from "../ui/OperationStatus";
 import { ProposalPreview } from "../../assistant/proposal";
 import type { Proposal } from "../../assistant/api";
 import type { AssistantFinding } from "../../assistant/controller";
-import { stopBusy } from "../../assistant/presentation";
+import { drawerHeights, stopBusy } from "../../assistant/presentation";
 
-export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; toggle: () => void; expand: () => void;
+export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; height: number; toggle: () => void; expand: () => void;
+  resize: (height: number) => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
   select: (id: string) => void; fresh: () => void;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean;
@@ -29,7 +31,10 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
     else if (!wasCollapsed.current) document.querySelector<HTMLButtonElement>("#agent-chat-host .chat-launcher")?.focus();
     wasCollapsed.current = collapsed;
   }, [collapsed]);
-  return <section id="agent-chat-host" aria-label="Помощник" className={collapsed ? undefined : `chat-open${expanded ? " chat-expanded" : ""}`}>
+  return <section id="agent-chat-host" aria-label="Помощник" className={collapsed ? undefined : `chat-open${expanded ? " chat-expanded" : ""}`}
+    style={collapsed ? undefined : { "--chat-height": `${String(props.height)}px` } as CSSProperties}>
+    {!collapsed && <PanelHandle className="chat-handle" label="Высота помощника" axis="y" sign={-1} value={props.height} minimum={drawerHeights.minimum}
+      maximum={drawerHeights.maximum} change={props.resize} reset={() => props.resize(320)} />}
     {collapsed ? <div className={active ? "uir-chat-active-bar" : undefined}><button className="chat-launcher" aria-expanded={false} aria-controls="assistant-content" onClick={toggle}><span><Icon name="chat" />Помощник</span>{active && <small><Spinner /><span className="agent-compact-label" role="status">{currentActivity(view, active)}</span>{view.run && <Elapsed key={view.run.id} startedAt={view.run.createdAt} />}</small>}<Icon name="chevron" /></button>
       {active && <button className="chat-icon" aria-label="Остановить" title="Остановить" disabled={stopBusy(view)} onClick={props.stop}>{stopBusy(view) ? <Spinner /> : <Icon name="stop" />}</button>}</div> : <div className="agent-chat-panel" id="assistant-content">
       <header className="chat-header"><div className="chat-title"><Icon name="chat" /><h2>Помощник</h2><span className="chat-access">{view.flags.allowEdits ? "Правки разрешены" : "Только чтение"}</span></div><div className="chat-header-actions">

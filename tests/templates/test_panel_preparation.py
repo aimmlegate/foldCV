@@ -390,3 +390,25 @@ def test_actual_preparer_maps_tree_guard_failure_without_accepting_an_id_or_chan
     request.operations[0].placement.after_id=before.project.document.regions[2].blocks[-1].id
     assert editor.edit(request).client_mutation_id==request.client_mutation_id
     assert editor.current().project.document.regions[2].blocks[-1].id==block.id
+
+
+def _typed(before,start,end,text):
+    block=next(value for value in before.project.document.blocks() if value.id=='tool-line')
+    selected={'blockId':block.id,'beforeRevision':block.revision,'cellId':None,'field':'content','start':start,'end':end}
+    return TemplateEditPreparationV1(schemaVersion=1,clientMutationId='typed',snapshot=response(before).snapshot,
+        capture={'sessionId':'session','actionId':'typed','actionToken':1,'dependencies':[]},
+        operations=[{'kind':'replace_text','opId':'text','range':selected,'styles':{},'text':text}])
+
+
+# "Tools: Python, PostgreSQL, Docker": Python is 7..13, PostgreSQL 15..25.
+@pytest.mark.parametrize('start,end,text',[(7,13,''),(7,13,'  '),(7,25,''),(7,25,' ')])
+def test_text_input_cannot_leave_a_technology_without_a_name(start,end,text):
+    before=technology_workspace()
+    with pytest.raises(ValueError,match='TECHNOLOGY_NAME_EMPTY'):
+        prepare_edit(response(before),_typed(before,start,end,text))
+
+
+def test_a_typed_name_still_replaces_the_old_one():
+    before=technology_workspace()
+    current=prepared(before,_typed(before,7,13,'Rust')).preview.workspace
+    assert next(value for value in current.project.facts.records if value.id=='python').display.raw_text=='Rust'

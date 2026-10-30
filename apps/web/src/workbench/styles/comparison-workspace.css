@@ -34,7 +34,9 @@
 .comparison-workspace { --document-zoom: 1.25; }
 .comparison-workspace .document-workspace { position: relative; overflow: hidden; }
 .comparison-workspace .document-workspace .resume-paper { zoom: var(--document-zoom, 1); }
+/* The floating Facts panel keeps its own strip of the desk, so it never covers the page. */
 .comparison-workspace .paper-scroll { padding: 24px; background: var(--desk); }
+.comparison-workspace .document-workspace[data-facts="open"] .paper-scroll { padding-right: calc(min(var(--facts-width, 300px), 100% - 16px) + 32px); }
 .comparison-workspace .editor-toolbar { min-height: 47px; padding: 7px 12px; gap: 8px; flex-wrap: nowrap; }
 .comparison-workspace .formatting-tools { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; }
 .comparison-workspace .formatting-tools .toolbar-select { flex-shrink: 0; }
@@ -43,7 +45,7 @@
 .comparison-workspace .editor-toolbar .tool-group { flex-shrink: 0; }
 .comparison-workspace .editor-toolbar .tool-divider { flex-shrink: 0; margin: 0 2px; }
 .comparison-workspace[data-view="compare"] .panel-tools .tool > span { display: none; }
-.comparison-workspace .document-workspace .facts-panel { position: absolute; z-index: 15; top: 47px; right: 8px; bottom: 40px; width: min(300px, calc(100% - 16px)); max-width: none; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px var(--line); }
+.comparison-workspace .document-workspace .facts-panel { position: absolute; z-index: 15; top: 47px; right: 8px; bottom: 40px; width: min(var(--facts-width, 300px), calc(100% - 16px)); max-width: none; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 18px var(--line); }
 @media (max-width: 900px) {
   .workspace-view-label { display: none; }
   .workspace-view-bar { justify-content: space-between; padding-inline: 8px; gap: 6px; }

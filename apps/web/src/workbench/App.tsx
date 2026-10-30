@@ -1,5 +1,5 @@
 import { errorMessage } from "../errors/messages";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ConnectionWorkflow, connectionSummary, type ConnectionView } from "../connection/workflow";
 import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
@@ -17,7 +17,10 @@ import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename } from "./files/filename";
 import { Icon } from "./ui/Icon";
 import { OperationStatus } from "./ui/OperationStatus";
+import { PanelHandle, readPanelSize, savePanelSize } from "./ui/PanelHandle";
 import { NotificationCenter, NotificationProvider, NotificationSection } from "./ui/NotificationCenter";
+
+const historyWidths = { minimum: 160, maximum: 360 };
 
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
@@ -25,6 +28,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, imports, importActions } = workspace;
   const shown = template?.response ?? null;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
+  const [historyWidth, setHistoryWidth] = useState(() => readPanelSize("history", historyWidths.minimum, historyWidths.maximum));
+  const changeHistoryWidth = (value: number | null) => { setHistoryWidth(value); savePanelSize("history", value); };
   const [paneOrder, setPaneOrder] = useState(readPaneOrder);
   const changePaneOrder = (order: PaneOrder) => { savePaneOrder(order); setPaneOrder(order); };
   useEffect(() => {
@@ -64,8 +69,12 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const filename = projectFilename(projectTitle, fileMode === "export" ? "docx" : "foldcv");
   const navigate = (id: string) => open(id).then(done => { if (done && innerWidth <= 600) setCollapsed(true); return done; });
   const templatePackage = template?.response.workspace.project?.templatePackage.definition;
-  return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}>
+  return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}
+    data-history-sized={historyWidth === null ? undefined : "true"}
+    style={historyWidth === null ? undefined : { "--history-width": `${String(historyWidth)}px` } as CSSProperties}>
     <History projects={projects} activeId={shown?.workspace.projectId ?? null} busy={busy} collapse={() => setCollapsed(true)}
+      handle={<PanelHandle className="history-handle" label="Ширина списка резюме" axis="x" sign={1} value={historyWidth ?? (innerWidth <= 1280 ? 187 : 208)}
+        minimum={historyWidths.minimum} maximum={historyWidths.maximum} change={changeHistoryWidth} reset={() => changeHistoryWidth(null)} />}
       fresh={() => { void fresh(); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings}
       connection={connectionSummary(connection?.snapshot ?? null)} error={error} />
     <section className="main-area">

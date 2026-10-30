@@ -20,7 +20,7 @@
 .facts-feedback > * { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: auto; }
 .facts-feedback .notice { margin: 0; }
 .facts-feedback:empty { display: none; }
-.operation-slot { height: 64px; min-height: 64px; overflow-y: auto; display: grid; align-items: center; margin-top: 10px; }
+.operation-slot { min-height: 64px; display: grid; align-items: center; margin-top: 10px; }
 .rewrite-progress-slot { height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 10px; overflow-y: auto; margin: 7px 0; }
 .rewrite-progress-slot .notice { margin: 0; }
 .rewrite-progress-slot .operation-status { flex: 1; }

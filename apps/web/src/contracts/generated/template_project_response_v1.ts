@@ -18,6 +18,7 @@ export type Packagehash = string;
 export type Styletoken = string;
 export type Templateinstanceid = string | null;
 export type Viewkey = string;
+export type Addkinds = ("employment" | "education" | "language")[];
 export type Band = true | null;
 /**
  * @minItems 1
@@ -2040,6 +2041,7 @@ export interface StyleOverrides {
  * Python's presentation decisions for the mounted editor; the editor only applies them.
  */
 export interface EditorPlanV1 {
+  addKinds?: Addkinds;
   blocks: Blocks1;
   focusPanel?: EditorFocusPanel | null;
   fonts: Fonts;

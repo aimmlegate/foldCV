@@ -250,12 +250,12 @@ def test_explicit_header_slots_copy_order_and_growth_move_body(captured_request,
     header = xml(content, 'word/header1.xml')
     actual = [emitted(node) for node in header.iter(qn('w:p')) if emitted(node)]
     assert actual == ['Long Synthetic Candidate Name ' * 8, 'Backend Engineer', 'Long Synthetic Candidate Name ' * 8]
-    frames = header.xpath('//w:p[w:r/w:t]/w:pPr/w:framePr/@w:y', namespaces=NS)
-    assert list(map(int, frames)) == sorted(map(int, frames))
-    assert all(value == 'around' for value in header.xpath('//w:framePr/@w:wrap', namespaces=NS))
-    assert not header[-1].xpath('w:pPr/w:framePr', namespaces=NS)
+    # Google Docs drops Word frames, so the lines flow; the body starts below them and reaches the grown position.
+    assert not header.xpath('//w:framePr', namespaces=NS)
+    spacing = header.xpath('//w:p/w:pPr/w:spacing', namespaces=NS)
+    bottom = sum(int(value.get(qn('w:before')) or 0) + int(value.get(qn('w:line'))) for value in spacing)
     body = xml(content)
-    assert int(body.xpath('string(//w:body/w:p[1]/w:pPr/w:spacing/@w:line)', namespaces=NS)) > 1420
+    assert bottom + int(body.xpath('string(//w:body/w:p[1]/w:pPr/w:spacing/@w:line)', namespaces=NS)) > 1420
 
 
 @pytest.mark.parametrize('damage', ['missing', 'mixed', 'unsupported'])
@@ -468,6 +468,37 @@ def test_invisible_characters_leave_the_docx_and_the_authored_text_stays(capture
     body = parts(render_captured_docx(request, tmp_path))['word/document.xml'].decode()
     assert 'softhyphen' in body and not set('\ufeff\u00ad\u200b') & set(body)
     assert canonical(request) == before
+
+
+def test_lines_nobody_filled_in_stay_out_of_the_docx(captured_request, tmp_path):
+    document = captured_request.document.model_copy(deep=True)
+    views = captured_request.package.recipe.views
+    bullet = next(block for block in document.blocks() if block.type == 'bullet_list')
+    siblings = next(block.children for block in document.blocks() if bullet in block.children)
+    index = siblings.index(bullet)
+    node = views[bullet.presentation.view_key].nodes[bullet.presentation.node_index]
+    label = bullet.model_copy(deep=True, update={'id': 'blank-label', 'type': 'paragraph', 'props': {}})
+    label = TemplateParagraphBlock.model_validate({**label.model_dump(by_alias=True), 'type': 'paragraph', 'props': {},
+        'content': [{'type': 'text', 'text': 'Blank label', 'styles': {}}]})
+    empty = type(bullet).model_validate({**bullet.model_dump(by_alias=True), 'id': 'blank-bullet', 'content': []})
+    siblings[index + 1:index + 1] = [label, empty]
+    assert node.type == 'bullets'
+    tree = xml(render_captured_docx(recapture(captured_request, document=document), tmp_path))
+    assert 'Blank label' not in emitted(tree)
+
+
+def test_russian_italic_exports_as_a_slanted_upright_face(captured_request, tmp_path):
+    document = captured_request.document.model_copy(deep=True)
+    block = editable_block(document)
+    block.content = [PresentedText(type='text', text='Торговая система', styles={'italic': True}),
+        PresentedText(type='text', text=' trading', styles={'italic': True})]
+    content = render_captured_docx(recapture(captured_request, document=document), tmp_path)
+    run = next(node for node in xml(content).iter(qn('w:r')) if 'Торговая' in emitted(node))
+    assert run.xpath('./w:rPr/w:i/@w:val', namespaces=NS) == ['1']
+    assert 'Italic' not in run.xpath('./w:rPr/w:rFonts/@w:ascii', namespaces=NS)[0]
+    # An embedded italic would take the slanted run back to a face without its letters.
+    table = xml(content, 'word/fontTable.xml')
+    assert not table.xpath('.//w:embedItalic | .//w:embedBoldItalic', namespaces=NS)
 
 
 @pytest.mark.parametrize(('text', 'code'), [('Missing \U0010ffff', 'FONT_UNAVAILABLE'), ('decomposed e\u0301', 'RICH_EXPORT_UNSUPPORTED')])

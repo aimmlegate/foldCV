@@ -80,8 +80,9 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     report(current.send(async () => { await mounted.flush(); return scope; }));
   }
   const active = controller.current?.active ?? false, failed = shownFailure(failure, view?.run ?? null);
-  return view?.settings?.enabled ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500}
+  return view?.settings?.enabled ? <DrawerView view={view} active={active} title={title} collapsed={size.collapsed} expanded={size.height >= 500} height={size.height}
     toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
+    resize={height => setSize(value => ({ ...value, height }))}
     log={log} captured={captured ? blocksText(captured.blockIds.length) : null}
     applying={view.proposalBusy !== null}
     failure={failed ? errorText(failed) : view.error ? errorText(view.error) : null} fence={null}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { errorMessage } from "../../errors/messages";
 import type { ProjectList, ProjectListEntry } from "../../projects/api";
 import { Button } from "../ui/Button";
@@ -17,8 +17,8 @@ export function DeleteDialog({ open, busy, error, close, confirm }: { open: bool
   </Dialog>;
 }
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection, error }: {
-  projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void;
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection, error, handle }: {
+  projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void; handle?: ReactNode;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   archive: (id: string, archived: boolean) => Promise<boolean>;
   openFile: () => void; settings: () => void; connection: string; error: string;
@@ -44,6 +44,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
     </div>;
   };
   return <aside className="history" aria-label="Список резюме" aria-busy={busy}>
+    {handle}
     <div className="brand-row"><button className="brand" disabled={busy} aria-label="FoldCV — новое резюме" onClick={fresh}><Icon name="fold" /><span className="brand-name">FoldCV<span>.</span></span></button>
       <button className="icon" aria-label="Скрыть список резюме" onClick={collapse}><Icon name="panel" /></button></div>
     <Button className="new-button" disabled={busy} onClick={fresh}><Icon name="plus" />Новое резюме</Button>

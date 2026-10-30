@@ -1,8 +1,9 @@
-"""Create only a new employment item from unambiguous captured bindings and nodes."""
+"""Create a new employment, education or language item from unambiguous captured bindings and nodes."""
 
 from .models.rich_document import FactFieldSpan, SectionBlock
-from .models.rich_facts import EmploymentRecord, WorkingPeriod
-from .models.template_document import BoundLink, FieldOccurrence, ManualScopeSpan, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
+from .models.rich_facts import EducationRecord, EmploymentRecord, LanguageRecord, WorkingPeriod
+from .models.template_document import (BoundLink, FieldOccurrence, ManualScopeSpan, PresentedText, TemplateBulletBlock,
+    TemplateParagraphBlock, TemplateSectionBlock)
 from .rich_fields import builtin_cell_values, inline_groups, set_text, working_field, field_key
 from .rich_mutations import locate, parent_items, subtree
 from .template_builtin_admission import unknown
@@ -15,9 +16,14 @@ from .templates.materialize_nodes import fallback_style, locale_text, reference
 from .templates.projection import pointer_tokens
 
 
-def view_options(project):
+# Each creatable kind: its record model, its fields and the field that names it.
+SCALAR_RECORDS = {'education': (EducationRecord, ('institution', 'qualification', 'specialty', 'completion'), 'institution'),
+    'language': (LanguageRecord, ('language', 'level'), 'language')}
+
+
+def view_options(project, kind='employment'):
     semantic = {value.id: value for value in project.template_package.definition.fact_types
-        if value.builtin_kind == 'employment' and value.builtin_fields}
+        if value.builtin_kind == kind and value.builtin_fields}
     result = []
     for view in project.template_package.definition.blocks:
         if view.view.mode != 'items':
@@ -71,7 +77,20 @@ def _mapping(view, semantic):
     return result
 
 
-def node_fields(view, semantic, node, period_id):
+def addable_kinds(project):
+    """The record kinds the panel can add: those with exactly one captured view to show them."""
+    kinds = []
+    for kind in ('employment', *SCALAR_RECORDS):
+        # This runs for every reply, so a binding the panel cannot follow only takes the button away.
+        try:
+            if len(view_options(project, kind)) == 1:
+                kinds.append(kind)
+        except ValueError:
+            continue
+    return kinds
+
+
+def node_fields(view, semantic, node, period_id, scalars=frozenset({'employer', 'role'})):
     mapping = _mapping(view, semantic)
     if node.type == 'period':
         base = tuple(pointer_tokens(node.field))
@@ -91,7 +110,7 @@ def node_fields(view, semantic, node, period_id):
                 for path in referenced for target in mapping):
             raise ValueError('employment creation node is unsupported')
         return []
-    if any(value is not None and (value.period is not None or value.field not in {'employer', 'role'}) for value in fields):
+    if any(value is not None and (value.period is not None or value.field not in scalars) for value in fields):
         raise ValueError('employment scalar node has unsupported canonical fields')
     return [value.field for value in fields if value is not None]
 
@@ -148,17 +167,39 @@ def _values(command, period_id, *, employment):
     return result
 
 
-def _blocks(package, view, semantic, record, period, indexes, instance, allocator, context=None):
+def _blank_lines(package, node, ref, record, index, allocator):
+    """A line to type in where the template shows text the facts do not hold yet; empty ones stay out of the DOCX."""
+    label = locale_text(node.label, package.definition.template.default_locale)
+    blocks = []
+    if label:
+        blocks.append(TemplateParagraphBlock(type='paragraph',
+            id=allocator.allocate('block', ['panel-blank-label', record.id, index]), revision=1, props={}, children=[],
+            provenance=[], presentation=ref, content=[PresentedText(type='text', text=label, styles={}, presentation=ref)]))
+    kind = TemplateBulletBlock if node.type == 'bullets' else TemplateParagraphBlock
+    blocks.append(kind(type='bullet_list' if node.type == 'bullets' else 'paragraph',
+        id=allocator.allocate('block', ['panel-blank', record.id, index]), revision=1, props={}, children=[], provenance=[],
+        presentation=ref, content=[]))
+    return blocks
+
+
+def _blocks(package, view, semantic, record, period, indexes, instance, allocator, context=None, *, scalars=None, blanks=False):
     blocks = []
     locale = package.definition.template.default_locale
     separator, ongoing_label = period_words(package)
+    period_id = period.id if period is not None else ''
     for index in indexes:
         node = view.view.nodes[index]
-        keys = node_fields(view, semantic, node, period.id)
+        keys = node_fields(view, semantic, node, period_id, *([scalars] if scalars else []))
+        # An item without a period shows only the fields it holds; a job keeps its role line for typing.
+        if scalars:
+            keys = [key for key in keys if working_field(record, key).raw_text]
         ongoing = False
         if node.type == 'period' and keys:
             keys, ongoing = period_fields(period, ongoing_label)
         if not keys and not ongoing:
+            if blanks and node.type in {'text', 'bullets'}:
+                blocks += _blank_lines(package, node, reference(package, view.id, node.style, instance, node_index=index),
+                    record, index, allocator)
             continue
         ref = reference(package, view.id, node.style, instance, node_index=index)
         if context is not None:
@@ -171,7 +212,7 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
             if position:
                 content.append(PresentedText(type='text', text=separator if node.type == 'period' else node.separator,
                     styles={}, presentation=ref))
-            root = allocator.allocate('occurrence', ['panel-occurrence', record.id, period.id, index, position, key])
+            root = allocator.allocate('occurrence', ['panel-occurrence', record.id, period_id, index, position, key])
             content.append(FieldOccurrence(type='fact_field',
                 bindingId=allocator.allocate('fragment', ['panel-fragment', root]), bindingRootId=root,
                 recordId=record.id, fieldKey=key, cellId=field_key(record.id, key), occurrenceId=root,
@@ -183,13 +224,40 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
         label = locale_text(node.label, locale)
         if label:
             blocks.append(TemplateParagraphBlock(type='paragraph',
-                id=allocator.allocate('block', ['panel-node-label', record.id, period.id, index]), revision=1,
+                id=allocator.allocate('block', ['panel-node-label', record.id, period_id, index]), revision=1,
                 props={}, children=[], provenance=[], presentation=ref,
                 content=[PresentedText(type='text', text=label, styles={}, presentation=ref)]))
         blocks.append(TemplateParagraphBlock(type='paragraph',
-            id=allocator.allocate('block', ['panel-node', record.id, period.id, index]), revision=1,
+            id=allocator.allocate('block', ['panel-node', record.id, period_id, index]), revision=1,
             props={'alignment': ref.overrides.alignment or 'left'}, children=[], provenance=[], presentation=ref, content=content))
     return blocks
+
+
+def _recency(record):
+    """When a job last ran, for newest-first order; None without a known date."""
+    dates = []
+    for period in record.periods:
+        if period.present.value is True:
+            return (9999, 12, 31)
+        value = period.end.value or period.start.value
+        if value is not None:
+            dates.append((value.year, value.month or 12, value.day or 31))
+    return max(dates, default=None)
+
+
+def _by_date(before, shown, record):
+    """The block a new job follows: the last one newer than it, as the import orders jobs. A job without dates goes last."""
+    key = _recency(record)
+    records = {value.id: value for value in before.facts.records if value.kind == 'employment'}
+    after = shown[-1].id
+    if key is None:
+        return after
+    for previous, block in zip([None, *shown], shown):
+        other = records.get(getattr(block.props, 'record_id', None))
+        known = _recency(other) if other is not None else None
+        if known is not None and known < key and previous is not None:
+            return previous.id
+    return after
 
 
 def create_employment(workspace, operation, allocator):
@@ -219,7 +287,7 @@ def create_employment(workspace, operation, allocator):
             'employment region missing')
         shown = [block for block in region.blocks if block.presentation is not None and block.presentation.view_key == view.id]
         if shown:
-            parent, after = region.id, shown[-1].id
+            parent, after = region.id, _by_date(before, shown, record)
     else:
         parent, after = operation.placement_context.placement.parent_id, operation.placement_context.placement.after_id
         cursor, seen = parent, set()
@@ -237,7 +305,7 @@ def create_employment(workspace, operation, allocator):
             raise ValueError('new employment placement crosses captured region')
     instance = allocator.allocate('template-instance', ['panel-employment-instance', record_id])
     children = _blocks(before.template_package, view, semantic, record, period,
-        range(len(view.view.nodes)), instance, allocator)
+        range(len(view.view.nodes)), instance, allocator, blanks=True)
     if not children:
         raise ValueError('employment view has no supported canonical item fields')
     section = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-employment-section', record_id]),
@@ -248,6 +316,41 @@ def create_employment(workspace, operation, allocator):
     # The view's last job was removed, and its title with it: both come back where the import puts the view.
     elif not restore_view(candidate.document, before.template_package, view, [section], allocator, 'employment'):
         raise ValueError('employment region missing')
+    return candidate, [{'kind': 'put_record', 'beforeRevision': None, 'record': record.model_dump(by_alias=True)}]
+
+
+def create_scalar(workspace, operation, allocator):
+    """A new education or language item, shown in its view after the items already there."""
+    before, command = workspace.project, operation.command
+    model, fields, name = SCALAR_RECORDS[command.record_kind]
+    values = {key: value for key, value in command.values.items() if value.strip()}
+    if command.record_id is not None or command.period_id is not None or not values.keys() <= set(fields) or name not in values:
+        raise ValueError('PANEL_ACTION_UNSUPPORTED')
+    options = view_options(before, command.record_kind)
+    if len(options) != 1:
+        raise ValueError('PANEL_ACTION_UNSUPPORTED')
+    view, semantic = options[0]
+    record_id = allocator.allocate(command.record_kind, ['panel-' + command.record_kind])
+    record = model(id=record_id, kind=command.record_kind, revision=1, origin='user', userCorrected=True, evidence=[],
+        **{key: unknown() for key in fields})
+    for key, value in values.items():
+        set_text(record, key, value)
+    _report_cells(before, record, allocator)
+    candidate = before.model_copy(deep=True)
+    instance = allocator.allocate('template-instance', ['panel-record-instance', record_id])
+    children = _blocks(before.template_package, view, semantic, record, None, range(len(view.view.nodes)), instance,
+        allocator, scalars=frozenset(fields))
+    if not children:
+        raise ValueError('PANEL_ACTION_UNSUPPORTED')
+    section = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-record-section', record_id]),
+        revision=1, props={'recordId': record_id}, content=[], children=children, provenance=[],
+        presentation=reference(before.template_package, view.id, fallback_style(view), instance))
+    region = next((value for value in candidate.document.regions if value.role == view.placement.region), None)
+    shown = [block for block in region.blocks if block.presentation is not None and block.presentation.view_key == view.id] if region else []
+    if shown:
+        _insert(candidate.document, [section], region.id, shown[-1].id)
+    elif not restore_view(candidate.document, before.template_package, view, [section], allocator, command.record_kind):
+        raise ValueError('PANEL_ACTION_UNSUPPORTED')
     return candidate, [{'kind': 'put_record', 'beforeRevision': None, 'record': record.model_dump(by_alias=True)}]
 
 

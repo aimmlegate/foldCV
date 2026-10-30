@@ -7,7 +7,7 @@ import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { RichDocumentV2 } from "../src/contracts/generated/rich_document_v2";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
 import { templateSchema } from "../src/rich/template-schema";
-import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, type ExtractedOperation } from "../src/rich/v7-extraction";
+import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, technologyLines, type ExtractedOperation } from "../src/rich/v7-extraction";
 import { projectTemplateDocument, type TemplateEditorBlock } from "../src/rich/v7-projection";
 import { translateIntent, type V7Operation } from "../src/rich/v7-translation";
 
@@ -178,6 +178,47 @@ test("Backspace and Delete merge adjacent text siblings only", () => {
   const paper = applied(mergeAt(caret(paperDoc, start(paperDoc, "block-paper-b")), "backward"));
   const merged = record(translated(paper.operation));
   assert.deepEqual([merged["kind"], merged["leadingId"], merged["trailingId"]], ["merge_blocks", "block-paper-a", "block-paper-b"]);
+});
+
+const name = (recordId: string, text: string) => ({ type: "templateField" as const, props: { bindingId: `binding-${recordId}-${text}`, occurrenceId: `occurrence-${recordId}`,
+  recordId, fieldKey: "display", cellId: `cell-${recordId}`, complete: true }, content: [{ type: "text" as const, text, styles: {} }] });
+const literalText = (text: string) => ({ type: "text" as const, text, styles: {} });
+// dates: "2020"; chips: name("Go") + " " + name("SQL"); parts: name("Python") + name(" 3"), one name in two fragments.
+const chipDoc = docOf([{ id: "dates", type: "paragraph", content: [literalText("2020")] },
+  { id: "chips", type: "paragraph", content: [name("go", "Go"), literalText(" "), name("sql", "SQL")] },
+  { id: "parts", type: "paragraph", content: [name("python", "Python"), name("python", " 3")] }]);
+const chips = start(chipDoc, "chips"), parts = start(chipDoc, "parts");
+function refusedWith(tr: Transaction, code: string): void {
+  const result = extractOperations(tr);
+  assert.ok(result.kind === "unsupported", "input must be refused"); assert.equal(result.code, code);
+}
+
+test("input cannot empty a technology name or run across names", () => {
+  const state = caret(chipDoc, chips + 1);
+  // chips + 1 opens "Go", chips + 3 ends it; " " follows its closing token and "SQL" starts at chips + 6.
+  refusedWith(state.tr.delete(chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY");
+  refusedWith(state.tr.insertText("  ", chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY");
+  refusedWith(state.tr.insertText("x", chips + 2, chips + 7), "TECHNOLOGY_EDIT_SINGLE");
+  refusedWith(state.tr.delete(chips + 1, chips + 5), "TECHNOLOGY_EDIT_SINGLE");
+  assert.equal(only(state.tr.delete(chips + 1, chips + 2)).operation.kind, "replace_text");
+  assert.equal(only(state.tr.insertText("Rust", chips + 1, chips + 3)).operation.kind, "replace_text");
+  // The separator is literal text and belongs to no name.
+  assert.equal(only(state.tr.insertText(",", chips + 4, chips + 5)).operation.kind, "replace_text");
+});
+
+test("a name in several fragments keeps a fragment when another goes", () => {
+  const state = caret(chipDoc, parts + 1);
+  assert.equal(replace(only(state.tr.delete(parts + 9, parts + 11)).operation).text, "");
+  assert.equal(replace(only(state.tr.delete(parts + 1, parts + 7)).operation).text, "");
+});
+
+test("a chip line keeps its names: no Enter inside it and no join with a neighbour", () => {
+  const inside = splitAt(caret(chipDoc, chips + 2), "local-1");
+  assert.ok("reason" in inside); assert.equal(inside.reason, technologyLines);
+  const end = chips + chipDoc.resolve(chips).parent.content.size;
+  assert.ok("transaction" in splitAt(caret(chipDoc, end), "local-1"), "a new line after the chips stays possible");
+  const joined = mergeAt(caret(chipDoc, chips), "backward");
+  assert.ok("reason" in joined); assert.equal(joined.reason, technologyLines);
 });
 
 test("input Python cannot address is refused before it reaches the queue", () => {

@@ -372,7 +372,7 @@ def _technology_context(chain, op):
 
 
 def create_fact(chain, op):
-    """The panel adds jobs, their periods and technologies; other kinds have no adapter there."""
+    """The panel adds jobs, their periods, technologies, education and languages; other kinds have no adapter there."""
     if op.target_id is not None and op.kind != 'technology':
         raise CompileFailure('ASSISTANT_OP_INVALID', 'targetId')
     if op.kind == 'period':
@@ -384,8 +384,8 @@ def create_fact(chain, op):
         if op.values.keys() != {'display'}:
             raise CompileFailure('ASSISTANT_FIELD_UNKNOWN', 'values', 'display')
         _panel(chain, 'add', None, 'technology', job_id=op.job_id, values=dict(op.values), context=_technology_context(chain, op))
-    elif op.kind == 'employment':
-        _panel(chain, 'add', None, 'employment', values=dict(op.values))
+    elif op.kind in {'employment', 'education', 'language'}:
+        _panel(chain, 'add', None, op.kind, values=dict(op.values))
     else:
         raise CompileFailure('ASSISTANT_OP_REFUSED', 'create ' + op.kind)
 

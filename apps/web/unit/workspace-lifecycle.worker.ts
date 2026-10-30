@@ -200,7 +200,7 @@ if (scenario === "import-restart") {
   // The refresh after the export record fails; the downloaded file is still delivered and the action succeeds.
   editor.flush = async () => opened("A").response as never;
   editor.refresh = async () => { throw new Error("REFRESH_FAILED"); };
-  assert.equal(await hook.exportFile("export", "resume.docx"), true);
+  assert.deepEqual(await hook.exportFile("export", "resume.docx"), { state: "started", name: "resume.docx" });
   assert.deepEqual(events, ["download:resume.docx"]);
   assert.ok(!stateWrites.get(ERROR)?.some(Boolean));
 } else if (scenario === "upload-archive") {
