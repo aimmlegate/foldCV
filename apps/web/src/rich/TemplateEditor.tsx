@@ -288,7 +288,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           text={state.kind === "conflict" ? errorMessage("V7_INPUT_CONFLICT") : knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED")}
           keep={() => session.keepEditorText()} discard={() => session.discard()} />}
       </aside>
-      {/* The layout host: the facts panel floats over the document. */}
+      {/* The layout host: the facts panel is docked beside the document. */}
       <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
         close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace" data-facts={factsVisible ? "open" : "closed"}
