@@ -93,7 +93,8 @@ def runtime_dll(installer: Path, work: Path) -> bytes:
             (folder / "archive.cab").write_bytes(cabinet)
             if subprocess.run([tar(), "-xf", "archive.cab"], cwd=folder, capture_output=True).returncode:
                 continue
-            for item in folder.iterdir():
+            # tar on Windows unpacks some cabinets into folders.
+            for item in filter(Path.is_file, folder.rglob("*")):
                 if item.name == "msvcp140.dll_amd64":
                     raw = item.read_bytes()
                     if hashlib.sha256(raw).hexdigest() != MSVCP140:
