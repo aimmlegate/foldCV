@@ -24,6 +24,8 @@ import zipfile
 
 import certifi
 
+from build_helper import template_folders
+
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / ".tools/windows"
 PYTHON = ("https://www.python.org/ftp/python/3.13.17/python-3.13.17-embed-amd64.zip", 11441267,
@@ -37,7 +39,7 @@ MSVCP140 = "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9"
 # mcp imports pywin32 on Windows; pip on another host leaves out dependencies marked for win32.
 WINDOWS_ONLY = ("pywin32==311",)
 # Read at run time; kept at their checkout paths (as in build_helper.py), next to the two source trees.
-DATA = ("apps/web/dist", "templates", "skills/format-resume/SKILL.md", "skills/format-resume/references",
+DATA = ("apps/web/dist", "skills/format-resume/SKILL.md", "skills/format-resume/references",
         "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
         "requirements.txt", "packaging/helper_entry.py")
 SOURCES = ("packages", "services/api/src/resume_api")
@@ -106,7 +108,7 @@ def copy_sources(app: Path) -> None:
     ignore = shutil.ignore_patterns("__pycache__", "*.pyc", "tests", ".DS_Store")
     for name in SOURCES:
         shutil.copytree(ROOT / name, app / name, ignore=ignore)
-    for name in DATA:
+    for name in (*DATA, *template_folders()):
         source, target = ROOT / name, app / name
         if source.is_dir():
             shutil.copytree(source, target, ignore=ignore, dirs_exist_ok=True)

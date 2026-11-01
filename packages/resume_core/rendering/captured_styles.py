@@ -31,6 +31,8 @@ class RunStyle:
     strike: bool
     chip: bool = False
     gap: float = 0
+    # The italic face lacks this text's letters, so the upright face carries it and Word slants it.
+    slanted: bool = False
 
 
 def scaled_line_height(height, size, base_size):
@@ -72,11 +74,12 @@ class CapturedStyleResolver:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         return self.style.text[ref.style_token]
 
-    def _run(self,block,ref,marks=None):
+    def _run(self,block,ref,marks=None,*,upright=False):
         style=self._reference(ref);overrides=ref.overrides
         if marks is not None and marks.code:raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         selected=self.fonts.select(FontRequest(overrides.font or style.font,bold=overrides.bold,
-            italic=overrides.italic,mark_bold=bool(marks and marks.bold),mark_italic=bool(marks and marks.italic)))
+            italic=False if upright else overrides.italic,mark_bold=bool(marks and marks.bold),
+            mark_italic=bool(marks and marks.italic and not upright)))
         size=overrides.size if overrides.size is not None else style.size
         height=scaled_line_height(style.line_height,size,style.size)
         inline_color=marks.text_color if marks else 'default'
@@ -94,8 +97,12 @@ class CapturedStyleResolver:
         if span.type not in {'text','fact_field','manual_scope'}:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         self._reference(block.presentation)
-        result=self._run(block,span.presentation if span.presentation is not None else block.presentation,span.styles)
-        self.validate_text(result.selection,visible_text(span.text))
+        ref,text=span.presentation if span.presentation is not None else block.presentation,visible_text(span.text)
+        result=self._run(block,ref,span.styles)
+        # Source Sans italics hold no Cyrillic, and the captured fonts stay with each project.
+        if result.selection.italic and self.missing(result.selection,text):
+            result=replace(self._run(block,ref,span.styles,upright=True),slanted=True)
+        self.validate_text(result.selection,text)
         return result
 
     def paragraph(self,block):
@@ -109,16 +116,24 @@ class CapturedStyleResolver:
             else block.props.alignment)
         return height,alignment
 
-    def validate_text(self,selection,text):
-        font=selection.font
+    def font_glyphs(self,font):
         if font.sha256 not in self.glyphs:
             with TTFont(BytesIO(font.content),lazy=True) as decoded:
                 order={name:index for index,name in enumerate(decoded.getGlyphOrder())}
                 self.glyphs[font.sha256]={point for point,name in decoded.getBestCmap().items()
                     if name!='.notdef' and order.get(name,0)>0}
+        return self.glyphs[font.sha256]
+
+    def missing(self,selection,text):
+        glyphs=self.font_glyphs(selection.font)
+        return any(ord(character) not in glyphs for character in text if character not in '\n\r\t')
+
+    def validate_text(self,selection,text):
+        font=selection.font
+        glyphs=self.font_glyphs(font)
         for character in text:
             if character in '\n\r\t':continue
             category=unicodedata.category(character)
             if category.startswith('M') or category in {'Cf','Cc','Cs'}:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-            if ord(character) not in self.glyphs[font.sha256]:raise RenderFailure('FONT_UNAVAILABLE')
+            if ord(character) not in glyphs:raise RenderFailure('FONT_UNAVAILABLE')

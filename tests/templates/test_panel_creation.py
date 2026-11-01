@@ -1,5 +1,6 @@
 """New employment items use captured configuration without rewriting existing items."""
 
+import asyncio
 from copy import deepcopy
 
 import pytest
@@ -16,12 +17,15 @@ from packages.resume_core.rich_mutations import apply_rich_mutation, RichMutatio
 from packages.resume_core.template_assembly import assemble_template
 from packages.resume_core.template_authoring import copy_blocks, copy_inline
 from packages.resume_core.template_capture import prepare_builtin_identities
+from packages.resume_core.template_panel_creation import addable_kinds
+from packages.resume_core.template_panel_records import panel_plan
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
 from packages.resume_core.templates.compiler import canonical, compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.editor_fixtures import TemplateEditor
+from tests.templates.generic_fixtures import generic_import
 from tests.templates.pipeline_fixtures import source_draft
 from tests.templates.test_materialize import admitted
 from tests.templates.test_panel_preparation import prepared, restore
@@ -44,9 +48,9 @@ def empty_configure(edit):
     return WorkspaceV7.model_validate(before.model_dump(by_alias=True))
 
 
-def request(before, *, operation='add', values=None, context=None, record_id=None, identifier='create-item'):
+def request(before, *, operation='add', kind='employment', values=None, context=None, record_id=None, identifier='create-item'):
     capture={'sessionId':'session','actionId':identifier,'actionToken':1,'dependencies':[]}
-    value={'kind':'builtin_panel','opId':'new-item','command':{'operation':operation,'recordKind':'employment',
+    value={'kind':'builtin_panel','opId':'new-item','command':{'operation':operation,'recordKind':kind,
         'recordId':record_id,'periodId':None,'jobId':None,'values':values or {},
         'factsRevision':before.project.facts.revision,'documentRevision':before.document_revision,'capture':capture}}
     if context is not None:value['placementContext']=context
@@ -395,3 +399,90 @@ def test_actual_prepared_creation_save_undo_redo_reopen_and_portable_transfer(tm
     transferred,retained,_,_=open_archive_v7(write_zip(archive_payload_v7(reopened,sources,{})),'creation-transfer')
     assert transferred.project.document==reopened.project.document and transferred.project.facts==reopened.project.facts
     assert retained==sources
+
+
+@pytest.fixture(scope='module')
+def two_column(tmp_path_factory):
+    return asyncio.run(generic_import(tmp_path_factory.mktemp('two-column'), 'F10'))[2]
+
+
+def added(before, result):
+    return next(record for record in result.preview.workspace.project.facts.records
+        if record.id not in {value.id for value in before.project.facts.records})
+
+
+def section_of(workspace, record):
+    return next(block for block in workspace.project.document.blocks() if block.type=='section' and block.props.record_id==record.id)
+
+
+def lines(section):
+    return [(block.type,''.join(span.text for span in block.content)) for block in section.children]
+
+
+def test_a_new_language_joins_its_view_after_the_others_and_undoes(two_column):
+    before=two_column
+    result=prepared(before,request(before,kind='language',values={'language':'Французский','level':'B2'}))
+    new=added(before,result);current=result.preview.workspace
+    assert (new.kind,new.origin,new.language.raw_text,new.level.raw_text)==('language','user','Французский','B2')
+    section=section_of(current,new)
+    assert lines(section)==[('paragraph','Французский B2')]
+    view=section.presentation.view_key
+    shown=[block.id for region in current.project.document.regions for block in region.blocks
+        if block.presentation is not None and block.presentation.view_key==view]
+    assert shown[-1]==section.id
+    restore(before,result)
+
+
+def test_a_new_education_item_shows_only_what_was_entered(two_column):
+    before=two_column
+    result=prepared(before,request(before,kind='education',values={'institution':'МГУ','qualification':'','specialty':'Физика','completion':'2015'}))
+    new=added(before,result)
+    assert new.completion.value.year==2015 and new.qualification.raw_text==''
+    assert [text for _kind,text in lines(section_of(result.preview.workspace,new))]==['МГУ','2015','Физика']
+
+
+def test_a_view_the_document_lost_comes_back_with_a_new_item(two_column):
+    language=next(record for record in two_column.project.facts.records if record.kind=='language')
+    before=prepared(two_column,request(two_column,operation='remove',kind='language',record_id=language.id)).preview.workspace
+    assert not any(block.presentation is not None and block.presentation.view_key=='languages' for block in before.project.document.blocks())
+    result=prepared(before,request(before,kind='language',values={'language':'French'},identifier='add-language'))
+    current=result.preview.workspace
+    assert any(block.type=='heading' and block.presentation.view_key=='languages' for block in current.project.document.blocks())
+    assert section_of(current,added(before,result)) is not None
+
+
+@pytest.mark.parametrize('values',[{},{'language':'   '},{'level':'B2'},{'language':'French','note':'x'}])
+def test_a_language_needs_its_name_and_known_fields(two_column,values):
+    before=two_column
+    with pytest.raises(ValueError,match='PANEL_ACTION_UNSUPPORTED'):
+        prepare_edit(response(before),request(before,kind='language',values=values))
+
+
+def test_only_kinds_the_template_can_show_are_offered(two_column,monkeypatch):
+    assert panel_plan(two_column.project)['addKinds']==['employment','education','language']
+    assert addable_kinds(employment_workspace()[0].project)==['employment']
+    # The plan comes with every reply, so a binding the panel cannot follow never stops a project from opening.
+    def unusable(*_args):
+        raise ValueError('field has no unique compiled item binding')
+    monkeypatch.setattr('packages.resume_core.template_panel_creation.view_options',unusable)
+    assert addable_kinds(two_column.project)==[]
+
+
+@pytest.mark.parametrize(('dates','position'),[({'start':'2030','end':'2031'},0),({'start':'1990','end':'1991'},-1),({},-1)])
+def test_a_new_job_takes_its_place_by_date(two_column,dates,position):
+    before=two_column
+    result=prepared(before,request(before,values={'employer':'New','role':'Dev',**dates}))
+    new=added(before,result);current=result.preview.workspace
+    employment={record.id for record in current.project.facts.records if record.kind=='employment'}
+    jobs=[block.props.record_id for block in current.project.document.blocks() if block.type=='section' and block.props.record_id in employment]
+    assert len(jobs)>1 and jobs[position]==new.id
+
+
+def test_a_new_job_has_lines_to_type_its_description_tasks_and_results_in(two_column):
+    before=two_column
+    result=prepared(before,request(before,values={'employer':'New','role':'Dev','start':'2020','end':'2021'}))
+    section=section_of(result.preview.workspace,added(before,result))
+    views=before.project.template_package.recipe.views
+    nodes=[views[child.presentation.view_key].nodes[child.presentation.node_index].type for child in section.children]
+    assert nodes.count('bullets')==4 and 'text' in nodes
+    assert [kind for kind,text in lines(section) if not text]==['paragraph','bullet_list','bullet_list']

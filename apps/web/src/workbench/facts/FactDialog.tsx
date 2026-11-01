@@ -53,7 +53,7 @@ export function FactDialog({ target, close, submit, unshown, addPeriod = false }
           </div> : <div key={field.key} className={index === 0 || field.key === "role" ? "full" : ""}>
           <label htmlFor={`fact-${field.key}`}>{field.label}</label><input id={`fact-${field.key}`} name={field.key} aria-label={field.label}
             type={field.checked === undefined ? "text" : "checkbox"} defaultValue={field.checked === undefined ? field.text : "present"}
-            defaultChecked={field.checked} autoFocus={index === 0} disabled={busy} maxLength={16000} />
+            defaultChecked={field.checked} autoFocus={index === 0} disabled={busy} maxLength={16000} required={!record && index === 0} />
         </div>)}</div>
         {record?.kind === "employment" && <div className="uir-period-actions">
           {record.periods.map((period, index) => <button className="text-button" type="button" key={period.id} disabled={busy}

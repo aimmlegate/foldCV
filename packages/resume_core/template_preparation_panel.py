@@ -14,7 +14,7 @@ from .templates.materialize_nodes import literal, locale_text, reference
 
 # Panel refusals the user can act on; the edit route answers with these codes instead of a generic rejection.
 PANEL_REFUSALS = frozenset({'PANEL_ACTION_UNSUPPORTED', 'PANEL_LINE_SHARED', 'PANEL_OWNER_INVALID', 'TECHNOLOGY_DUPLICATE',
-    'TECHNOLOGY_NAME_REQUIRED', 'TECHNOLOGY_GROUP_REQUIRED', 'TECHNOLOGY_LINE_MISSING', 'TECHNOLOGY_MOVE_INVALID',
+    'TECHNOLOGY_NAME_REQUIRED', 'TECHNOLOGY_NAME_EMPTY', 'TECHNOLOGY_GROUP_REQUIRED', 'TECHNOLOGY_LINE_MISSING', 'TECHNOLOGY_MOVE_INVALID',
     'TECHNOLOGY_TARGET_MISSING', 'FOCUS_DUPLICATE', 'FOCUS_FULL', 'FOCUS_SCOPE_INVALID', 'FOCUS_VIEW_MISSING',
     'FOCUS_ICON_UNKNOWN'})
 
@@ -365,6 +365,7 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
         # Only an add names a place: the line of a technology, the position of a job or a period.
         if operation.placement_context is not None and command.operation not in {'add', 'add_period'}:
             raise ValueError('PANEL_ACTION_UNSUPPORTED')
+        from .template_panel_creation import SCALAR_RECORDS, create_scalar
         from .template_panel_focus import FOCUS_OPERATIONS, prepare_focus
         from .template_panel_records import add_technology, edit_record, remove_records
         records = {value.id: value.kind for value in workspace.project.facts.records}
@@ -379,8 +380,10 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
         elif command.operation == 'move_technology':
             moved = _reorder_technology_displays(workspace.project, command)
             prepared = (moved, []) if moved is not None else None
+        elif command.operation == 'add' and command.record_kind in SCALAR_RECORDS and command.job_id is None:
+            prepared = create_scalar(workspace, operation, allocator)
         elif command.job_id is not None or command.record_kind not in {None, 'employment'}:
-            # Adding a candidate, an education or language item or a claim has no adapter; the panel does not offer it.
+            # Adding a candidate or a claim has no adapter; the panel does not offer it.
             raise ValueError('PANEL_ACTION_UNSUPPORTED')
         elif command.operation in {'add', 'add_period'}:
             from .template_panel_creation import create_employment, create_period

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { literalRuns, sheetColumns } from "../src/rich/v7-presentation";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import { literalRuns, sheetColumns, templateSheet } from "../src/rich/v7-presentation";
 
 test("literal style ranges ignore field keys and reversed bounds", () => {
   assert.deepEqual(literalRuns(undefined), []);
@@ -20,4 +21,16 @@ test("a layout without a sidebar is one column that stacks the regions and hides
     "--fcv-header-width": "556pt", "--fcv-columns": "528pt", "--fcv-gap": "0pt", "--fcv-main-column": "1", "--fcv-main-row": "3",
     "--fcv-sidebar-empty": "none" });
   assert.equal(sheetColumns([header, sidebar]), null, "a layout needs its main column");
+});
+
+test("italic faces are declared italic, so only an upright stand-in gets the browser's slant", () => {
+  const faces = { regular: "regular", bold: "bold", italic: "italic", boldItalic: "bold-italic" };
+  const asset = (id: string) => ({ id, sha256: id.padEnd(64, "0") });
+  const regions = [{ id: "header", x: 20, width: 556 }, { id: "main", x: 20, width: 556 }];
+  const response = { workspace: { project: { templatePackage: { assets: Object.values(faces).map(asset) } } }, presentation: { editor: {
+    fonts: Object.values(faces), icons: [], blocks: {}, styles: { body: { faces, size: 10, lineHeight: 12, color: "#000", alignment: null } } },
+    recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {}, focus: {}, bullets: {}, colors: {} } } } } as unknown as TemplateProjectResponseV1;
+  const css = templateSheet(response)?.css ?? "";
+  for (const id of ["italic", "bold-italic"]) assert.match(css, new RegExp(`fcv-${id.padEnd(24, "0")}"; font-style: italic;`));
+  for (const id of ["regular", "bold"]) assert.match(css, new RegExp(`fcv-${id.padEnd(24, "0")}"; src:`));
 });

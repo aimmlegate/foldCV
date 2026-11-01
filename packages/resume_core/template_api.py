@@ -96,6 +96,9 @@ class EditorPlanV1(Wire):
     unshown_fields: dict[Id, list[str]] = Field(default_factory=dict, exclude_if=lambda value: not value)
     # The technologies of each line with several; a move stays inside its line.
     technology_lines: list[list[Id]] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # The record kinds this template's document has a place for; the panel offers adding only these.
+    add_kinds: list[Literal['employment', 'education', 'language']] = Field(default_factory=list,
+        exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

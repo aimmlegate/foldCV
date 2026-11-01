@@ -63,12 +63,12 @@ test("a helper that exits or answers garbage fails the start", async () => {
 });
 
 test("each app starts its own helper: the macOS bundle, or the embeddable Python in the Windows resources", () => {
-  const resources = "C:\\Apps\\FoldCV Local\\resources", root = "C:\\Users\\a\\AppData\\Local\\FoldCV Desktop";
+  const resources = "C:\\Apps\\foldCV Beta\\resources", root = "C:\\Users\\a\\AppData\\Local\\foldCV Beta";
   assert.deepEqual(helperCommand("win32", resources, root), {
-    executable: "C:\\Apps\\FoldCV Local\\resources\\helper\\python\\python.exe",
-    args: ["-X", "utf8", "C:\\Apps\\FoldCV Local\\resources\\helper\\app\\packaging\\helper_entry.py", "serve", root] });
-  assert.deepEqual(helperCommand("darwin", "/Applications/FoldCV Local.app/Contents/Resources", "/data/root"), {
-    executable: "/Applications/FoldCV Local.app/Contents/Helpers/FoldCV Helper.app/Contents/MacOS/foldcv-helper",
+    executable: "C:\\Apps\\foldCV Beta\\resources\\helper\\python\\python.exe",
+    args: ["-X", "utf8", "C:\\Apps\\foldCV Beta\\resources\\helper\\app\\packaging\\helper_entry.py", "serve", root] });
+  assert.deepEqual(helperCommand("darwin", "/Applications/foldCV Beta.app/Contents/Resources", "/data/root"), {
+    executable: "/Applications/foldCV Beta.app/Contents/Helpers/FoldCV Helper.app/Contents/MacOS/foldcv-helper",
     args: ["serve", "/data/root"] });
 });
 
@@ -89,18 +89,18 @@ test("the Windows helper gets only the system variables and the system PATH", ()
 
 test("the data root is local app data on Windows, Application Support on macOS, or an absolute QA override", () => {
   const roaming = "C:\\Users\\a\\AppData\\Roaming", local = { LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local" };
-  assert.equal(dataRoot("win32", local, roaming), "C:\\Users\\a\\AppData\\Local\\FoldCV Desktop");
-  assert.equal(dataRoot("win32", {}, roaming), "C:\\Users\\a\\AppData\\Roaming\\FoldCV Desktop");
+  assert.equal(dataRoot("win32", local, roaming), "C:\\Users\\a\\AppData\\Local\\foldCV Beta");
+  assert.equal(dataRoot("win32", {}, roaming), "C:\\Users\\a\\AppData\\Roaming\\foldCV Beta");
   assert.equal(dataRoot("win32", { ...local, FOLDCV_DESKTOP_ROOT: "D:\\qa root" }, roaming), "D:\\qa root");
   assert.equal(dataRoot("win32", { FOLDCV_DESKTOP_ROOT: "\\\\server\\share\\qa" }, roaming), "\\\\server\\share\\qa");
   // The service refuses a root without a drive, so the app does not pass one.
   for (const override of ["qa", "\\qa", "/qa", "D:qa"]) {
     assert.equal(dataRoot("win32", { ...local, FOLDCV_DESKTOP_ROOT: override }, roaming),
-      "C:\\Users\\a\\AppData\\Local\\FoldCV Desktop", override);
+      "C:\\Users\\a\\AppData\\Local\\foldCV Beta", override);
   }
   const support = "/Users/a/Library/Application Support";
-  assert.equal(dataRoot("darwin", {}, support), "/Users/a/Library/Application Support/FoldCV Desktop");
+  assert.equal(dataRoot("darwin", {}, support), "/Users/a/Library/Application Support/foldCV Beta");
   assert.equal(dataRoot("darwin", { FOLDCV_DESKTOP_ROOT: "/private/tmp/qa" }, support), "/private/tmp/qa");
   assert.equal(dataRoot("darwin", { FOLDCV_DESKTOP_ROOT: "qa" }, support),
-    "/Users/a/Library/Application Support/FoldCV Desktop");
+    "/Users/a/Library/Application Support/foldCV Beta");
 });

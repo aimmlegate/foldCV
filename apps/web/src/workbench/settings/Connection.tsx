@@ -2,6 +2,7 @@ import { useState } from "react";
 import { errorMessage } from "../../errors/messages";
 import { loginCodePattern, type ConnectionView, type ConnectionWorkflow, type ProviderActivity, type ProviderEntry } from "../../connection/workflow";
 import { connectionMessage } from "../../connection/messages";
+import { APP_NAME } from "../app-name";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
@@ -11,7 +12,7 @@ import { Installation } from "./Installation";
 export function Connections({ view, workflow, disabled }: { view: ConnectionView; workflow: ConnectionWorkflow; disabled: boolean }) {
   const { snapshot } = view;
   return <><h3>Провайдеры</h3>
-    <p>Включите провайдеров, через которых работает FoldCV. Модели всех включённых провайдеров можно выбрать ниже.</p>
+    <p>Включите провайдеров, через которых работает {APP_NAME}. Модели всех включённых провайдеров можно выбрать ниже.</p>
     {snapshot.provider === null && !view.readFailed && <p className="small muted" role="status">Проверяем подключение…</p>}
     {view.readFailed && <div className="settings-actions"><p className="notice error" role="alert">Не удалось прочитать состояние подключения.</p>
       <Button className="small" onClick={() => void workflow.peek()}>Повторить</Button></div>}
@@ -41,7 +42,7 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
       <div className="connection-status"><span className="connection-check">{pending || detaching || entry.state === "login_pending" ? <Spinner /> : <Icon name={entry.state === "connected" ? "check" : "info"} />}</span>
         <div><strong role="status">{detaching ? "Останавливаем подключение…" : installing ? `Устанавливаем ${display}…` : entry.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : pending ? "Проверяем подключение…" : connectionMessage(entry.state, { display, subscription })}</strong>
           <small>{[entry.plan, entry.version].filter(Boolean).join(" · ") || "Нет сведений о подписке"}</small></div></div>
-      {entry.versionStatus === "graceful" && <p className="small muted">Версия новее проверенной в FoldCV; её возможности проверены при подключении.</p>}
+      {entry.versionStatus === "graceful" && <p className="small muted">Версия новее проверенной в {APP_NAME}; её возможности проверены при подключении.</p>}
       <div className="quota-line">{entry.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${entry.quota.usedPercent}%` }} /></span>}
         {quota}
       </div>

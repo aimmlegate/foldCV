@@ -123,8 +123,9 @@ class ToolSession(PrivateMcp):
             delete_blocks {blockIds}; move_block {blockId, afterBlockId or parentId}; format_block {blockId, kind?,
             level?, alignment?, textColor?, backgroundColor?}; update_fact {recordId, field, value}; create_fact
             {kind, values, jobId?, targetId?}: kind employment (values employer, role, start, end, present), period
-            (jobId; values start, end, present) or technology (values display; jobId for a job's line; targetId when a
-            refusal lists several lines); delete_fact {recordId}. history {direction} and action {action: rename,
+            (jobId; values start, end, present), technology (values display; jobId for a job's line; targetId when a
+            refusal lists several lines), education (values institution, qualification, specialty, completion) or
+            language (values language, level); delete_fact {recordId}. history {direction} and action {action: rename,
             formatting_date, archive, restore or delete; value?; targetId?} are proposals of their own. One call carries
             at most 64 KiB of JSON and 100 ops; split a larger edit into several proposals over different blocks."""
             return await self.call('propose_changes', lambda: self.propose(request))

@@ -5,6 +5,7 @@ import type { PanelCommand, TechnologyTarget } from "../../rich/v7-panel";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { Icon } from "../ui/Icon";
 import { technologySuggestions } from "./technology-catalog";
+import { title } from "../../rich/fact-fields";
 import { Spinner } from "../ui/OperationStatus";
 import { documentTechnologies } from "../../rich/technology-order";
 import { useTechnologyDrag } from "./useTechnologyDrag";
@@ -63,13 +64,13 @@ export function TechnologySelect({ facts, document: resumeDocument, jobId, label
         {(expanded || focused ? records : records.slice(0, 8)).map(record => <li key={record.id} className="technology-chip" data-fact-id={record.id} {...drag.target(record.id)}
           aria-busy={scoped.some(command => command.operation === "clear_technologies" || command.recordId === record.id ||
             command.operation === "add" && technologyKey(command.values?.["display"] ?? "") === technologyKey(record.display.rawText))}>
-          <button type="button" className="technology-drag" aria-label={`Порядок: ${record.display.rawText}`} title="Перетащите или Alt+↑/↓"
+          <button type="button" className="technology-drag" aria-label={`Порядок: ${title(record)}`} title="Перетащите или Alt+↑/↓"
             disabled={paused || pending.length > 0 || !drag.movable(record.id)} {...drag.handle(record.id)}><span aria-hidden="true">⠿</span></button>
-          <button type="button" className="technology-edit" aria-label={`Изменить: ${record.display.rawText}`} disabled={paused}
+          <button type="button" className="technology-edit" aria-label={`Изменить: ${title(record)}`} disabled={paused}
             onClick={event => { event.stopPropagation(); setOpen(false); edit(record.id); }}>
-            <span>{record.display.rawText}</span>{record.experience?.rawText && <small>{record.experience.rawText}</small>}
+            <span>{title(record)}</span>{record.experience?.rawText && <small>{record.experience.rawText}</small>}
           </button>
-          <button type="button" aria-label={`Убрать: ${record.display.rawText}`} disabled={paused}
+          <button type="button" aria-label={`Убрать: ${title(record)}`} disabled={paused}
             onClick={event => { event.stopPropagation(); apply({ operation: "remove", recordId: record.id }); }}><Icon name="close" /></button>
         </li>)}
         {[...new Set(adding)].filter(name => !records.some(record => technologyKey(record.display.rawText) === technologyKey(name))).map(name =>

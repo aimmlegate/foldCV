@@ -22,8 +22,8 @@ for (const part of ["python/python.exe", "app/packaging/helper_entry.py"]) {
   if (!existsSync(join(helper, part))) throw new Error("The helper directory has no " + part);
 }
 if (existsSync(output)) throw new Error("The output directory must not exist yet");
-const { version, devDependencies } = JSON.parse(await readFile(join(desktop, "package.json"), "utf8"));
-const electron = devDependencies.electron, name = "FoldCV Local";
+const { version, devDependencies, productName: name } = JSON.parse(await readFile(join(desktop, "package.json"), "utf8"));
+const electron = devDependencies.electron;
 
 const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" }).stdout.trim();
 async function sha256(path) {
@@ -50,13 +50,13 @@ try {
     await build({ absWorkingDir: desktop, entryPoints: [entry], outfile: join(work, "app", file), bundle: true,
       platform: "node", target: "node22", format: "cjs", external: ["electron"], logLevel: "warning" });
   }
-  await writeFile(join(work, "app/package.json"), JSON.stringify({ name: "foldcv-local", version, main: "main.cjs" }) + "\n");
+  await writeFile(join(work, "app/package.json"), JSON.stringify({ name: "foldcv-beta", productName: name, version, main: "main.cjs" }) + "\n");
   // resedit writes the icon, the version strings and the ASAR integrity resource into the exe.
   const [packaged] = await packager({ dir: join(work, "app"), out: join(work, "package"), name, executableName: name,
     platform: "win32", arch: "x64", electronVersion: electron, electronZipDir: cache, appVersion: version,
-    buildVersion: version, appCopyright: "FoldCV", asar: true, prune: false, overwrite: false,
+    buildVersion: version, appCopyright: "foldCV", asar: true, prune: false, overwrite: false,
     icon: join(root, "assets/branding/foldcv/liquid-glass-v2/windows/FoldCV.ico"),
-    win32metadata: { CompanyName: "FoldCV", FileDescription: name, ProductName: name, InternalName: name,
+    win32metadata: { CompanyName: "foldCV", FileDescription: name, ProductName: name, InternalName: name,
       OriginalFilename: name + ".exe" } });
   await cp(helper, join(packaged, "resources/helper"), { recursive: true, verbatimSymlinks: true, errorOnExist: true,
     force: false });
@@ -66,9 +66,9 @@ try {
     [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true, [FuseV1Options.OnlyLoadAppFromAsar]: true,
     [FuseV1Options.GrantFileProtocolExtraPrivileges]: false });
 
-  // The zip holds one "FoldCV Local" folder. bsdtar (macOS, Windows 10+) picks the zip format from the suffix; Git for
+  // The zip holds one folder named after the app. bsdtar (macOS, Windows 10+) picks the zip format from the suffix; Git for
   // Windows puts GNU tar first on PATH, so the system one is named. No AppleDouble entries from macOS.
-  const stage = join(work, "zip"), zip = join(output, `FoldCV-Local-${version}-win-x64.zip`);
+  const stage = join(work, "zip"), zip = join(output, `${name.replaceAll(" ", "-")}-${version}-win-x64.zip`);
   await mkdir(stage);
   await rename(packaged, join(stage, name));
   await mkdir(output, { recursive: true });

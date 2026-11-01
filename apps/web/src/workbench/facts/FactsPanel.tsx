@@ -100,7 +100,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
           </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
             targets={technologyTargets.filter(target => target.jobId === record.id)} lines={plan.technologyLines} excluded={focusOnly} />}</div>;
         })}
-      {panelSupport.add.has(kind) && <button className="text-button fact-add" disabled={busy}
+      {plan.addKinds?.some(value => value === kind) && <button className="text-button fact-add" disabled={busy}
         onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
     </details>
       {/* Beside the summary, not inside it: a click inside a summary also folds the group. */}

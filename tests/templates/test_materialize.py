@@ -252,7 +252,8 @@ def test_disabled_rewriting_materializes_exact_source_raw_text_with_same_cell_id
     operation, facts, package, src, _raw = admitted(rewrite=False, payload_edit=edit)
     document, _coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
     assert 'Built asynchronous' not in text(document)
-    assert text(document).count('Implemented queue processing.') == 1
+    # The source's wording stays; a list item loses only its closing punctuation.
+    assert text(document).count('Implemented queue processing') == 1
     cell = next(value.cell_ids['value'] for value in operation.allocations if value.key == 'tasks-entry')
     assert any(isinstance(part, FieldOccurrence) and part.cell_id == cell for block in document.blocks() for part in block.content)
 

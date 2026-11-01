@@ -71,12 +71,12 @@ jobs:
           node apps\desktop\scripts\package-windows.mjs $helper output\windows
           Expand-Archive (Get-ChildItem output\windows\*.zip).FullName "$env:RUNNER_TEMP\app"
       - name: Helper smoke check with both CLIs
-        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\FoldCV Local\resources\helper" --cli
+        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\foldCV Beta\resources\helper" --cli
       - name: App start and close
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'
           $env:FOLDCV_DESKTOP_ROOT = $root
-          $app = Start-Process -FilePath "$env:RUNNER_TEMP\app\FoldCV Local\FoldCV Local.exe" -PassThru
+          $app = Start-Process -FilePath "$env:RUNNER_TEMP\app\foldCV Beta\foldCV Beta.exe" -PassThru
           $port = Join-Path $root 'desktop-port'
           $deadline = (Get-Date).AddMinutes(3)
           while (-not (Test-Path $port)) {

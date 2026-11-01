@@ -1,3 +1,6 @@
+/** The channel on which the shell tells the page how a download ended. */
+export const DOWNLOAD_DONE = "foldcv:download-done";
+
 /** The window shows only pages of its own service. */
 export function appUrl(raw: string, origin: string): boolean {
   try { return new URL(raw).origin === origin; } catch { return false; }

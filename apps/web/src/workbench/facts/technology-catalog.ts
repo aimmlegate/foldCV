@@ -66,12 +66,14 @@ function description(document: OrderDocument | undefined, jobId: string | null):
 export function technologySuggestions(facts: WorkingFacts, jobId: string | null, query: string, document?: OrderDocument): string[] {
   const context = technologyKey(facts.records.filter(record => record.kind !== "technology" && (jobId === null || record.id === jobId || "jobId" in record && record.jobId === jobId))
     .map(rawText).join(" ") + " " + description(document, jobId));
-  const existing = facts.records.filter(record => record.kind === "technology").map(record => record.display.rawText);
+  const existing = facts.records.filter(record => record.kind === "technology").map(record => record.display.rawText).filter(name => technologyKey(name));
   const catalog = [...new Map([...technologyCatalog, ...existing].map(name => [technologyKey(name), name])).values()];
   const relevant = new Set(groups.filter(group => group.context.test(context)).flatMap(group => group.names.split("|")));
   const tokens = technologyKey(query).split(/\s+/u).filter(Boolean);
   const mentioned = (name: string) => {
     const key = technologyKey(name);
+    // An empty key is found at every position, so the search below would never move on.
+    if (!key) return false;
     let start = context.indexOf(key);
     while (start >= 0) {
       if (!/[\p{L}\p{N}]/u.test(context[start - 1] ?? "") && !/[\p{L}\p{N}]/u.test(context[start + key.length] ?? "")) return true;

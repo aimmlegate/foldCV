@@ -31,7 +31,7 @@ test("every refusal on an enabled panel is re-read, not only the connection one"
 
 test("assistant drawer persistence contains only bounded dimensions and collapse state", () => {
   assert.deepEqual(drawerSize(null), { collapsed: true, height: 320 });
-  assert.deepEqual(drawerSize({ height: 10000, collapsed: false, token: "do-not-store", messages: ["private"] }), { height: 520, collapsed: false });
+  assert.deepEqual(drawerSize({ height: 10000, collapsed: false, token: "do-not-store", messages: ["private"] }), { height: 720, collapsed: false });
   assert.deepEqual(drawerSize({ height: NaN, collapsed: "bad" }), { height: 320, collapsed: true });
 });
 

@@ -26,19 +26,19 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 
 ## macOS app
 
-`tools/build-macos-dmg.sh` builds `FoldCV Local.app` and its DMG from this checkout in one step: the frontend, the
+`tools/build-macos-dmg.sh` builds `foldCV Beta.app` and its DMG from this checkout in one step: the frontend, the
 local service frozen with PyInstaller, and the Electron window around it. It needs Apple Silicon, arm64 Node 22 and
 python.org Python 3.13, and writes to `output/foldcv-macos-<version>-<commit>/`. The app keeps its data in
-`~/Library/Application Support/FoldCV Desktop`, apart from the browser service's `FoldCV` root. The signature is ad
+`~/Library/Application Support/foldCV Beta`, apart from the browser service's `FoldCV` root. The signature is ad
 hoc: on another Mac, allow the app once in System Settings → Privacy & Security.
 
 ## Windows app
 
-`tools/build-windows-zip.sh` builds the portable `FoldCV-Local-<version>-win-x64.zip` on a Mac in one step (Node 22,
+`tools/build-windows-zip.sh` builds the portable `foldCV-Beta-<version>-win-x64.zip` on a Mac in one step (Node 22,
 python.org Python 3.13): the frontend, the python.org embeddable Python with the service's Windows wheels, and the
 Electron window. The `Windows` workflow builds the same zip on a Windows runner and checks it there (helper, both CLIs,
-app start). Unpack the zip anywhere and run `FoldCV Local.exe`; there is no installer. Data stays in
-`%LOCALAPPDATA%\FoldCV Desktop`, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed:
+app start). Unpack the zip anywhere and run `foldCV Beta.exe`; there is no installer. Data stays in
+`%LOCALAPPDATA%\foldCV Beta`, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed:
 Windows SmartScreen asks once (More info → Run anyway). Codex and Claude run in a Job Object that lets them start no
 other program and ends them with the app; unlike the macOS sandbox it does not limit which files they read or write.
 
@@ -61,7 +61,7 @@ other program and ends them with the app; unlike the macOS sandbox it does not l
 
 Put a template YAML and its `assets/` folder into the ignored `templates/local/`. A local
 run or desktop build lists it first and uses it as the default. A clean clone ships only
-the bundled generic templates.
+the bundled generic templates; `FOLDCV_PUBLIC_TEMPLATES=1` keeps the private ones out of a run or desktop build.
 
 ## Documentation
 

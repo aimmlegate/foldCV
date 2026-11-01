@@ -7,7 +7,7 @@ import { containerKey, correctionRange, type ClipboardSource, type LocalContaine
 type Styles = Extract<V7Operation, { kind: "set_marks" }>["styles"];
 /** One operation in optimistic coordinates with the container texts it was expressed against. */
 export type ExtractedOperation = { operation: V7Operation; prior: ReadonlyMap<string, string> };
-export type Extraction = { kind: "operations"; operations: ExtractedOperation[] } | { kind: "unsupported"; reason: string };
+export type Extraction = { kind: "operations"; operations: ExtractedOperation[] } | { kind: "unsupported"; reason: string; code?: string };
 type Located = { container: LocalContainer; node: Node; start: number; depth: number; type: string };
 
 const structureMeta = "foldcv.v7.structure";
@@ -17,8 +17,8 @@ const textBlocks = new Set(["paragraph", "heading", "bulletListItem", "numberedL
 const editable = new Set([...textBlocks, "section"]);
 const flags = new Set(["bold", "italic", "underline", "strike", "code"]);
 
-class Unsupported extends Error {}
-function unsupported(reason: string): never { throw new Unsupported(reason); }
+class Unsupported extends Error { constructor(reason: string, readonly code?: string) { super(reason); } }
+function unsupported(reason: string, code?: string): never { throw new Unsupported(reason, code); }
 
 const leafText = (leaf: Node) => leaf.type.name === "hardBreak" ? "\n" : "";
 function textOf(node: Node, from = 0, to = node.content.size): string { return node.textBetween(from, to, "", leafText); }
@@ -92,6 +92,41 @@ function sideAt(doc: Node, pos: number, insertedLink: boolean): Side {
   return unsupported("input between two non-literal nodes");
 }
 
+/** The technology names of a text container with their text offsets; one name may hold several fragments. */
+function technologyNames(node: Node): { record: string; start: number; end: number }[] {
+  const names: { record: string; start: number; end: number }[] = [];
+  let cursor = 0;
+  node.descendants(child => {
+    if (child.type.name === "templateField" && child.attrs["fieldKey"] === "display") {
+      const length = textOf(child).length;
+      names.push({ record: String(child.attrs["recordId"]), start: cursor, end: cursor + length });
+      cursor += length;
+      return false;
+    }
+    if (child.isText) cursor += child.text?.length ?? 0;
+    else if (child.type.name === "hardBreak") cursor += 1;
+    return true;
+  });
+  return names;
+}
+
+/** Facts and the other lists read a technology by its name, so a chip stays one name: input cannot empty it or run across it. */
+function guardTechnologyNames(node: Node, start: number, end: number, text: string): void {
+  if (start === end) return;
+  const names = technologyNames(node), touched = names.filter(name => name.start < end && name.end > start);
+  const records = new Set(touched.map(name => name.record));
+  if (!records.size) return;
+  const whole = touched.reduce((covered, name) => covered + Math.min(end, name.end) - Math.max(start, name.start), 0) === end - start;
+  if (records.size > 1 || !whole) unsupported("input runs across technology names", "TECHNOLOGY_EDIT_SINGLE");
+  const prior = textOf(node), kept = names.filter(name => records.has(name.record))
+    .map(name => prior.slice(name.start, Math.max(name.start, Math.min(start, name.end))) + prior.slice(Math.min(name.end, Math.max(end, name.start)), name.end)).join("");
+  if (!(kept + text).trim()) unsupported("input empties a technology name", "TECHNOLOGY_NAME_EMPTY");
+}
+
+/** Chip lines are built from Facts: Enter inside one or a join with its neighbour would break the line's names apart. */
+export const technologyLines = "technology lines keep their structure";
+function technologyLine(node: Node | null | undefined): boolean { return !!node && technologyNames(node).length > 0; }
+
 function replaced(doc: Node, after: Node, step: ReplaceStep): ExtractedOperation {
   const from = locate(doc.resolve(step.from)), to = locate(doc.resolve(step.to));
   if (from.start !== to.start) return unsupported("input spans several containers");
@@ -107,6 +142,7 @@ function replaced(doc: Node, after: Node, step: ReplaceStep): ExtractedOperation
   const text = step.slice.content.textBetween(0, step.slice.content.size, "", leafText);
   const prior = textOf(from.node), start = offset(from, step.from), end = offset(from, step.to);
   if (!text && start === end) return unsupported("structure-only change");
+  guardTechnologyNames(from.node, start, end, text);
   const result = find(after, from.container);
   if (!result || textOf(result.node) !== prior.slice(0, start) + text + prior.slice(end)) return unsupported("input changed text outside its range");
   const styles = inserted.map(node => stylesOf(node.marks)), first = styles[0] ?? stylesOf([]);
@@ -184,7 +220,7 @@ export function extractOperations(transaction: Transaction): Extraction {
       return replaced(before, after, step);
     }) };
   } catch (error) {
-    if (error instanceof Unsupported) return { kind: "unsupported", reason: error.message };
+    if (error instanceof Unsupported) return { kind: "unsupported", reason: error.message, ...(error.code ? { code: error.code } : {}) };
     throw error;
   }
 }
@@ -216,6 +252,7 @@ export function splitAt(state: EditorState, created: string): Structure {
   return structure(() => {
     const at = collapsedText(state), position = state.doc.resolve(at.pos), depth = at.depth;
     textBlock(at);
+    if (technologyLine(at.node) && at.offset > 0 && at.offset < textOf(at.node).length) return unsupported(technologyLines);
     const block = position.node(depth - 1), relative = at.pos - at.start;
     const blockType = state.schema.nodes["blockContainer"];
     if (!blockType) return unsupported("missing block schema");
@@ -243,6 +280,7 @@ export function mergeAt(state: EditorState, direction: "backward" | "forward"): 
     const leadingText = leading.firstChild, trailingText = trailing.firstChild;
     if (!leadingText || !trailingText || !textBlocks.has(leadingText.type.name) || !textBlocks.has(trailingText.type.name))
       return unsupported("only text blocks merge");
+    if (technologyLine(leadingText) || technologyLine(trailingText)) return unsupported(technologyLines);
     // With children the visually preceding block is not the sibling Python would merge into.
     if (leading.childCount > 1) return unsupported("the leading block has children");
     const leadingId: unknown = leading.attrs["id"], trailingId: unknown = trailing.attrs["id"];

@@ -102,7 +102,7 @@ class OperationSidecar:
         target = self.path(project, operation_id)
         try:
             target.unlink()
-            _fsync_directory(target.parent)
+            host.sync_directory(target.parent)
         except FileNotFoundError:
             pass
 

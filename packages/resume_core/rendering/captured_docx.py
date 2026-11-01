@@ -9,9 +9,10 @@ import platform
 import re
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml.ns import qn
-from docx.shared import Twips
+from docx.shared import Pt, Twips
 
 from ..models.template_document import PresentedText, TemplateParagraphBlock
 from ..models.template_render import TemplateRendererIdentity, TemplateRenderRequestV1
@@ -71,8 +72,8 @@ def run_properties(style):
     font = style.selection.font
     props = element('w:rPr')
     props.append(element('w:rFonts', ascii=font.family, hAnsi=font.family, eastAsia=font.family, cs=font.family))
-    for tag, value in [('b', font.bold), ('bCs', font.bold), ('i', font.italic), ('iCs', font.italic),
-            ('strike', style.strike)]:
+    italic = font.italic or style.slanted
+    for tag, value in [('b', font.bold), ('bCs', font.bold), ('i', italic), ('iCs', italic), ('strike', style.strike)]:
         props.append(element('w:' + tag, val='1' if value else '0'))
     props.append(element('w:color', val=style.color.removeprefix('#')))
     if style.gap:
@@ -124,6 +125,7 @@ class CapturedWriter:
         self.next_numbering = 6000
         self.next_drawing = 100000
         self.selections = {}
+        self.slanted = set()
         self.widths = {}
         self.regions = {}
         def assign_width(blocks, width, region):
@@ -206,6 +208,8 @@ class CapturedWriter:
         half_points(style.size)
         native_units(style.line_height, positive=True)
         self.selections[style.selection.font.sha256] = style.selection
+        if style.slanted:
+            self.slanted.add(style.selection.font.family)
 
     def generated(self, block, text):
         span = PresentedText(type='text', text=text, styles={}, presentation=None)
@@ -231,7 +235,7 @@ class CapturedWriter:
         native_text(run, text)
         return run
 
-    def paragraph(self, container, block, *, header=False, depth=0, sequence=None):
+    def paragraph(self, container, block, *, header=False, depth=0, sequence=None, celled=False):
         self.block = block
         paragraph = container.add_paragraph()
         height, alignment = self.paragraphs[block.id]
@@ -246,7 +250,7 @@ class CapturedWriter:
         band = is_heading and block.presentation.node_index is None and view.heading == 'band'
         node = resolved_node(self.resolver, block.presentation)
         focus = node is not None and node.type == 'focus_entry'
-        inset = 0 if header or band else view.inset + (self.recipe.style.focus.text_x if focus else 0)
+        inset = 0 if header or band or celled else view.inset + (self.recipe.style.focus.text_x if focus else 0)
         left = native_units(inset)
         if left >= self.widths[block.id]:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
@@ -352,41 +356,68 @@ class CapturedWriter:
 
     def blocks(self, container, blocks, depth=0):
         sequence = {}
+        unfilled = unfilled_lines(blocks, self.resolver, self.runs)
+        table = None
         for block in blocks:
+            if block.id in unfilled:
+                continue
             if block.type not in {'bullet_list', 'numbered_list'}:
                 sequence.clear()
             if block.type != 'section' or block.content:
                 self.paragraph(container, block, depth=depth, sequence=sequence)
             row, icon = self.rows.get(block.id, ([], None))
             if row:
-                self.focus(container, block, row, icon, depth)
-            self.blocks(container, block.children[len(row):], depth + (block.type in {'bullet_list', 'numbered_list'}))
+                table = table or self.focus_table(container, block)
+                self.blocks(self.focus_row(table, block, row, icon, depth), block.children[len(row):], depth)
+                continue
+            table = None
+            self.blocks(container, block.children, depth + (block.type in {'bullet_list', 'numbered_list'}))
             if block.type == 'section' and block.children:
                 gap = self.resolver.views[block.presentation.view_key].item_gap
                 if gap:
                     self.spacer(container, native_units(gap, positive=True))
 
-    def focus(self, container, section, row, icon, depth):
+    def focus_table(self, container, section):
+        """Focus rows as one borderless table: Google Docs moves floating pictures, a cell keeps an icon beside its text."""
+        first = native_units(self.resolver.views[section.presentation.view_key].inset + self.recipe.style.focus.text_x, positive=True)
+        widths = (first, self.widths[section.id] - first)
+        if widths[1] <= 0:
+            raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+        table = container.add_table(0, 2)
+        # A table needs no closing paragraph unless it ends its cell, and columns() sees to that.
+        if not isinstance(container, type(self.document)):
+            container.paragraphs[-1]._p.getparent().remove(container.paragraphs[-1]._p)
+        self.borderless(table, widths)
+        return table
+
+    def focus_row(self, table, section, row, icon, depth):
         """Focus text centered in at least the minimum row height; the decorative icon centered in its box."""
         style = self.recipe.style.focus
         view = self.resolver.views[row[0].presentation.view_key]
-        text = sum(native_units(self.metrics.paragraph_height(self.runs[block.id],
-            self.widths[block.id] / 20 - view.inset - style.text_x, self.paragraphs[block.id][0]), positive=True) for block in row)
-        height = max(native_units(style.minimum_row_height, positive=True), text)
-        before = (height - text) // 2
-        anchor = self.spacer(container, before) if before else None
-        paragraphs = [self.paragraph(container, block, depth=depth, sequence={}) for block in row]
-        # One entry stays on one page: its leading spacer and lines keep with what follows.
-        for paragraph in [*([anchor] if anchor is not None else []), *paragraphs[:-1]]:
-            paragraph.paragraph_format.keep_with_next = True
-        if height - text - before:
-            self.spacer(container, height - text - before)
-        if icon is not None:
+        widths = [column.width.twips for column in table.columns]
+        cells = table.add_row().cells
+        properties = cells[0]._tc.getparent().get_or_add_trPr()
+        properties.append(element('w:cantSplit'))
+        # The gap between rows is part of the row: Word and LibreOffice count a cell's bottom margin differently.
+        height = native_units(style.minimum_row_height, positive=True) + native_units(view.item_gap)
+        properties.append(element('w:trHeight', val=height, hRule='atLeast'))
+        for cell, width in zip(cells, widths, strict=True):
+            cell.width = Twips(width)
+            self.clear_cell(cell)
+            cell._tc.tcPr.append(element('w:vAlign', val='center'))
+        if icon is None:
+            self.spacer(cells[0], 1)
+        else:
             image = self.icons[icon]
             scale = min(style.icon_width / image.width, style.icon_height / image.height)
-            width, image_height = image.width * scale, image.height * scale
-            self.placed.append((anchor if anchor is not None else paragraphs[0], icon, width, image_height,
-                view.inset + style.icon_x + (style.icon_width - width) / 2, (height / 20 - image_height) / 2, self.widths[section.id]))
+            width, height = image.width * scale, image.height * scale
+            holder = cells[0].add_paragraph()
+            holder.paragraph_format.space_before = holder.paragraph_format.space_after = Twips(0)
+            holder.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            self.placed.append((holder, icon, width, height))
+        for block in row:
+            self.paragraph(cells[1], block, depth=depth, sequence={}, celled=True)
+        return cells[1]
 
     def spacer(self, container, height):
         paragraph = container.add_paragraph()
@@ -395,23 +426,26 @@ class CapturedWriter:
         paragraph.paragraph_format.widow_control = False
         return paragraph
 
-    def frame(self, paragraph, x, y, width):
-        native_x, native_y = native_units(x), native_units(y)
-        native_width = native_units(width, positive=True)
-        if native_x + native_width > self.geometry.width or native_y >= self.geometry.height:
+    def header_line(self, paragraph, x, width, before):
+        """A header line by spacing and indents, not a Word frame: Google Docs drops frames and stacks their text."""
+        left, native_width = native_units(x), native_units(width, positive=True)
+        if left + native_width > self.geometry.width:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-        paragraph._p.get_or_add_pPr().insert(0, element('w:framePr', wrap='around',
-            hAnchor='page', vAnchor='page', x=native_x, y=native_y,
-            w=native_width, hSpace=0, vSpace=0))
+        props = paragraph._p.get_or_add_pPr()
+        indent = props.find(qn('w:ind'))
+        indent.set(qn('w:left'), str(left - self.geometry.left))
+        indent.set(qn('w:right'), str(self.geometry.width - self.geometry.right - left - native_width))
+        props.find(qn('w:spacing')).set(qn('w:before'), str(native_units(before)))
 
     def header(self):
         header = self.document.sections[0].first_page_header
-        self.compact(header.paragraphs[0], .05)
+        anchor = .05
+        self.compact(header.paragraphs[0], anchor)
         recipe = self.recipe.style.header
         region = self.recipe.layout.regions[0]
         # Source fallback lines stack from the first slot; growth counts from the last slot, as if they filled both.
         first, last = min(recipe.name_top, recipe.profession_top), max(recipe.name_top, recipe.profession_top)
-        cursor = 0.0
+        cursor = anchor
         growth = 0.0
         for block in self.request.document.regions[0].blocks:
             for child in self.header_blocks(block):
@@ -428,14 +462,12 @@ class CapturedWriter:
                 height = self.metrics.paragraph_height(self.runs[child.id], region.width, self.paragraphs[child.id][0])
                 paragraph = self.paragraph(header, child, header=True)
                 y = max(top, cursor)
-                self.frame(paragraph, region.x, y, region.width)
+                self.header_line(paragraph, region.x, region.width, y - cursor)
                 cursor = y + height
                 growth = max(growth, cursor - designed - self.paragraphs[child.id][0])
-        # A final ordinary paragraph terminates the last independent text frame.
-        self.spacer(header, 1)
         if cursor > self.recipe.style.page.body_bottom or self.recipe.style.page.first_body_top + growth >= self.recipe.style.page.body_bottom:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-        return growth
+        return growth, cursor
 
     def header_fallback(self, block, refs):
         """A paragraph of source wording a header block kept: no view node, the block's own fallback style."""
@@ -479,8 +511,10 @@ class CapturedWriter:
             paragraph._p.get_or_add_pPr().append(element('w:ind', left=left, right=right))
             self.emit_run(paragraph, recipe.text, style)
 
-    def first_page_spacer(self, growth):
-        total = self.geometry.first_top - self.geometry.continuation_top + native_units(growth)
+    def first_page_spacer(self, growth, header_bottom):
+        # A header taller than the top margin starts the body below itself.
+        start = max(self.geometry.continuation_top, native_units(header_bottom))
+        total = max(0, self.geometry.first_top + native_units(growth) - start)
         divider = self.recipe.style.header.divider
         if divider is None:
             if total:
@@ -491,7 +525,7 @@ class CapturedWriter:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         x1, x2 = native_units(divider.x1), native_units(divider.x2)
         thickness = native_units(divider.width, 8, positive=True, maximum=96)
-        target = native_units(divider.y + growth) - self.geometry.continuation_top
+        target = native_units(divider.y + growth) - start
         before = max(0, target - 1)
         after = total - before - 1
         if x1 >= x2 or x2 > self.geometry.width or thickness < 2 or after < 0:
@@ -509,12 +543,7 @@ class CapturedWriter:
         if after:
             self.spacer(self.document, after)
 
-    def columns(self):
-        """The sidebar and main columns as one borderless table row."""
-        widths = [self.geometry.sidebar_width, self.geometry.main_width]
-        if self.geometry.gap:
-            widths.insert(1, self.geometry.gap)
-        table = self.document.add_table(rows=1, cols=len(widths))
+    def borderless(self, table, widths):
         table.autofit = False
         props = table._tbl.tblPr
         props.find(qn('w:tblW')).set(qn('w:w'), str(sum(widths)))
@@ -526,6 +555,15 @@ class CapturedWriter:
         props.append(borders)
         for index, width in enumerate(widths):
             table.columns[index].width = Twips(width)
+
+    def columns(self):
+        """The sidebar and main columns as one borderless table row."""
+        widths = [self.geometry.sidebar_width, self.geometry.main_width]
+        if self.geometry.gap:
+            widths.insert(1, self.geometry.gap)
+        table = self.document.add_table(rows=1, cols=len(widths))
+        self.borderless(table, widths)
+        for index, width in enumerate(widths):
             cell = table.cell(0, index)
             cell.width = Twips(width)
             self.clear_cell(cell)
@@ -537,13 +575,14 @@ class CapturedWriter:
                 keep = cell.paragraphs[0]._p.pPr.find(qn('w:keepNext')) if cell.paragraphs and cell.paragraphs[0]._p.pPr is not None else None
                 if keep is not None:
                     keep.set(qn('w:val'), '0')
-            if not cell.paragraphs:
+            # A cell ends in a paragraph, also after a Focus table.
+            if cell._tc[-1].tag != qn('w:p'):
                 self.spacer(cell, 1)
 
     def render(self, workspace):
-        growth = self.header()
+        growth, header_bottom = self.header()
         self.footer()
-        self.first_page_spacer(growth)
+        self.first_page_spacer(growth, header_bottom)
         if self.geometry.sidebar_width:
             self.columns()
         else:
@@ -556,9 +595,12 @@ class CapturedWriter:
             self.logo = decode_logo(asset)
         paths = CapturedAssets({selection.font.asset_id: selection.font for selection in self.selections.values()}, self.logo,
             self.icons).materialize(workspace)
-        for paragraph, icon, width, height, x, y, right in self.placed:
-            self.floating_image(paragraph, paths[icon], width, height, x, y, label='', horizontal='column',
-                vertical='paragraph', right=right)
+        for paragraph, icon, width, height in self.placed:
+            inline = paragraph.add_run().add_picture(str(paths[icon]), width=Pt(width), height=Pt(height))._inline
+            inline.docPr.set('descr', '')
+            # Without them LibreOffice leaves a margin beside the picture.
+            for side in ('distT', 'distB', 'distL', 'distR'):
+                inline.set(side, '0')
         if logo is not None:
             ratio = min(logo.width / self.logo.width, logo.height / self.logo.height)
             width, height = self.logo.width * ratio, self.logo.height * ratio
@@ -572,7 +614,9 @@ class CapturedWriter:
         self.document.save(raw)
         if len(raw.getvalue()) > DOCX_BYTES:
             raise RenderFailure('RENDER_OUTPUT_LIMIT')
-        return embed_captured_fonts(raw.getvalue(), list(self.selections.values()))
+        # Word slants an upright face only while its family embeds no italic, so one such run decides for the family.
+        return embed_captured_fonts(raw.getvalue(), [selection for selection in self.selections.values()
+            if not (selection.font.italic and selection.font.family in self.slanted)])
 
     def order_properties(self):
         names = ('pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'framePr', 'widowControl',
@@ -590,6 +634,20 @@ class CapturedWriter:
             table_order = {qn('w:' + name): index for index, name in enumerate(table_names)}
             for props in root.iter(qn('w:tblPr')):
                 props[:] = sorted(props, key=lambda child: table_order.get(child.tag, len(table_order)))
+
+
+def unfilled_lines(blocks, resolver, runs):
+    """Lines of a new job nobody typed in, with the labels they would follow: a blank line never reaches the DOCX."""
+    def blank(block):
+        node = resolved_node(resolver, block.presentation)
+        return (block.type in {'paragraph', 'bullet_list'} and not block.children and not runs[block.id] and not block.content
+            and node is not None and node.type in {'text', 'bullets'})
+    found = {block.id for block in blocks if blank(block)}
+    for index, block in enumerate(blocks[:-1]):
+        node = resolved_node(resolver, block.presentation)
+        if blocks[index + 1].id in found and node is not None and node.type == 'bullets' and block.type == 'paragraph':
+            found.add(block.id)
+    return found
 
 
 def located(block):

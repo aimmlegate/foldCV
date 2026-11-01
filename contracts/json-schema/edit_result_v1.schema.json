@@ -2400,6 +2400,18 @@
       "additionalProperties": false,
       "description": "Python's presentation decisions for the mounted editor; the editor only applies them.",
       "properties": {
+        "addKinds": {
+          "items": {
+            "enum": [
+              "employment",
+              "education",
+              "language"
+            ],
+            "type": "string"
+          },
+          "title": "Addkinds",
+          "type": "array"
+        },
         "blocks": {
           "additionalProperties": {
             "$ref": "#/$defs/EditorBlock"

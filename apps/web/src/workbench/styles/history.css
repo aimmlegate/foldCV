@@ -2,8 +2,11 @@
 .app-shell .history .brand-row { margin-bottom: 26px; padding: 0 0 0 6px; gap: 6px; }
 .app-shell .history .brand { gap: 8px; min-width: 0; color: var(--ink); font-size: 25px; font-weight: 650; line-height: 1; letter-spacing: -1.2px; }
 .app-shell .history .brand > svg { width: 28px; height: 28px; margin: 0; }
-.app-shell .history .brand > .brand-name { color: inherit; white-space: nowrap; }
+.app-shell .history .brand > .brand-name { position: relative; color: inherit; white-space: nowrap; }
 .app-shell .history .brand-name > span { color: #7d8a6e; }
+/* Under the wordmark, in the gap above the next button: on one line the name would run into the sidebar toggle. */
+.app-shell .history .brand-name > small { position: absolute; top: 100%; left: 1px; color: #7d8a6e; font-size: 11px;
+  font-weight: 600; line-height: 1; letter-spacing: 0; }
 .app-shell .history .new-button { margin: 0 0 24px; padding: 9px 11px; }
 .app-shell .history .history-heading { margin-bottom: 6px; padding: 0 12px; }
 

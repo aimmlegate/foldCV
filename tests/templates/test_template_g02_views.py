@@ -134,7 +134,7 @@ async def test_focus_durations_order_names_and_merges_stay_exact_through_undo_tr
     body = emitted(xml(content := render(copy, tmp_path)))
     order = ['SQL', 'about 2.5 years', 'Python', '11 months', 'Docker', '7 weeks']
     assert [body.index(value) for value in order] == sorted(body.index(value) for value in order)
-    assert '10 months' not in body and len(xml(content).xpath('//w:body//wp:anchor', namespaces={**NS,
+    assert '10 months' not in body and len(xml(content).xpath('//w:body//wp:inline', namespaces={**NS,
         'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})) == 2
     unmerged = undo(renamed, merged, 'merge')
     assert [text(find(unmerged, value)) for value in ['Python', '11 months']] == ['Python', '11 months']

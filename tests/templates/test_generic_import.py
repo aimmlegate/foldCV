@@ -105,12 +105,14 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     assert shown['opensource'] == ['OPEN SOURCE', 'Queue Tools'] and 'portfolio' not in shown
     # The accepted task shows once; only the rejected result's own source line falls back, without its line break.
     projects = shown['projects']
-    assert projects.count('Implemented queue processing.') == 1 and projects[-1] == F10_RESULT
+    # Without rewriting a list item keeps the source's wording and loses only its closing punctuation.
+    task = 'Implemented queue processing' + ('.' if rewrite else '')
+    assert projects.count(task) == 1 and projects[-1] == F10_RESULT
     text_all = body(workspace)
     assert text_all.count(F10_RESULT) == 1 and F10_REJECTED not in text_all and 'Результаты:' not in text_all
     assert 'None' not in text_all and 'null' not in text_all
     claims = sorted(record.value.raw_text for record in records(workspace, 'claim'))
-    assert claims == ['Implemented queue processing.']
+    assert claims == [task]
     fallback, *uncertain = sorted(workspace.project.import_issues, key=lambda issue: issue.code != 'IMPORT_SOURCE_FALLBACK')
     assert (fallback.code, fallback.category, fallback.rule_id) == ('IMPORT_SOURCE_FALLBACK', 'content_violation', 'projects-support')
     assert [issue.code for issue in uncertain] == ([] if rewrite else ['IMPORT_SKILL_GROUP_UNCERTAIN'])
@@ -123,7 +125,8 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
         assert shown['summary'][1] == 'Summary: Backend engineer focused on reliable queue systems.'
         assert 'Product: message queue platform for internal services.' in projects and 'Old Systems' in projects
     # The career-wide highlight has no owner; both employment records and the old job's technology stay facts.
-    assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', ('' if rewrite else 'Career: ') + 'Mentored five engineers across teams.']
+    assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', 'Mentored five engineers across teams.' if rewrite
+        else 'Career: Mentored five engineers across teams']
     highlight = next(record for record in workspace.project.facts.extensions if record.semantic_type == 'foldcv:career_highlights')
     assert not highlight.relations and not any(relation.subject_id == highlight.id for relation in workspace.project.facts.relations)
     assert sorted(record.employer.raw_text for record in records(workspace, 'employment')) == ['Example Labs', 'Old Systems']
@@ -148,7 +151,7 @@ async def test_missing_data_keeps_year_precision_and_adds_no_block_or_placeholde
     shown = views(workspace)
     assert order(workspace) == ['identity', 'projects', 'programming']
     assert shown['projects'] == ['ПРОЕКТЫ', 'Example Labs', '2020 – 2023', 'Python', 'Роль: backend engineer', 'Задачи:',
-        'Implemented queue processing.']
+        'Implemented queue processing' + ('.' if rewrite else '')]
     [job] = records(workspace, 'employment')
     assert [(period.start.value.precision, period.end.value.precision, period.end.raw_text) for period in job.periods] == [
         ('year', 'year', '2023')]

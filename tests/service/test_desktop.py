@@ -19,6 +19,7 @@ from resume_api.cli import distribution, experimental_profile
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.cli.installation import ClaudeInstallation, curl as system_curl
 from resume_api.cli.profiles import claude
+from tools.desktop import build_helper
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -147,3 +148,13 @@ def test_the_service_serves_the_page_and_stops_when_its_shell_closes_stdin(tmp_p
                 process.wait(timeout=5)
     # The second start keeps the origin, so the page finds the edits it stored but had not sent.
     assert origins[0] == origins[1]
+
+
+def test_a_public_build_leaves_the_private_templates_out(tmp_path, monkeypatch):
+    for name in ("bundled", "generic", "local"):
+        (tmp_path / "templates" / name).mkdir(parents=True)
+    monkeypatch.setattr(build_helper, "ROOT", tmp_path)
+    monkeypatch.setenv("FOLDCV_PUBLIC_TEMPLATES", "1")
+    assert build_helper.template_folders() == ["templates/bundled", "templates/generic"]
+    monkeypatch.delenv("FOLDCV_PUBLIC_TEMPLATES")
+    assert "templates/local" in build_helper.template_folders()

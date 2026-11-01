@@ -179,6 +179,32 @@ def test_missing_or_zero_glyph_mapping_fails_even_when_package_and_font_hashes_a
         CapturedStyleResolver(captured).run(missing,missing.content[0])
 
 
+def test_italic_cyrillic_keeps_the_upright_face_and_leaves_the_slant_to_word(captured):
+    block=paragraph(captured,text='Торговая система');span=block.content[0];span.styles.italic=True
+    styled=CapturedStyleResolver(captured).run(block,span)
+    assert styled.slanted and not styled.selection.font.italic and styled.selection.font.weight==300
+    span.styles.bold=True
+    heavy=CapturedStyleResolver(captured).run(block,span)
+    assert heavy.slanted and heavy.selection.font.weight==700
+
+
+def test_italic_latin_keeps_the_real_italic_face(captured):
+    block=paragraph(captured,text='Trading system');span=block.content[0];span.styles.italic=True
+    styled=CapturedStyleResolver(captured).run(block,span)
+    assert not styled.slanted and styled.selection.font.italic
+
+
+def test_a_character_no_face_holds_still_refuses_italic_text(captured):
+    block=paragraph(captured,text='Missing \U0010ffff');block.content[0].styles.italic=True
+    with pytest.raises(RenderFailure,match='FONT_UNAVAILABLE'):
+        CapturedStyleResolver(captured).run(block,block.content[0])
+
+
+def test_bold_never_thins_a_heavier_style(captured):
+    block=paragraph(captured,'name');block.content[0].styles.bold=True
+    assert CapturedStyleResolver(captured).run(block,block.content[0]).selection.font.weight==900
+
+
 def test_generated_text_must_be_checked_against_its_actual_selected_face(captured):
     block=paragraph(captured);resolver=CapturedStyleResolver(captured)
     selection=resolver.run(block,block.content[0]).selection

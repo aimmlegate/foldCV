@@ -28,8 +28,9 @@
   color: var(--muted); font: 10px var(--sans); }
 .fcv-sheet .uir-empty-region:hover, .fcv-sheet .uir-empty-region:focus-visible { opacity: 1; }
 .fcv-sheet [data-fcv-style] strong { font-family: var(--fcv-bold), sans-serif; font-weight: normal; }
-.fcv-sheet [data-fcv-style] em { font-family: var(--fcv-italic), sans-serif; font-style: normal; }
-.fcv-sheet [data-fcv-style] strong em, .fcv-sheet [data-fcv-style] em strong { font-family: var(--fcv-bold-italic), sans-serif; }
+/* Source Sans italics hold no Cyrillic: the upright face stands in and is slanted, as Word does in the DOCX. */
+.fcv-sheet [data-fcv-style] em { font-family: var(--fcv-italic), var(--fcv-regular), sans-serif; font-style: italic; }
+.fcv-sheet [data-fcv-style] strong em, .fcv-sheet [data-fcv-style] em strong { font-family: var(--fcv-bold-italic), var(--fcv-bold), sans-serif; }
 /* Custom blocks render their content inside a React node view wrapper. */
 .fcv-sheet [data-fcv-inset] > .bn-block > .bn-block-content,
 .fcv-sheet [data-fcv-inset] > .bn-block > .bn-react-node-view-renderer > .bn-block-content { padding-left: var(--fcv-inset); }

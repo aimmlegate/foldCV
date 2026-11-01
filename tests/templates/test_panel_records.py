@@ -213,8 +213,7 @@ def test_actions_without_an_adapter_are_refused_with_a_public_code(before):
     candidate = record(before, 'candidate')
     claim = record(before, 'claim')
     for value in [request(before, 'remove', record_id=candidate.id), request(before, 'remove', record_id=claim.id),
-            request(before, 'add', kind='education', values={'institution': 'Other'}),
-            request(before, 'add', kind='language', values={'language': 'French'}),
+            request(before, 'add', kind='claim', values={'value': 'Other'}),
             request(before, 'edit', record_id=candidate.id, values={'email': 'a@example.org'})]:
         with pytest.raises(ValueError, match='PANEL_ACTION_UNSUPPORTED'):
             prepare_edit(response(before), value)
@@ -393,13 +392,13 @@ def test_removing_a_jobs_only_period_takes_its_line(before):
     assert undone(before, after, result)
 
 
-def test_a_new_job_lands_after_its_view_with_the_formats_dates(before):
+def test_a_new_current_job_opens_its_view_with_the_formats_dates(before):
     after, result = applied(before, request(before, 'add', kind='employment', values={'employer': 'New Co', 'role': 'Dev',
         'start': '2024-01', 'end': '', 'present': 'по настоящее время'}))
     blocks = after.project.document.regions[2].blocks
     old = {block.id for block in before.project.document.regions[2].blocks}
     at = next(index for index, block in enumerate(blocks) if block.id not in old)
-    assert blocks[at - 1].presentation.view_key == 'projects' and blocks[at + 1].presentation.view_key == 'other_projects'
+    assert blocks[at - 1].type == 'heading' and blocks[at + 1].presentation.view_key == 'projects'
     assert period_lines(after, 'New Co') == ['01.2024 – по настоящее время']
     assert undone(before, after, result)
     closed, _ = applied(before, request(before, 'add', kind='employment', values={'employer': 'Old Co', 'start': '2010', 'end': ''}))

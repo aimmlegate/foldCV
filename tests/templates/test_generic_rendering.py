@@ -230,9 +230,15 @@ def unreadable(_reply):
 
 
 def frames(tree):
-    """(top in twips, text) of every framed paragraph with text."""
-    return [(int(paragraph.xpath('string(w:pPr/w:framePr/@w:y)', namespaces=NS)), emitted(paragraph))
-        for paragraph in tree.xpath('//w:p[w:pPr/w:framePr]', namespaces=NS) if emitted(paragraph)]
+    """(top in twips, text) of every header line with text; the lines flow from the top of the page."""
+    result, cursor = [], 0
+    for paragraph in tree.xpath('//w:p', namespaces=NS):
+        spacing = paragraph.find(qn('w:pPr')).find(qn('w:spacing'))
+        cursor += int(spacing.get(qn('w:before')) or 0)
+        if emitted(paragraph):
+            result.append((cursor, emitted(paragraph)))
+        cursor += int(spacing.get(qn('w:line')))
+    return result
 
 
 @pytest.mark.asyncio

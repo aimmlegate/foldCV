@@ -1,5 +1,8 @@
 import { posix, win32 } from "node:path";
 
+// Its own folder, so the app runs next to the FoldCV Local builds and shows none of their data.
+const DATA_FOLDER = "foldCV Beta";
+
 /** The helper executable and its arguments. */
 export type HelperCommand = { executable: string; args: string[] };
 
@@ -50,10 +53,10 @@ function absolute(platform: NodeJS.Platform, path: string): boolean {
   return platform === "win32" ? /^(?:[a-z]:[\\/]|[\\/]{2}[^\\/])/iu.test(path) : posix.isAbsolute(path);
 }
 
-/** FOLDCV_DESKTOP_ROOT for QA runs, else `FoldCV Desktop` in the per-user data folder (local, not roaming, on Windows). */
+/** FOLDCV_DESKTOP_ROOT for QA runs, else `foldCV Beta` in the per-user data folder (local, not roaming, on Windows). */
 export function dataRoot(platform: NodeJS.Platform, environment: NodeJS.ProcessEnv, appData: string): string {
   const override = environment["FOLDCV_DESKTOP_ROOT"];
   if (override && absolute(platform, override)) return override;
-  if (platform === "win32") return win32.join(variable(environment, "LOCALAPPDATA") ?? appData, "FoldCV Desktop");
-  return posix.join(appData, "FoldCV Desktop");
+  if (platform === "win32") return win32.join(variable(environment, "LOCALAPPDATA") ?? appData, DATA_FOLDER);
+  return posix.join(appData, DATA_FOLDER);
 }

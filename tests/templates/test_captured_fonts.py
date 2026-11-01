@@ -46,7 +46,7 @@ def test_default_false_marks_preserve_exact_base_asset(captured,token,weight,ita
     (FontRequest('light',mark_italic=True),'light_italic'),
     (FontRequest('semibold',mark_italic=True),'semibold_italic'),
     (FontRequest('black',mark_italic=True),'black_italic'),
-    (FontRequest('black',mark_bold=True),'bold'),
+    (FontRequest('black',mark_bold=True),'black'),
     (FontRequest('light',mark_bold=True,mark_italic=True),'bold_italic'),
     (FontRequest('black_italic',bold=False),'italic'),
     (FontRequest('black_italic',italic=False),'black'),

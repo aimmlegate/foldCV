@@ -50,7 +50,8 @@ class CapturedFontResolver:
         base=self._decode(identifier)
         weight=base.weight if request.bold is None else 700 if request.bold else 400
         italic=base.italic if request.italic is None else request.italic
-        if request.mark_bold:weight=700
+        # Bold never thins a heavier style such as Black.
+        if request.mark_bold:weight=max(weight,700)
         if request.mark_italic:italic=True
         selected=base
         if (weight,italic)!=(base.weight,base.italic):

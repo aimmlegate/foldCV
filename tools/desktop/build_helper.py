@@ -15,7 +15,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 # Read at run time; kept at their checkout paths.
-DATA = ("apps/web/dist", "templates", "skills/format-resume/SKILL.md", "skills/format-resume/references",
+DATA = ("apps/web/dist", "skills/format-resume/SKILL.md", "skills/format-resume/references",
         "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
         "requirements.txt")
 # The captured DOCX renderer identity reads these installed versions.
@@ -24,9 +24,18 @@ METADATA = ("fonttools", "python-docx", "lxml", "pydantic", "jsonschema", "PyYAM
 HIDDEN = ("uvicorn.logging", "uvicorn.loops.asyncio", "uvicorn.protocols.http.h11_impl", "uvicorn.lifespan.on")
 
 
+def template_folders() -> list[str]:
+    """The `templates` folders to ship; FOLDCV_PUBLIC_TEMPLATES=1 leaves out the ignored private ones, as it hides them
+    from a run."""
+    public = os.environ.get("FOLDCV_PUBLIC_TEMPLATES") == "1"
+    return [f"templates/{path.name}" for path in sorted((ROOT / "templates").iterdir())
+            if path.is_dir() and not (public and path.name == "local")]
+
+
 def spec(work: Path, version: str) -> str:
     skills = ROOT / "services/api/src/resume_api/assistant/skills"
-    datas = [(str(ROOT / name), str(Path(name).parent) if (ROOT / name).is_file() else name) for name in DATA]
+    datas = [(str(ROOT / name), str(Path(name).parent) if (ROOT / name).is_file() else name)
+             for name in (*DATA, *template_folders())]
     datas += [(str(path), "resume_api/assistant/skills") for path in sorted(skills.glob("*.md"))]
     # python-docx opens docx/parts/../templates, so the parts directory must exist on disk.
     keep = work / "docx-parts.txt"
@@ -42,7 +51,7 @@ pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="foldcv-helper", console=True, strip=False, upx=False,
     target_arch="arm64", codesign_identity=None)
 payload = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="foldcv-helper")
-app = BUNDLE(payload, name="FoldCV Helper.app", bundle_identifier="invalid.foldcv.local.helper",
+app = BUNDLE(payload, name="FoldCV Helper.app", bundle_identifier="invalid.foldcv.beta.helper",
     version={version!r}, info_plist={{"LSBackgroundOnly": True}})
 """
 

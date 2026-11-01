@@ -185,22 +185,23 @@ async def test_focus_entries_keep_stated_durations_and_show_catalog_icons_only(t
     positions = [body.index(value) for row in FOCUS for value in row]
     assert positions == sorted(positions) and all(body.count(value) == 1 for row in FOCUS for value in row)
     # Only Python has a catalog icon; SQL and the unknown tool stay text only.
-    icons = tree.xpath('//w:body//wp:anchor', namespaces={**NS, 'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing'})
+    drawing = {**NS, 'wp': 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
+        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+    # A floating picture moves in Google Docs; each icon sits in a cell beside its text.
+    assert not tree.xpath('//w:body//wp:anchor', namespaces=drawing)
+    icons = tree.xpath('//w:body//wp:inline', namespaces=drawing)
     assert len(icons) == 1
-    anchor = icons[0]
-    position = {axis: anchor.find('{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}position' + axis)
-        for axis in 'HV'}
-    assert position['H'].get('relativeFrom') == 'column' and position['V'].get('relativeFrom') == 'paragraph'
-    embedded = anchor.xpath('.//a:blip/@r:embed', namespaces={**NS, 'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'})
+    embedded = icons[0].xpath('.//a:blip/@r:embed', namespaces=drawing)
     rels = etree.fromstring(parts(content)['word/_rels/document.xml.rels'])
     target = next(child.get('Target') for child in rels if child.get('Id') == embedded[0])
     python = icon_catalog(workspace.project.template_package).files['python']
     assert parts(content)['word/' + target] == base64.b64decode(python.bytes_base64)
-    # Each entry stays on one page: its lines keep with the next; the last line does not.
-    keep = {name: tree.xpath('string(//w:p[.//w:t[text()="%s"]]/w:pPr/w:keepNext/@w:val)' % name, namespaces=NS) for name in ['SQL', 'about 2.5 years']}
-    assert keep['SQL'] in {'', '1', 'true', 'on'} and keep['about 2.5 years'] == '0'
-    indents = {int(value) for value in tree.xpath('//w:p[.//w:t[text()="SQL" or text()="7 weeks"]]/w:pPr/w:ind/@w:left', namespaces=NS)}
-    assert indents == {round(workspace.project.template_package.recipe.style.focus.text_x * 20)}
+    # Each entry stays on one page; its text starts where the icon's cell ends.
+    row = tree.xpath('//w:tr[.//w:t[text()="SQL"]][not(.//w:tr)]', namespaces=NS)[0]
+    assert row.xpath('w:trPr/w:cantSplit', namespaces=NS) and row.xpath('w:tc[2]//w:t[text()="about 2.5 years"]', namespaces=NS)
+    grid = row.getparent().xpath('w:tblGrid/w:gridCol/@w:w', namespaces=NS)
+    assert int(grid[0]) == round(workspace.project.template_package.recipe.style.focus.text_x * 20)
+    assert {int(value) for value in row.xpath('.//w:p[w:r/w:t]/w:pPr/w:ind/@w:left', namespaces=NS)} == {0}
 
 
 @pytest.mark.asyncio

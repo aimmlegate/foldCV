@@ -51,6 +51,19 @@ async def test_a_sidecar_on_the_current_revision_is_overlaid_and_a_folded_one_is
 
 
 @pytest.mark.asyncio
+async def test_discard_removes_the_sidecar_and_accepts_a_missing_one(tmp_path):
+    fixture = RuntimeFixture(tmp_path)
+    operation = await fixture.pipeline.start(fixture.project, fixture.command)
+    saved = fixture.saved()
+    fixture.sidecar.write(fixture.project, saved.project_revision, operation, saved.pre_draft.facts)
+    path = fixture.sidecar.path(fixture.project, operation.id)
+    assert path.exists()
+    fixture.sidecar.discard(fixture.project, operation.id)
+    assert not path.exists()
+    fixture.sidecar.discard(fixture.project, operation.id)
+
+
+@pytest.mark.asyncio
 async def test_a_save_that_lost_sidecar_steps_or_a_damaged_sidecar_fences_the_reader(tmp_path):
     # P17: an older sidecar holding an attempt the project lacks means a save dropped import steps.
     fixture = RuntimeFixture(tmp_path)

@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Build the portable FoldCV Windows zip (x64, no installer, no signature) from this checkout on a Mac in one go.
 # Usage: tools/build-windows-zip.sh — the result goes to output/foldcv-windows-<version>-<commit>/.
+# FOLDCV_PUBLIC_TEMPLATES=1 builds without the private templates in templates/local.
 # Needs arm64 Node 22 (FOLDCV_NODE, else the newest nvm v22 or node on PATH) and python.org Python 3.13
 # (FOLDCV_PYTHON). Nothing Windows runs here: the CI workflow .github/workflows/windows.yml checks the zip on Windows.
 set -euo pipefail

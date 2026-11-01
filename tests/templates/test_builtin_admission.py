@@ -162,7 +162,7 @@ def test_disabled_rewriting_retains_source_display_even_if_review_accepts_a_para
     allocation = next(value for value in admitted.allocations if value.key == 'tasks-entry')
     claim = next(record for record in after.records if record.id == allocation.record_id)
     assert claim.value.value == paraphrase
-    expected = paraphrase if rewrite else 'Implemented queue processing.'
+    expected = paraphrase if rewrite else 'Implemented queue processing'
     assert claim.value.raw_text == expected
     from packages.resume_core.template_effective import builtin_effective_cells
     cell = next(cell for cell in builtin_effective_cells(after, [admitted]) if cell.id == allocation.cell_ids['value'])
@@ -236,7 +236,7 @@ def test_disabled_rewriting_shows_a_cited_line_without_its_line_break():
     src, _raw = employment_source()
     reply = employment_proposal(src)
     unit = src.units[0]
-    start = unit.text.index('Implemented queue processing.')
+    start = unit.text.index('Implemented queue processing')
     line = capture_span(src, unit, start, unit.text.index('\n', start) + 1).model_dump(by_alias=True)
     field = next(value for value in reply['fields'] if value['pointer'] == '/0/tasks/0/value')
     field['evidence'] = [line]
@@ -245,4 +245,4 @@ def test_disabled_rewriting_shows_a_cited_line_without_its_line_break():
     admitted, after = accept(operation, facts, proposed, package, src)
     allocation = next(value for value in admitted.allocations if value.key == 'tasks-entry')
     claim = next(record for record in after.records if record.id == allocation.record_id)
-    assert claim.value.raw_text == 'Implemented queue processing.'
+    assert claim.value.raw_text == 'Implemented queue processing'

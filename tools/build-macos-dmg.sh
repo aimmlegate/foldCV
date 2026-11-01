@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Build the FoldCV macOS app and its DMG from this checkout in one go (Apple Silicon, ad-hoc signature).
 # Usage: tools/build-macos-dmg.sh — the result goes to output/foldcv-macos-<version>-<commit>/.
+# FOLDCV_PUBLIC_TEMPLATES=1 builds without the private templates in templates/local.
 # Needs arm64 Node 22 (FOLDCV_NODE, else the newest nvm v22 or node on PATH) and python.org Python 3.13
 # (FOLDCV_PYTHON). The first run downloads Python packages, npm packages and Electron into .tools and node_modules.
 set -euo pipefail

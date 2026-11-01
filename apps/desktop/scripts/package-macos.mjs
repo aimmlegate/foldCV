@@ -16,8 +16,8 @@ const [helperArgument, outputArgument] = process.argv.slice(2);
 if (!helperArgument?.endsWith(".app") || !outputArgument) throw new Error("Usage: package-macos.mjs <FoldCV Helper.app> <output directory>");
 const helper = resolve(helperArgument), output = resolve(outputArgument);
 if (existsSync(output)) throw new Error("The output directory must not exist yet");
-const { version, devDependencies } = JSON.parse(await readFile(join(desktop, "package.json"), "utf8"));
-const electron = devDependencies.electron, name = "FoldCV Local";
+const { version, devDependencies, productName: name } = JSON.parse(await readFile(join(desktop, "package.json"), "utf8"));
+const electron = devDependencies.electron;
 
 function run(command, ...args) {
   const result = spawnSync(command, args, { stdio: ["ignore", "inherit", "inherit"] });
@@ -43,9 +43,9 @@ try {
     await build({ absWorkingDir: desktop, entryPoints: [entry], outfile: join(work, "app", file), bundle: true,
       platform: "node", target: "node22", format: "cjs", external: ["electron"], logLevel: "warning" });
   }
-  await writeFile(join(work, "app/package.json"), JSON.stringify({ name: "foldcv-local", version, main: "main.cjs" }) + "\n");
+  await writeFile(join(work, "app/package.json"), JSON.stringify({ name: "foldcv-beta", productName: name, version, main: "main.cjs" }) + "\n");
   const [packaged] = await packager({ dir: join(work, "app"), out: join(work, "package"), name, executableName: name,
-    platform: "darwin", arch: "arm64", electronVersion: electron, electronZipDir: cache, appBundleId: "invalid.foldcv.local",
+    platform: "darwin", arch: "arm64", electronVersion: electron, electronZipDir: cache, appBundleId: "invalid.foldcv.beta",
     appVersion: version, buildVersion: version, appCategoryType: "public.app-category.productivity", asar: true,
     prune: false, overwrite: false, icon: join(root, "assets/branding/foldcv/liquid-glass-v2/macos/FoldCV-native-olive.icns") });
   await mkdir(output, { recursive: true });

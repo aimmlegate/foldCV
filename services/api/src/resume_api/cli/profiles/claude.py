@@ -98,6 +98,7 @@ class ClaudeCliProfile:
         prompts. Temporary files stay under the operation directory."""
         return self.root / "cwd"
 
+    @property
     def windows_home(self) -> Path:
         """Home and app data of the CLI on Windows, so it does not read or write the user's own."""
         return self.root / "home"

@@ -6,6 +6,7 @@ from ..template_capture import item_identities
 from ..template_effective import builtin_effective_cells, effective_cells
 from ..template_identity import _bound_root, capture_span, line_spans, source_slice
 from ..template_import import digest
+from ..template_source_cleanup import without_contacts
 from .captured_fields import capture_fields, ownership_parents, visible_path
 from .focus import focus_durations
 from .materialize_nodes import DisplayField, fallback_style, literal, locale_text, reference, render_nodes, render_plain_fields, stable_id
@@ -235,16 +236,20 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         output = regions[declaration.placement.region]['blocks']
         # Each view shows its own placements; a line two failed blocks both cited shows once, in the first of them.
         paragraphs = []
+        rewriting = any(value.capture.allow_text_rewrite for value in operations)
         for span in subtract_spans(sources, placements.get(declaration.id, []), shown_fallback):
             shown_fallback.append(span)
             key = digest(span)
             shown = without_line_break(sources, span)
-            if shown is None or not source_slice(sources, shown).strip():
+            wording = source_slice(sources, shown) if shown is not None else ''
+            if not rewriting:
+                wording = without_contacts(wording)
+            if not wording.strip():
                 continue
             identifier = stable_id(operation_id, 'fallback', key)
             ref = reference(package, declaration.id, fallback_style(declaration),
                 stable_id(operation_id, declaration.id, 'fallback'))
-            text = literal(source_slice(sources, shown), ref)
+            text = literal(wording, ref)
             text.citations = [shown]
             paragraphs.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
                 'children': [], 'provenance': [], 'presentation': ref})

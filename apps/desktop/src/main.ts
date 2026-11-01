@@ -1,19 +1,19 @@
 import { app, BrowserWindow, dialog, Menu, screen, session, shell, type BrowserWindowConstructorOptions,
   type MenuItemConstructorOptions, type Session, type WebContents } from "electron";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { startHelper, type Helper } from "./helper.js";
 import { dataRoot, helperCommand, helperEnvironment } from "./platform.js";
-import { appUrl, externalUrl } from "./policy.js";
+import { appUrl, DOWNLOAD_DONE, externalUrl } from "./policy.js";
 
 const mac = process.platform === "darwin";
-// The service data, the CLI profile and Chromium's own storage share the root of the 0.1 builds; QA runs may set
-// FOLDCV_DESKTOP_ROOT to another absolute path.
+// The service data, the CLI profile and Chromium's own storage share one root, apart from the FoldCV Local builds;
+// QA runs may set FOLDCV_DESKTOP_ROOT to another absolute path.
 const root = dataRoot(process.platform, process.env, app.getPath("appData"));
 const log = join(root, "logs", "helper.log");
 app.setPath("userData", join(root, "electron"));
 app.setAppLogsPath(join(root, "logs"));
-if (process.platform === "win32") app.setAppUserModelId("invalid.foldcv.local");
+if (process.platform === "win32") app.setAppUserModelId("invalid.foldcv.beta");
 
 let helper: Helper | null = null, stopping: Promise<void> | null = null, finished = false;
 
@@ -27,8 +27,12 @@ function secure(owned: Session, origin: string): void {
     callback(permission === "clipboard-sanitized-write" && appUrl(details.requestingUrl, origin)));
   owned.setPermissionCheckHandler((_contents, permission, requesting) =>
     permission === "clipboard-sanitized-write" && requesting === origin);
-  owned.on("will-download", (_event, item) => {
+  owned.on("will-download", (_event, item, contents) => {
     item.setSaveDialogOptions({ defaultPath: join(app.getPath("downloads"), item.getFilename()) });
+    // The page cannot see the save dialog, so it hears here whether the file was saved.
+    item.once("done", (_done, state) => {
+      if (!contents.isDestroyed()) contents.send(DOWNLOAD_DONE, state, basename(item.getSavePath()));
+    });
   });
 }
 
@@ -67,7 +71,7 @@ const frame: BrowserWindowConstructorOptions = mac
 function createWindow(origin: string): BrowserWindow {
   const area = screen.getPrimaryDisplay().workAreaSize;
   const window = new BrowserWindow({ width: Math.min(1440, area.width), height: Math.min(960, area.height),
-    minWidth: 800, minHeight: 600, show: false, title: "FoldCV", ...frame, backgroundColor: "#eae9e2",
+    minWidth: 800, minHeight: 600, show: false, title: app.name, ...frame, backgroundColor: "#eae9e2",
     webPreferences: { preload: join(__dirname, "preload.cjs"), sandbox: true, contextIsolation: true,
       nodeIntegration: false, webSecurity: true, webviewTag: false, devTools: false, navigateOnDragDrop: false } });
   guard(window.webContents, origin);
@@ -117,11 +121,11 @@ async function start(): Promise<void> {
     helper = await startHelper(helperCommand(process.platform, process.resourcesPath, root),
       helperEnvironment(process.platform, process.env, homedir()), log);
   } catch {
-    await fatal("Не удалось запустить FoldCV.");
+    await fatal(`Не удалось запустить ${app.name}.`);
     return;
   }
   const { origin, secret } = helper.endpoint;
-  void helper.exited.then(() => { if (!stopping) void fatal("Сервис FoldCV остановился. Приложение будет закрыто."); });
+  void helper.exited.then(() => { if (!stopping) void fatal(`Сервис ${app.name} остановился. Приложение будет закрыто.`); });
   secure(session.defaultSession, origin);
   await createWindow(origin).loadURL(`${origin}/#secret=${secret}`);
 }

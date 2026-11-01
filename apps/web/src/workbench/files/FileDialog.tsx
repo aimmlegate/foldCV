@@ -4,6 +4,7 @@ import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
+import { deliveryMessage, type Delivery } from "./delivery";
 
 export type FileMode = "open" | "save" | "export";
 export function FileDialog({ mode, title, subtitle, filename, error, busy, operation, close, download, upload, templateName }: {
@@ -11,7 +12,7 @@ export function FileDialog({ mode, title, subtitle, filename, error, busy, opera
   /** The project's own captured template. */
   templateName?: string | undefined;
   operation?: string | undefined;
-  close: () => void; download: () => Promise<boolean>; upload: (file: File) => Promise<boolean>;
+  close: () => void; download: () => Promise<Delivery | null>; upload: (file: File) => Promise<boolean>;
 }) {
   const input = useRef<HTMLInputElement>(null), [message, setMessage] = useState("");
   const exporting = mode === "export", opening = mode === "open";
@@ -24,7 +25,7 @@ export function FileDialog({ mode, title, subtitle, filename, error, busy, opera
         <Button className="small" busy={busy} busyLabel={opening ? "Открываем…" : "Готовим…"} onClick={() => {
           setMessage("");
           if (opening) input.current?.click();
-          else void download().then(done => { if (done) setMessage("Скачивание началось."); });
+          else void download().then(delivery => setMessage(deliveryMessage(delivery)));
         }}><Icon name={opening ? "upload" : "download"} />{opening ? "Открыть .foldcv" : "Скачать .foldcv"}</Button>
       </div>
       {opening && <input ref={input} hidden type="file" aria-label="Файл .foldcv" accept=".foldcv" disabled={busy} onChange={event => {
@@ -34,8 +35,8 @@ export function FileDialog({ mode, title, subtitle, filename, error, busy, opera
     </>}
     <div className="operation-slot">{busy ? <OperationStatus label={operation ?? (opening ? "Открываем файл" : "Готовим файл")} timed />
       : error ? <p className="notice error" role="alert">{errorMessage(error)}</p> : message ? <OperationStatus state="success" label={message} /> : null}</div>
-    <div className="dialog-actions">{exporting ? <><button className="text-button" disabled={busy} onClick={close}>Отмена</button>
-      <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" onClick={() => { setMessage(""); void download().then(done => { if (done) setMessage("Скачивание началось."); }); }}>Скачать DOCX<Icon name="download" /></Button></>
+    <div className="dialog-actions">{exporting ? <><button className="text-button" disabled={busy} onClick={close}>{message ? "Закрыть" : "Отмена"}</button>
+      <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" onClick={() => { setMessage(""); void download().then(delivery => setMessage(deliveryMessage(delivery))); }}>Скачать DOCX<Icon name="download" /></Button></>
       : <Button disabled={busy} onClick={close}>Закрыть</Button>}
     </div>
   </Dialog>;

@@ -42,9 +42,11 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
     const asset = id === null ? undefined : assets.get(id);
     return asset ? `"fcv-${asset.sha256.slice(0, 24)}"` : null;
   };
+  // An italic face is declared as one: the browser then slants only the upright face that stands in for letters it lacks.
+  const italics = new Set(Object.values(plan.styles).flatMap(style => [style.faces.italic, style.faces.boldItalic]));
   const rules = plan.fonts.flatMap(id => {
-    const asset = assets.get(id);
-    return asset ? [`@font-face { font-family: ${family(id) ?? ""}; src: url("${assetUrl(asset)}") format("truetype"); font-display: block; }`] : [];
+    const asset = assets.get(id), slant = italics.has(id) ? " font-style: italic;" : "";
+    return asset ? [`@font-face { font-family: ${family(id) ?? ""};${slant} src: url("${assetUrl(asset)}") format("truetype"); font-display: block; }`] : [];
   });
   const styles = new Map<string, string>();
   Object.entries(plan.styles).forEach(([key, style], index) => {

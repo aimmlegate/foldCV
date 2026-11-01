@@ -36,8 +36,9 @@ export function sourceUrl(value: string): string | null {
   catch { return null; }
 }
 export type DrawerSize = { collapsed: boolean; height: number };
+export const drawerHeights = { minimum: 200, maximum: 720 };
 export function drawerSize(value: unknown): DrawerSize {
   if (typeof value !== "object" || value === null) return { collapsed: true, height: 320 };
   return { collapsed: "collapsed" in value && typeof value.collapsed === "boolean" ? value.collapsed : true,
-    height: "height" in value && typeof value.height === "number" && Number.isFinite(value.height) ? Math.max(200, Math.min(520, value.height)) : 320 };
+    height: "height" in value && typeof value.height === "number" && Number.isFinite(value.height) ? Math.max(drawerHeights.minimum, Math.min(drawerHeights.maximum, value.height)) : 320 };
 }
