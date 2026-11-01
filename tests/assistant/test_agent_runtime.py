@@ -98,10 +98,14 @@ def test_all_native_server_requests_get_correlated_denial_and_bounded_failure(me
 
 @pytest.mark.parametrize(("method", "code"), [("model/rerouted", "AGENT_MODEL_REROUTED"),
     ("thread/compacted", "AGENT_UNEXPECTED_COMPACTION"), ("hook/started", "AGENT_PROTOCOL"),
-    ("future/write", "AGENT_PROTOCOL")])
+    ("item/commandExecution/outputDelta", "AGENT_PROTOCOL")])
 def test_state_changing_notifications_fail_closed(method, code):
     with pytest.raises(AgentFailure, match=code):
         NativeSession(input_value(), threading.Event(), lambda *_: None).accept(frame(None, method, {}))
+
+
+def test_a_notice_of_a_newer_cli_is_skipped():
+    assert NativeSession(input_value(), threading.Event(), lambda *_: None).accept(frame(None, "future/notice", {})) is None
 
 
 def captured_settings(value, cwd):

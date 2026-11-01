@@ -23,7 +23,7 @@ from resume_api.cli.experimental_profile import ExperimentalProfileError
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked, INFERENCE
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import strict_json
+from resume_api.providers.codex_cli import ACTION_METHODS, strict_json
 from resume_api.profile_ownership import native_profile
 from resume_api.agent.host_profile import CODE_MODE_HOST, TOKEN_ENV
 
@@ -437,8 +437,9 @@ class NativeSession:
                 raise AgentFailure("AGENT_PROTOCOL")
             if method == "account/updated" and params.get("authMode") not in {None, "chatgpt"}:
                 raise AgentFailure("AGENT_AUTH_REQUIRED")
-        else:
+        elif method.startswith(ACTION_METHODS):
             raise AgentFailure("AGENT_PROTOCOL")
+        # Anything else is a newer CLI's notice: `accept` refuses server requests.
         return None
 
     def limit_text(self, text):

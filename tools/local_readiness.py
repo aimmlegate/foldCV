@@ -121,7 +121,7 @@ def check_cli(executable: Path | None = None) -> str:
     try:
         qualify(version)
     except QualificationError:
-        return "CLI version is outside the supported range; manual editing and rendering are ready."
+        return "This CLI build cannot be used; manual editing and rendering are ready."
 
     from resume_api.connection import ConnectionAdapter, ConnectionFailure
     from resume_api.launcher import trusted_temp_root
@@ -136,7 +136,7 @@ def check_cli(executable: Path | None = None) -> str:
             raise ReadinessError("CLI metadata process cleanup failed; inspect owned operations before launching.") from None
         messages = {
             "CLI_MISSING": "CLI absent; manual editing and rendering are ready.",
-            "UNSUPPORTED_VERSION": "CLI version is outside the supported range; manual editing and rendering are ready.",
+            "UNSUPPORTED_VERSION": "This CLI build cannot be used; manual editing and rendering are ready.",
             "LOGIN_REQUIRED": "CLI native login is absent; manual editing and rendering are ready.",
             "API_KEY_MODE": "CLI is not in native ChatGPT login mode; manual editing and rendering are ready.",
         }

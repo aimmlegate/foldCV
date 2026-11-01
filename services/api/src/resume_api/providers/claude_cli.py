@@ -44,16 +44,19 @@ ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHA
 # `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while (MP05-2).
 NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
 FORBIDDEN = {"compact_boundary", "permission_denied"}
+MODEL_EVENTS = {"assistant", "user", "result"}
 # The stream repeats the reply (each tool call of a schema retry, then the result) and adds thinking. Only the final
 # line counts against the reply budget, as Codex's one final message does; this keeps the whole stream bounded.
 STREAM_MULTIPLE = 8
 LOG = logging.getLogger(__name__)
 
 
-def _unknown(label: str) -> ContentFailure:
-    # Names only the event kind, never its content: a new CLI event is otherwise just INVALID_RESULT.
-    LOG.warning("Claude stream event refused: %s", label)
-    return ContentFailure("INVALID_RESULT")
+def skipped(seen: set[str], label: str) -> None:
+    """A newer CLI adds events of its own, so an unknown one is skipped: tools only ever run through assistant blocks.
+    The log names the kind once a run, never its content."""
+    if label not in seen:
+        seen.add(label)
+        LOG.warning("Claude stream event skipped: %s", label)
 
 
 def _usage(raw: object) -> ReportedUsage:
@@ -83,6 +86,7 @@ class ClaudeEvents:
         self.error: str | None = None
         self.output = False
         self.final_bytes = 0
+        self.skipped: set[str] = set()
 
     @property
     def renewal(self) -> bool:
@@ -91,9 +95,16 @@ class ClaudeEvents:
 
     def accept(self, raw: bytes) -> None:
         event = strict_json(raw, max_bytes=self.max_bytes)
-        if not isinstance(event, dict) or not isinstance(event.get("type"), str) or self.complete:
+        if not isinstance(event, dict) or not isinstance(event.get("type"), str):
             raise ContentFailure("INVALID_RESULT")
         kind, subtype = event["type"], event.get("subtype")
+        if kind == "rate_limit_event" or kind == "system" and subtype in NOTICES:
+            return
+        if kind not in MODEL_EVENTS and not (kind == "system" and (subtype == "init" or subtype in FORBIDDEN)):
+            skipped(self.skipped, f"system/{subtype}" if kind == "system" else kind)
+            return
+        if self.complete:
+            raise ContentFailure("INVALID_RESULT")
         if kind == "system" and subtype == "init" and not self.started:
             try:
                 if self.check is not None:
@@ -108,18 +119,15 @@ class ClaudeEvents:
             raise ContentFailure("INVALID_RESULT")
         elif kind == "system" and subtype in FORBIDDEN:
             raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
-        elif kind in {"system", "rate_limit_event"}:
-            if kind == "system" and subtype not in NOTICES:
-                raise _unknown(f"system/{subtype}")
+        elif kind == "system":
+            raise ContentFailure("INVALID_RESULT")  # a second init
         elif kind == "assistant":
             self._assistant(event)
         elif kind == "user":
             self._user(event)
-        elif kind == "result":
+        else:
             self.final_bytes = len(raw)
             self._result(event)
-        else:
-            raise _unknown(kind)
 
     def _assistant(self, event: dict) -> None:
         message = event.get("message")
@@ -139,8 +147,12 @@ class ClaudeEvents:
                         or not isinstance(identifier, str)):
                     raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
                 self.tool_ids.add(identifier)
+            elif not isinstance(kind, str):
+                raise ContentFailure("INVALID_RESULT")
+            elif "tool" in kind:
+                raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")  # server_tool_use, mcp_tool_use and the like
             elif kind not in {"text", "thinking", "redacted_thinking"}:
-                raise _unknown(f"assistant block {kind}")
+                skipped(self.skipped, f"assistant block {kind}")
 
     def _user(self, event: dict) -> None:
         message = event.get("message")
@@ -302,10 +314,10 @@ class ClaudeCliProvider:
         except ProcessExit:
             raise ContentFailure("CLI_UNSUPPORTED") from None
         status = profile_rules.COMPATIBILITY.status(version)
-        if status in {"unsupported", "broken"}:
+        # A missing flag is the one real limit: the profile cannot confine this CLI, whatever its number says.
+        missing = qualification.missing_flags(raw_help.decode("utf-8", "replace"), profile_rules.REQUIRED_FLAGS)
+        if status == "broken" or missing:
             raise ContentFailure("CLI_UNSUPPORTED")
-        if qualification.missing_flags(raw_help.decode("utf-8", "replace"), profile_rules.REQUIRED_FLAGS):
-            raise ContentFailure("CLI_PROFILE_UNSAFE")
         try:
             stdout, _ = self._run(files, ("auth", "status", "--json"), end, cancel)
         except ProcessExit as error:

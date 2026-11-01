@@ -98,10 +98,10 @@ def test_local_readiness_reports_renderer_failure(pinned_host, monkeypatch, code
 def test_unsupported_cli_version_never_checks_login(tmp_path):
     calls = tmp_path / "calls"
     cli = tmp_path / "codex"
-    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.161.0\\n'\n",
+    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'not-codex 1.0.0\\n'\n",
                    encoding="utf-8")
     cli.chmod(0o700)
-    assert "outside the supported range" in readiness.check_cli(cli)
+    assert "build cannot be used" in readiness.check_cli(cli)
     assert calls.read_text(encoding="utf-8") == "--version\n"
 
 
@@ -118,12 +118,12 @@ def test_entrypoint_handles_cli_path_with_spaces_without_login(tmp_path):
     directory.mkdir()
     calls = directory / "calls"
     cli = directory / "codex"
-    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'codex-cli 0.161.0\\n'\n",
+    cli.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$1\" >> '{calls}'\nprintf 'not-codex 1.0.0\\n'\n",
                    encoding="utf-8")
     cli.chmod(0o700)
     result = run_local("--check", "--codex-executable", str(cli), ready=True)
     assert result.returncode == 0
-    assert "outside the supported range" in result.stderr
+    assert "build cannot be used" in result.stderr
     assert "http://" not in result.stdout
     assert calls.read_text(encoding="utf-8") == "--version\n"
 

@@ -15,7 +15,7 @@ from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import MODEL, PLAN, strict_json
+from resume_api.providers.codex_cli import ACTION_METHODS, MODEL, PLAN, strict_json
 from resume_api.cli.profile import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
 
@@ -199,14 +199,14 @@ class ConnectionAdapter:
             if not isinstance(message, dict):
                 raise ConnectionFailure("METADATA_FAILED")
             if "method" in message:
-                if message.get("method") in {"remoteControl/status/changed", "account/rateLimits/updated"} and "id" not in message:
-                    return None
-                if message.get("method") == "account/updated" and "id" not in message:
+                # A server request has no answer here, and hooks and items report an action; the rest are notices.
+                if "id" in message or str(message.get("method")).startswith(ACTION_METHODS):
+                    raise ConnectionFailure("METADATA_FAILED")
+                if message.get("method") == "account/updated":
                     params = message.get("params")
                     if not isinstance(params, dict) or params.get("authMode") != "chatgpt":
                         raise ConnectionFailure("API_KEY_MODE")
-                    return None
-                raise ConnectionFailure("METADATA_FAILED")
+                return None
             if message.get("id") != stage:
                 raise ConnectionFailure("METADATA_FAILED")
             if stage == 3 and "error" in message:

@@ -1,4 +1,6 @@
-"""Qualify a user-installed CLI by publisher signature and a version table, not by exact pins."""
+"""Qualify a user-installed CLI by publisher signature and what it can do, not by its version number.
+
+Only a release listed as broken is refused by its number; `last_tested` is a notice."""
 
 from __future__ import annotations
 
@@ -10,7 +12,7 @@ import subprocess
 from typing import Literal
 
 
-Status = Literal["supported", "graceful", "unsupported", "broken"]
+Status = Literal["supported", "graceful", "broken"]
 _VERSION = re.compile(r"(?:^|\s)v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\s|$)")
 
 
@@ -55,15 +57,12 @@ class Version:
 
 @dataclass(frozen=True)
 class Compatibility:
-    floor: str
     last_tested: str
     broken: tuple[str, ...] = ()
 
     def status(self, version: Version) -> Status:
         if any(version.key() == Version.parse(item).key() for item in self.broken):
             return "broken"
-        if version < Version.parse(self.floor):
-            return "unsupported"
         return "supported" if version <= Version.parse(self.last_tested) else "graceful"
 
 

@@ -64,6 +64,10 @@ if args and args[0] == "app-server":
                 sys.exit(0)
             if case == "metadata_tool":
                 emit({"method": "item/started", "params": {"type": "command_execution"}})
+            if case == "metadata_request":
+                emit({"id": "server_1", "method": "future/ask", "params": {}})
+            if case == "metadata_notice":
+                emit({"method": "future/notice", "params": {}})
             emit({"method": "remoteControl/status/changed", "params": {"status": "disabled"}})
         elif method == "initialized":
             continue
@@ -244,7 +248,9 @@ if case == "intermediate_invalid_final":
 if case == "out_of_order":
     events.reverse()
 if case == "unknown_event":
-    events[2] = {"type": "unknown.event"}
+    events.insert(0, {"type": "unknown.event"})
+    events.insert(3, {"type": "unknown.event"})
+    events.append({"type": "unknown.event"})
 raw = "".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events).encode()
 if case in ("utf16", "utf32"):
     encoding = "utf-16-le" if case == "utf16" else "utf-32-le"

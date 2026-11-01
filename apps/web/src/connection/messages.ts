@@ -7,7 +7,7 @@ export function connectionMessage(state: ConnectionState, { display, subscriptio
     unchecked: "Подключение не проверено.", detached: `Модель отключена. Вход в ${display} остаётся.`,
     cli_missing: `${display} не найден. Установите его.`,
     launcher_unsupported: `Нужна совместимая версия ${display}.`,
-    unsupported_version: `Эта версия ${display} не поддерживается.`,
+    unsupported_version: `Установленный ${display} не подходит.`,
     login_required: `Войдите через ${subscription}.`,
     api_key_mode: `Вход выполнен по API-ключу, а нужна подписка ${subscription}.`,
     metadata_failed: "Не удалось получить сведения об аккаунте и моделях. Повторите проверку.",

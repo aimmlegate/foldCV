@@ -35,7 +35,7 @@ DISABLED_FEATURES = (
 TEAM_ID = "2DC432GLL2"
 IDENTIFIER = "codex"
 HOST_IDENTIFIER = "codex-code-mode-host"
-COMPATIBILITY = Compatibility(floor="0.162.0-alpha.2", last_tested="0.163.0-alpha.11.1")
+COMPATIBILITY = Compatibility(last_tested="0.163.0-alpha.11.1")
 # `features list` reports unified_exec on even with `--disable unified_exec` (0.163.0-alpha.11.1);
 # the exec grammar aborts on any tool item instead.
 REQUIRED_OFF = tuple(name for name in DISABLED_FEATURES if name != "unified_exec")
@@ -43,11 +43,11 @@ _FEATURE = re.compile(r"([a-z0-9_.]+)\s+\S.*?\s+(true|false)\s*")
 
 
 def qualify(banner: str) -> Status:
-    """Status of a `codex-cli <semver>` banner; below the floor or broken is unsupported."""
+    """Status of a `codex-cli <semver>` banner; a foreign banner or a listed broken release is refused."""
     if len(banner) > 80 or not banner.startswith("codex-cli "):
         raise QualificationError("CLI_UNSUPPORTED")
     status = COMPATIBILITY.status(Version.parse(banner.removeprefix("codex-cli ")))
-    if status in {"unsupported", "broken"}:
+    if status == "broken":
         raise QualificationError("CLI_UNSUPPORTED")
     return status
 

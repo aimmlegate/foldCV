@@ -86,10 +86,14 @@ if case == "init_mcp":
 if case == "init_model":
     init["model"] = "claude-other"
 if case == "init_plugin":
-    init["plugins"] = [{"name": "new-builtin", "path": "builtin", "source": "new-builtin@builtin"}]
+    init["plugins"] = [{"name": "other", "path": "/plugins/other", "source": "other@market"}]
 if case == "init_key":
     init["apiKeySource"] = "ANTHROPIC_API_KEY"
+if case == "early_notice":
+    emit({"type": "system", "subtype": "new_notice"})
 emit(init)
+if case == "second_init":
+    emit(init)
 if case == "hang":
     (base / "ready").touch()
     while True:
@@ -100,7 +104,9 @@ emit({"type": "system", "subtype": "api_retry", "attempt": 1, "error": "overload
      {"type": "rate_limit_event", "rate_limit_info": {"status": "allowed"}})
 emit({"type": "system", "subtype": "thinking_tokens", "estimated_tokens": 64, "estimated_tokens_delta": 64})
 if case == "unknown_notice":
-    emit({"type": "system", "subtype": "new_notice"})
+    for _ in range(2):
+        emit({"type": "system", "subtype": "new_notice", "detail": "synthetic-secret"})
+        emit({"type": "new_event", "detail": "synthetic-secret"})
 usage = {"input_tokens": 12, "cache_creation_input_tokens": 3, "cache_read_input_tokens": 5, "output_tokens": 7}
 
 
@@ -138,9 +144,10 @@ if case == "repair" and count == 1:
     value = config["invalid"]
 if structured:
     tool = "Bash" if case == "tool" else "StructuredOutput"
+    extra = {"new_block": [{"type": "new_block"}], "server_tool": [{"type": "server_tool_use"}]}.get(case, [])
     emit({"type": "assistant", "parent_tool_use_id": None,
           "message": {"role": "assistant", "model": model, "content": [
-              {"type": "thinking", "thinking": "", "signature": "x"},
+              *extra, {"type": "thinking", "thinking": "", "signature": "x"},
               {"type": "tool_use", "id": "t-1", "name": tool, "input": value}]}})
     emit({"type": "user", "parent_tool_use_id": None, "message": {"role": "user", "content": [
         {"type": "tool_result", "tool_use_id": "t-1", "content": "Structured output provided successfully"}]}})
@@ -150,6 +157,8 @@ if structured:
     if case == "incomplete":
         sys.exit(0)
     result(result="", structured_output=None if case == "no_output" else value)
+    if case == "late_notice":
+        emit({"type": "system", "subtype": "new_notice"})
 else:
     text = config.get("text", "plain answer")
     emit({"type": "assistant", "parent_tool_use_id": None,
