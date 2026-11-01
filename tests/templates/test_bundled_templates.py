@@ -14,6 +14,7 @@ from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.presentation import project_presentation
+from packages.resume_core.templates.projection import validate_payload
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, shipped_templates
 from tests.templates.generic_fixtures import generic_import, f10
 from tests.templates.test_captured_docx import NS, emitted, xml
@@ -21,7 +22,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = '1d1c2166d593376052371eb23077e0d7c488fe802d81959019560932117ddaab'
+TWO_COLUMN_HASH = 'ab6f43b7907cef28a0e16913ff24d88e09f9101e49c5b0e8af04f0e0ed201ab8'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 
 
@@ -34,6 +35,14 @@ def test_the_two_column_package_keeps_its_exact_hash_in_the_shared_folder():
     # Captured projects and the template store name this hash; moving the files must not change a byte of it.
     assert next(iter(BUNDLED_TEMPLATES)) == 'generic-two-column' and BUNDLED_TEMPLATE == BUNDLED_TEMPLATES['generic-two-column']
     assert compile_template(BUNDLED_TEMPLATE).package_hash == TWO_COLUMN_HASH
+
+
+@pytest.mark.parametrize('template', list(BUNDLED_TEMPLATES))
+@pytest.mark.parametrize('block', ['programming', 'data_and_tools', 'infrastructure', 'role_tools'])
+def test_a_long_technology_list_stays_a_valid_reply(template, block):
+    # A list limit refuses the whole reply: 41 tools of 40 lost the repair that added the two a review found missing.
+    schema = next(item.full_schema for item in compile_template(BUNDLED_TEMPLATES[template]).blocks if item.id == block)
+    validate_payload(schema, {'items': [f'Tool {index}' for index in range(120)]})
 
 
 def test_the_two_column_template_uses_the_foldcv_logo_and_no_footer_text():

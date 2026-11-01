@@ -15,9 +15,10 @@ from resume_api.providers.content import ContentFailure
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('repair', ['primary', 'fallback', 'fallback_failure', 'fallback_unavailable', 'no_fallback'])
-async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, repair):
-    fixture = RuntimeFixture(tmp_path, fallback=repair != 'no_fallback')
+@pytest.mark.parametrize('repair', ['primary', 'fallback', 'fallback_failure', 'fallback_unavailable', 'no_fallback',
+    'no_fallback_refused', 'no_fallback_reviewed'])
+async def test_repairs_keep_siblings_and_use_only_captured_models(tmp_path, repair):
+    fixture = RuntimeFixture(tmp_path, fallback=not repair.startswith('no_fallback'))
     rejected, reviews, models = [], [], []
     def script(request, value):
         models.append(request.policy.model)
@@ -25,7 +26,7 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
             reviews.append(value)
             if not rejected:
                 rejected.extend(allocation['cellIds']['journal'] for allocation in value['handleMap'] if allocation['key'] == 'b')
-            fail = len(reviews) == 1 or repair == 'fallback_failure'
+            fail = len(reviews) == 1 or repair in {'fallback_failure', 'no_fallback_reviewed'}
             return {'results': [{'ruleId': target['ruleId'], 'targetId': target['targetId'],
                 'disposition': 'violation' if fail and target['targetId'] in rejected else 'satisfied',
                 'reason': 'Journal is not supported by source' if fail and target['targetId'] in rejected else '',
@@ -35,8 +36,10 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
             result['payload'][1]['journal'] = 'Invented journal'
             return result
         assert value['feedback'] and all(item['ruleId'] and item['targetId'] and item['reason'] for item in value['feedback'])
-        if repair in {'fallback', 'fallback_unavailable', 'no_fallback'} and value['slot'] == 'primary_repair':
+        if repair in {'fallback', 'fallback_unavailable', 'no_fallback', 'no_fallback_refused'} and value['slot'] == 'primary_repair':
             return '{invalid primary repair'
+        if repair == 'no_fallback_refused' and value['slot'] == 'fallback_repair':
+            return '{invalid second repair'
         if repair == 'fallback_unavailable' and value['slot'] == 'fallback_repair':
             raise ContentFailure('MODEL_DENIED', logical_attempts=0, cleanup_verified=True,
                 dispatch_witness={'transport': 'controlled', 'neverDispatched': True})
@@ -44,7 +47,7 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
         result['discoveries'], result['lineage'] = [], []
         for field in result['fields']:
             field['item'] = {'kind': 'handle', 'itemHandle': handles[field['item']['key']]}
-        if repair == 'fallback_failure':
+        if repair in {'fallback_failure', 'no_fallback_reviewed'}:
             # A reworded journal is the model's to check; the verbatim one would be settled by the coordinator (D115).
             result['payload'][1]['journal'] = 'Queue Review Quarterly'
         return result
@@ -56,7 +59,7 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
     assert len(facts.extensions) == 2
     assert facts.extensions[0].cells[0].revision == 1
     assert next(value for value in facts.observations if value.typed_value == 'Invented journal').admission == 'rejected'
-    if repair in {'primary', 'fallback'}:
+    if repair in {'primary', 'fallback', 'no_fallback'}:
         assert not operation.issues and operation.tasks[0].state == 'accepted'
         assert next(cell for record in facts.extensions for cell in record.cells if cell.id == rejected[0]).typed_value == 'Queue Review'
         assert len(operation.receipts) == 2 and reviews[0] != reviews[-1]
@@ -71,7 +74,8 @@ async def test_repairs_keep_siblings_and_use_only_configured_slots(tmp_path, rep
         assert operation.issues and operation.tasks[0].state == 'accepted'
         assert operation.task_results[0].disposition == 'source_fallback'
         assert rejected[0] not in {cell.id for record in facts.extensions for cell in record.cells}
-        assert len(fixture.transport.calls) == (3 if repair == 'no_fallback' else 4 if repair == 'fallback_unavailable' else 6)
+        assert len(fixture.transport.calls) == (6 if repair == 'fallback_failure' else 4)
+        assert 'исправить её автоматически не удалось' in operation.issues[0].message
         if repair == 'fallback_unavailable':
             assert operation.attempts[-1].state == 'released' and operation.cleanup_records[-1].never_dispatched
     assert ('synthetic-fallback' in models) == (repair in {'fallback', 'fallback_failure', 'fallback_unavailable'})

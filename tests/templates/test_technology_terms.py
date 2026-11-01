@@ -35,9 +35,7 @@ def test_sentences_descriptions_and_line_breaks_are_refused(block, item, rule):
     assert error.value.rule[0] == rule
 
 
-def test_a_block_lists_at_most_forty_names_and_key_skills_stay_phrases():
-    with pytest.raises(SchemaFailure):
-        validate_payload(schema('data_and_tools'), {'items': ['Tool ' + str(index) for index in range(41)]})
+def test_key_skills_stay_phrases():
     # Analyst skills are phrases by design; only named technologies are limited.
     validate_payload(schema('key_skills'), {'items': ['Сбор и анализ требований: интервью, workshops, BPMN-моделирование процессов']})
 

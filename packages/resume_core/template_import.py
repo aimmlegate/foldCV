@@ -337,8 +337,8 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     if slot in GENERATION_SLOTS:
         if any(attempt.slot == slot for attempt in prior):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
-        expected = result.capture.fallback if slot == 'fallback_repair' else result.capture.primary
-        if expected is None or not same_captured_model(model, expected):
+        expected = (result.capture.fallback or result.capture.primary) if slot == 'fallback_repair' else result.capture.primary
+        if not same_captured_model(model, expected):
             raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
         if slot != 'initial' and not any(attempt.slot == 'initial' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REPAIR_WITHOUT_INITIAL')

@@ -18,7 +18,7 @@ OPERATION_TITLES = {'partition_employment': 'Опыт по проектам', 's
     'preserve_stated_text': 'Исходные формулировки'}
 UNTITLED_BLOCK = 'Шапка'
 CALLED = {'initial': 'Извлекаем данные', 'review': 'Проверяем результат',
-    'primary_repair': 'Исправляем ответ', 'fallback_repair': 'Исправляем ответ резервной моделью',
+    'primary_repair': 'Исправляем ответ', 'fallback_repair': 'Исправляем ответ ещё раз',
     'replacement_review': 'Проверяем исправление', 'outline': 'Размечаем записи',
     'outline_review': 'Проверяем разметку записей'}
 RETURNED = {'completed': 'Ответ получен', 'timed_out': 'Нет ответа в срок',

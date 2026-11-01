@@ -139,7 +139,7 @@ OUTLINE_REMARK = 'Разметка записей блока под вопрос
 OUTLINE_UNCHECKED = 'Проверка полноты записей блока не завершилась.'
 
 
-FALLBACK_MESSAGES = {'content_violation': 'проверка нашла ошибку в извлечённых данных.',
+FALLBACK_MESSAGES = {'content_violation': 'проверка нашла ошибку в извлечённых данных, исправить её автоматически не удалось.',
     'uncertain_interpretation': 'проверка не подтвердила извлечённые данные.',
     'check_not_completed': 'проверку извлечённых данных не удалось завершить.'}
 EMPTY_FALLBACK = 'Блок не заполнен: данные не удалось извлечь и проверить. Исходный текст сохранён в оригинале.'
@@ -630,7 +630,7 @@ class TemplatePipeline:
             spawned = await self.outline(project, operation_id, task_id, deadline, cancel)
             if spawned is not None:
                 return spawned
-        feedback, unresolved, previous, previous_receipt = (), [], None, None
+        feedback, unresolved, previous, previous_receipt, repair_reviewed = (), [], None, None, False
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
@@ -638,7 +638,8 @@ class TemplatePipeline:
                 and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
             if slot != 'initial' and not feedback:
                 break
-            if slot == 'fallback_repair' and operation.capture.fallback is None:
+            # Without a fallback model, a repair that never reached its review gets one more try on the import model.
+            if slot == 'fallback_repair' and operation.capture.fallback is None and repair_reviewed:
                 break
             if existing is not None and existing.state == 'outcome_unknown':
                 break
@@ -770,7 +771,7 @@ class TemplatePipeline:
             except (TemplateImportFailure, ValueError) as error:
                 unresolved.append(getattr(error, 'code', 'IMPORT_REVIEW_INVALID'))
                 break
-            feedback, previous, previous_receipt = decision.feedback, proposal, receipt
+            feedback, previous, previous_receipt, repair_reviewed = decision.feedback, proposal, receipt, slot != 'initial'
             # A clean repair that was not better leaves the first reply and its findings in place.
             if not decision.unresolved_target_ids and not kept_first[0]:
                 await self.finish_admitted(project, operation_id, task_id, proposal)
@@ -949,7 +950,7 @@ class TemplatePipeline:
         await asyncio.to_thread(self.guard, project, operation)
         remaining = deadline.remaining(operation, self.wall(), self.elapsed())
         # Every call runs the model and effort chosen for the import (D114 removed the block-level effort).
-        policy = (review.policy if review is not None else operation.capture.fallback if slot == 'fallback_repair'
+        policy = (review.policy if review is not None else (operation.capture.fallback or operation.capture.primary) if slot == 'fallback_repair'
             else (operation.capture.review or operation.capture.primary) if slot == 'outline_review' else operation.capture.primary)
         launch_owner = self.transport.reserve_owner(operation, task_in(operation, task_id), policy)
         reserved = []

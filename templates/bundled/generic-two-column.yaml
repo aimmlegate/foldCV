@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 1.0.0
+  revision: 1.1.0
   name: Две колонки
   default_locale: ru
 model:
@@ -433,7 +433,6 @@ blocks:
         pattern: ^[^:;\n]+$
         description: One technology, tool or library name exactly as the source writes it, such as Go, Laravel 5.1 or React.
           Never a sentence, a description of how it was used, or experience.
-      maxItems: 40
   facts:
     programming: [items/*=display]
   extract:
@@ -471,7 +470,6 @@ blocks:
         pattern: ^[^:;\n]+$
         description: One technology, tool or library name exactly as the source writes it, such as PostgreSQL or Kafka 4.0.
           Never a sentence, a description of how it was used, or experience.
-      maxItems: 40
   facts:
     data_and_tools: [items/*=display]
   extract:
@@ -508,7 +506,6 @@ blocks:
         pattern: ^[^:;\n]+$
         description: One technology, tool or library name exactly as the source writes it, such as Docker Compose, Kubernetes or Ubuntu 22.04.
           Never a sentence, a description of how it was used, or experience.
-      maxItems: 40
   facts:
     infrastructure: [items/*=display]
   extract:
@@ -568,7 +565,6 @@ blocks:
         pattern: ^[^:;\n]+$
         description: One technology, tool or library name exactly as the source writes it, such as PostgreSQL or Kafka 4.0.
           Never a sentence, a description of how it was used, or experience.
-      maxItems: 40
   facts:
     role_tools: [items/*=display]
   extract:
