@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import json
+import logging
 import math
 from pathlib import Path
 import re
@@ -40,6 +41,11 @@ MAX_SCHEMA = 65_536
 MAX_RESULT = 65_536
 MAX_DEPTH = 32
 REPAIR_FEEDBACK = "The completed response was invalid JSON or did not match the schema. Return only a valid JSON object matching the schema."
+# What `exec --json` sends today. A newer CLI adds events of its own; tools only ever run as items, which stay checked.
+EXEC_EVENTS = frozenset({"thread.started", "turn.started", "item.started", "item.updated", "item.completed",
+                         "turn.completed", "error", "turn.failed"})
+ACTION_METHODS = ("hook/", "item/")
+LOG = logging.getLogger(__name__)
 _GENERATION_LOCK = INFERENCE
 
 
@@ -125,12 +131,20 @@ class Events:
         self.text: str | None = None
         self.message_ids: set[str] = set()
         self.usage = ReportedUsage()
+        self.skipped: set[str] = set()
 
     def accept(self, raw: bytes) -> None:
         event = strict_json(raw, max_bytes=self.max_bytes)
-        if not isinstance(event, dict) or not isinstance(event.get("type"), str) or self.complete:
+        if not isinstance(event, dict) or not isinstance(event.get("type"), str):
             raise ContentFailure("INVALID_RESULT")
         kind = event["type"]
+        if kind not in EXEC_EVENTS:
+            if kind not in self.skipped:
+                self.skipped.add(kind)
+                LOG.warning("Codex stream event skipped: %s", kind)
+            return
+        if self.complete:
+            raise ContentFailure("INVALID_RESULT")
         if kind == "thread.started" and not self.thread and not self.turn:
             self.thread = True
         elif kind == "turn.started" and self.thread and not self.turn:
@@ -317,14 +331,14 @@ class CodexCliProvider:
             if not isinstance(event, dict):
                 raise ContentFailure("METADATA_FAILED")
             if "method" in event:
-                if event.get("method") == "remoteControl/status/changed" and "id" not in event:
-                    return None
-                if event.get("method") == "account/updated" and "id" not in event:
+                # A server request has no answer here, and hooks and items report an action; the rest are notices.
+                if "id" in event or str(event.get("method")).startswith(ACTION_METHODS):
+                    raise ContentFailure("METADATA_FAILED")
+                if event.get("method") == "account/updated":
                     params = event.get("params")
-                    if isinstance(params, dict) and params.get("authMode") == "chatgpt":
-                        return None
-                    raise ContentFailure("AUTH_MODE_MISMATCH")
-                raise ContentFailure("METADATA_FAILED")
+                    if not isinstance(params, dict) or params.get("authMode") != "chatgpt":
+                        raise ContentFailure("AUTH_MODE_MISMATCH")
+                return None
             if event.get("id") != state["id"] or "error" in event or not isinstance(event.get("result"), dict):
                 raise ContentFailure("METADATA_FAILED")
             result = event["result"]

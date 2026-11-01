@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import getpass
 import json
 import os
 from pathlib import Path
@@ -15,7 +16,7 @@ from resume_api.cli.qualification import Compatibility
 KIND = "claude_cli"
 TEAM_ID = "Q6L2SF6YDW"
 IDENTIFIER = "com.anthropic.claude-code"
-COMPATIBILITY = Compatibility(floor="2.1.302", last_tested="2.1.308")
+COMPATIBILITY = Compatibility(last_tested="2.1.308")
 # Flags that `--help` lists; `--max-turns` is parsed and documented but hidden from `--help` (2.1.308).
 REQUIRED_FLAGS = (
     "--print", "--output-format", "--verbose", "--json-schema", "--model", "--effort", "--restricted",
@@ -29,7 +30,8 @@ STRUCTURED_TOOLS = ("StructuredOutput",)
 STRUCTURED_MAX_TURNS = 4
 SYSTEM_PROMPT = ("Follow the user's instructions exactly. Return the result only through the structured "
                  "output; do not add commentary.")
-# Built-in plugins seen in 2.1.308; a new one fails the system/init check instead of loading silently.
+# Built-in plugins seen in 2.1.308. A new one adds nothing the system/init check does not see: it reports tools, skills,
+# commands and MCP servers on their own, and hooks stay off.
 SETTINGS = {"disableAllHooks": True,
             "enabledPlugins": {"cc-plugin-agents-md@builtin": False, "cc-plugin-plugin-authoring@builtin": False}}
 STRIPPED = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN")
@@ -121,9 +123,11 @@ class ClaudeCliProfile:
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
 
     def environment(self, operation: Path) -> dict[str, str]:
-        user = os.environ.get("USER") or os.environ.get("LOGNAME")
-        if not user:
-            raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
+        # The desktop shell starts the service without USER, so the name also comes from the system account.
+        try:
+            user = getpass.getuser()
+        except OSError:
+            raise ClaudeProfileError("CLI_PROFILE_UNSAFE") from None
         # USER selects the keychain account; without it the CLI reports "not logged in".
         return {"PATH": "/usr/bin:/bin", "HOME": str(self.home), "USER": user, "LOGNAME": user,
                 "LANG": "en_US.UTF-8", "LC_ALL": "en_US.UTF-8", "TMPDIR": str(operation / "tmp"),
@@ -222,6 +226,10 @@ def check_init(event: dict, *, model: str, version: str, tools: tuple[str, ...],
                 "skills": [], "plugins": [], "permissionMode": "dontAsk", "model": model,
                 "apiKeySource": "none", "claude_code_version": version}
     actual = {key: sorted(event.get(key) or []) if key == "tools" else event.get(key) for key in expected}
+    plugins = event.get("plugins")
+    if isinstance(plugins, list):
+        actual["plugins"] = [item for item in plugins if not (isinstance(item, dict)
+                                                              and str(item.get("source")).endswith("@builtin"))]
     # 2.1.308 adds `"source": "dynamic"` to each server; the name and the status are what is checked.
     servers = event.get("mcp_servers")
     if isinstance(servers, list):

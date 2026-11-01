@@ -97,7 +97,7 @@ def test_rewrite_diagnostics_separate_cli_preflight_startup_and_model_turn(fake,
     ("bad_usage", "INVALID_RESULT"), ("incomplete", "INCOMPLETE_STREAM"),
     ("unterminated", "INCOMPLETE_STREAM"), ("duplicate_completion", "INVALID_RESULT"),
     ("duplicate_message", "INVALID_RESULT"), ("out_of_order", "INVALID_RESULT"),
-    ("unknown_event", "INVALID_RESULT"), ("tool", "UNEXPECTED_TOOL_ACTIVITY"),
+    ("tool", "UNEXPECTED_TOOL_ACTIVITY"),
     ("nonzero_after_complete", "CLI_FAILED"), ("nonzero", "CLI_FAILED"),
     ("quota", "RATE_LIMITED"), ("expired", "AUTH_REQUIRED"),
     ("bad_error_code", "CLI_FAILED"),
@@ -108,6 +108,12 @@ def test_rewrite_diagnostics_separate_cli_preflight_startup_and_model_turn(fake,
 ])
 def test_protocol_failures_are_terminal(fake, case: str, code: str) -> None:
     failure(fake, case, code, 1)
+
+
+def test_events_of_a_newer_cli_are_skipped_and_named_once(fake, caplog) -> None:
+    result, starts = generate(fake, case="unknown_event")
+    assert result.value == generate(fake)[0].value and starts == 1
+    assert [record.getMessage() for record in caplog.records] == ["Codex stream event skipped: unknown.event"]
 
 
 def test_fragmented_utf8_unknown_optional_and_unknown_usage(fake) -> None:
@@ -230,7 +236,7 @@ def test_total_output_budget_includes_incomplete_second_attempt(fake) -> None:
 
 
 @pytest.mark.parametrize("case,code,extra", [
-    ("valid", "CLI_UNSUPPORTED", {"version": "codex-cli 0.0.1"}),
+    ("valid", "CLI_UNSUPPORTED", {"version": "not-codex 1.0.0"}),
     ("valid", "CLI_PROFILE_UNSAFE", {"version": "codex-cli 0.162.0-alpha.2"}),
     ("bad_help", "CLI_PROFILE_UNSAFE", {}),
     ("unsafe_features", "CLI_PROFILE_UNSAFE", {}),
@@ -239,6 +245,7 @@ def test_total_output_budget_includes_incomplete_second_attempt(fake) -> None:
     ("login_failure", "CLI_FAILED", {}),
     ("metadata_api_key", "AUTH_MODE_MISMATCH", {}),
     ("metadata_error", "METADATA_FAILED", {}),
+    ("metadata_request", "METADATA_FAILED", {}),
 ])
 def test_probe_and_metadata_fail_before_generation(fake, case: str, code: str, extra: dict[str, str]) -> None:
     failure(fake, case, code, 0, **extra)

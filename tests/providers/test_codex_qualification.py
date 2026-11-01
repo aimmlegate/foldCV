@@ -1,4 +1,4 @@
-"""MP01: Codex qualifies by publisher, version table and features, not by exact version or binary hash."""
+"""MP01: Codex qualifies by publisher and features, not by its version number or binary hash."""
 
 import hashlib
 from pathlib import Path
@@ -19,22 +19,21 @@ from tests.service.test_connection import cli  # noqa: F401  (fixture)
 
 
 @pytest.mark.parametrize(("banner", "status"), [
-    ("codex-cli 0.162.0-alpha.2", "supported"), ("codex-cli 0.162.0-alpha.17.2", "supported"),
+    ("codex-cli 0.150.0", "supported"), ("codex-cli 0.162.0-alpha.2", "supported"), ("codex-cli 0.162.0-alpha.17.2", "supported"),
     ("codex-cli 0.163.0-alpha.11.1", "supported"), ("codex-cli 0.163.0", "graceful"), ("codex-cli 1.0.0", "graceful"),
 ])
-def test_versions_inside_the_table_qualify(banner, status):
+def test_any_version_qualifies(banner, status):
     assert codex.qualify(banner) == status
 
 
-@pytest.mark.parametrize("banner", ["codex-cli 0.162.0-alpha.1", "codex-cli 0.161.9", "2.1.308 (Claude Code)",
-                                    "codex-cli", "codex-cli " + "9" * 80])
-def test_versions_below_the_floor_or_foreign_are_unsupported(banner):
+@pytest.mark.parametrize("banner", ["2.1.308 (Claude Code)", "codex-cli", "codex-cli " + "9" * 80])
+def test_foreign_banners_are_unsupported(banner):
     with pytest.raises(QualificationError, match="CLI_UNSUPPORTED"):
         codex.qualify(banner)
 
 
 def test_a_listed_broken_version_is_unsupported(monkeypatch):
-    monkeypatch.setattr(codex, "COMPATIBILITY", Compatibility("0.162.0-alpha.2", "0.163.0-alpha.11.1", ("0.163.1",)))
+    monkeypatch.setattr(codex, "COMPATIBILITY", Compatibility("0.163.0-alpha.11.1", ("0.163.1",)))
     with pytest.raises(QualificationError):
         codex.qualify("codex-cli 0.163.1")
     assert codex.qualify("codex-cli 0.163.2") == "graceful"
@@ -142,7 +141,7 @@ def test_managed_runtime_keeps_its_hash_pin(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(("version", "status"), [
     ("codex-cli " + distribution.RELEASE, "supported"), ("codex-cli 0.163.0-alpha.11.1", "supported"),
-    ("codex-cli 0.170.0", "graceful"), ("codex-cli 0.161.0", None),
+    ("codex-cli 0.170.0", "graceful"), ("codex-cli 0.161.0", "supported"), ("not-codex 1.0.0", None),
 ])
 def test_connection_accepts_any_qualifying_version(cli, tmp_path, version, status):  # noqa: F811
     path, configure = cli

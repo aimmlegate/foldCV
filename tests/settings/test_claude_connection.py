@@ -54,7 +54,7 @@ def summary(entry):
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("case", "version", "state"), [
     ("valid", "2.1.308 (Claude Code)", "connected"),
-    ("valid", "2.1.200 (Claude Code)", "unsupported_version"),
+    ("valid", "2.1.290 (Claude Code)", "connected"),
     ("bad_help", "2.1.308 (Claude Code)", "unsupported_version"),
     ("logged_out", "2.1.308 (Claude Code)", "login_required"),
     ("api_key", "2.1.308 (Claude Code)", "api_key_mode"),

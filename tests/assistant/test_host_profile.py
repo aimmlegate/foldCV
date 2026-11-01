@@ -36,14 +36,14 @@ def pinned_host(tmp_path, monkeypatch):
     return host, manifest
 
 
-@pytest.mark.parametrize("version", ["0.162.0-alpha.2", "0.163.0-alpha.11.1", "0.170.0"])
+@pytest.mark.parametrize("version", ["0.161.0", "0.162.0-alpha.2", "0.163.0-alpha.11.1", "0.170.0"])
 def test_user_installed_host_qualifies_by_signature_not_version(pinned_host, version):
     _host, manifest = pinned_host
     manifest.write_bytes(manifest_bytes(version))
     agent.check_host()
 
 
-@pytest.mark.parametrize("damage", ["host", "manifest", "old", "variant", "missing", "symlink", "mode"])
+@pytest.mark.parametrize("damage", ["host", "manifest", "unreadable", "variant", "missing", "symlink", "mode"])
 def test_changed_or_unsafe_host_fails_before_launch(tmp_path, pinned_host, monkeypatch, damage):
     host, manifest = pinned_host
     agent.check_host()
@@ -51,8 +51,8 @@ def test_changed_or_unsafe_host_fails_before_launch(tmp_path, pinned_host, monke
         host.write_bytes(b"changed")
     elif damage == "manifest":
         manifest.write_bytes(b"changed")
-    elif damage == "old":
-        manifest.write_bytes(manifest_bytes("0.161.0"))
+    elif damage == "unreadable":
+        manifest.write_bytes(manifest_bytes("not a version"))
     elif damage == "variant":
         manifest.write_bytes(json.dumps({"version": "0.163.0", "variant": "other"}).encode())
     elif damage == "missing":

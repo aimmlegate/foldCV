@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
+import pwd
 import shutil
 import sys
 import threading
@@ -146,18 +148,27 @@ def test_a_sign_in_that_stays_refused_fails_after_the_second_run(fake):
     ("tool", "UNEXPECTED_TOOL_ACTIVITY"), ("subagent", "UNEXPECTED_TOOL_ACTIVITY"),
     ("compact", "UNEXPECTED_TOOL_ACTIVITY"), ("denied", "UNEXPECTED_TOOL_ACTIVITY"),
     ("init_mcp", "CLI_PROFILE_UNSAFE"), ("init_model", "CLI_PROFILE_UNSAFE"),
-    ("init_plugin", "CLI_PROFILE_UNSAFE"), ("init_key", "CLI_PROFILE_UNSAFE"),
+    ("init_plugin", "CLI_PROFILE_UNSAFE"), ("init_key", "CLI_PROFILE_UNSAFE"), ("second_init", "INVALID_RESULT"),
+    ("server_tool", "UNEXPECTED_TOOL_ACTIVITY"),
     ("bad_schema", "INVALID_SCHEMA"), ("unknown_option", "CLI_PROFILE_UNSAFE"),
-    ("incomplete", "INCOMPLETE_STREAM"), ("unknown_notice", "INVALID_RESULT"),
+    ("incomplete", "INCOMPLETE_STREAM"),
 ])
 def test_failures_are_typed_without_a_second_dispatch(fake, case, code):
     error = failure(fake, case, code, 1)
     assert error.logical_attempts == 1 and error.cleanup_verified
 
 
-def test_an_unknown_notice_is_named_in_the_log_without_its_content(fake, caplog):
-    failure(fake, "unknown_notice", "INVALID_RESULT", 1)
-    assert [record.getMessage() for record in caplog.records] == ["Claude stream event refused: system/new_notice"]
+def test_an_unknown_notice_is_skipped_and_named_in_the_log_without_its_content(fake, caplog):
+    result, _starts = generate(fake, "unknown_notice")
+    assert result.value.summary == "Synthetic summary"
+    assert [record.getMessage() for record in caplog.records] == ["Claude stream event skipped: system/new_notice",
+                                                                  "Claude stream event skipped: new_event"]
+
+
+@pytest.mark.parametrize("case", ["early_notice", "new_block", "late_notice"])
+def test_what_a_newer_cli_adds_around_the_reply_is_skipped(fake, case):
+    result, _starts = generate(fake, case)
+    assert result.value.summary == "Synthetic summary"
 
 
 class Open(BaseModel):
@@ -209,8 +220,7 @@ def test_retry_notice_is_tolerated(fake):
 
 @pytest.mark.parametrize(("case", "code", "extra"), [
     ("logged_out", "AUTH_REQUIRED", {}), ("api_key", "AUTH_MODE_MISMATCH", {}),
-    ("bad_help", "CLI_PROFILE_UNSAFE", {}), ("valid", "CLI_UNSUPPORTED", {"version": "2.1.290 (Claude Code)"}),
-    ("valid", "CLI_UNSUPPORTED", {"version": "not a version"}),
+    ("bad_help", "CLI_UNSUPPORTED", {}), ("valid", "CLI_UNSUPPORTED", {"version": "not a version"}),
 ])
 def test_preflight_fails_before_any_dispatch(fake, case, code, extra):
     failure(fake, case, code, 0, **extra)
@@ -223,6 +233,15 @@ def test_newer_untested_version_is_graceful_and_still_generates(fake):
     with OperationFiles(root).open() as files:
         probe = provider.probe(files, threading.Event())
     assert probe.status == "graceful" and probe.plan == "max" and MODEL in probe.reasoning
+
+
+def test_an_older_cli_with_every_flag_qualifies_with_the_models_it_knows(fake):
+    cli, root, _directory, configure, _audit = fake
+    configure("valid", version="2.1.280 (Claude Code)")
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        probe = provider.probe(files, threading.Event())
+    assert probe.status == "supported" and set(probe.reasoning) == {"claude-opus-5-5", "claude-fable-5-1"}
 
 
 def test_preflight_is_reused_until_invalidated(fake):
@@ -287,7 +306,7 @@ def test_connection_reports_catalog_plan_and_no_quota_source(fake):
 
 @pytest.mark.parametrize(("case", "code", "extra", "version"), [
     ("logged_out", "LOGIN_REQUIRED", {}, "2.1.308"), ("api_key", "API_KEY_MODE", {}, "2.1.308"),
-    ("valid", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}, "2.1.200"),
+    ("bad_help", "UNSUPPORTED_VERSION", {"version": "2.1.200 (Claude Code)"}, "2.1.200"),
     ("valid", "UNSUPPORTED_VERSION", {"version": "no version here"}, None),
 ])
 def test_connection_states_name_the_version_the_cli_reported(fake, case, code, extra, version):
@@ -358,9 +377,9 @@ def test_versions_parse_from_cli_banners(text, parsed):
 def test_prerelease_ordering_and_statuses():
     parse = qualification.Version.parse
     assert parse("0.163.0-alpha.2") < parse("0.163.0-alpha.11") < parse("0.163.0-beta") < parse("0.163.0")
-    table = qualification.Compatibility(floor="2.1.302", last_tested="2.1.308", broken=("2.1.305",))
-    assert [table.status(parse(v)) for v in ("2.1.301", "2.1.302", "2.1.305", "2.1.308", "2.1.309")] == [
-        "unsupported", "supported", "broken", "supported", "graceful"]
+    table = qualification.Compatibility(last_tested="2.1.308", broken=("2.1.305",))
+    assert [table.status(parse(v)) for v in ("1.0.0", "2.1.301", "2.1.305", "2.1.308", "2.1.309")] == [
+        "supported", "supported", "broken", "supported", "graceful"]
 
 
 def test_help_flags_match_whole_words_only():
@@ -437,6 +456,39 @@ def test_init_check_requires_the_exact_reported_session():
                        ("skills", ["x"]), ("claude_code_version", "2.1.309")):
         with pytest.raises(rules.ClaudeProfileError):
             rules.check_init({**event, key: value}, model=MODEL, version="2.1.308", tools=("StructuredOutput",))
+
+
+def test_init_check_takes_built_in_plugins_but_no_other():
+    event = {"type": "system", "subtype": "init", "tools": ["StructuredOutput"], "mcp_servers": [],
+             "slash_commands": [], "skills": [], "permissionMode": "dontAsk", "model": MODEL,
+             "apiKeySource": "none", "claude_code_version": "2.1.308"}
+    built_in = {"name": "cc-plugin-new", "path": "builtin", "source": "cc-plugin-new@builtin"}
+    rules.check_init({**event, "plugins": [built_in]}, model=MODEL, version="2.1.308", tools=("StructuredOutput",))
+    for plugin in ({"name": "x", "path": "/plugins/x", "source": "x@market"}, {"name": "x"}, "x"):
+        with pytest.raises(rules.ClaudeProfileError):
+            rules.check_init({**event, "plugins": [plugin]}, model=MODEL, version="2.1.308", tools=("StructuredOutput",))
+
+
+def test_the_desktop_shell_starts_the_service_without_user(tmp_path, monkeypatch):
+    monkeypatch.delenv("USER", raising=False)
+    monkeypatch.delenv("LOGNAME", raising=False)
+    environment = rules.ClaudeCliProfile(tmp_path / "profile", Path("/bin/ls")).environment(tmp_path / "operation")
+    assert environment["USER"] == environment["LOGNAME"] == pwd.getpwuid(os.getuid()).pw_name
+
+
+def test_a_profile_failure_does_not_read_as_a_version(fake, tmp_path, monkeypatch):
+    def unsafe(*_args, **_kwargs):
+        raise rules.ClaudeProfileError("CLI_PROFILE_UNSAFE")
+
+    cli, root, _directory, _configure, _audit = fake
+    profile = rules.ClaudeCliProfile(tmp_path / "profile", cli, home=tmp_path / "home")
+    adapter = ClaudeConnectionAdapter(profile)
+    monkeypatch.setattr(ProcessRunner, "run", unsafe)
+    monkeypatch.setattr(qualification, "require_publisher", lambda *_args: cli)
+    with pytest.raises(ConnectionFailure) as raised:
+        with OperationFiles(root).open() as files:
+            adapter.inspect(files, threading.Event())
+    assert raised.value.code == "METADATA_FAILED"
 
 
 def test_envelopes_of_the_live_mp00_run_are_accepted():

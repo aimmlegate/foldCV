@@ -146,7 +146,7 @@ async def test_the_mcp_config_names_the_variable_not_the_token(tmp_path, monkeyp
     ("init_extra", "AGENT_RUNTIME_UNSUPPORTED"), ("wrong_token", "AGENT_RUNTIME_UNSUPPORTED"),
     ("builtin", "AGENT_TOOL_DENIED"), ("subagent", "AGENT_TOOL_DENIED"), ("denied", "AGENT_TOOL_DENIED"),
     ("permission", "AGENT_TOOL_DENIED"), ("compact", "AGENT_UNEXPECTED_COMPACTION"),
-    ("fallback", "AGENT_MODEL_REROUTED"), ("unknown", "AGENT_PROTOCOL"), ("auth", "AGENT_AUTH_REQUIRED"),
+    ("fallback", "AGENT_MODEL_REROUTED"), ("server_tool", "AGENT_TOOL_DENIED"), ("auth", "AGENT_AUTH_REQUIRED"),
     ("quota", "AGENT_QUOTA"), ("max_turns", "AGENT_TOOL_LIMIT"), ("big", "AGENT_OUTPUT_LIMIT"),
 ])
 async def test_failures_are_typed_and_cleaned_up(tmp_path, case, code):
@@ -160,6 +160,12 @@ async def test_failures_are_typed_and_cleaned_up(tmp_path, case, code):
         assert listener.dispatcher_state.calls == 0
     if case == "big":
         assert result.truncated and len(result.text.encode()) <= 16 * 1024
+
+
+@pytest.mark.asyncio
+async def test_what_a_newer_cli_adds_is_skipped(tmp_path):
+    result, *_rest = await run(tmp_path, "unknown")
+    assert (result.state, result.error) == ("completed", None)
 
 
 @pytest.mark.asyncio

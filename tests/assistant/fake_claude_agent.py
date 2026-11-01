@@ -61,6 +61,8 @@ prompt = sys.stdin.buffer.read().decode()
 (base / "prompt.txt").write_text(prompt)
 model = option("--model")
 tools = ["mcp__foldcv__" + name for name in listed] + (["Bash"] if case == "init_extra" else [])
+if case == "unknown":
+    emit({"type": "new_event"})
 emit({"type": "system", "subtype": "init", "cwd": os.getcwd(), "session_id": "s-1", "tools": tools,
       "mcp_servers": [{"name": "foldcv", "status": status, "source": "dynamic"}], "model": model,
       "permissionMode": option("--permission-mode"), "slash_commands": [], "apiKeySource": "none",
@@ -102,6 +104,12 @@ if case in notices:
 if case == "subagent":
     emit({"type": "assistant", "parent_tool_use_id": "toolu_0", "message": {"role": "assistant", "content": [
         {"type": "text", "text": "x"}]}})
+if case == "server_tool":
+    emit({"type": "assistant", "parent_tool_use_id": None, "message": {"role": "assistant", "content": [
+        {"type": "server_tool_use"}]}})
+if case == "unknown":
+    emit({"type": "assistant", "parent_tool_use_id": None, "message": {"role": "assistant", "content": [
+        {"type": "new_block"}]}})
 if case in {"auth", "quota"}:
     kind, text = (("authentication_failed", "Not logged in · Please run /login") if case == "auth"
                   else ("rate_limit", "You've hit your usage limit · resets 5pm"))

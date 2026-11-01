@@ -147,7 +147,7 @@ def test_distinct_auth_and_metadata_failures(cli, tmp_path, case, expected):
 
 def test_missing_and_wrong_version_fail_before_auth(cli, tmp_path):
     path, configure = cli
-    configure(version="codex-cli 0.0.1")
+    configure(version="not-codex 1.0.0")
     with OperationFiles(tmp_path / "wrong").open() as files:
         with pytest.raises(ConnectionFailure, match="UNSUPPORTED_VERSION"):
             ConnectionAdapter(path).inspect(files, threading.Event())

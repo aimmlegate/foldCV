@@ -31,6 +31,7 @@ from resume_api.cli.profiles.claude import ClaudeProfileError
 from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
+from resume_api.providers.claude_cli import skipped
 from resume_api.providers.codex_cli import strict_json
 from resume_api.providers.content import ContentFailure
 
@@ -39,6 +40,8 @@ PREFIX = "mcp__" + SERVER + "__"
 # Notices without model output; `rate_limit_event` is its own type.
 NOTICES = frozenset({"api_retry", "status", "thinking_tokens"})
 REROUTED = frozenset({"model_fallback", "model_refusal_fallback", "model_consent_fallback"})
+STOPPING = REROUTED | {"compact_boundary", "permission_denied"}
+MODEL_EVENTS = frozenset({"stream_event", "assistant", "user", "result"})
 ERRORS = {"authentication_failed": "AGENT_AUTH_REQUIRED", "billing_error": "AGENT_QUOTA", "rate_limit": "AGENT_QUOTA",
           "model_not_found": "AGENT_MODEL_UNAVAILABLE"}
 # The CLI exits by itself after its result; past this it is stopped like any other process.
@@ -71,6 +74,7 @@ class MessagesStreamSession:
         self.error: str | None = None
         self.calls: dict[str, str] = {}
         self.finished: set[str] = set()
+        self.skipped: set[str] = set()
         self.message = ""
         self.thoughts = 0
         self.progress = PublicProgress(clock)
@@ -118,6 +122,11 @@ class MessagesStreamSession:
         kind, subtype = event["type"], event.get("subtype")
         if kind == "system" and subtype == "init":
             return self.init(event)
+        if kind == "rate_limit_event" or kind == "system" and subtype in NOTICES:
+            return None
+        if kind not in MODEL_EVENTS and not (kind == "system" and subtype in STOPPING):
+            skipped(self.skipped, f"system/{subtype}" if kind == "system" else kind)
+            return None
         if self.active_started is None:
             raise AgentFailure("AGENT_PROTOCOL")
         # A nested agent's output carries its parent tool call; the run grants no agents.
@@ -128,20 +137,15 @@ class MessagesStreamSession:
                 raise AgentFailure("AGENT_UNEXPECTED_COMPACTION")
             if subtype == "permission_denied":
                 raise AgentFailure("AGENT_TOOL_DENIED")
-            if subtype in REROUTED:
-                raise AgentFailure("AGENT_MODEL_REROUTED")
-            if subtype not in NOTICES:
-                raise AgentFailure("AGENT_PROTOCOL")
+            raise AgentFailure("AGENT_MODEL_REROUTED")
         elif kind == "stream_event":
             self.stream(event.get("event"))
         elif kind == "assistant":
             self.assistant(event)
         elif kind == "user":
             self.user(event)
-        elif kind == "result":
+        else:
             self.finish(event)
-        elif kind != "rate_limit_event":
-            raise AgentFailure("AGENT_PROTOCOL")
         return None
 
     def init(self, event):
@@ -150,7 +154,7 @@ class MessagesStreamSession:
         version = event.get("claude_code_version")
         try:
             if not isinstance(version, str) or profile_rules.COMPATIBILITY.status(
-                    qualification.Version.parse(version)) in {"unsupported", "broken"}:
+                    qualification.Version.parse(version)) == "broken":
                 raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
             profile_rules.check_init(event, model=self.value.model, version=version, tools=tuple(sorted(self.tools)),
                                      mcp_servers=({"name": SERVER, "status": "connected"},))
@@ -215,8 +219,10 @@ class MessagesStreamSession:
                 if not isinstance(block.get("text"), str):
                     raise AgentFailure("AGENT_PROTOCOL")
                 self.limit_text(block["text"])
-            elif kind != "redacted_thinking":
+            elif not isinstance(kind, str) or "tool" in kind:
                 raise AgentFailure("AGENT_TOOL_DENIED")
+            elif kind != "redacted_thinking":
+                skipped(self.skipped, f"assistant block {kind}")
 
     def user(self, event):
         message = event.get("message")
