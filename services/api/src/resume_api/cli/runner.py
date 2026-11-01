@@ -131,7 +131,8 @@ def cleanup_intent_ids(root: Path, *, owner: str = OWNER) -> set[str]:
         raise SpikeError("CLEANUP_FAILED") from None
     for marker in entries:
         match = INTENT_NAME.fullmatch(marker.name)
-        if match is None or marker.is_symlink():
+        # Windows refuses to open a directory; on POSIX the mode check below would skip it.
+        if match is None or marker.is_symlink() or marker.is_dir():
             continue
         try:
             descriptor = os.open(marker, os.O_RDONLY | host.O_NOFOLLOW | host.O_NONBLOCK | host.O_BINARY)

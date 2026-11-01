@@ -8,11 +8,11 @@ HERE = Path(__file__).resolve().parent
 
 
 def corpus():
-    return json.loads((HERE / 'synthetic/corpus.json').read_text())
+    return json.loads((HERE / 'synthetic/corpus.json').read_text(encoding='utf-8'))
 
 
 def results():
-    return json.loads((HERE / 'results.json').read_text())
+    return json.loads((HERE / 'results.json').read_text(encoding='utf-8'))
 
 
 def loaded(entry):
@@ -24,7 +24,7 @@ def loaded(entry):
     from tests.templates.storage_fixtures import package
     for asset in package().assets:
         remember_asset(asset.sha256, asset.bytes_base64, asset.mime_type)
-    for digest, asset in json.loads((HERE / 'synthetic/retained-assets.json').read_text()).items():
+    for digest, asset in json.loads((HERE / 'synthetic/retained-assets.json').read_text(encoding='utf-8')).items():
         text = asset.get('bytesBase64') or base64.b64encode((HERE.parents[2] / asset['path']).read_bytes()).decode('ascii')
         remember_asset(digest, text, asset['mimeType'])
     return WorkspaceV7.model_validate(entry['workspace']), {key: base64.b64decode(raw) for key, raw in entry['sources'].items()}
