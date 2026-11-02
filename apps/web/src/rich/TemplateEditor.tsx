@@ -305,25 +305,28 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
               <option value="fit">По ширине</option>{zoomLevels.map(level => <option key={level} value={String(level)}>{level * 100}%</option>)}
             </select></div>} />
         </fieldset>
-        <fieldset className="contents uir-editor-controls" disabled={locked}>
-          <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-            focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
-            technologyTargets={shown.presentation?.editor?.technologyTargets ?? []} plan={shown.presentation?.editor ?? {}}
-            hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
-            anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
-        </fieldset>
-        {factsVisible && <PanelHandle className="facts-handle" label="Ширина панели фактов" axis="x" sign={-1} value={factsWidth} minimum={factsWidths.minimum}
-          maximum={factsWidths.maximum} change={changeFactsWidth} reset={() => changeFactsWidth(null)} />}
-        <div className="paper-scroll" ref={paperScroll} onKeyDownCapture={linkShortcut}>
-          <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
-            data-history-position={session.history.position} data-history-length={session.history.length}>
-            {sheet && <style>{sheet.css}</style>}
-            {/* A style rule, not classes on the blocks: ProseMirror owns their DOM. */}
-            {changed && <style key={changed.at}>{`${changed.blockIds.map(id => `.cv-document .bn-block[data-id="${CSS.escape(id)}"] > :first-child`).join(", ")} { animation: assistant-change 3s ease-out; }`}</style>}
-            <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} style={sheet?.variables}>
-              {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
-              <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
-                {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
+        {/* The page and the facts panel share one row above the assistant, so the open assistant never covers the panel. */}
+        <div className="document-row">
+          <fieldset className="contents uir-editor-controls" disabled={locked}>
+            <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
+              focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
+              technologyTargets={shown.presentation?.editor?.technologyTargets ?? []} plan={shown.presentation?.editor ?? {}}
+              hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
+              anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
+          </fieldset>
+          {factsVisible && <PanelHandle className="facts-handle" label="Ширина панели фактов" axis="x" sign={-1} value={factsWidth} minimum={factsWidths.minimum}
+            maximum={factsWidths.maximum} change={changeFactsWidth} reset={() => changeFactsWidth(null)} />}
+          <div className="paper-scroll" ref={paperScroll} onKeyDownCapture={linkShortcut}>
+            <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
+              data-history-position={session.history.position} data-history-length={session.history.length}>
+              {sheet && <style>{sheet.css}</style>}
+              {/* A style rule, not classes on the blocks: ProseMirror owns their DOM. */}
+              {changed && <style key={changed.at}>{`${changed.blockIds.map(id => `.cv-document .bn-block[data-id="${CSS.escape(id)}"] > :first-child`).join(", ")} { animation: assistant-change 3s ease-out; }`}</style>}
+              <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} style={sheet?.variables}>
+                {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
+                <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
+                  {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
+              </div>
             </div>
           </div>
         </div>
