@@ -14,6 +14,7 @@ from packages.resume_core.models.template_document import (PresentedText, Manual
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateRenderAsset, presentation_value
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.rendering.captured_layout import half_points, native_units
+from packages.resume_core.rendering.captured_styles import CapturedStyleResolver, authored_spans, visible_text
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.template_assembly import assemble_template
 from packages.resume_core.template_export import capture_export, snapshot_identity
@@ -403,8 +404,31 @@ def test_empty_body_paragraph_still_requires_its_block_face(captured_request, tm
         render_captured_docx(recapture(captured_request, document=document, package=package), tmp_path)
 
 
+def list_lines(content, request):
+    """Each list paragraph's exact line beside the natural line of its own text."""
+    resolver = CapturedStyleResolver(request.package)
+    blocks = {block.id: block for block in request.document.blocks() if block.type in {'bullet_list', 'numbered_list'}}
+    tree = xml(content)
+    pairs = []
+    for block in blocks.values():
+        text = ''.join(visible_text(span.text) for span, _link in authored_spans(block))
+        paragraph = next(node for node in tree.iter(qn('w:p')) if text and text in emitted(node))
+        assert paragraph.find(f'{qn("w:pPr")}/{qn("w:numPr")}') is not None
+        pairs.append((paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS),
+            str(native_units(resolver.paragraph(block)[0], positive=True))))
+    return pairs
+
+
+def test_list_lines_keep_the_text_height_under_a_bigger_marker(captured_request, tmp_path):
+    """The tester's sparse lists: the 14 pt marker had set every line of a 10 pt item to its own 17.6 pt."""
+    bullets = captured_request.package.recipe.style.bullets
+    pairs = list_lines(render_captured_docx(captured_request, tmp_path), captured_request)
+    assert pairs and all(actual == natural for actual, natural in pairs)
+    assert all(bullets.marker_size * 20 > int(natural) for _actual, natural in pairs)
+
+
 @pytest.mark.parametrize('size', [30, 700])
-def test_generated_marker_height_scales_and_participates_in_native_line_fit(captured_request, tmp_path, size):
+def test_generated_marker_scales_without_changing_the_list_line(captured_request, tmp_path, size):
     request = configured(captured_request, lambda config: config['style']['bullets'].update(marker_size=size))
     document = request.document.model_copy(deep=True)
     source = next(block for block in document.blocks() if block.type == 'bullet_list')
@@ -419,7 +443,8 @@ def test_generated_marker_height_scales_and_participates_in_native_line_fit(capt
         return
     content = render_captured_docx(request, tmp_path)
     paragraph = next(node for node in xml(content).iter(qn('w:p')) if 'Actual numbered marker' in emitted(node))
-    assert paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS) == '754'
+    natural = native_units(CapturedStyleResolver(request.package).paragraph(document.regions[2].blocks[0])[0], positive=True)
+    assert paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS) == str(natural) and natural < 600
     numbering = xml(content, 'word/numbering.xml')
     assert numbering.xpath('//w:abstractNum[@w:abstractNumId="6000"]/w:lvl/w:rPr/w:sz/@w:val', namespaces=NS) == ['60']
 

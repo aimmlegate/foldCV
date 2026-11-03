@@ -272,11 +272,10 @@ class CapturedWriter:
         if block.type in {'bullet_list', 'numbered_list'}:
             if header:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+            # The marker keeps its own size, but every line of the item stays at the text's height, as on screen.
             marker_height = self.list_marker(paragraph, block, inset, depth, sequence)
-            line = native_units(max(height, marker_height), positive=True)
-            if line > self.geometry.bottom - self.geometry.continuation_top:
+            if native_units(marker_height, positive=True) > self.geometry.bottom - self.geometry.continuation_top:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-            props.find(qn('w:spacing')).set(qn('w:line'), str(line))
         if not self.runs[block.id]:
             props.append(run_properties(self.generated(block, '')))
         previous_cr, current, hyperlink = False, None, None
