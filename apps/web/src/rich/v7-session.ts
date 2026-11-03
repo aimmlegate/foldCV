@@ -1,5 +1,5 @@
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
-import { Plugin, PluginKey, TextSelection, type Transaction } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
 import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
@@ -12,7 +12,8 @@ import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type Tem
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
 import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, technologyLines, textPoint, textPosition, type ExtractedOperation, type TextPoint } from "./v7-extraction";
+  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, technologyLines, technologyLocked, technologySelected, textPoint, textPosition,
+  type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { serverRewriteStage, type RewriteStage } from "./rewrite-progress";
@@ -199,20 +200,16 @@ export class TemplateEditorSession {
     if (!transaction.docChanged || this.projecting || transaction.getMeta(projectionMeta)) return true;
     if (this.closed || this.navigating || this.pendingNavigation || this.panelBusy || !this.writable) return false;
     const result = extractOperations(transaction);
-    if (result.kind === "unsupported") {
-      // Deleting the last letters of a chip removes its technology, as «Убрать» in Facts does (D127).
-      if (result.recordId !== undefined) void this.removeTechnology(result.recordId);
-      else this.refuse(result.reason, result.code);
-      return false;
-    }
+    if (result.kind === "unsupported") { this.refuse(result.reason, result.code); return false; }
     if (result.operations.length) this.stash.set(transaction, result.operations);
     return true;
   }
 
-  /** The chip whose name a deletion emptied goes through the panel path: typing drains first and Python removes the record. */
-  private async removeTechnology(recordId: string): Promise<void> {
-    try { await this.panel({ operation: "remove", recordId }); }
-    catch (error) { this.port.warning(errorMessage(error)); }
+  /** Input that would change a technology line goes nowhere: those lines change only in Facts (D131). */
+  private technologyRefused(state: EditorState): boolean {
+    if (!technologySelected(state)) return false;
+    this.refuse(technologyLocked, "TECHNOLOGY_IN_FACTS");
+    return true;
   }
 
   private accept(operations: readonly ExtractedOperation[]): void {
@@ -393,7 +390,7 @@ export class TemplateEditorSession {
   /** The text a rewrite would read: one non-empty range inside one block or cell. */
   rewriteSource(): { container: LocalContainer; start: number; end: number; prior: string; text: string } | null {
     const editor = this.editor;
-    if (!editor) return null;
+    if (!editor || technologySelected(editor._tiptapEditor.state)) return null;
     const at = insertionAt(editor._tiptapEditor.state);
     if ("reason" in at || at.start === at.end) return null;
     return { container: at.container, start: at.start, end: at.end, prior: at.prior, text: at.prior.slice(at.start, at.end) };
@@ -459,6 +456,7 @@ export class TemplateEditorSession {
     // A caret copies nothing, so the clipboard keeps what it holds.
     if (!editor || !data || this.closed || view.state.selection.empty) return false;
     event.preventDefault();
+    if (cut && this.technologyRefused(view.state)) return true;
     if (cut && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
       this.refuse("cut needs whole blocks or text inside one block"); return true;
     }
@@ -527,6 +525,7 @@ export class TemplateEditorSession {
     const captured = copied ? await copied.capture : null, editor = this.editor;
     if (!editor || this.closed) return;
     const state = editor._tiptapEditor.state;
+    if (this.technologyRefused(state)) return;
     if (captured?.kind === "blocks") {
       const caret = blockAt(state), around = caret ? placementOf(state.doc, caret) : null;
       if (!caret || !around) { this.refuse("blocks paste needs a caret in a block"); return; }
@@ -744,7 +743,8 @@ export class TemplateEditorSession {
       event.preventDefault(); void this.move(event.key === "ArrowUp" ? "up" : "down"); return true;
     }
     if (event.key === "Backspace" || event.key === "Delete") {
-      const blocks = this.editor ? selectedBlocks(this.editor._tiptapEditor.state) : null;
+      const state = this.editor?._tiptapEditor.state, blocks = state ? selectedBlocks(state) : null;
+      if (state && blocks && this.technologyRefused(state)) { event.preventDefault(); return true; }
       if (blocks) { event.preventDefault(); if (!this.composing) void this.removeBlocks(blocks); return true; }
       return this.join(event.key === "Backspace" ? "backward" : "forward");
     }

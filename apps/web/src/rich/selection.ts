@@ -1,6 +1,7 @@
 import { Selection, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { ResolvedPos } from "@tiptap/pm/model";
 import type { BlockKind } from "./v7-translation";
+import { technologyLine } from "./v7-extraction";
 
 export function selectionLocation(tr: Transaction): string | null {
   const position = tr.selection.$head;
@@ -47,7 +48,8 @@ export type TextBlock = { id: string; type: BlockKind["type"]; level: number | n
 export type BlockStyle = "p" | "h2" | "h3" | "list" | "numbered";
 
 /** The text blocks a selection reaches into, in document order; a caret names its own block. A range that ends at
- * the start of a block, as a whole-block selection does, does not reach that block. */
+ * the start of a block, as a whole-block selection does, does not reach that block. Technology lines are left out:
+ * their style is the template's and they change only in Facts (D131). */
 export function selectedTextBlocks(state: EditorState): TextBlock[] {
   const { from, to, empty } = state.selection, blocks: TextBlock[] = [];
   state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, to + 1), (node, pos) => {
@@ -58,7 +60,7 @@ export function selectedTextBlocks(state: EditorState): TextBlock[] {
     const start = pos + 2, end = start + content.content.size;
     const reached = empty ? from >= start && from <= end : start === end ? from <= start && to > start : from < end && to > start;
     const level: unknown = content.attrs["level"];
-    if (reached) blocks.push({ id, type, level: type === "heading" && typeof level === "number" ? level : null });
+    if (reached && !technologyLine(content)) blocks.push({ id, type, level: type === "heading" && typeof level === "number" ? level : null });
     return true;
   });
   return blocks;

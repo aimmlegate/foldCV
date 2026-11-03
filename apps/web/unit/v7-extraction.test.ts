@@ -7,7 +7,8 @@ import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import type { RichDocumentV2 } from "../src/contracts/generated/rich_document_v2";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
 import { templateSchema } from "../src/rich/template-schema";
-import { extractOperations, foldComposition, mergeAt, selectedBlocks, splitAt, technologyLines, type ExtractedOperation } from "../src/rich/v7-extraction";
+import { extractOperations, foldComposition, markable, mergeAt, selectedBlocks, splitAt, technologyLines, technologySelected, type ExtractedOperation } from "../src/rich/v7-extraction";
+import { technologyLockPlugin } from "../src/rich/technology-lock";
 import { projectTemplateDocument, type TemplateEditorBlock } from "../src/rich/v7-projection";
 import { translateIntent, type V7Operation } from "../src/rich/v7-translation";
 
@@ -187,30 +188,46 @@ const literalText = (text: string) => ({ type: "text" as const, text, styles: {}
 const chipDoc = docOf([{ id: "dates", type: "paragraph", content: [literalText("2020")] },
   { id: "chips", type: "paragraph", content: [name("go", "Go"), literalText(" "), name("sql", "SQL")] },
   { id: "parts", type: "paragraph", content: [name("python", "Python"), name("python", " 3")] }]);
-const chips = start(chipDoc, "chips"), parts = start(chipDoc, "parts");
-function refusedWith(tr: Transaction, code: string, recordId?: string): void {
+const dates = start(chipDoc, "dates"), chips = start(chipDoc, "chips"), parts = start(chipDoc, "parts");
+const ranged = (anchor: number, head: number) => EditorState.create({ doc: chipDoc, selection: TextSelection.create(chipDoc, anchor, head) });
+function refusedWith(tr: Transaction, code: string): void {
   const result = extractOperations(tr);
   assert.ok(result.kind === "unsupported", "input must be refused"); assert.equal(result.code, code);
-  assert.equal(result.recordId, recordId, "only a deletion names the technology to remove");
 }
 
-test("input cannot empty a technology name or run across names", () => {
-  const state = caret(chipDoc, chips + 1);
+test("a technology line takes no typing or styles: technologies change in Facts (D131)", () => {
+  const state = caret(chipDoc, chips + 1), bold = chipDoc.type.schema.marks["bold"];
+  assert.ok(bold);
   // chips + 1 opens "Go", chips + 3 ends it; " " follows its closing token and "SQL" starts at chips + 6.
-  refusedWith(state.tr.delete(chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY", "go");
-  refusedWith(state.tr.insertText("  ", chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY");
-  refusedWith(state.tr.insertText("x", chips + 2, chips + 7), "TECHNOLOGY_EDIT_SINGLE");
-  refusedWith(state.tr.delete(chips + 1, chips + 5), "TECHNOLOGY_EDIT_SINGLE");
-  assert.equal(only(state.tr.delete(chips + 1, chips + 2)).operation.kind, "replace_text");
-  assert.equal(only(state.tr.insertText("Rust", chips + 1, chips + 3)).operation.kind, "replace_text");
-  // The separator is literal text and belongs to no name.
-  assert.equal(only(state.tr.insertText(",", chips + 4, chips + 5)).operation.kind, "replace_text");
+  refusedWith(state.tr.delete(chips + 2, chips + 3), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.delete(chips + 1, chips + 3), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.insertText("Rust", chips + 1, chips + 3), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.insertText("o", chips + 3), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.insertText(",", chips + 4, chips + 5), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.delete(chips + 1, chips + 9), "TECHNOLOGY_IN_FACTS");
+  // One fragment of a name in two, as an earlier edit left it, is no way in either.
+  refusedWith(caret(chipDoc, parts + 1).tr.delete(parts + 9, parts + 11), "TECHNOLOGY_IN_FACTS");
+  refusedWith(state.tr.addMark(chips + 1, chips + 3, bold.create()), "TECHNOLOGY_IN_FACTS");
+  assert.equal(markable(ranged(chips + 1, chips + 3)), false, "the toolbar styles are off on a chip");
+  assert.equal(markable(caret(chipDoc, chips + 2)), false, "and with only a caret there");
+  assert.equal(only(caret(chipDoc, dates + 4).tr.insertText("!", dates + 4)).operation.kind, "replace_text", "other lines take typing");
+  assert.equal(markable(ranged(dates + 1, dates + 3)), true);
 });
 
-test("a name in several fragments keeps a fragment when another goes", () => {
-  const state = caret(chipDoc, parts + 1);
-  assert.equal(replace(only(state.tr.delete(parts + 9, parts + 11)).operation).text, "");
-  assert.equal(replace(only(state.tr.delete(parts + 1, parts + 7)).operation).text, "");
+test("a selection changes a technology line only when it is in one or holds nothing else", () => {
+  assert.equal(technologySelected(caret(chipDoc, chips + 2)), true);
+  assert.equal(technologySelected(ranged(chips + 1, chips + 2)), true);
+  assert.equal(technologySelected(caret(chipDoc, dates + 1)), false);
+  assert.equal(technologySelected(ranged(dates + 1, chips)), false, "a range that ends where the chips start does not reach them");
+  // Whole blocks: the chip lines alone are technologies; with another line they are part of the document.
+  assert.equal(technologySelected(ranged(chips, parts)), true);
+  assert.equal(technologySelected(ranged(dates, parts)), false);
+});
+
+test("technology lines are drawn read-only; other lines stay editable", () => {
+  const plugin = technologyLockPlugin(() => {}), state = EditorState.create({ doc: chipDoc, plugins: [plugin] });
+  const lines = (plugin.getState(state)?.find() ?? []).map(decoration => decoration.from).sort((left, right) => left - right);
+  assert.deepEqual(lines, [chips - 1, parts - 1]);
 });
 
 test("a chip line keeps its names: no Enter inside it and no join with a neighbour", () => {

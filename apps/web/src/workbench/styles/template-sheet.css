@@ -47,6 +47,11 @@
 /* A technology chip from the plan; the DOCX draws the same shade with a border of its color, so corners stay small. */
 .fcv-sheet [data-fcv-chip] { background: var(--fcv-chip); border-radius: 2pt; padding: .5pt 1.5pt; margin-inline: 1pt;
   white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Technology lines take no typing (D131); a click on a technology opens it in Facts. */
+.fcv-sheet [data-fcv-technology-line] { cursor: default; }
+.fcv-sheet [data-fcv-technology-line] [data-field-key="display"] { cursor: pointer; }
+.fcv-sheet [data-fcv-technology-line] .node-templateField:has(> [data-field-key="display"]):hover {
+  box-shadow: 0 0 0 1px var(--ink, #1c2119); border-radius: 2pt; }
 .uir-prototype .fcv-sheet .fcv-link,
 .uir-prototype .fcv-sheet .bn-editor a,
 .fcv-sheet .fcv-link,
