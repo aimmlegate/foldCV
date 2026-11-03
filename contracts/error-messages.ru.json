@@ -98,7 +98,7 @@
     "technologyName": "Введите название технологии.",
     "fileSaveFailed": "Файл не сохранён. Попробуйте ещё раз или выберите другую папку.",
     "technologyNameEmpty": "Название технологии нельзя оставить пустым. Убрать технологию можно в панели «Факты».",
-    "technologyInFacts": "Технологии меняются только в панели «Факты». Нажмите на технологию в резюме, чтобы открыть её там.",
+    "technologyEditSingle": "Технологии меняются по одной. Выделите только название одной технологии или откройте панель «Факты».",
     "technologyGroup": "Выберите группу, в которую добавить технологию.",
     "technologyLine": "В документе нет места для этой технологии. Впишите её прямо в документ.",
     "focus": "Не удалось обновить список «Фокус». Выберите доступную технологию и повторите действие.",
@@ -1196,7 +1196,7 @@
     "TECHNOLOGY_NAME_REQUIRED": "technologyName",
     "FILE_SAVE_FAILED": "fileSaveFailed",
     "TECHNOLOGY_NAME_EMPTY": "technologyNameEmpty",
-    "TECHNOLOGY_IN_FACTS": "technologyInFacts",
+    "TECHNOLOGY_EDIT_SINGLE": "technologyEditSingle",
     "PROVIDER_INACTIVE": "providerInactive",
     "PROVIDER_UNAVAILABLE": "providerUnavailable"
   },
