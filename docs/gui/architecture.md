@@ -9,6 +9,9 @@
 > paginated preview are deferred; the new flow must work without LibreOffice.
 > Portable project save/open and PDF source import remain supported.
 
+> D133: PDF export prints a paged copy of the shown sheet through the system print
+> window (WebKit on macOS, Chromium on Windows); no LibreOffice, no server call.
+
 > Storage and transport follow D109; see [Storage and transport](#storage-and-transport).
 > Later sections that conflict with it describe the first-release design; D109 wins.
 

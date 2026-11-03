@@ -14,6 +14,7 @@ const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
 const { Composer } = await import("../src/workbench/assistant/Composer");
 const { Connections } = await import("../src/workbench/settings/Connection");
+const { FileDialog } = await import("../src/workbench/files/FileDialog");
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 
@@ -24,6 +25,16 @@ test("the header has no rename control, whatever a caller passes (D084)", () => 
   assert.ok(!header.includes("Переименовать"));
   assert.ok(header.includes("Synthetic resume"));
   assert.ok(!source("../src/workbench/App.tsx").includes("rename"));
+});
+
+test("the export dialog offers DOCX and PDF; DOCX is chosen first and the print hint waits for PDF", () => {
+  const dialog = renderToStaticMarkup(createElement(FileDialog, { mode: "export", title: "Synthetic resume", subtitle: "Engineer",
+    filename: "Synthetic resume.docx", error: "", busy: false, close: () => {}, download: () => Promise.resolve(null),
+    print: () => Promise.resolve(false), upload: () => Promise.resolve(false) }));
+  const inputs = dialog.match(/<input[^>]*>/gu) ?? [];
+  assert.deepEqual(inputs.map(input => [/value="(\w+)"/u.exec(input)?.[1], input.includes('checked=""')]), [["docx", true], ["pdf", false]]);
+  assert.ok(dialog.includes("Скачать DOCX"));
+  assert.ok(!dialog.includes("Печать в PDF") && !dialog.includes("Откроется окно печати"));
 });
 
 test("a refused delete says why inside its dialog, and an open dialog carries no old error", () => {

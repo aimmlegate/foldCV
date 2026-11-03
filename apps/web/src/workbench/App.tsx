@@ -14,7 +14,7 @@ import { sourceSummary } from "./import/progress";
 import { Settings } from "./settings/Settings";
 import { readPaneOrder, savePaneOrder, type PaneOrder, readAppearance, saveAppearance, type Appearance } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
-import { projectFilename } from "./files/filename";
+import { projectFilename, projectStem } from "./files/filename";
 import { Icon } from "./ui/Icon";
 import { OperationStatus } from "./ui/OperationStatus";
 import { PanelHandle, readPanelSize, savePanelSize } from "./ui/PanelHandle";
@@ -25,7 +25,7 @@ const historyWidths = { minimum: 160, maximum: 360 };
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
   const { template, projects, error, status, setStatus, busy, settings, setSettings,
-    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, imports, importActions } = workspace;
+    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, printPdf, imports, importActions } = workspace;
   const shown = template?.response ?? null;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [historyWidth, setHistoryWidth] = useState(() => readPanelSize("history", historyWidths.minimum, historyWidths.maximum));
@@ -119,6 +119,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}
       error={error} busy={busy} operation={workspace.operation?.label} close={() => setFileMode(null)} download={() => exportFile(fileMode === "export" ? "export" : "archive",
         current => projectFilename(current.identity?.title ?? current.workspace.title, fileMode === "export" ? "docx" : "foldcv"))}
+      print={() => printPdf(projectStem(projectTitle))}
       upload={async file => { const done = await upload(file); if (done) { setSettings(false); if (innerWidth <= 600) setCollapsed(true); } return done; }} />}
   </main></NotificationProvider>;
 }
