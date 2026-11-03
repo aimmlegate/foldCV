@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
@@ -309,6 +310,55 @@ class AssistantSkillV1(Wire):
 
 class AssistantSkillListV1(Wire):
     items: list[AssistantSkillV1] = Field(max_length=20)
+
+
+# The template assistant (D136). Hand-parsed on the client; not in the contracts registry.
+
+TEMPLATE_TEXT_BYTES = 256 * 1024
+
+
+class TemplateRunRequestV1(Wire):
+    client_request_id: Id
+    message: str = Field(min_length=1, max_length=limits.USER_CHARS)
+    allow_edits: Literal[False]
+    allow_web: bool
+    template_id: str | None = Field(default=None, min_length=1, max_length=200)
+    assets_from: str | None = Field(default=None, min_length=1, max_length=200)
+    text: str = Field(max_length=TEMPLATE_TEXT_BYTES)
+    text_hash: Sha256
+    sample_id: Id | None = Field(default=None, max_length=128)
+
+    @model_validator(mode='after')
+    def hashed(self):
+        raw = self.text.encode('utf-8')
+        if len(raw) > TEMPLATE_TEXT_BYTES or hashlib.sha256(raw).hexdigest() != self.text_hash:
+            raise ValueError('text exceeds its limit or does not match textHash')
+        return self
+
+
+class TemplateProposalV1(Wire):
+    id: Id
+    conversation_id: Id
+    run_id: Id
+    template_id: str | None = Field(max_length=200)
+    name: str | None = Field(max_length=200)
+    base_hash: Sha256
+    text: str = Field(max_length=TEMPLATE_TEXT_BYTES)
+    summary: str = Field(max_length=2000)
+    state: Literal['proposed', 'applied', 'discarded']
+
+
+class TemplateProposalListV1(Wire):
+    items: list[TemplateProposalV1] = Field(max_length=100)
+
+
+class TemplateProposalStateV1(Wire):
+    state: Literal['applied', 'discarded']
+
+
+class DraftEditV1(Wire):
+    find: str = Field(min_length=1, max_length=16000)
+    replace: str = Field(max_length=16000)
 
 
 ASSISTANT_CONTRACTS = {

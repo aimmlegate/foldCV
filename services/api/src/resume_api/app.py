@@ -10,6 +10,7 @@ from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
 import json
+import re
 from pathlib import Path
 import secrets
 import threading
@@ -62,6 +63,10 @@ POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status",
                             "host/enable", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
+TEMPLATE_ASSISTANT_PATH = "/v2/templates/assistant/"
+TEMPLATE_SAMPLES_PATH = TEMPLATE_ASSISTANT_PATH + "samples"
+# The one query string the API admits: the conversation whose template proposals are listed.
+TEMPLATE_PROPOSALS_QUERY = re.compile(rb"conversationId=[A-Za-z0-9_-]{1,128}")
 
 
 @dataclass
@@ -100,7 +105,15 @@ def strict_json(raw: bytes) -> object:
 def takes_json(method: str, path: str) -> bool:
     """Every /v1/ PUT and every template-config write has one strict JSON body; the other /v1/ POSTs that do are listed."""
     return ((method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path.startswith("/v1/"))
-            or (method in {"POST", "PUT"} and path.startswith(TEMPLATE_CONFIG_PATH)))
+            or (method in {"POST", "PUT"} and template_config(path)))
+
+
+def template_config(path: str) -> bool:
+    return path.startswith(TEMPLATE_CONFIG_PATH) or path == TEMPLATE_CONFIG_PATH.rstrip("/")
+
+
+def template_proposals(method: str, path: str, query: bytes) -> bool:
+    return method == "GET" and path == TEMPLATE_ASSISTANT_PATH + "proposals" and TEMPLATE_PROPOSALS_QUERY.fullmatch(query) is not None
 
 
 def is_json_media_type(raw: bytes) -> bool:
@@ -139,7 +152,8 @@ class LocalBoundary:
         response = None
         if host != self.host or b"forwarded" in headers or b"x-forwarded-host" in headers or b"x-forwarded-proto" in headers:
             response = problem("HOST_DENIED", 403)
-        elif is_api and (scope.get("query_string") or (origin and origin != self.origin) or (method != "GET" and origin != self.origin)):
+        elif is_api and ((scope.get("query_string") and not template_proposals(method, path, scope["query_string"]))
+                or (origin and origin != self.origin) or (method != "GET" and origin != self.origin)):
             response = problem("ORIGIN_DENIED", 403)
         elif is_api and path != "/v1/session/exchange" and not self._authorized(headers):
             response = problem("AUTH_REQUIRED", 401)
@@ -169,14 +183,14 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive", TEMPLATE_SAMPLES_PATH}
                     or path.startswith("/v1/rich/projects/template-input/"))
                 body_limit = (ARCHIVE_BYTES + 4096 if path == "/v2/projects/archive" else MAX_EXTRACT_BODY if project_upload
                     else MAX_BODY)
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
                     # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
                     body_limit = MAX_BODY + 64 * 1024
-                if path.startswith(TEMPLATE_CONFIG_PATH):
+                if template_config(path):
                     # The compiler's own limit, plus the JSON escapes of a text of that size (its line ends and quotes).
                     body_limit = 2 * CONFIG_BYTES
                 if size > body_limit:
@@ -186,7 +200,8 @@ class LocalBoundary:
                 if not message.get("more_body", False):
                     break
             body = b"".join(chunks)
-            project_json = path.startswith("/v2/projects") and path != "/v2/projects/archive"
+            project_json = ((path.startswith("/v2/projects") and path != "/v2/projects/archive")
+                or (path.startswith(TEMPLATE_ASSISTANT_PATH) and path != TEMPLATE_SAMPLES_PATH))
             if takes_json(method, path) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
@@ -266,6 +281,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         rewrite.request_shutdown()
         projects.imports.stop_all()
         await assistant.shutdown()
+        await template_assistant.shutdown()
         # An import left running would keep its model process and block the default executor's shutdown.
         for stopping in (intake.shutdown, rewrite.shutdown, projects.imports.shutdown):
             try:
@@ -486,7 +502,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     mount_projects_v2(app, projects)
 
     from .assistant.runs import AgentConnection, AssistantService
-    from .assistant.routes import mount_assistant
+    from .assistant.routes import mount_assistant, mount_template_assistant
+    from .assistant.template_tools import TemplateScope
 
     def agent_connection():
         owners = catalog()
@@ -515,7 +532,13 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                                            else slots[catalog().get(model, "codex_cli")].runtime)
     projects.on_deleted = assistant.project_deleted
     app.state.assistant = assistant
-    mount_assistant(app, assistant)
+    # The template assistant (D136) has no project repository, so its tools cannot reach a resume.
+    template_assistant = AssistantService(None, resolved_agent_runtime, agent_connection,
+        scope=TemplateScope(rules_store.root), root=rules_store.root)
+    template_assistant.runtime_for = assistant.runtime_for
+    app.state.template_assistant = template_assistant
+    mount_assistant(app, assistant, companions=(template_assistant,))
+    mount_template_assistant(app, template_assistant, problem=problem, temp_root=temp_root, worker_slot=worker_slot)
 
     def template_import_model(effort=None):
         # The capture records the selected import model with the effort the import start chose, else its catalog
@@ -921,6 +944,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 # An import may use both providers, so a new sign-in or CLI on either stops all model work (D119). The
                 # job's thread starts after this, and its exclusive permit then waits for that work to end.
                 assistant.stop_all()
+                template_assistant.stop_all()
                 rewrite.request_shutdown()
                 projects.imports.stop_all()
                 if job == "install":
@@ -1135,6 +1159,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             rewrite.request_shutdown()
             projects.imports.stop_all()
             assistant.stop_all()
+            template_assistant.stop_all()
         codes = await asyncio.gather(*(stop_connection(task, files, cancel) for task, files, cancel in current))
         try:
             await intake.shutdown()
@@ -1167,6 +1192,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             connection_epoch += 1
             epochs[kind] += 1
             assistant.stop_all()
+            template_assistant.stop_all()
             states[kind] = ProviderState(state="login_required", version=states[kind].version)
             files, cancel = connection_work[current]
         code = await stop_connection(current, files, cancel)

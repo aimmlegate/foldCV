@@ -23,7 +23,7 @@ from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentUsage
 from packages.resume_core.storage import StorageFailure
 from resume_api.agent.host_profile import TOKEN_ENV
-from resume_api.agent.runtime import BASE_INSTRUCTIONS, RuntimeResult, SessionFinished, terminal_cleanup
+from resume_api.agent.runtime import RuntimeResult, SessionFinished, terminal_cleanup
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.profiles import claude as profile_rules
@@ -343,7 +343,7 @@ class ClaudeAgentRuntime:
         began = elapsed()
         session, cleanup_started, operation_path, argv = None, None, None, ()
         active_seconds = self.active_seconds if value.active_seconds is None else value.active_seconds
-        system = BASE_INSTRUCTIONS + "\n\n" + value.developer_instructions
+        system = value.base_instructions + "\n\n" + value.developer_instructions
         try:
             if len((value.prompt + system).encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")

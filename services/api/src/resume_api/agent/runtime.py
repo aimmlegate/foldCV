@@ -111,6 +111,8 @@ class RuntimeInput:
     queued_at: float | None = None
     close_tools: Callable[[float], None] = lambda _seconds: None
     developer_instructions: str = DEVELOPER_INSTRUCTIONS
+    # Codex `baseInstructions` and the Claude system prompt; the template assistant has its own (D136).
+    base_instructions: str = BASE_INSTRUCTIONS
     elapsed_clock: Callable[[], float] = time.monotonic
     child_started: Callable[[], None] = lambda: None
     job_id: str | None = None
@@ -258,7 +260,7 @@ class NativeSession:
             return None
         return self.request("thread/start", {"model": self.value.model, "cwd": str(self.operation),
             "ephemeral": True, "allowProviderModelFallback": False, "approvalPolicy": "never",
-            "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions": BASE_INSTRUCTIONS,
+            "approvalsReviewer": "user", "sandbox": "read-only", "baseInstructions": self.value.base_instructions,
             "developerInstructions": self.value.developer_instructions, "environments": [], "runtimeWorkspaceRoots": [],
             "config": {"model_reasoning_effort": self.value.reasoning_effort}})
 
@@ -511,7 +513,7 @@ class CodexAgentRuntime:
         began_elapsed = elapsed()
         active_seconds = self.active_seconds if value.active_seconds is None else value.active_seconds
         try:
-            if len((value.prompt + BASE_INSTRUCTIONS + value.developer_instructions).encode()) > limits.CONTEXT_BYTES:
+            if len((value.prompt + value.base_instructions + value.developer_instructions).encode()) > limits.CONTEXT_BYTES:
                 raise AgentFailure("AGENT_CONTEXT_LIMIT")
             # A turn runs beside imports and rewrites on either provider (D121).
             with self.admission.hold(cancel, deadline=queued + limits.ADMISSION_SECONDS), native_profile(
