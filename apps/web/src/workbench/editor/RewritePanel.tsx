@@ -1,14 +1,19 @@
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { rulesRequest } from "../../api/client";
 import { Icon } from "../ui/Icon";
 import { rewriteCancellable, rewriteLabels, type RewriteActivity } from "../../rich/rewrite-progress";
+import { textChanges, type TextPart } from "../../rich/text-changes";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import { RewriteOptions, useRewriteSettings } from "./RewriteOptions";
 
 // Used until the saved presets from Settings are read, and when that read fails.
 const builtInPresets = { shorten: "Сократи текст, сохрани факты и смысл.", clarify: "Сделай текст яснее, сохрани факты и смысл." };
+
+function marked(parts: TextPart[], Mark: "del" | "ins") {
+  return parts.map((part, index) => part.changed ? <Mark key={index}>{part.text}</Mark> : part.text);
+}
 
 export function RewritePanel({ open, close, instruction, change, submit, apply, preview, editPreview, busy, source, error, activity, cancel, anchor, focusInstruction }: {
   open: boolean; close: () => void; instruction: string; change: (value: string) => void;
@@ -20,6 +25,9 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
   const dialog = useRef<HTMLElement>(null), returnFocus = useRef<HTMLElement | null>(null);
   const [presets, setPresets] = useState(builtInPresets);
   const settings = useRewriteSettings(open);
+  // Against the edited text, so the marks show what Apply would change.
+  const previewText = preview?.text ?? null;
+  const changes = useMemo(() => previewText === null ? null : textChanges(source, previewText), [source, previewText]);
   // Read on every opening: Settings may have saved new presets while this editor stayed mounted.
   useEffect(() => {
     if (!open) return;
@@ -58,9 +66,13 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     }}>
     <div className="dialog-heading"><div><h2 id="uir-rewrite-title">Изменить текст</h2></div><button className="icon" aria-label={busy ? "Скрыть" : "Закрыть"} onClick={close}><Icon name="close" /></button></div>
     {!preview && <details className="rewrite-original"><summary>Выделено: {source.length} знаков</summary><blockquote className="rewrite-source">{source}</blockquote></details>}
-    {preview ? <>
-      <section className="rewrite-result"><label htmlFor="uir-rewrite-result">Новый текст</label>
-        <textarea id="uir-rewrite-result" rows={5} maxLength={65536} disabled={busy || preview.applied === true} value={preview.text} onChange={event => editPreview(event.currentTarget.value)} /></section></>
+    {preview && changes ? <>
+      <section className="rewrite-before"><h3>Было</h3><p className="rewrite-source">{marked(changes.before, "del")}</p></section>
+      <section className="rewrite-result"><label htmlFor="uir-rewrite-result">Станет</label>
+        {/* A copy of the text under the transparent field carries the marks while it is edited; the trailing space keeps a
+            final empty line, as the field has one. */}
+        <div className="rewrite-after"><div className="rewrite-marks" aria-hidden="true">{marked(changes.after, "ins")}{" "}</div>
+          <textarea id="uir-rewrite-result" maxLength={65536} disabled={busy || preview.applied === true} value={preview.text} onChange={event => editPreview(event.currentTarget.value)} /></div></section></>
       : fields}
     {preview && <details className="rewrite-adjust"><summary>Изменить инструкцию</summary>{fields}</details>}
     <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{errorMessage(error)}</p> : busy && activity ? <>

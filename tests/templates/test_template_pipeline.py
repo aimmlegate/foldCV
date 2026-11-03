@@ -1033,3 +1033,26 @@ async def test_an_import_that_cannot_be_assembled_fails_alone_and_the_project_st
     fixture.restart()
     assert fixture.current().project is None
     assert fixture.current().pre_draft.template_operations[0].state != 'published'
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_technology_name_shows_no_source_line(tmp_path):
+    # A technology list cites lines of the whole CV; a rejected name must not put those lines under the list.
+    src, raw = employment_source()
+    fixture = EmploymentFixture(tmp_path, captured=employment_package(), src=src, original_bytes=raw, cap=2, fallback=False)
+    def script(_request, value):
+        if 'targets' not in value:
+            reply = employment_proposal(src)
+            # An invented name (the coordinator settles a name it finds in its cited line, D115) citing two lines.
+            reply['payload'][0]['technologies'][0]['display'] = 'Git'
+            field = next(entry for entry in reply['fields'] if entry['pointer'] == '/0/technologies/0/display')
+            field['evidence'] = [span(src, 'Python'), span(src, 'Implemented queue processing.')]
+            return reply
+        cell = next(allocation['cellIds']['display'] for allocation in value['handleMap'] if allocation['key'] == 'technology')
+        return failing_review(value, [target for target in model_targets(value) if target['targetId'] == cell])
+    fixture.transport.scripted = script
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    assert not any(record.kind == 'technology' for record in fixture.current().project.facts.records)
+    outcome = result.task_results[0]
+    assert outcome.disposition == 'source_fallback' and outcome.value['sourceTexts'] == {} and outcome.source_spans == []
+    assert result.issues and 'Неверно' in result.issues[0].message

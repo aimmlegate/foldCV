@@ -157,6 +157,11 @@ def _rewrite(content, selected, operation, allocator, bound, flanks, *, path=(),
         inserted_span.fragment_id = allocator.allocate('manual-fragment', ['replace-scope-text', bound.scope_id,
             bound.occurrence_id, selected.start, selected.end, list(path)])
         inserted = [inserted_span]
+    elif isinstance(bound, FactFieldSpan) and not operation.text and any(isinstance(span, FactFieldSpan)
+            and _identity(span) == _identity(bound) for span, _start, _end in _leaves(prefix + suffix)):
+        # A deletion adds no empty fragment while the field keeps another one here; only an emptied field keeps one, as
+        # the place to type into. Each deleted letter used to leave one behind.
+        inserted = []
     elif isinstance(bound, FactFieldSpan):
         inserted_span = bound.model_copy(deep=True)
         inserted_span.text, inserted_span.styles = operation.text, operation.styles.model_copy(deep=True)

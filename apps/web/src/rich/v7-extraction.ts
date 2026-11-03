@@ -7,8 +7,7 @@ import { containerKey, correctionRange, type ClipboardSource, type LocalContaine
 type Styles = Extract<V7Operation, { kind: "set_marks" }>["styles"];
 /** One operation in optimistic coordinates with the container texts it was expressed against. */
 export type ExtractedOperation = { operation: V7Operation; prior: ReadonlyMap<string, string> };
-/** `recordId`: the technology whose name a deletion would empty, so the session can remove it instead (D127). */
-export type Extraction = { kind: "operations"; operations: ExtractedOperation[] } | { kind: "unsupported"; reason: string; code?: string; recordId?: string };
+export type Extraction = { kind: "operations"; operations: ExtractedOperation[] } | { kind: "unsupported"; reason: string; code?: string };
 type Located = { container: LocalContainer; node: Node; start: number; depth: number; type: string };
 
 const structureMeta = "foldcv.v7.structure";
@@ -18,8 +17,8 @@ const textBlocks = new Set(["paragraph", "heading", "bulletListItem", "numberedL
 const editable = new Set([...textBlocks, "section"]);
 const flags = new Set(["bold", "italic", "underline", "strike", "code"]);
 
-class Unsupported extends Error { constructor(reason: string, readonly code?: string, readonly recordId?: string) { super(reason); } }
-function unsupported(reason: string, code?: string, recordId?: string): never { throw new Unsupported(reason, code, recordId); }
+class Unsupported extends Error { constructor(reason: string, readonly code?: string) { super(reason); } }
+function unsupported(reason: string, code?: string): never { throw new Unsupported(reason, code); }
 
 const leafText = (leaf: Node) => leaf.type.name === "hardBreak" ? "\n" : "";
 function textOf(node: Node, from = 0, to = node.content.size): string { return node.textBetween(from, to, "", leafText); }
@@ -73,13 +72,24 @@ function stylesOf(marks: readonly Mark[]): Styles {
   try { return wireMarks(value); } catch { return unsupported("unsupported color"); }
 }
 
+/** An empty field fragment beside text of the same field: Python keeps no empty fragment there (only an emptied field keeps
+ * one), so the text joins that neighbour instead. */
+function emptyFieldSide(position: ResolvedPos): Side {
+  const field = position.parent, host = position.node(position.depth - 1), index = position.index(position.depth - 1);
+  const same = (node: Node) => node.type.name === "templateField" && node.attrs["occurrenceId"] === field.attrs["occurrenceId"]
+    && node.attrs["cellId"] === field.attrs["cellId"];
+  for (let at = index - 1; at >= 0 && same(host.child(at)); at--) if (host.child(at).content.size > 0) return "before";
+  for (let at = index + 1; at < host.childCount && same(host.child(at)); at++) if (host.child(at).content.size > 0) return "after";
+  return "anchor";
+}
+
 /** The editor node that received a collapsed insertion decides its side; text never decides ownership. */
 function sideAt(doc: Node, pos: number, insertedLink: boolean): Side {
   const position = doc.resolve(pos), parent = position.parent;
   if (identities.has(parent.type.name)) {
     if (parent.type.name === "boundLink") return unsupported("collapsed input inside a bound link");
     if (parent.type.name === "templateField" && parent.attrs["complete"] !== true) return unsupported("input in an incomplete field");
-    if (parent.content.size === 0) return "anchor";
+    if (parent.content.size === 0) return parent.type.name === "templateField" ? emptyFieldSide(position) : "anchor";
     return position.parentOffset === 0 ? "after" : position.parentOffset === parent.content.size ? "before" : "interior";
   }
   // Python inserts literal text only at an addressed literal; inside a link there is none.
@@ -93,44 +103,26 @@ function sideAt(doc: Node, pos: number, insertedLink: boolean): Side {
   return unsupported("input between two non-literal nodes");
 }
 
-/** The technology names of a text container with their text offsets; one name may hold several fragments. */
-function technologyNames(node: Node): { record: string; start: number; end: number }[] {
-  const names: { record: string; start: number; end: number }[] = [];
-  let cursor = 0;
-  node.descendants(child => {
-    if (child.type.name === "templateField" && child.attrs["fieldKey"] === "display") {
-      const length = textOf(child).length;
-      names.push({ record: String(child.attrs["recordId"]), start: cursor, end: cursor + length });
-      cursor += length;
-      return false;
-    }
-    if (child.isText) cursor += child.text?.length ?? 0;
-    else if (child.type.name === "hardBreak") cursor += 1;
-    return true;
+/** Whether a text block shows a technology name (only technologies have a `display` field). Such lines are built from
+ * Facts and change only there (D131): typing, styles, paste and rewrites stay out, and Enter or a join would break their
+ * names apart. */
+export function technologyLine(node: Node | null | undefined): boolean {
+  let found = false;
+  node?.descendants(child => {
+    if (child.type.name === "templateField" && child.attrs["fieldKey"] === "display") found = true;
+    return !found;
   });
-  return names;
+  return found;
 }
-
-/** Facts and the other lists read a technology by its name, so a chip stays one name: input cannot empty it or run across it.
- * A deletion that would empty one name reports its record: the session removes the technology, as Facts «Убрать» does. */
-function guardTechnologyNames(node: Node, start: number, end: number, text: string): void {
-  if (start === end) return;
-  const names = technologyNames(node), touched = names.filter(name => name.start < end && name.end > start);
-  const records = new Set(touched.map(name => name.record));
-  if (!records.size) return;
-  const whole = touched.reduce((covered, name) => covered + Math.min(end, name.end) - Math.max(start, name.start), 0) === end - start;
-  if (records.size > 1 || !whole) unsupported("input runs across technology names", "TECHNOLOGY_EDIT_SINGLE");
-  const prior = textOf(node), kept = names.filter(name => records.has(name.record))
-    .map(name => prior.slice(name.start, Math.max(name.start, Math.min(start, name.end))) + prior.slice(Math.min(name.end, Math.max(end, name.start)), name.end)).join("");
-  if (!(kept + text).trim()) unsupported("input empties a technology name", "TECHNOLOGY_NAME_EMPTY", text === "" ? [...records][0] : undefined);
-}
-
-/** Chip lines are built from Facts: Enter inside one or a join with its neighbour would break the line's names apart. */
+/** Input refused in a technology line; the notice sends the user to Facts. */
+export const technologyLocked = "technology lines change in Facts";
+/** Enter or Backspace at a chip line's edge: the keys offer no action there, so nothing is said. */
 export const technologyLines = "technology lines keep their structure";
-function technologyLine(node: Node | null | undefined): boolean { return !!node && technologyNames(node).length > 0; }
+function lockedLine(node: Node): void { if (technologyLine(node)) unsupported(technologyLocked, "TECHNOLOGY_IN_FACTS"); }
 
 function replaced(doc: Node, after: Node, step: ReplaceStep): ExtractedOperation {
   const from = locate(doc.resolve(step.from)), to = locate(doc.resolve(step.to));
+  lockedLine(from.node); lockedLine(to.node);
   if (from.start !== to.start) return unsupported("input spans several containers");
   // Open edge nodes only close partial nodes around the range; any closed node would be new structure.
   const inserted: Node[] = [], content = step.slice.content;
@@ -144,7 +136,6 @@ function replaced(doc: Node, after: Node, step: ReplaceStep): ExtractedOperation
   const text = step.slice.content.textBetween(0, step.slice.content.size, "", leafText);
   const prior = textOf(from.node), start = offset(from, step.from), end = offset(from, step.to);
   if (!text && start === end) return unsupported("structure-only change");
-  guardTechnologyNames(from.node, start, end, text);
   const result = find(after, from.container);
   if (!result || textOf(result.node) !== prior.slice(0, start) + text + prior.slice(end)) return unsupported("input changed text outside its range");
   const styles = inserted.map(node => stylesOf(node.marks)), first = styles[0] ?? stylesOf([]);
@@ -167,7 +158,10 @@ function marked(transaction: Transaction): ExtractedOperation[] {
       const located = locate(doc.resolve(pos + 1)), key = containerKey(located.container);
       const start = offset(located, Math.max(from, located.start)), end = offset(located, Math.min(to, located.start + node.content.size));
       const known = ranges.get(key);
-      if (start < end) ranges.set(key, { located, start: Math.min(start, known?.start ?? start), end: Math.max(end, known?.end ?? end) });
+      if (start < end) {
+        lockedLine(node);
+        ranges.set(key, { located, start: Math.min(start, known?.start ?? start), end: Math.max(end, known?.end ?? end) });
+      }
       return false;
     });
   });
@@ -197,7 +191,7 @@ function marked(transaction: Transaction): ExtractedOperation[] {
 export function markable(state: EditorState): boolean {
   try {
     const selection = state.selection, bold = state.schema.marks["bold"];
-    if (selection.empty) { locate(selection.$from); return true; }
+    if (selection.empty) return !technologyLine(locate(selection.$from).node);
     if (!bold) return false;
     marked(state.tr.addMark(selection.from, selection.to, bold.create()));
     return true;
@@ -222,10 +216,35 @@ export function extractOperations(transaction: Transaction): Extraction {
       return replaced(before, after, step);
     }) };
   } catch (error) {
-    if (error instanceof Unsupported) return { kind: "unsupported", reason: error.message, ...(error.code ? { code: error.code } : {}),
-      ...(error.recordId ? { recordId: error.recordId } : {}) };
+    if (error instanceof Unsupported) return { kind: "unsupported", reason: error.message, ...(error.code ? { code: error.code } : {}) };
     throw error;
   }
+}
+
+/** Whether the selection would change a technology line: a caret or range in one, or whole selected blocks that are all
+ * such lines. A whole-block selection that also holds other blocks removes part of the document, not technologies. */
+export function technologySelected(state: EditorState): boolean {
+  const blocks = selectedBlocks(state);
+  if (blocks) {
+    const wanted = new Set(blocks);
+    let lines = 0;
+    state.doc.descendants(node => {
+      if (node.type.name === "blockContainer" && wanted.has(String(node.attrs["id"])) && technologyLine(node.firstChild)) lines++;
+      return true;
+    });
+    return lines === wanted.size;
+  }
+  const { from, to, empty } = state.selection;
+  let found = false;
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (found || !node.isTextblock) return !found;
+    // As for block styles (`selectedTextBlocks`): a range that ends at the start of a block does not reach it.
+    const start = pos + 1, end = start + node.content.size;
+    const reached = empty ? from >= start && from <= end : start === end ? from <= start && to > start : from < end && to > start;
+    found = reached && technologyLine(node);
+    return false;
+  });
+  return found;
 }
 
 function collapsedText(state: EditorState): Located & { pos: number; offset: number } {

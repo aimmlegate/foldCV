@@ -80,7 +80,7 @@ events.length = 0;
 const gate = deferred();
 const editor: TemplateEditorHandle = {
   background: true, navigate: () => gate.promise, resume: async () => { events.push("resume"); }, refresh: async () => {},
-  flush: async () => { throw new Error("Unexpected flush"); }, undo: () => {}, redo: () => {},
+  flush: async () => { throw new Error("Unexpected flush"); }, print: async () => { throw new Error("Unexpected print"); }, undo: () => {}, redo: () => {},
   applyAssistant: () => Promise.reject(new Error("Unexpected apply")), captureSelection: () => null, focusFinding: () => false,
 };
 hook.templateEditor.current = editor;

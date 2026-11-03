@@ -22,7 +22,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = 'ae4d2e72359f71635c1a5e17d223d3b19cf8407cc73c4f9f9ceb20045ea06033'
+TWO_COLUMN_HASH = 'c22f5ab9365ea15ad9bb3d503fbaf6557e9c05393f07bc480c5d4e2e60d2d5c8'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 
 

@@ -282,11 +282,19 @@ export function useResumeWorkspace() {
     }, "Сохраняем изменения");
     return finished ? outcome.delivery : null;
   }
+  /** The PDF export: the editor prints its sheet; the title names the saved file. */
+  async function printPdf(title: string) {
+    return action(async () => {
+      const editor = templateEditor.current;
+      if (!editor) throw new Error("Сначала откройте резюме.");
+      await editor.print(title);
+    }, "Открываем печать");
+  }
   const importActions = {
     stop: (id: string) => void tracker.current?.stop(id), retry: (id: string) => void tracker.current?.retry(id),
     dismiss: (id: string) => tracker.current?.dismiss(id), reopen: (id: string) => void reopenImported(id),
   };
   return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects,
     error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, settings, setSettings,
-    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, dismissError };
+    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, printPdf, dismissError };
 }

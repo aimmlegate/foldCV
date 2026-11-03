@@ -1,10 +1,18 @@
-"""What the no-rewrite mode still changes in source wording: list punctuation and the candidate's contacts."""
+"""What the no-rewrite mode still changes in source wording: the form a source gives a claim (list markers, field
+labels, closing punctuation) and the candidate's contacts. The words of the claim stay."""
 
 import re
 
 
 # A symbol marker needs a space or a letter after it, so "-5% затрат" keeps its sign.
 _MARKER = re.compile(r'^\s*(?:[-–—―•·∙◦▪▫●○■□*‣⁃►▸✓✔]+(?:\s+|(?=[^\W\d_]))|\d{1,3}[.)]\s+)')
+# A source names the kind of a claim before it ("Результат: …", "Суть проекта: …"); the template has its own field
+# for that kind, so the label is form, not wording. Only known labels with a colon count: "Этап 1: анализ" stays.
+_LABELS = (r'задачи|задача|обязанности|функции|результаты?|достижения?|итоги?|суть проекта|описание проекта|описание|'
+    r'проект|проблема|решение|средства|инструменты|основные технологии|технологии|стек технологий|стек|роль|участие|'
+    r'цель|tasks?|responsibilities|duties|results?|achievements?|outcomes?|project|description|summary|problem|'
+    r'solution|tools|technologies|tech stack|stack|role|goal')
+_LABEL = re.compile(rf'^\s*(?:{_LABELS})\s*:\s*', re.I)
 _ABBREVIATION = re.compile(r'(?:^|[\s(])(?:и\s+т\.\s?[дп]|т\.\s?[дпе]|и\s+др|и\s+пр|см|гг?|etc|inc|ltd|llc|corp|co)\.$', re.I)
 
 _EMAIL = r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+'
@@ -22,9 +30,25 @@ _SEPARATORS = re.compile(r'\s*([,;|/])(?:\s*[,;|/])+')
 _EDGE = ' \t,;|/:-–—'
 
 
+def without_form(text):
+    """The lines of the text without their list markers and field labels; a line of nothing but a label goes too.
+    A marker may follow a label ("Задачи: - разработка") and a label a marker ("- Результат: …")."""
+    lines = []
+    for line in text.split('\n'):
+        previous = None
+        while previous != line:
+            previous, line = line, _LABEL.sub('', _MARKER.sub('', line))
+        if line.strip() or not lines:
+            lines.append(line)
+    while len(lines) > 1 and not lines[0].strip():
+        lines.pop(0)
+    result = '\n'.join(lines)
+    return result if result.strip() else text
+
+
 def list_item_text(text):
     """A list item without its source marker and closing punctuation; the template draws its own bullets."""
-    lines = [_MARKER.sub('', line) for line in text.split('\n')]
+    lines = without_form(text).split('\n')
     last = lines[-1].rstrip()
     if not last.endswith(('...', '…')) and not _ABBREVIATION.search(last):
         last = last.rstrip(' .;,')
@@ -50,5 +74,7 @@ def without_contacts(text):
 def clean_source_wording(text, pointer):
     """Source wording as the resume shows it; `pointer` tells a list item from a text field."""
     cleaned = without_contacts(text)
+    if not cleaned.strip():
+        return cleaned
     listed = any(token.isdecimal() for token in pointer.strip('/').split('/')[1:])
-    return list_item_text(cleaned) if listed and cleaned.strip() else cleaned
+    return list_item_text(cleaned) if listed else without_form(cleaned)

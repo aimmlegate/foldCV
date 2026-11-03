@@ -1,7 +1,8 @@
 # FoldCV
 
 Local resume editor. It imports a PDF, DOCX, TXT or Markdown resume, extracts its
-facts into a template, lets you edit and rewrite the text, and exports DOCX.
+facts into a template, lets you edit and rewrite the text, and exports DOCX, or PDF
+through the system print window.
 
 Projects stay on your computer in `~/Library/Application Support/FoldCV`. Model work
 runs through your own Codex or Claude CLI sign-in. FoldCV has no server of its own

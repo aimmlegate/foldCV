@@ -1,0 +1,33 @@
+/* Export: the format choice, and the copy of the sheet that the PDF export prints (D133). */
+.export-formats { display: grid; gap: 10px; margin: 23px 0; }
+.export-formats .export-format { margin: 0; cursor: pointer; }
+.export-formats .export-format:not(:has(input:checked)) { background: transparent; }
+.export-formats .export-format:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.export-formats .export-format:has(input:disabled) { cursor: default; }
+.print-hint { margin: 0; color: var(--muted); font-size: var(--ui-small); line-height: 1.5; }
+
+/* The copy is measured off screen and shown only on paper. Rules that change its layout apply to both, so the measured lines
+   are the printed ones. */
+.print-root { display: none; }
+.print-root.print-measure { display: block; position: absolute; top: 0; left: -100000px; visibility: hidden; pointer-events: none; }
+.print-root, .print-root * { animation: none !important; transition: none !important; }
+.print-root .resume-paper { min-height: 0; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+/* The screen's room under the sheet; each page keeps the template's bottom margin instead. */
+.print-root .fcv-sheet { padding-bottom: 0; }
+/* An empty block's hint and a selected node's frame are the editor's. */
+.print-root .bn-block-content::after { content: none !important; }
+/* Each page is a copy of the sheet with only its own blocks, down to the body's bottom. Its contained box keeps WebKit from
+   breaking it again by the printer's own page height, which moved a line near the bottom. */
+.print-root .print-hidden { display: none !important; }
+.print-root .print-page { contain: strict; overflow: hidden; break-after: page; }
+.print-root .print-page:last-child { break-after: auto; }
+@media print {
+  /* The app's frame clips the window; the printed pages need the whole copy. */
+  html, body { display: block !important; width: auto !important; height: auto !important; min-height: 0 !important;
+    margin: 0 !important; padding: 0 !important; overflow: visible !important; background: #fff !important; }
+  body:has(> .print-root) > :not(.print-root) { display: none !important; }
+  .print-root { display: block; }
+  .print-root * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* A link prints as the DOCX shows it: in its run's own look, without the editor's dotted line. */
+  .print-root .fcv-sheet .fcv-link, .print-root .fcv-sheet .bn-editor a { text-decoration: none; }
+}

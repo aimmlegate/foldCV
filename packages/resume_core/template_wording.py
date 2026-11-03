@@ -1,9 +1,11 @@
 """Keep exact source display text while retaining reviewed interpretations separately."""
 
+import re
+
 from .models.template_import import EvidenceOption
 from .template_completion import stating, stating_words
 from .template_import import digest
-from .template_source_cleanup import clean_source_wording
+from .template_source_cleanup import clean_source_wording, without_form
 from .templates.compiler import canonical
 
 
@@ -35,10 +37,32 @@ def own_evidence(raw, evidence, units, captured):
 
 
 def display_raw_input(review, field, raw):
+    """What a field shows. Without rewriting a value keeps the words of its cited lines: the model's value stays when
+    every sentence of it is in them word for word (it may split a line into claims, drop the label and the marker, or
+    assign a claim to its field), and the cited lines themselves show when it is not (a paraphrase)."""
     if (review.allow_text_rewrite or not isinstance(raw, str) or not raw.strip()
             or field.pointer not in review.semantic_context.get('sourceWordingPointers', [])):
         return display_text(raw)
-    return clean_source_wording(source_wording(review, field, raw), field.pointer)
+    wording = source_wording(review, field, raw)
+    return clean_source_wording(raw if verbatim(raw, wording) else wording, field.pointer)
+
+
+_SENTENCE = re.compile(r'(?<=[.!?;])\s+|\n+')
+
+
+def _plain(text):
+    return ' '.join(text.split()).casefold()
+
+
+def verbatim(value, source):
+    """Whether every sentence of the value is in the source word for word. Case, spacing, markers, labels and closing
+    punctuation are form; the order of sentences and what a sentence leaves out are not checked beyond each sentence."""
+    plain = _plain(source)
+    if not plain:
+        return False
+    sentences = [_plain(without_form(part)).rstrip(' .;,:') for part in _SENTENCE.split(value)]
+    sentences = [sentence for sentence in sentences if sentence]
+    return bool(sentences) and all(sentence in plain for sentence in sentences)
 
 
 def source_wording(review, field, raw):

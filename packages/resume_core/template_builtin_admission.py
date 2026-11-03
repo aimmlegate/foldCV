@@ -64,6 +64,44 @@ class WithheldOwner(ValueError):
     """The owner a new record needs was not admitted: the record waits with it, the block's other values stay."""
 
 
+def inferred_owner_relations(proposal, allocations, declarations, facts, sources, relations):
+    """The employment a new subproject joins when its reply names none: in an entry request (D117) the outline may
+    have cut the projects of an employer from the lines that name it, so the model cannot state the employer. A CV
+    lists an employer's projects under it, so the subproject joins the nearest employment above its first cited line.
+    The relations stand in for the reply's during admission only; the record keeps its owner as its job id."""
+    from .models.template_facts import Relation
+    owned = {relation.subject_id for relation in relations if relation.active and relation.kind == 'owned_by'}
+    known = {record.id for record in facts.records}
+    order = {(source.id, unit.id): (index, position) for index, source in enumerate(sources)
+        for position, unit in enumerate(source.units)}
+    def position(source_id, unit_id, text=None, start=0):
+        unit = next((unit for source in sources if source.id == source_id for unit in source.units if unit.id == unit_id), None)
+        if unit is None or (source_id, unit_id) not in order:
+            return None
+        offset = unit.text.find(text) if text else start
+        return (*order[(source_id, unit_id)], max(offset, 0))
+    employments = []
+    for record in facts.records:
+        if record.kind != 'employment':
+            continue
+        starts = [place for span in record.evidence if (place := position(span.source_id, span.unit_id, span.text)) is not None]
+        if starts:
+            employments.append((min(starts), record.id))
+    result = []
+    for handle in dict.fromkeys(field.item_handle for field in proposal.resolved_fields):
+        allocation = allocations[handle]
+        if (declarations[allocation.semantic_type].builtin_kind != 'subproject' or allocation.record_id in known
+                or allocation.record_id in owned):
+            continue
+        starts = [place for field in proposal.resolved_fields if field.item_handle == handle for span in field.evidence
+            if (place := position(span.source_id, span.unit_id, start=span.start)) is not None]
+        above = [(place, identifier) for place, identifier in employments if starts and place <= min(starts)]
+        if above:
+            result.append(Relation(id='relation-inferred-' + allocation.record_id, kind='owned_by',
+                subjectId=allocation.record_id, targetId=max(above)[1], revision=1, active=True))
+    return result
+
+
 def owner_values(record_id, operation, facts, declarations, relations):
     from .template_capture import item_identities
     records = {record.id: record for record in facts.records}

@@ -246,3 +246,59 @@ def test_disabled_rewriting_shows_a_cited_line_without_its_line_break():
     allocation = next(value for value in admitted.allocations if value.key == 'tasks-entry')
     claim = next(record for record in after.records if record.id == allocation.record_id)
     assert claim.value.raw_text == 'Implemented queue processing'
+
+
+def test_disabled_rewriting_keeps_a_value_that_is_part_of_its_cited_line():
+    # A sentence taken from a longer line, with its label and marker gone, is source wording in the template's form.
+    package = employment_package()
+    src, _raw = employment_source()
+    reply = employment_proposal(src)
+    unit = src.units[0]
+    start = unit.text.index('Our team reduced')
+    line = capture_span(src, unit, start, unit.text.index('\n', start) + 1).model_dump(by_alias=True)
+    field = next(value for value in reply['fields'] if value['pointer'] == '/0/results/0/value')
+    field['evidence'] = [line]
+    reply['payload'][0]['results'][0]['value'] = '- Result: reduced median latency from 800 ms to 500 ms.'
+    operation, facts, proposed, _package, _src = proposed_from(package, src, reply, allow_text_rewrite=False)
+    admitted, after = accept(operation, facts, proposed, package, src)
+    allocation = next(value for value in admitted.allocations if value.key == 'results-entry')
+    claim = next(record for record in after.records if record.id == allocation.record_id)
+    assert claim.value.raw_text == 'reduced median latency from 800 ms to 500 ms'
+
+
+def test_an_entry_subproject_without_an_employer_joins_the_employment_above_its_lines():
+    # D117 cut the four projects of one employer from its lines; the model named no company and the projects were lost.
+    from types import SimpleNamespace
+    from packages.resume_core.template_builtin_admission import inferred_owner_relations
+    units = [SimpleNamespace(id='u1', text='Acme\nProgrammer\n'), SimpleNamespace(id='u2', text='Tasks: - built a service\n'),
+        SimpleNamespace(id='u3', text='Projects: - Project: Integration layer\n'), SimpleNamespace(id='u4', text='Globex\nProgrammer\n')]
+    sources = [SimpleNamespace(id='s', units=units)]
+    evidence = lambda unit, text: SimpleNamespace(source_id='s', unit_id=unit, text=text)
+    facts = SimpleNamespace(records=[
+        SimpleNamespace(id='job-1', kind='employment', evidence=[evidence('u1', 'Acme')]),
+        SimpleNamespace(id='job-2', kind='employment', evidence=[evidence('u4', 'Globex')])])
+    declarations = {'sub': SimpleNamespace(builtin_kind='subproject'), 'job': SimpleNamespace(builtin_kind='employment')}
+    allocations = {'item-sub': SimpleNamespace(record_id='sub-1', semantic_type='sub'),
+        'item-late': SimpleNamespace(record_id='sub-2', semantic_type='sub'),
+        'item-owned': SimpleNamespace(record_id='sub-3', semantic_type='sub')}
+    cited = lambda unit, start: SimpleNamespace(source_id='s', unit_id=unit, start=start, end=start + 1)
+    proposal = SimpleNamespace(resolved_fields=[
+        SimpleNamespace(item_handle='item-sub', evidence=[cited('u3', 20)]),
+        SimpleNamespace(item_handle='item-late', evidence=[cited('u4', 0)]),
+        SimpleNamespace(item_handle='item-owned', evidence=[cited('u3', 20)])])
+    owned = SimpleNamespace(active=True, kind='owned_by', subject_id='sub-3', target_id='job-2')
+    relations = inferred_owner_relations(proposal, allocations, declarations, facts, sources, [owned])
+    assert [(value.subject_id, value.target_id, value.kind, value.active) for value in relations] == [
+        ('sub-1', 'job-1', 'owned_by', True), ('sub-2', 'job-2', 'owned_by', True)]
+
+
+def test_a_subproject_before_any_employment_keeps_no_inferred_owner():
+    from types import SimpleNamespace
+    from packages.resume_core.template_builtin_admission import inferred_owner_relations
+    sources = [SimpleNamespace(id='s', units=[SimpleNamespace(id='u1', text='Project: Tool\nAcme\n')])]
+    facts = SimpleNamespace(records=[SimpleNamespace(id='job', kind='employment',
+        evidence=[SimpleNamespace(source_id='s', unit_id='u1', text='Acme')])])
+    proposal = SimpleNamespace(resolved_fields=[SimpleNamespace(item_handle='item',
+        evidence=[SimpleNamespace(source_id='s', unit_id='u1', start=0, end=5)])])
+    assert inferred_owner_relations(proposal, {'item': SimpleNamespace(record_id='sub', semantic_type='sub')},
+        {'sub': SimpleNamespace(builtin_kind='subproject')}, facts, sources, []) == []
