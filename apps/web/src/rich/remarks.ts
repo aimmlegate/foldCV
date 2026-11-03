@@ -12,7 +12,14 @@ type FactsInput = { records: readonly unknown[] };
 /** The marked places with the remarks on each: shown fields by cell ID, and blocks whose own text is marked. */
 export type RemarkMarks = { cells: ReadonlyMap<string, readonly string[]>; blocks: ReadonlyMap<string, readonly string[]> };
 
-export const DOUBTFUL_VALUE = "Значение не распознано однозначно. Проверьте его.";
+/** What a doubtful value's mark says: it names the value, so the tip speaks of the place it is on (D130). */
+export function doubtfulValue(rawText: unknown, what: "value" | "date" | "present" | "datedEnd" = "value"): string {
+  const shown = typeof rawText === "string" && rawText.trim() ? ` «${rawText.trim()}»` : "";
+  if (what === "date") return `Дата${shown} не распознана однозначно. Проверьте её в фактах.`;
+  if (what === "present") return `Отметка о текущей работе${shown} не распознана однозначно. Проверьте период в фактах.`;
+  if (what === "datedEnd") return `Указана дата окончания${shown}, хотя работа отмечена как текущая. Проверьте период в фактах.`;
+  return `Значение${shown} не распознано однозначно. Проверьте его в фактах.`;
+}
 export const remarkMarksMeta = "foldcv-remark-marks";
 
 const cellId = (recordId: string, key: string): string => JSON.stringify(["fact", recordId, key]);
@@ -28,8 +35,9 @@ function shownCells(block: OutlineBlock): string[] {
 
 /** The fields Python could not read as one value (the panel's «Проверьте значение»), as fact cell IDs. A current period's
  * end label is no doubt; a dated end beside «present» is. */
-function doubtfulCells(facts: FactsInput | undefined): string[] {
-  const result: string[] = [];
+function doubtfulCells(facts: FactsInput | undefined): [string, string][] {
+  const result: [string, string][] = [];
+  const raw = (value: unknown) => field(value, "rawText");
   for (const record of facts?.records ?? []) {
     const id = field(record, "id");
     if (typeof id !== "string" || typeof record !== "object" || record === null) continue;
@@ -38,18 +46,19 @@ function doubtfulCells(facts: FactsInput | undefined): string[] {
         for (const period of Array.isArray(value) ? value : []) {
           const periodId = field(period, "id"), present = field(field(period, "present"), "value") === true;
           if (typeof periodId !== "string") continue;
-          const end = field(field(period, "end"), "rawText");
-          const endDoubtful = present && typeof end === "string" && end.trim() ? !currentMarker(end) && !userCorrected(field(period, "end"))
-            : needsCheck(field(period, "end"));
-          if (needsCheck(field(period, "start"))) result.push(cellId(id, `period:${periodId}:start`));
-          if (endDoubtful) result.push(cellId(id, `period:${periodId}:end`));
-          if (needsCheck(field(period, "present"))) result.push(cellId(id, `period:${periodId}:present`));
+          const start = field(period, "start"), end = field(period, "end"), endText = raw(end);
+          const datedEnd = present && typeof endText === "string" && endText.trim() !== "";
+          const endDoubtful = datedEnd ? !currentMarker(endText) && !userCorrected(end) : needsCheck(end);
+          if (needsCheck(start)) result.push([cellId(id, `period:${periodId}:start`), doubtfulValue(raw(start), "date")]);
+          if (endDoubtful) result.push([cellId(id, `period:${periodId}:end`), doubtfulValue(endText, datedEnd ? "datedEnd" : "date")]);
+          if (needsCheck(field(period, "present")))
+            result.push([cellId(id, `period:${periodId}:present`), doubtfulValue(raw(field(period, "present")), "present")]);
         }
         continue;
       }
       // A technology's catalog key is internal; an unknown one does not make its source label doubtful.
       if (key === "canonicalId" || typeof field(value, "status") !== "string") continue;
-      if (needsCheck(value)) result.push(cellId(id, key));
+      if (needsCheck(value)) result.push([cellId(id, key), doubtfulValue(raw(value))]);
     }
   }
   return result;
@@ -91,7 +100,7 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
       lines(block).forEach(id => add(marked, id, message));
     }
   }
-  for (const id of doubtfulCells(facts)) if (shown.has(id)) add(cells, id, DOUBTFUL_VALUE);
+  for (const [id, message] of doubtfulCells(facts)) if (shown.has(id)) add(cells, id, message);
   return { cells, blocks: marked };
 }
 

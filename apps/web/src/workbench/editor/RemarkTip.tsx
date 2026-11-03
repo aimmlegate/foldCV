@@ -36,8 +36,12 @@ export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | nu
       setShown({ ...remark, left: rect.left, top: rect.top, bottom: rect.bottom });
     };
     const leave = () => hideSoon();
-    // A press or a selection means the user is at work in the text: the tip gets out of the way at once.
-    const hide = () => { cancelHide(); setShown(null); };
+    // A press or a selection means the user is at work in the text: the tip gets out of the way at once. A press on the tip
+    // itself is its button: hiding then would unmount the button before its click.
+    const hide = (event?: Event) => {
+      if (event && tip.current && event.target instanceof Node && tip.current.contains(event.target)) return;
+      cancelHide(); setShown(null);
+    };
     const selection = () => { if (!document.getSelection()?.isCollapsed) hide(); };
     element.addEventListener("mouseover", over);
     element.addEventListener("mouseleave", leave);

@@ -50,7 +50,22 @@ def test_first_active_group_keeps_a_canonical_technology_and_unassigned_project_
     assert result.value == {'active': ['tech-a', 'tech-b'], 'kept': {'tech-a': ['a-python'], 'tech-b': ['b-tool']},
         'hidden': {'tech-a': [], 'tech-b': ['b-python', 'b-tool-2']}, 'added': ['job-perl'], 'uncertainGroup': 'tech-b'}
     assert [(issue.code, issue.target_ids) for issue in result.issues] == [('IMPORT_SKILL_GROUP_UNCERTAIN', ('cell-job-perl',))]
+    assert result.issues[0].message == ('Технология «Perl» указана в проектах, но ни к одной группе навыков не отнесена. '
+        'Она показана в группе по умолчанию. Проверьте, подходит ли эта группа.')
     assert result.item_handles == ('item-a-python', 'item-b-tool', 'item-job-perl')
+
+
+def test_each_unassigned_technology_gets_its_own_remark_naming_the_fallback_group():
+    records = [technology('job-perl', ' Perl '), technology('job-go', 'Go'), technology('a-python', 'Python')]
+    producers = {'job-perl': 'employment-view', 'job-go': 'employment-view', 'a-python': 'tech-a'}
+    value = context('technical', records, producers)
+    value.blocks['tech-b'].view = SimpleNamespace(title={'ru': 'СУБД, ИНСТРУМЕНТЫ', 'en': 'DATABASES, TOOLS'})
+    result = assign_skills(skills(), value)
+    assert [(issue.target_ids, issue.message) for issue in result.issues] == [
+        (('cell-job-perl',), 'Технология «Perl» указана в проектах, но ни к одной группе навыков не отнесена. '
+            'Она показана в группе «СУБД, ИНСТРУМЕНТЫ». Проверьте, подходит ли эта группа.'),
+        (('cell-job-go',), 'Технология «Go» указана в проектах, но ни к одной группе навыков не отнесена. '
+            'Она показана в группе «СУБД, ИНСТРУМЕНТЫ». Проверьте, подходит ли эта группа.')]
 
 
 def test_an_assignment_for_the_other_branch_shows_nothing_and_reports_nothing():

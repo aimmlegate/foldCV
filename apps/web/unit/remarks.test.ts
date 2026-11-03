@@ -3,7 +3,7 @@ import test from "node:test";
 import { Schema, type Node } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
 import { DecorationSet } from "@tiptap/pm/view";
-import { DOUBTFUL_VALUE, remarkMarks, remarkMarksPlugin, type RemarkMarks } from "../src/rich/remarks";
+import { doubtfulValue, remarkMarks, remarkMarksPlugin, type RemarkMarks } from "../src/rich/remarks";
 import { groupAnchors, type OutlineDocument } from "../src/rich/outline";
 
 type Block = OutlineDocument["regions"][number]["blocks"][number];
@@ -81,12 +81,16 @@ test("values Python could not read are marked where shown; a current end label a
     { id: "kafka", kind: "technology", display: unresolved("Kafka?") },
     { id: "hidden", kind: "language", language: unresolved("Klingon") },
   ] };
-  assert.deepEqual(sorted(remarkMarks(document, [], facts).cells),
-    [[cell("kafka", "display"), [DOUBTFUL_VALUE]], [cell("labs", "period:p1:start"), [DOUBTFUL_VALUE]]]);
+  assert.deepEqual(sorted(remarkMarks(document, [], facts).cells), [
+    [cell("kafka", "display"), ["Значение «Kafka?» не распознано однозначно. Проверьте его в фактах."]],
+    [cell("labs", "period:p1:start"), ["Дата «весна 2021» не распознана однозначно. Проверьте её в фактах."]]],
+    "each mark names the value it is on");
   const dated = { records: [{ id: "labs", kind: "employment",
     periods: [{ id: "p1", start: known("2021"), end: known("2025-03"), present: { ...known("н.в."), value: true } }] }] };
-  assert.deepEqual(sorted(remarkMarks(document, [], dated).cells), [[cell("labs", "period:p1:end"), [DOUBTFUL_VALUE]]],
+  assert.deepEqual(sorted(remarkMarks(document, [], dated).cells), [[cell("labs", "period:p1:end"),
+    ["Указана дата окончания «2025-03», хотя работа отмечена как текущая. Проверьте период в фактах."]]],
     "a dated end beside «present» is a doubt");
+  assert.equal(doubtfulValue("   "), "Значение не распознано однозначно. Проверьте его в фактах.", "an empty value is not quoted");
 });
 
 test("each fact group jumps to the section listing its records as items, else to one showing its fields", () => {

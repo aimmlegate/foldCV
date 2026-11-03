@@ -32,6 +32,7 @@ class OperationContext:
     cells: dict = field(default_factory=dict)
     results: dict = field(default_factory=dict)
     blocks: dict = field(default_factory=dict)
+    locale: str = 'ru'
 
 
 def latest_day(value):
@@ -76,8 +77,22 @@ def format_period(declaration, _context):
         'ongoingLabel': dict(declaration.parameters.ongoing_label)}, ())
 
 
-ROLE_FAMILY_UNCERTAIN = 'Тип роли кандидата не определён однозначно, поэтому выбран вариант шаблона по умолчанию.'
-SKILL_GROUP_UNCERTAIN = 'Для части технологий из проектов группа не определена, поэтому они показаны в группе по умолчанию.'
+ROLE_FAMILY_UNCERTAIN = ('Тип роли кандидата не определён однозначно, поэтому этот раздел показан в варианте шаблона '
+    'по умолчанию. Проверьте его состав.')
+
+
+def skill_group_uncertain(name, group_title):
+    """The remark on one technology (D130): the tip beside its chip names it and the group it landed in."""
+    where = f'Она показана в группе «{group_title}».' if group_title else 'Она показана в группе по умолчанию.'
+    return f'Технология «{name}» указана в проектах, но ни к одной группе навыков не отнесена. {where} Проверьте, подходит ли эта группа.'
+
+
+def block_title(context, block_id):
+    """A block's view title in the template's locale; '' when the block has none."""
+    title = getattr(getattr(context.blocks.get(block_id), 'view', None), 'title', None)
+    if not isinstance(title, dict):
+        return ''
+    return (title.get(context.locale) or next(iter(title.values()), '')).strip()
 
 
 def select_role_branch(declaration, context):
@@ -119,8 +134,9 @@ def assign_skills(declaration, context):
         if context.producers.get(record.id) in sources and identity and identity not in seen:
             added.append(record.id)
             seen.add(identity)
-    issues = (OperationIssue('IMPORT_SKILL_GROUP_UNCERTAIN', SKILL_GROUP_UNCERTAIN,
-        tuple(cell for record in added for cell in context.cells.get(record, ()))),) if added else ()
+    names, title = {record.id: record.display.raw_text.strip() for record, _identity in technologies}, block_title(context, parameters.uncertain_group)
+    issues = tuple(OperationIssue('IMPORT_SKILL_GROUP_UNCERTAIN', skill_group_uncertain(names[record], title), tuple(context.cells.get(record, ())))
+        for record in added)
     value = {'active': groups, 'kept': kept, 'hidden': hidden, 'added': added, 'uncertainGroup': parameters.uncertain_group}
     shown = [*(record for group in groups for record in kept[group]), *added]
     return OperationResult(value, tuple(context.handles[record] for record in shown if record in context.handles), (), issues)
@@ -185,7 +201,8 @@ def operation_context(operation, data):
         handles={value.record_id: value.item_handle for value in identities},
         producers={value.record_id: tasks[value.task_id].block_id for value in operation.allocations if value.task_id in tasks},
         cells={value.record_id: tuple(value.cell_ids.values()) for value in identities},
-        results=finished, blocks={value.id: value for value in data.template_package.definition.blocks})
+        results=finished, blocks={value.id: value for value in data.template_package.definition.blocks},
+        locale=data.template_package.definition.template.default_locale)
 
 
 def derive_task(operation, task, data):
