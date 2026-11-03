@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 1.1.0
+  revision: 1.2.0
   name: Две колонки
   default_locale: ru
 model:
@@ -610,14 +610,16 @@ style:
     ink: '#000000'
     band: '#EFEFEF'
     divider: '#888888'
+  # Regular and Bold only (D127): Google Docs knows these two faces of Source Sans Pro and replaced Light, Semibold and
+  # Black with Arial; the other faces stay in the package for marks and older projects.
   text:
     name:
-      font: black
+      font: bold
       size: 18
       line_height: 22.6
       color: ink
     profession:
-      font: semibold
+      font: bold
       size: 16
       line_height: 20.1
       color: ink
@@ -627,12 +629,12 @@ style:
       line_height: 19
       color: ink
     project:
-      font: semibold
+      font: bold
       size: 12
       line_height: 15.08
       color: ink
     body:
-      font: light
+      font: regular
       size: 10
       line_height: 12.57
       color: ink
@@ -642,7 +644,7 @@ style:
       line_height: 12.57
       color: ink
     emphasis:
-      font: semibold
+      font: bold
       size: 10
       line_height: 12.57
       color: ink
@@ -652,7 +654,7 @@ style:
       line_height: 16
       color: ink
     footer:
-      font: light
+      font: regular
       size: 12
       line_height: 15.08
       color: ink
@@ -711,7 +713,8 @@ layout:
     flow: independent_column
   - id: main
     x: 150.26
-    width: 444.75
+    # Ends 15.74 pt before the page edge, where the reference page ends its column; 444.75 reached the edge.
+    width: 430
     flow: independent_column
   reading_order: [header, sidebar, main]
   pagination:

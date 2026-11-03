@@ -66,8 +66,8 @@ export function RewritePanel({ open, close, instruction, change, submit, apply, 
     <div className="rewrite-progress-slot">{error ? <p className="notice warning" role="alert">{errorMessage(error)}</p> : busy && activity ? <>
       <OperationStatus label={rewriteLabels[activity.stage]} timed startedAt={activity.startedAt} />
       {rewriteCancellable(activity.stage) && <button className="text-button" onClick={() => cancel(activity.actionId)}>Отменить</button>}
-    </> : null}</div>
-    <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={preview ? !preview.text.trim() : !instruction.trim() || !source.trim()} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
+    </> : settings.checking && !preview ? <OperationStatus label="Проверяем подключение" /> : null}</div>
+    <div className="rewrite-actions"><Button variant="primary" busy={busy} busyLabel={preview ? "Применяем…" : "Готовим вариант…"} disabled={preview ? !preview.text.trim() : !instruction.trim() || !source.trim() || settings.checking} onClick={preview ? apply : submit}>{preview ? "Применить" : "Изменить текст"}<Icon name={preview ? "check" : "spark"} /></Button>
       {preview && <Button variant="quiet" disabled={busy || !instruction.trim()} onClick={submit}>Ещё вариант</Button>}
     </div>
   </section>;

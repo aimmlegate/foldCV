@@ -1,0 +1,17 @@
+/* Settings → Интерфейс → Читаемость (D127). The root carries the choice; the shell's text sizes and colors come from the
+   tokens these rules replace. The resume page is not scaled here: it has its own zoom in the toolbar. */
+:root[data-ui-text="large"] { --ui-body: 16px; --ui-small: 14px; --ui-title: 18px; }
+:root[data-ui-text="x-large"] { --ui-body: 18px; --ui-small: 16px; --ui-title: 21px; }
+:root[data-ui-text] .app-shell { line-height: 1.45; }
+:root[data-ui-text] :is(.app-shell, .modal, .notice-panel, .uir-rewrite) svg { width: calc(var(--ui-body) * 1.25); height: calc(var(--ui-body) * 1.25); }
+:root[data-ui-text] .app-shell :is(.chat-launcher, .eyebrow, .history-heading, .settings-saved, .source-note, .technology-note, .chat-activity, .chat-context) { font-size: var(--ui-small); }
+:root[data-ui-text] .uir-rewrite { width: min(420px, calc(100vw - 24px)); }
+/* High contrast: black text, dark captions and firmer lines; dimmed controls stay readable. */
+:root[data-ui-contrast="high"] { --ink: #000; --muted: #1f241c; --line: #9ea697; --accent: #3a4731; --accent-hover: #2b351f; --warn: #4f3710; }
+:root[data-ui-contrast="high"] button:disabled, :root[data-ui-contrast="high"] [data-uir-engine-ui] button:disabled { opacity: .6; }
+:root[data-ui-contrast="high"] .app-shell :is(.project-select small, .project-select em, .history-open, .connection-mini, .project-heading > span, .session-status) { color: var(--muted); }
+:root[data-ui-contrast="high"] .app-shell :is(.tool, .toolbar-select, .text-button) { color: var(--ink); }
+:root[data-ui-contrast="high"] .app-shell :is(input, select, textarea) { border-color: var(--line); }
+/* The resume list's rows set their own sizes in the design with a longer selector; the choice applies to them too. */
+:root[data-ui-text] .app-shell .project-select strong { font-size: var(--ui-title); }
+:root[data-ui-text] .app-shell :is(.project-select small, .project-select em, .history-open, .connection-mini) { font-size: var(--ui-small); }

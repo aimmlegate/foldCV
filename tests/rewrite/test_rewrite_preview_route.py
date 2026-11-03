@@ -245,3 +245,25 @@ async def test_a_rewrite_on_an_exhausted_plan_names_the_plan(tmp_path):
             'snapshot': snapshot, 'instruction': 'Make clearer.',
             'range': {'blockId': 'block-paper-a', 'beforeRevision': 1, 'cellId': None, 'field': 'content', 'start': 0, 'end': 6}})
     assert (reply.status_code, reply.json()['error']['code']) == (409, 'QUOTA_EXHAUSTED')
+
+
+@pytest.mark.asyncio
+async def test_a_rewrite_before_the_check_ends_says_so_and_unknown_limits_are_named(tmp_path):
+    # Right after launch the provider is on and not checked yet: "connect a model" sent the tester to Settings for nothing (D127).
+    executable = tmp_path / 'cli'
+    executable.write_text('#!' + sys.executable + '\n')
+    executable.chmod(0o700)
+    slot = ProviderSlot(QuotaAdapter('unknown'), ClaudeProvider('Clear'), ClaudeCliProfile(tmp_path / 'claude profile', executable))
+    app = make_app(tmp_path, connection_adapter=HealthyConnection(), provider_slots={'claude_cli': slot})
+    add_project(app)
+    async with signed_in(app) as client:
+        await client.post('/v1/host/enable', json={'provider': 'claude_cli', 'enabled': True})
+        token, snapshot = await open_project(client)
+        request = {'editorToken': token, 'requestId': 'rewrite-1', 'snapshot': snapshot, 'instruction': 'Make clearer.',
+            'range': {'blockId': 'block-paper-a', 'beforeRevision': 1, 'cellId': None, 'field': 'content', 'start': 0, 'end': 6}}
+        reply = await client.post(f'/v2/projects/{PROJECT}/rewrite/preview', json=request)
+        assert (reply.status_code, reply.json()['error']['code']) == (409, 'CONNECTION_CHECKING')
+        assert (await client.post('/v1/host/status', json={'provider': 'claude_cli'})).json()['state'] == 'unknown_limits'
+        await client.post('/v1/host/select', json={'provider': 'claude_cli', 'model': 'claude-sonnet-5-5'})
+        reply = await client.post(f'/v2/projects/{PROJECT}/rewrite/preview', json={**request, 'requestId': 'rewrite-2'})
+        assert (reply.status_code, reply.json()['error']['code']) == (409, 'LIMITS_UNKNOWN')

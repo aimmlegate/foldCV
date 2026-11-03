@@ -188,15 +188,16 @@ const chipDoc = docOf([{ id: "dates", type: "paragraph", content: [literalText("
   { id: "chips", type: "paragraph", content: [name("go", "Go"), literalText(" "), name("sql", "SQL")] },
   { id: "parts", type: "paragraph", content: [name("python", "Python"), name("python", " 3")] }]);
 const chips = start(chipDoc, "chips"), parts = start(chipDoc, "parts");
-function refusedWith(tr: Transaction, code: string): void {
+function refusedWith(tr: Transaction, code: string, recordId?: string): void {
   const result = extractOperations(tr);
   assert.ok(result.kind === "unsupported", "input must be refused"); assert.equal(result.code, code);
+  assert.equal(result.recordId, recordId, "only a deletion names the technology to remove");
 }
 
 test("input cannot empty a technology name or run across names", () => {
   const state = caret(chipDoc, chips + 1);
   // chips + 1 opens "Go", chips + 3 ends it; " " follows its closing token and "SQL" starts at chips + 6.
-  refusedWith(state.tr.delete(chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY");
+  refusedWith(state.tr.delete(chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY", "go");
   refusedWith(state.tr.insertText("  ", chips + 1, chips + 3), "TECHNOLOGY_NAME_EMPTY");
   refusedWith(state.tr.insertText("x", chips + 2, chips + 7), "TECHNOLOGY_EDIT_SINGLE");
   refusedWith(state.tr.delete(chips + 1, chips + 5), "TECHNOLOGY_EDIT_SINGLE");

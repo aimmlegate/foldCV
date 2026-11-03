@@ -8,17 +8,19 @@ import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSel
 import { ModelOptions } from "../settings/ModelSelect";
 
 type Saved = Pick<Preferences, "selectedRewriteModel" | "rewriteReasoningEffort">;
-export type RewriteSettings = { catalog: ConnectionSnapshot | null; saved: Saved | null; saving: boolean; error: string;
+/** `checking`: a connection check is running, as right after launch; a rewrite sent then is refused (D127). */
+export type RewriteSettings = { catalog: ConnectionSnapshot | null; saved: Saved | null; saving: boolean; error: string; checking: boolean;
   chooseModel: (model: string | null) => void; chooseEffort: (effort: string) => void };
 
 /** The rewrite model and reasoning level are the saved choices Settings also shows: read on every opening, saved on change. */
 export function useRewriteSettings(open: boolean): RewriteSettings {
   const [catalog, setCatalog] = useState<ConnectionSnapshot | null>(null), [saved, setSaved] = useState<Saved | null>(null);
-  const [saving, setSaving] = useState(false), [error, setError] = useState("");
+  const [saving, setSaving] = useState(false), [error, setError] = useState(""), [checking, setChecking] = useState(false);
   useEffect(() => {
     if (!open) return;
     let live = true;
-    const workflow = new ConnectionWorkflow(view => { if (live) setCatalog(view.snapshot); });
+    // The peek checks a provider that is on and not checked yet, so the popover sees the check it would otherwise run into.
+    const workflow = new ConnectionWorkflow(view => { if (live) { setCatalog(view.snapshot); setChecking(view.pending); } });
     void workflow.peek();
     void preferencesRequest().then(value => { if (live) { setSaved(value); setError(""); } },
       (failure: unknown) => { if (live) setError(errorMessage(failure)); });
@@ -29,7 +31,7 @@ export function useRewriteSettings(open: boolean): RewriteSettings {
     setSaving(true); setError("");
     try { setSaved(await work()); } catch (failure) { setError(errorMessage(failure)); } finally { setSaving(false); }
   }
-  return { catalog, saved, saving, error,
+  return { catalog, saved, saving, error, checking,
     chooseModel: next => void save(() => saveRewriteModelRequest(next)),
     chooseEffort: next => { if (model) void save(() => saveRewriteReasoningRequest(model, isReasoningEffort(next) ? next : null)); } };
 }

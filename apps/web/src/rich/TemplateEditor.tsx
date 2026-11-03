@@ -15,6 +15,8 @@ import { BlockedInputNotice } from "../workbench/editor/BlockedInputNotice";
 import { EditorNotices } from "../workbench/editor/EditorNotices";
 import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
+import { RemarkTip } from "../workbench/editor/RemarkTip";
+import { SelectionAction } from "../workbench/editor/SelectionAction";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
@@ -29,6 +31,7 @@ import { projectTemplateDocument } from "./v7-projection";
 import { focusFacts } from "./v7-focus";
 import { focusIconChoices } from "../projects/api";
 import { remarkMarks, remarkMarksMeta, remarkMarksPlugin, type RemarkMarks } from "./remarks";
+import { listIndexPlugin } from "./list-index";
 import { groupAnchors } from "./outline";
 import { readRemarkMarks, saveRemarkMarks } from "../workbench/settings/interface";
 import { presentationMeta, templatePresentationPlugin, templateSheet, type TemplateSheet } from "./v7-presentation";
@@ -78,6 +81,14 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     return () => clearTimeout(timer);
   }, [changed]);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("layout");
+  // While the pointer drags a selection the action beside it waits, or it would sit under the pointer.
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    const down = (event: PointerEvent) => { if (paperScroll.current?.contains(event.target instanceof Node ? event.target : null)) setDragging(true); };
+    const up = () => setDragging(false);
+    document.addEventListener("pointerdown", down); document.addEventListener("pointerup", up); document.addEventListener("pointercancel", up);
+    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("pointerup", up); document.removeEventListener("pointercancel", up); };
+  }, []);
   const [sourceVisited, setSourceVisited] = useState(false);
   const [panelPending, setPanelPending] = useState<PanelCommand[]>([]);
   const [, refresh] = useState(0);
@@ -113,6 +124,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const marked = useRef<RemarkMarks | null>(null);
   marked.current = marking ? marks : null;
   const remarkPlugin = useMemo(() => remarkMarksPlugin(() => marked.current), []);
+  const listIndex = useMemo(() => listIndexPlugin(), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
     status: text => { callbacks.current.onStatus(text); refresh(value => value + 1); },
     // A repeated text still re-renders: the undo buttons follow the history a refused step brought back.
@@ -123,7 +135,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // Copy, cut and paste must run before BlockNote's own clipboard handlers, which would otherwise end the event.
   const extension = useMemo(() => createExtension({ key: "foldcv-v7-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes,
     Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
-    prosemirrorPlugins: [session.plugin, presentation, remarkPlugin] }), [session, presentation, remarkPlugin]);
+    prosemirrorPlugins: [session.plugin, presentation, remarkPlugin, listIndex] }), [session, presentation, remarkPlugin, listIndex]);
   const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
     disableExtensions: disabledExtensions,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
@@ -200,6 +212,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     done: preview => { setRewritePreview(preview); setRewriteText(preview.text); setRewriteSource(preview.source); },
     failed: setRewriteError, cancelFailed: error => setWarning(errorMessage(error)),
   }), [session]);
+  /** Where the selection ends on screen, for the action beside it; null while the editor has no view yet. */
+  function selectionEnd(): { left: number; top: number; bottom: number } | null {
+    try {
+      const view = editor._tiptapEditor.view, coords = view.coordsAtPos(view.state.selection.to);
+      return { left: coords.left, top: coords.top, bottom: coords.bottom };
+    } catch { return null; }
+  }
   function openRewrite() {
     const source = session.rewriteSource();
     if (!source) { unsupported(); return; }
@@ -268,7 +287,13 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const anchors = useMemo(() => groupAnchors(documentShown, new Map(facts.records.map(record => [record.id, record.kind]))),
     [documentShown, facts]);
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
+  const selecting = session.rewriteSource() !== null;
+  const selectionAnchor = selecting && !rewriteOpen && !dragging && !locked && workspaceView !== "original" ? selectionEnd() : null;
+  // The fact a mark names, shown in Facts: the panel opens on its row.
+  const openFact = (recordId: string) => { setFactsVisible(true); setFactFocus({ recordId }); };
   return <div className="contents uir-editor-session">
+    <SelectionAction anchor={selectionAnchor} open={openRewrite} />
+    <RemarkTip host={paperScroll} openFact={openFact} />
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
       submit={submitRewrite} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
       preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
@@ -294,7 +319,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace" data-facts={factsVisible ? "open" : "closed"}
         style={{ "--facts-width": `${String(factsWidth)}px`, "--document-zoom": String(zoom) } as CSSProperties}>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
-          <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={session.rewriteSource() !== null}
+          <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={selecting}
             style={blockStyle(textBlocks[0])} canUndo={session.canUndo} canRedo={session.canRedo}
             blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)} bold={heavier}
             active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,

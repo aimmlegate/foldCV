@@ -199,9 +199,20 @@ export class TemplateEditorSession {
     if (!transaction.docChanged || this.projecting || transaction.getMeta(projectionMeta)) return true;
     if (this.closed || this.navigating || this.pendingNavigation || this.panelBusy || !this.writable) return false;
     const result = extractOperations(transaction);
-    if (result.kind === "unsupported") { this.refuse(result.reason, result.code); return false; }
+    if (result.kind === "unsupported") {
+      // Deleting the last letters of a chip removes its technology, as «Убрать» in Facts does (D127).
+      if (result.recordId !== undefined) void this.removeTechnology(result.recordId);
+      else this.refuse(result.reason, result.code);
+      return false;
+    }
     if (result.operations.length) this.stash.set(transaction, result.operations);
     return true;
+  }
+
+  /** The chip whose name a deletion emptied goes through the panel path: typing drains first and Python removes the record. */
+  private async removeTechnology(recordId: string): Promise<void> {
+    try { await this.panel({ operation: "remove", recordId }); }
+    catch (error) { this.port.warning(errorMessage(error)); }
   }
 
   private accept(operations: readonly ExtractedOperation[]): void {
