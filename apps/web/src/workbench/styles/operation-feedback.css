@@ -31,8 +31,6 @@
 .settings-feedback > * { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent); pointer-events: auto; }
 .source-render-status { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 2; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
 .source-viewer, .source-pdf-scroll { position: relative; }
-.import-progress-heading .progress-icon { position: relative; }
-.import-progress-heading .operation-spinner { position: absolute; inset: -5px; width: auto; height: auto; color: var(--accent); }
 .progress-list .step-indicator .operation-spinner { width: 16px; height: 16px; }
 .technology-chip[aria-busy="true"] > button:last-child svg { display: none; }
 .technology-chip > .operation-spinner { flex: 0 0 14px; width: 14px; height: 14px; }

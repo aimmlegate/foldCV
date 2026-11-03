@@ -1,10 +1,9 @@
 .progress-screen { box-sizing: border-box; align-items: safe center; padding: 36px 40px; }
 .progress-screen .progress-content { max-width: 900px; min-width: 0; margin-block: auto; }
-.import-progress-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.import-progress-heading .progress-icon { margin: 0; width: 42px; height: 42px; background: var(--wash); border-color: var(--line); color: var(--accent); }
-.import-progress-heading .progress-icon svg { width: 21px; height: 21px; }
+.import-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
 .import-elapsed { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .progress-screen .progress-content h2 { margin: 18px 0 9px; font-size: 34px; }
+.progress-screen .import-progress-heading h2 { margin-top: 0; }
 .import-source-name { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .import-progress-grid { display: grid; grid-template-columns: minmax(200px, .85fr) minmax(0, 1.15fr); gap: 40px; margin-top: 30px; align-items: start; }
 .import-process .progress-list { margin: 0; }
@@ -60,7 +59,8 @@
 .import-problem-actions .button { font-size: 12px; padding: 7px 12px; }
 .import-activity { margin-top: 18px; }
 .import-activity h4 { margin: 0 0 8px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: .6px; text-transform: uppercase; }
-.import-activity ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+/* A fixed height keeps the screen still as events arrive; `align-content: start` keeps a few rows from stretching. */
+.import-activity ol { display: grid; align-content: start; gap: 6px; height: 140px; margin: 0; padding: 0 6px 0 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; list-style: none; }
 .import-activity li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .import-activity time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .task-notice p { display: grid; gap: 2px; }
