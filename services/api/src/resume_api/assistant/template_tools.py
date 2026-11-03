@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import threading
 from typing import Literal
@@ -23,6 +24,9 @@ from packages.resume_core.storage import StorageFailure, atomic_write
 from packages.resume_core.templates.store import UnknownTemplate
 
 from resume_api.agent.mcp import PrivateMcp
+from resume_api.extracting import UploadFailure, run_extract
+from resume_api.inference_admission import AdmissionCancelled
+from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.projects.errors import ProjectFailure
 from resume_api.template_config import TemplateConfig, stated_name
 
@@ -37,6 +41,7 @@ TEMPLATE_TOOL_NAMES = ('list_templates', 'read_template', 'read_draft', 'edit_dr
 ACTIVE_SECONDS = 600
 EDITS = 20
 SAMPLES_KEPT = 3
+SAMPLE_BYTES = 32 * 1024
 PROPOSALS_KEPT = 100
 
 TEMPLATE_BASE_INSTRUCTIONS = (
@@ -96,6 +101,12 @@ class Pinned:
     sample: Sample | None
     assets: dict
     directory: Path
+
+
+def summarize(result):
+    """The sample summary builder (lane C); a seam so the route is tested before it exists."""
+    from packages.resume_core.sample_summary import sample_summary
+    return sample_summary(result, limit=SAMPLE_BYTES)
 
 
 class TemplateScope:
@@ -435,3 +446,26 @@ def set_state(store, proposal_id, state):
         value = value.model_copy(update={'state': state})
         store._write(path, value)
         return value
+
+
+# Samples: one DOCX or PDF read by the extraction worker, summarized once.
+
+def signature_ok(data):
+    return data.startswith(b'PK\x03\x04') or data.startswith(b'%PDF-')
+
+
+async def attach_sample(scope, data, name, *, temp_root, worker_slot):
+    """Extract the file in the worker process and keep its summary; an UploadFailure names a bad file."""
+    if not signature_ok(data):
+        raise UploadFailure('EXTRACT_UNSUPPORTED')
+    files, cancel = OperationFiles(temp_root), threading.Event()
+    try:
+        async with worker_slot(cancel):
+            with files.open():
+                result = await run_extract(data, name, False, files)
+    except (SpikeError, AdmissionCancelled):
+        raise UploadFailure('EXTRACT_INTERRUPTED') from None
+    summary = await asyncio.to_thread(summarize, result)
+    if len(json.dumps(summary, ensure_ascii=False).encode()) > SAMPLE_BYTES:
+        raise UploadFailure('EXTRACT_TEXT_LIMIT')
+    return scope.add_sample(name, summary)

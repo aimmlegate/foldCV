@@ -17,6 +17,8 @@ from packages.resume_core.models.assistant import TemplateProposalListV1, Templa
 from resume_api.projects.errors import ProjectFailure
 from resume_api.projects.routes import file_reply, model_reply
 
+from resume_api.extracting import UploadFailure, parse_one_part
+
 from . import proposals, template_tools
 from .skills import skill_catalog
 
@@ -127,9 +129,9 @@ def mount_assistant(app, service, *, companions=()):
         return file_reply(data, media, {'Content-Disposition': f'attachment; filename="{filename}"'})
 
 
-def mount_template_assistant(app, service):
-    """The template assistant (D136): the run routes of one fixed scope key and its proposals."""
-    key = template_tools.TEMPLATES
+def mount_template_assistant(app, service, *, problem, temp_root, worker_slot):
+    """The template assistant (D136): the run routes of one fixed scope key, its samples and its proposals."""
+    key, scope = template_tools.TEMPLATES, service.scope
 
     @app.get(TEMPLATE_PREFIX + '/capabilities')
     async def template_capabilities():
@@ -167,6 +169,17 @@ def mount_template_assistant(app, service):
             return model_reply(await service.cancel(key, run_id))
         except AgentFailure as error:
             raise translated(error) from None
+
+    @app.post(TEMPLATE_PREFIX + '/samples')
+    async def template_sample(request: Request):
+        try:
+            data, name, pasted = parse_one_part(await request.body(), request.headers.get('content-type', ''))
+            if pasted:
+                raise UploadFailure('EXTRACT_UNSUPPORTED')
+            sample = await template_tools.attach_sample(scope, data, name, temp_root=temp_root, worker_slot=worker_slot)
+        except UploadFailure as error:
+            return problem(error.code, 413 if error.code == 'INPUT_TOO_LARGE' else 422, 'input')
+        return JSONResponse(sample.reply(), status_code=201, headers={'Cache-Control': 'no-store'})
 
     # The boundary admits this one query string (conversationId) on this path.
     @app.get(TEMPLATE_PREFIX + '/proposals')

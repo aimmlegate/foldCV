@@ -64,6 +64,7 @@ POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status",
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 TEMPLATE_ASSISTANT_PATH = "/v2/templates/assistant/"
+TEMPLATE_SAMPLES_PATH = TEMPLATE_ASSISTANT_PATH + "samples"
 # The one query string the API admits: the conversation whose template proposals are listed.
 TEMPLATE_PROPOSALS_QUERY = re.compile(rb"conversationId=[A-Za-z0-9_-]{1,128}")
 
@@ -182,7 +183,7 @@ class LocalBoundary:
                     return
                 part = message.get("body", b"")
                 size += len(part)
-                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive"}
+                project_upload = (path in {"/v1/rich/projects/template-input", "/v2/projects/archive", TEMPLATE_SAMPLES_PATH}
                     or path.startswith("/v1/rich/projects/template-input/"))
                 body_limit = (ARCHIVE_BYTES + 4096 if path == "/v2/projects/archive" else MAX_EXTRACT_BODY if project_upload
                     else MAX_BODY)
@@ -200,7 +201,7 @@ class LocalBoundary:
                     break
             body = b"".join(chunks)
             project_json = ((path.startswith("/v2/projects") and path != "/v2/projects/archive")
-                or path.startswith(TEMPLATE_ASSISTANT_PATH))
+                or (path.startswith(TEMPLATE_ASSISTANT_PATH) and path != TEMPLATE_SAMPLES_PATH))
             if takes_json(method, path) or project_json:
                 if not is_json_media_type(headers.get(b"content-type", b"")):
                     await problem("INVALID_REQUEST", 415)(scope, receive, send)
@@ -537,7 +538,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     template_assistant.runtime_for = assistant.runtime_for
     app.state.template_assistant = template_assistant
     mount_assistant(app, assistant, companions=(template_assistant,))
-    mount_template_assistant(app, template_assistant)
+    mount_template_assistant(app, template_assistant, problem=problem, temp_root=temp_root, worker_slot=worker_slot)
 
     def template_import_model(effort=None):
         # The capture records the selected import model with the effort the import start chose, else its catalog
