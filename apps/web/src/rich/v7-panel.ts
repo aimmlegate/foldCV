@@ -9,8 +9,9 @@ export type PanelCommand = Omit<RichPanelRequest, "capture" | "factsRevision" | 
 export type TechnologyTarget = EditorTechnologyTarget;
 
 /** What Python's plan says the panel shows and offers (D113): each job's periods as the document writes them and whether it
- * can take another, the fields with no place in the document, and the technologies that share a line. */
-export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines" | "addKinds">;
+ * can take another, the fields with no place in the document, the technologies that share a line, and whether a skill
+ * group of one's own can be started (D136). */
+export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines" | "addKinds" | "addTechnologyGroup">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { remove: ReadonlySet<string> } = {
@@ -26,6 +27,16 @@ const editedKinds: ReadonlySet<string> = new Set(["candidate", "technology", "ed
 export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string, string>): PanelCommandV7[] | null {
   const kind = command.recordId ? kinds.get(command.recordId) : command.recordKind;
   const values = command.values && Object.keys(command.values).length ? structuredClone(command.values) : null;
+  // A skill group is named only by a technology's move into it or removal from it (D136).
+  if (command.groupId && (kind !== "technology" || command.operation !== "move_technology" && command.operation !== "remove")) return null;
+  if (command.operation === "add_technology_group") {
+    // A group of one's own starts with a new name or with a technology moved from its group.
+    const title = values?.["title"], display = values?.["display"], count = Object.keys(values ?? {}).length;
+    if (!title || command.jobId || command.periodId || (command.recordId ? kind !== "technology" || count !== 1 : display === undefined || count !== 2))
+      return null;
+    return [command.recordId ? { operation: "add_technology_group", recordId: command.recordId, values: { title } }
+      : { operation: "add_technology_group", recordKind: "technology", values: { title, display: display ?? "" } }];
+  }
   if (focusOperations.has(command.operation)) {
     if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;
     const focus: PanelCommandV7 = { operation: command.operation, recordId: command.recordId };
@@ -43,6 +54,7 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
     if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;
     const move: PanelCommandV7 = { operation: "move_technology", recordId: command.recordId };
     if (command.beforeRecordId) move.beforeRecordId = command.beforeRecordId;
+    if (command.groupId) move.groupId = command.groupId;
     return [move];
   }
   if (kind === "technology" && !command.recordId && command.operation === "add") {
@@ -62,7 +74,8 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
   if (kind !== undefined && kind !== null && editedKinds.has(kind)) {
     if (!command.recordId || command.jobId || command.periodId) return null;
     if (command.operation === "edit") return values ? [{ operation: "edit", recordId: command.recordId, values }] : null;
-    return command.operation === "remove" && panelSupport.remove.has(kind) && !values ? [{ operation: "remove", recordId: command.recordId }] : null;
+    return command.operation === "remove" && panelSupport.remove.has(kind) && !values
+      ? [{ operation: "remove", recordId: command.recordId, ...(command.groupId ? { groupId: command.groupId } : {}) }] : null;
   }
   if (kind !== "employment" || command.jobId) return null;
   const recordId = command.recordId;

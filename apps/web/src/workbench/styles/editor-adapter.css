@@ -219,6 +219,16 @@
 .technology-group select { min-width: 0; padding: 6px; }
 [data-drop-target="true"] { box-shadow: inset 0 2px var(--accent); }
 .technology-drop-end { padding: 8px; border: 1px dashed var(--line); color: var(--muted); font-size: 11px; }
+/* D136: the resume's skill groups in Facts, each with its technologies and its own field. */
+.technology-categories { display: grid; gap: 16px; }
+.technology-category { display: grid; gap: 4px; min-width: 0; }
+.technology-category-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.technology-category-heading h4 { margin: 0; color: var(--muted); font-size: var(--ui-small); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.technology-category .technology-values { margin: 0; }
+.technology-category .technology-note { margin: 0; }
+.technology-category-new { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.technology-category-new input { flex: 1 1 100%; min-width: 0; padding: 7px 8px; font-size: var(--ui-body); }
+.technology-category-new .technology-note { flex-basis: 100%; }
 .technology-select .technology-field { min-height: 32px; padding: 3px 6px; gap: 4px; }
 .technology-select input.technology-search { width: 0; flex: 1; min-width: 0; padding: 5px 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; outline: none; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .technology-expand {

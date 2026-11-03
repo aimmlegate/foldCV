@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/working_facts";
 import { panelSupport, type PanelCommand, type PanelPlan, type TechnologyTarget } from "../../rich/v7-panel";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
+import { TechnologyGroups } from "./TechnologyGroups";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
 import { Icon } from "../ui/Icon";
@@ -89,8 +90,12 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       return <div className="fact-group-frame" key={kind}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
       {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null} />
-        <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
-          targets={technologyTargets.filter(target => target.jobId === null)} lines={plan.technologyLines} excluded={focusOnly} /></>
+        {/* D136: the resume's skill groups; a template without them keeps one general list. */}
+        {technologyTargets.some(target => target.jobId === null)
+          ? <TechnologyGroups facts={facts} document={document} targets={technologyTargets.filter(target => target.jobId === null)}
+            creatable={plan.addTechnologyGroup === true} pending={pending} paused={busy} submit={apply} edit={editTechnology} excluded={focusOnly} />
+          : <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology}
+            focusRecordId={focusRequest?.recordId} targets={[]} lines={plan.technologyLines} excluded={focusOnly} />}</>
         : facts.records.filter(record => record.kind === kind).map(record => {
           const [name, sub] = summary(record, plan.jobs?.[record.id]?.periods ?? []);
           return <div key={record.id}><div className="fact-row" data-fact-id={record.id}>

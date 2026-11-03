@@ -25,12 +25,18 @@ def view_title(block, view=None):
 
 
 def drop_empty_titles(document, views):
-    """The title of each given view that shows nothing else goes, as an import would not show it."""
+    """The title of each given view that shows nothing else goes, as an import would not show it. A view shown twice, as a
+    skill group of the user's own copies one (D136), loses each title with nothing of its view right after it."""
     for view in set(views) - {None}:
         if all(view_title(block) for block in document.blocks()
                 if block.presentation is not None and block.presentation.view_key == view):
             for items in sibling_lists(document):
                 items[:] = [block for block in items if not view_title(block, view)]
+        elif sum(1 for block in document.blocks() if view_title(block, view)) > 1:
+            for items in sibling_lists(document):
+                items[:] = [block for index, block in enumerate(items) if not view_title(block, view) or index + 1 < len(items)
+                    and not view_title(items[index + 1]) and items[index + 1].presentation is not None
+                    and items[index + 1].presentation.view_key == view]
 
 
 def view_position(document, package, view):
@@ -370,10 +376,17 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
         from .template_panel_records import add_technology, edit_record, remove_records
         records = {value.id: value.kind for value in workspace.project.facts.records}
         kind = records.get(command.record_id) if command.record_id is not None else command.record_kind
+        from .template_panel_groups import add_technology_group, move_to_group, remove_from_group
         if command.operation in FOCUS_OPERATIONS:
             prepared = prepare_focus(workspace, command, allocator, remembered)
         elif command.operation == 'add' and command.record_kind == 'technology':
             prepared = add_technology(workspace.project, operation, allocator)
+        elif command.operation == 'move_technology' and command.group_id is not None:
+            prepared = move_to_group(workspace.project, command, allocator)
+        elif command.operation == 'remove' and command.group_id is not None:
+            prepared = remove_from_group(workspace.project, command, request.capture.action_id)
+        elif command.operation == 'add_technology_group':
+            prepared = add_technology_group(workspace.project, command, allocator)
         elif command.operation in {'edit', 'remove', 'clear_technologies'} and kind not in {None, 'employment'}:
             prepared = (edit_record(workspace.project, command, allocator) if command.operation == 'edit'
                 else remove_records(workspace.project, command, request.capture.action_id))

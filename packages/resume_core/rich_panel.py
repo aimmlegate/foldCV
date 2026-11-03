@@ -36,12 +36,14 @@ class RichPanelRequest(Wire):
                     "jobId": {"type": "null"}, "periodId": {"type": "null"},
                     "values": {"required": ["icon"], "maxProperties": 1}}, "required": ["recordId"]}}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon", "add_technology_group"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
     period_id: Id | None = None
     before_record_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The skill group a technology moves to or leaves, as the plan's general target names it (D136).
+    group_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
     values: dict[str, str] = Field(default_factory=dict, max_length=50)
     facts_revision: Revision
     document_revision: Revision
@@ -51,9 +53,18 @@ class RichPanelRequest(Wire):
     def operation_scope(self):
         if self.before_record_id is not None and self.operation not in {"move_technology", "move_focus"}:
             raise ValueError("TECHNOLOGY_MOVE_INVALID")
+        if self.group_id is not None and self.operation not in {"move_technology", "remove"}:
+            raise ValueError("TECHNOLOGY_GROUP_INVALID")
         if self.operation in {"move_technology", "move_focus"} and (self.record_id is None
                 or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
             raise ValueError("TECHNOLOGY_MOVE_INVALID")
+        if self.operation == "move_focus" and self.group_id is not None:
+            raise ValueError("TECHNOLOGY_MOVE_INVALID")
+        # A new skill group with its first technology: a new name, or a technology moved from its group (D136).
+        if self.operation == "add_technology_group" and (self.record_kind not in {None, "technology"} or self.job_id is not None
+                or self.period_id is not None or "title" not in self.values
+                or set(self.values) != ({"title"} if self.record_id is not None else {"title", "display"})):
+            raise ValueError("TECHNOLOGY_GROUP_INVALID")
         if self.operation in {"add_to_focus", "remove_from_focus"} and (self.record_id is None
                 or self.record_kind not in {None, "technology"} or self.job_id is not None or self.period_id is not None or self.values):
             raise ValueError("FOCUS_SCOPE_INVALID")
@@ -132,6 +143,9 @@ def panel_mutation(workspace, request):
     project = workspace.project
     if project is None or (project.facts.revision, project.document.revision) != (request.facts_revision, request.document_revision):
         raise ValueError("STALE_PANEL_EDIT")
+    # Skill groups are a template document's (D136); this document has none.
+    if request.operation == "add_technology_group" or request.group_id is not None:
+        raise ValueError("PANEL_ACTION_UNSUPPORTED")
     records = {record.id: record for record in project.facts.records}
     if request.operation in {"move_technology", "move_focus"}:
         record = records.get(request.record_id)

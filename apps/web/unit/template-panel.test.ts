@@ -5,7 +5,7 @@ import { BlockNoteEditor } from "@blocknote/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";
-import { panelCommandsV7 } from "../src/rich/v7-panel";
+import { panelCommandsV7, type PanelCommand } from "../src/rich/v7-panel";
 import { focusFacts, focusOptions, searchIcons, wholeYears, yearsValue } from "../src/rich/v7-focus";
 import { parseFocusIconChoices } from "../src/projects/api";
 import { ProjectApiFailure } from "../src/rich/v7-connection";
@@ -135,6 +135,24 @@ test("panel commands adapt to Python's V7 employment form; a technology reorder 
   assert.equal(panelCommandsV7({ operation: "move_technology", recordId: "job", beforeRecordId: "tech" }, kinds), null);
   assert.equal(panelCommandsV7({ operation: "edit", recordId: "job", values: {} }, kinds), null);
   assert.equal(panelCommandsV7({ operation: "remove", recordId: "job", jobId: "job" }, kinds), null);
+});
+
+test("skill group commands name their group; a group of one's own starts with a new name or a moved technology (D136)", () => {
+  assert.deepEqual(panelCommandsV7({ operation: "move_technology", recordId: "tech", beforeRecordId: "other", groupId: "view:tools" }, kinds),
+    [{ operation: "move_technology", recordId: "tech", beforeRecordId: "other", groupId: "view:tools" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "remove", recordId: "tech", groupId: "line" }, kinds), [{ operation: "remove", recordId: "tech", groupId: "line" }]);
+  assert.deepEqual(panelCommandsV7({ operation: "add_technology_group", recordKind: "technology", values: { title: "Облака", display: "AWS" } }, kinds),
+    [{ operation: "add_technology_group", recordKind: "technology", values: { title: "Облака", display: "AWS" } }]);
+  assert.deepEqual(panelCommandsV7({ operation: "add_technology_group", recordId: "tech", values: { title: "Облака" } }, kinds),
+    [{ operation: "add_technology_group", recordId: "tech", values: { title: "Облака" } }]);
+  const refused: PanelCommand[] = [
+    { operation: "edit", recordId: "tech", groupId: "line", values: { display: "Go" } },
+    { operation: "remove", recordId: "school", groupId: "line" },
+    { operation: "add_technology_group", recordId: "tech", values: { title: "Облака", display: "AWS" } },
+    { operation: "add_technology_group", recordKind: "technology", values: { display: "AWS" } },
+    { operation: "add_technology_group", recordId: "job", values: { title: "Облака" } },
+  ];
+  for (const command of refused) assert.equal(panelCommandsV7(command, kinds), null, command.operation);
 });
 
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[] };
