@@ -36,9 +36,13 @@ export type AssistantEditor = {
   applyProposal: (proposalId: string, allowEdits: boolean) => Promise<AssistantApplyResultV1>;
   actionApplied?: (action: NonNullable<AssistantApplyResultV1["action"]>) => Promise<void>;
 };
-export type Port = Pick<AssistantApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" |
-  "createConversation" | "messages" | "submit" | "events" | "cancel" | "proposals" | "discard">;
-type Pending = { conversationId: string; request: AssistantRunRequestV2 };
+/** A run request: the message and the flags plus the scope's own fields (the resume selection, the template context). */
+export type RunRequest<Fields> = Pick<AssistantRunRequestV2, "clientRequestId" | "message" | "allowEdits" | "allowWeb"> & Fields;
+export type ResumeFields = { selection: AssistantSelection | null };
+export type Port<Fields = ResumeFields> = Pick<AssistantApi, "projectId" | "settings" | "saveSettings" | "capabilities" | "conversations" |
+  "createConversation" | "messages" | "events" | "cancel" | "proposals" | "discard"> & {
+  submit: (conversationId: string, request: RunRequest<Fields>) => Promise<Run> };
+type Pending<Fields> = { conversationId: string; request: RunRequest<Fields> };
 // The combined reply types each message as an open object (see above); the server validated it as an AgentMessage.
 const messagesOf = (value: AssistantMessagesV1): AgentMessage[] => value.messages as unknown as AgentMessage[];
 const pause = (milliseconds: number) => new Promise<void>(resolve => { setTimeout(resolve, milliseconds); });
@@ -52,7 +56,8 @@ function code(error: unknown): string {
 const lasting = (error: unknown): boolean => error instanceof AgentApiFailure && error.status >= 400 && error.status < 500
   && ![408, 409, 429].includes(error.status);
 
-export class AssistantController {
+/** Runs of one assistant scope; `Fields` are what each run request carries beside the message and the flags. */
+export class AssistantRuns<Fields extends object> {
   view: AssistantView = { settings: null, capabilities: null, flags: { allowEdits: true, allowWeb: true }, conversations: [],
     conversationId: null, messages: [], sources: [], findings: [], files: [], run: null, activity: [], partial: "",
     partialTruncated: false, proposals: [], proposalBusy: null, proposalAction: null, staleProposals: [], draft: "", submitting: false,
@@ -62,7 +67,7 @@ export class AssistantController {
   private sendEpoch = 0;
   private stream: AbortController | null = null;
   private following: Promise<void> | null = null;
-  private pending: Pending | null = null;
+  private pending: Pending<Fields> | null = null;
   // Message reads answer out of order: `reads` numbers them, `applied` is the newest one shown.
   private reads = 0;
   private applied = 0;
@@ -70,7 +75,7 @@ export class AssistantController {
   // The whole conversation as last read; the transcript shows sources and findings as they arrive or are opened.
   private loaded: { sources: AssistantSource[]; findings: AssistantFinding[] } = { sources: [], findings: [] };
 
-  constructor(readonly api: Port, private readonly editor: AssistantEditor, private readonly changed: (view: AssistantView) => void,
+  constructor(readonly api: Port<Fields>, private readonly editor: AssistantEditor, private readonly changed: (view: AssistantView) => void,
     private readonly retryMs = 250, private readonly stopMs = 6000) {}
 
   get active(): boolean { return this.view.submitting || this.view.pendingSend || this.view.proposalBusy !== null || this.view.run !== null && !terminal(this.view.run); }
@@ -206,7 +211,8 @@ export class AssistantController {
     this.publish({ messages: messagesOf(value), files: [...value.files ?? []], ...(fresh ? { run: current } : {}) });
   }
 
-  async send(selection: () => Promise<AssistantSelection | null> = () => Promise.resolve(null)): Promise<void> {
+  /** `fields` is read once per new request, after the conversation exists; a retried send repeats its result. */
+  async sendWith(fields: () => Promise<Fields>): Promise<void> {
     if (this.closed || this.view.submitting || this.view.proposalBusy || this.view.run && !terminal(this.view.run)) return;
     const message = this.view.draft;
     if (!message.trim() || [...message].length > 8000) return;
@@ -220,8 +226,8 @@ export class AssistantController {
         await this.refreshWork(); current();
         if (!this.view.capabilities?.ready) throw new AgentApiFailure(this.view.capabilities?.unavailable?.code ?? "AGENT_CONNECTION_UNAVAILABLE");
         const conversationId = this.view.conversationId ?? await this.openConversation(); current();
-        const selected = await selection(); current();
-        pending = { conversationId, request: { clientRequestId: crypto.randomUUID(), message, ...this.view.flags, selection: selected } };
+        const extra = await fields(); current();
+        pending = { conversationId, request: { clientRequestId: crypto.randomUUID(), message, ...this.view.flags, ...extra } };
         this.pending = pending;
       }
       // A retried send repeats the captured request: the server returns the run it already started.
@@ -369,4 +375,11 @@ export class AssistantController {
     }
   }
   close(): void { this.closed = true; ++this.epoch; ++this.sendEpoch; this.stream?.abort(); }
+}
+
+/** The resume assistant: a run carries the editor selection captured at send time. */
+export class AssistantController extends AssistantRuns<ResumeFields> {
+  send(selection: () => Promise<AssistantSelection | null> = () => Promise.resolve(null)): Promise<void> {
+    return this.sendWith(async () => ({ selection: await selection() }));
+  }
 }

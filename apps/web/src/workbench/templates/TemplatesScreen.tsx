@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage } from "../../errors/messages";
 import type { TemplateCatalog } from "../../projects/api";
 import { Button } from "../ui/Button";
@@ -8,15 +8,18 @@ import { OperationStatus } from "../ui/OperationStatus";
 import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
 import { checkTemplateConfig, createTemplate, deleteTemplate, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig,
   setDefaultTemplate, withState, type TemplateConfigState, type TemplateProblem, type TemplateSave } from "./config";
-import { deleteControl, downloadName, shownId, templateKind, unsaved, type ShownTemplate } from "./studio";
+import { deleteControl, downloadName, draftLabel, shownId, templateKind, unsaved, type ShownTemplate } from "./studio";
+import type { TemplateProposal } from "../../assistant/template";
+import { applyProposal, type ApplyOutcome } from "./apply";
+import { TemplateAssistant, type TemplateContext } from "./TemplateAssistant";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
 type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | null;
 type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" | null;
 
-/** The templates screen: the list, the YAML of the shown template and, later, the assistant. New imports use these
+/** The templates screen: the list, the YAML of the shown template and the template assistant. New imports use these
  * templates; existing resumes keep their own captured version. */
-export default function TemplatesScreen({ close }: { close: () => void }) {
+export default function TemplatesScreen({ open, close, settings }: { open: boolean; close: () => void; settings: () => void }) {
   const [catalog, setCatalog] = useState<TemplateCatalog | null>(null);
   const [shown, setShown] = useState<ShownTemplate | null>(null);
   const [text, setText] = useState("");
@@ -33,6 +36,11 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
   const answer = useRef<((open: boolean) => void) | null>(null);
   const [technical, setTechnical] = useState(false);
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
+  const draft = shown?.kind === "draft" ? shown : null;
+  // The assistant reads and applies after renders: these hold what the editor shows now.
+  const live = useRef({ shown, text });
+  live.current = { shown, text };
+  const names = useMemo(() => new Map(catalog?.templates.map(entry => [entry.id, entry.name]) ?? []), [catalog]);
 
   async function run(kind: Exclude<Work, null>, task: () => Promise<void>) {
     setWork(kind); setFailure(null); setOutcome(null); setDelivery(null);
@@ -46,7 +54,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
   });
   useEffect(() => { void load(); }, []); // Load once per mount; Retry calls load again.
   function mayLeave(): Promise<boolean> {
-    if (!dirty) return Promise.resolve(true);
+    if (!unsaved(live.current.shown, live.current.text)) return Promise.resolve(true);
     return new Promise(resolve => { answer.current = resolve; setAsking(true); });
   }
   function answered(open: boolean) { setAsking(false); answer.current?.(open); answer.current = null; }
@@ -61,6 +69,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
     if (result.valid) { setProblem(null); setOutcome("checked"); } else setProblem(result.error);
   });
   const save = () => run("saving", async () => {
+    if (draft) { if (await created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
     if (!state) return;
     const result = await saveTemplateConfig(state.package.id, text);
     if (!result.saved) { setProblem(result.error); return; }
@@ -93,6 +102,19 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
     const next = await deleteTemplate(state.package.id);
     setCatalog(next); adopt(await readTemplateConfig(next.defaultId)); setOutcome("deleted");
   });
+  function context(): TemplateContext | null {
+    const { shown: current, text: source } = live.current;
+    if (!current) return null;
+    return current.kind === "saved" ? { templateId: current.state.package.id, assetsFrom: current.state.package.id, text: source, name: current.state.package.name }
+      : { templateId: null, assetsFrom: current.assetsFrom, text: source, name: draftLabel(current.name) };
+  }
+  function apply(proposal: TemplateProposal, force: boolean, runAssets: string | null): Promise<ApplyOutcome> {
+    const replace = (value: string) => { setText(value); setProblem(null); setOutcome(null); };
+    return applyProposal(proposal, force, runAssets, { current: () => live.current, mayLeave,
+      open: async templateId => { const opened = await readTemplateConfig(templateId); adopt(opened); return opened.text; },
+      showDraft: (name, assetsFrom, value) => { setShown({ kind: "draft", name, assetsFrom }); replace(value); },
+      renameDraft: name => setShown(value => value?.kind === "draft" ? { ...value, name } : value), replace });
+  }
   const download = async () => {
     setDelivery(null);
     setDelivery(await deliverFile(new Blob([text], { type: "application/yaml" }), downloadName(shown)));
@@ -110,6 +132,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
           <strong>{entry.name}</strong>
           <small>{entry.revision}{entry.id === catalog.defaultId ? " · основной" : ""} · {templateKind(entry)}</small>
         </button>)}
+        {draft && <button className="template-row" aria-current="page" disabled={busy}><strong>{draftLabel(draft.name)}</strong><small>новый</small></button>}
       </nav>
       <div className="templates-editor">
         {state && catalog && <div className="template-active">
@@ -122,6 +145,8 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
             title={state.package.id === catalog.defaultId ? "Основной шаблон удалить нельзя: сначала сделайте основным другой" : undefined}
             onClick={() => setConfirmDelete(true)}>Удалить</Button>}
         </div>}
+        {draft && <div className="template-active"><h3>{draftLabel(draft.name)}</h3>
+          <span className="small muted">Сохраните, чтобы новые резюме могли его выбрать.</span></div>}
         {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}
         {failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
         {problem && <p className="notice error template-problem" role="alert">Ошибка в <code>{problem.path}</code>: {problem.message}</p>}
@@ -140,6 +165,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
         </Suspense>}
         <div className="settings-actions">
           {!shown && !busy && <Button className="small" onClick={() => void load()}>Загрузить снова</Button>}
+          {draft && <Button variant="primary" busy={work === "saving"} busyLabel="Сохраняем…" disabled={busy} onClick={() => void save()}>Сохранить</Button>}
           {state && <>
             <Button variant="primary" busy={work === "saving"} busyLabel="Сохраняем…" disabled={!dirty || busy} onClick={() => void save()}>Сохранить</Button>
             <Button busy={work === "checking"} busyLabel="Проверяем…" disabled={busy} onClick={() => void check()}>Проверить</Button>
@@ -151,6 +177,9 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
           {dirty && <span className="settings-saved" role="status">Не сохранено</span>}
         </div>
       </div>
+      <aside className="templates-assistant" aria-label="Помощник по шаблонам">
+        <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} />
+      </aside>
     </div>
     <Dialog open={confirmReset} close={() => setConfirmReset(false)} title="Вернуть встроенный шаблон?">
       <p className="dialog-copy">Ваши правки этого шаблона пропадут. Готовые резюме не изменятся.</p>

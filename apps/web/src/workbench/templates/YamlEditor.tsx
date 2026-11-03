@@ -1,20 +1,8 @@
-import * as monaco from "monaco-editor";
-import { configureMonacoYaml } from "monaco-yaml";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useEffect, useRef } from "react";
-import schema from "../../../../../contracts/template-source.schema.json";
 import { pointerRange, technicalLines, type TemplateProblem } from "./config";
-import YamlWorker from "./yaml.worker?worker";
+import { MODEL_URI, monaco } from "./monaco";
 
-// The repository layout: the template's "# yaml-language-server: $schema=../../contracts/..." line resolves to SCHEMA_URI.
-const MODEL_URI = monaco.Uri.parse("file:///templates/active/template.yaml");
-const SCHEMA_URI = "file:///contracts/template-source.schema.json";
 const SERVER_OWNER = "foldcv-template-check";
-
-self.MonacoEnvironment = { getWorker: (_moduleId: string, label: string) => label === "yaml" ? new YamlWorker() : new EditorWorker() };
-// The schema is generated from the Python model plus the short form, so hints work offline; the server stays the authority.
-configureMonacoYaml(monaco, { enableSchemaRequest: false, validate: true, hover: true, completion: true,
-  schemas: [{ fileMatch: [MODEL_URI.toString()], uri: SCHEMA_URI, schema }] });
 
 export type YamlEditorProps = { value: string; change: (value: string) => void; problem: TemplateProblem | null; readOnly: boolean;
   technical: boolean };

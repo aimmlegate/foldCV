@@ -4,25 +4,29 @@ import { sourceUrl } from "../../assistant/presentation";
 import { Activity } from "./AgentActivity";
 import { MessageText } from "../../assistant/MessageText";
 import { Icon } from "../ui/Icon";
+import { resumeScope, type ChatScope } from "./scope";
 
-export function Transcript({ view, active, resource, focus, draft }: { view: AssistantView; active: boolean;
-  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean; draft: (value: string) => void }) {
+/** `attachment` names a file sent with a user message, such as the template sample of its run. */
+export function Transcript({ view, active, resource, focus, draft, scope = resumeScope, attachment }: { view: AssistantView; active: boolean;
+  resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean; draft: (value: string) => void;
+  scope?: ChatScope; attachment?: ((runId: string) => string | null) | undefined }) {
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
   return <>
-    {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>Чат по резюме</h3>
+    {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>{scope.empty}</h3>
       <div className="chat-suggestions">
-        {["Проверь резюме", "Сократи текст", "Сравни с вакансией"].map(text => <button key={text} onClick={() => { draft(text); document.getElementById("chat-input")?.focus(); }}><Icon name="spark" />{text}</button>)}
+        {scope.suggestions.map(text => <button key={text} onClick={() => { draft(text); document.getElementById(scope.input)?.focus(); }}><Icon name="spark" />{text}</button>)}
       </div></div>}
     {view.messages.map(message => <article key={message.id} className={`chat-message${message.role === "user" ? " from-user" : ""}`}>
       <div className="chat-message-heading"><span>{message.role !== "user" && <Icon name="spark" />}{message.role === "user" ? "Вы" : "Помощник"}</span>
         <small><time dateTime={message.timestamp}>{new Date(message.timestamp).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}</time></small></div>
       <MessageText text={message.text} truncated={message.truncated} error={message.error?.code ?? null} />
+      {message.role === "user" && attachment?.(message.runId) && <small className="chat-message-attachment"><Icon name="file" />{attachment(message.runId)}</small>}
       {message.sources.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("sources", ref.id)}><Icon name="file" />{ref.label || "Открыть источник"}<Icon name="arrow" /></button>)}
       {message.findings.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("findings", ref.id)}><Icon name="info" />{ref.label || "Открыть замечание"}<Icon name="arrow" /></button>)}
       {message.role !== "user" && <div className="chat-message-actions"><button className="chat-icon" aria-label="Скопировать ответ" title="Скопировать ответ"
         onClick={() => { void navigator.clipboard.writeText(message.text).then(() => setCopy("Скопировано"), () => setCopy("Не удалось скопировать")); }}><Icon name="copy" /></button>
         {message.error && !active && <button className="chat-retry" onClick={() => { const index = view.messages.indexOf(message); const prior = view.messages.slice(0, index).reverse().find(item => item.role === "user");
-          if (prior) { draft(prior.text); document.getElementById("chat-input")?.focus(); } }}><Icon name="redo" />Повторить</button>}</div>}
+          if (prior) { draft(prior.text); document.getElementById(scope.input)?.focus(); } }}><Icon name="redo" />Повторить</button>}</div>}
     </article>)}
     {(view.run || view.submitting || view.pendingSend) && <article className="chat-message"><Activity key={view.run?.id ?? "sending"} view={view} active={active} />
       {view.partial && <div className="chat-message-text" aria-label="Текущий ответ"><p>{view.partial}</p>{view.partialTruncated && <small>Ответ сокращён.</small>}</div>}

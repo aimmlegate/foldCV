@@ -122,7 +122,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       </div>
       {visited.has("settings") && <div className="screen" hidden={screen !== "settings"}><Settings open={screen === "settings"} close={backToResume} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
       {visited.has("templates") && <div className="screen" hidden={screen !== "templates"}>
-        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen close={backToResume} /></Suspense></div>}
+        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen open={screen === "templates"} close={backToResume} settings={openSettings} /></Suspense></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}
