@@ -32,7 +32,7 @@
 .settings-screen .settings-nav { flex-shrink: 0; }
 .app-shell :is(.chat-title h2, .chat-message, .chat-empty p, .chat-findings strong, .chat-receipt strong), .app-shell #chat-input { font-size: var(--ui-body); color: var(--ink); }
 .app-shell :is(.chat-launcher, .chat-message-heading, .chat-message-heading small, .chat-access, .chat-context, .chat-scope, .chat-mode, .chat-composer-footer, .chat-source, .chat-activity, .chat-activity ol, .chat-activity-log li small, .chat-activity-note, .chat-findings small, .chat-message-actions > span, .chat-message-attachment, .chat-receipt small, .chat-thread-menu > span, .chat-command-caption, .operation-copy small, .operation-elapsed) { font-size: var(--ui-small); color: var(--muted); }
-.app-shell :is(.chat-findings button, .chat-suggestions button, .chat-thread-menu button, .chat-retry, .chat-scope.has-selection) { font-size: var(--ui-small); color: var(--ink); }
+.app-shell :is(.chat-findings button, .chat-thread-menu button, .chat-retry, .chat-scope.has-selection) { font-size: var(--ui-small); color: var(--ink); }
 .app-shell :is(.chat-message-heading > span, .chat-empty h3, .chat-launcher small) { color: var(--ink); }
 .app-shell .chat-composer #chat-input::placeholder { color: var(--muted); }
 .settings-screen .settings-nav button { white-space: normal; line-height: 1.5; text-align: left; }
