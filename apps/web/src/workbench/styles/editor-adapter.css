@@ -240,8 +240,6 @@
 .uir-rewrite .rewrite-original summary { cursor: pointer; }
 .uir-rewrite .rewrite-original .rewrite-source { margin-top: 7px; }
 .uir-rewrite .rewrite-result { margin-bottom: 12px; }
-.uir-rewrite .rewrite-result > strong { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; }
-.uir-rewrite .rewrite-result > div { max-height: 170px; overflow: auto; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
 .uir-rewrite label { margin-bottom: 5px; font-size: 11px; }
 .uir-rewrite textarea { min-height: 58px; margin-bottom: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; }
 .uir-rewrite .rewrite-chips { gap: 6px; margin: 0 0 10px; }

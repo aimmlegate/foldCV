@@ -14,7 +14,19 @@
 .app-shell :is(.dropzone strong, .fact-edit strong, .technology-chip, .technology-option, .technology-no-results, .settings-nav button.active, .settings-content h3),
 .modal :is(.dialog-heading h2, .export-format strong, .export-summary strong), .uir-rewrite .rewrite-chips button { color: var(--ink); }
 .uir-rewrite .rewrite-source, .uir-rewrite .rewrite-original, .uir-rewrite .rewrite-adjust { color: var(--muted); font-size: var(--ui-small); }
-.uir-rewrite .rewrite-result textarea { min-height: 100px; max-height: 240px; resize: vertical; margin: 0; }
+/* Было over Станет. The new text's box holds the field and its marked copy in one grid cell; both layers share every
+   metric that affects wrapping, the box grows with the text and scrolls past its limit, so the marks stay under the words. */
+.uir-rewrite .rewrite-before h3 { margin: 16px 0 5px; color: #748265; font-size: var(--ui-small); font-weight: 500; }
+.uir-rewrite .rewrite-before .rewrite-source { max-height: 240px; font-size: var(--ui-body); line-height: 1.65; }
+.uir-rewrite :is(.rewrite-before del, .rewrite-marks ins) { border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.uir-rewrite .rewrite-before del { background: var(--danger-bg); color: var(--danger); text-decoration-thickness: 1px; }
+.uir-rewrite .rewrite-after { display: grid; grid-template-columns: minmax(0, 1fr); max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 5px; background: var(--paper); }
+.uir-rewrite .rewrite-after:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.uir-rewrite .rewrite-after > :is(textarea, .rewrite-marks) { grid-area: 1 / 1; align-self: stretch; width: 100%; min-height: 0; max-height: none; margin: 0; padding: 8px 10px; border: 0; font: inherit; font-size: var(--ui-body); line-height: 1.65; letter-spacing: normal; white-space: pre-wrap; overflow-wrap: anywhere; }
+.uir-rewrite .rewrite-after textarea { overflow: hidden; resize: none; background: transparent; }
+.uir-rewrite .rewrite-after textarea:focus-visible { outline: none; }
+.uir-rewrite .rewrite-marks { color: transparent; }
+.uir-rewrite .rewrite-marks ins { background: #d9eac6; text-decoration: none; }
 .settings-content > #workspace-pane-order { display: block; width: 100%; max-width: 420px; margin-top: 8px; padding: 10px 12px; }
 .settings-content > .limit-input { display: block; max-width: 160px; }
 .settings-screen .settings-nav { flex-shrink: 0; }
