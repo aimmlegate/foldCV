@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import socket
 import sys
@@ -225,6 +226,43 @@ async def projects(root, employment_shape='issues', template=None):
         (employment, employment_sources)]
 
 
+NAME_SIZE = re.compile(r'\n    name:\n      font: \w+\n      size: (\d+(?:\.\d+)?)\n')
+
+
+async def template_script(call, value, message, cancel, emit, counter):
+    """The template scope (D136): reads the draft, then the attached sample, a stored page, or proposes the name style
+    2 pt larger as one changed line."""
+    emit('activity.updated', {'itemId': 'read', 'kind': 'summary', 'text': 'Читаю шаблон'})
+    first = await call('read_draft', {'page': 0})
+    draft = first['text'] + ''.join([(await call('read_draft', {'page': page}))['text']
+        for page in range(1, first['pages'])])
+    if 'долго' in message:
+        while not cancel.is_set():
+            await asyncio.sleep(0.05)
+        return RuntimeResult(state='cancelled', error='AGENT_CANCELLED', native_started=True)
+    match = NAME_SIZE.search(draft)
+    if json.loads(value.prompt.split('\n', 1)[1])['sample'] is not None:
+        sample = await call('read_sample')
+        columns = sorted({unit['column'] for unit in sample['units'] if unit['column'] is not None})
+        text = (f"Образец «{sample['name']}»: показано {sample['listed']} из {sample['unitCount']} блоков, "
+            f"колонки: {', '.join(map(str, columns)) or 'нет'}.")
+    elif 'страниц' in message and 'read_public_page' in value.tools:
+        page = await call('read_public_page', {'url': 'https://example.org/template-guide'})
+        text = f"Прочитал страницу «{page['source']['title']}» ({page['source']['id']})."
+    elif match is None:
+        text = 'Не нашёл размер имени в шаблоне.'
+    else:
+        old, size = match.group(0), match.group(1)
+        new = f'{float(size) + 2:g}'
+        edited = await call('edit_draft', {'edits': [{'find': old, 'replace': old.replace('size: ' + size, 'size: ' + new)}]})
+        await call('check_draft')
+        result = await call('propose_draft', {'summary': f'Имя крупнее на 2 pt: {size} → {new} pt.'})
+        text = ('Подготовил вариант. Посмотрите и примените.' if 'proposalId' in result
+            else 'Не удалось подготовить вариант: ' + json.dumps(edited.get('error'), ensure_ascii=False))
+    emit('message.delta', {'text': text})
+    return RuntimeResult(state='completed', text=text, native_started=True, tool_calls=counter[0])
+
+
 async def assistant_script(value, cancel, emit):
     """A scripted assistant that calls the real run tools over the private MCP listener; no model is started."""
     import httpx
@@ -241,6 +279,8 @@ async def assistant_script(value, cancel, emit):
             return json.loads(result['content'][0]['text']) if result.get('content') else {}
         await client.post(value.url, json={'jsonrpc': '2.0', 'id': 0, 'method': 'initialize', 'params': {
             'protocolVersion': '2025-03-26', 'capabilities': {}, 'clientInfo': {'name': 'synthetic', 'version': '1'}}})
+        if 'read_draft' in value.tools:
+            return await template_script(call, value, message, cancel, emit, counter)
         emit('activity.updated', {'itemId': 'read', 'kind': 'summary', 'text': 'Читаю резюме'})
         page = await call('read_resume', {'page': 0})
         first = next(item for item in page['items'] if item['type'] != 'section' and item['containers']
@@ -307,8 +347,10 @@ def install_live_limits(app, ledger, limit):
     rewrites, so they are refused here, before a native process starts."""
     assistant = app.app.state.assistant
     budget = LiveBudget(assistant.runtime_for, ledger, limit)
-    assistant.runtime = budget
-    assistant.runtime_for = lambda model: None if budget.runtime_for(model) is None else budget
+    # The template assistant (D136) starts the same native models, so it is charged to the same budget.
+    for service in (assistant, app.app.state.template_assistant):
+        service.runtime = budget
+        service.runtime_for = lambda model: None if budget.runtime_for(model) is None else budget
 
     async def refused(*_args):
         raise ProjectFailure('CONNECTION_REQUIRED', 409)
@@ -353,7 +395,7 @@ async def main(args):
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
                 template_import_call_cap=args.template_call_cap,
                 provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)})
-        app.app.state.assistant._fetcher = web
+        app.app.state.assistant._fetcher = app.app.state.template_assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None and not args.reopen:
         # The store's active package for new imports: the synthetic employment subset.

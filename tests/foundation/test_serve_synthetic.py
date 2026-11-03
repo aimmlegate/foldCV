@@ -43,10 +43,10 @@ def live(tmp_path, monkeypatch):
     return app, tmp_path / "ledger.jsonl"
 
 
-def start(app):
+def start(app, service="assistant"):
     value = RuntimeInput(model=MODEL, prompt='context\n{"message": "check"}', url="http://127.0.0.1:1/mcp", token="t",
                          tools=(), allow_web=False)
-    runtime = app.app.state.assistant.runtime_for(MODEL)
+    runtime = getattr(app.app.state, service).runtime_for(MODEL)
     return asyncio.run(runtime.run(value, threading.Event(), lambda *_: None))
 
 
@@ -55,6 +55,14 @@ def test_a_native_run_is_charged_before_it_starts(live):
     serve_synthetic.install_live_limits(app, ledger, 1)
     assert start(app).state == "completed"
     assert FakeNative.starts == 1 and len(ledger.read_text().splitlines()) == 1
+
+
+def test_a_template_run_is_charged_to_the_same_allowance(live):
+    app, ledger = live
+    serve_synthetic.install_live_limits(app, ledger, 1)
+    assert start(app, "template_assistant").state == "completed"
+    assert FakeNative.starts == 1 and len(ledger.read_text().splitlines()) == 1
+    assert start(app).error == "AGENT_QUOTA" and FakeNative.starts == 1
 
 
 def test_a_start_past_the_allowance_is_refused_without_a_native_start(live):
