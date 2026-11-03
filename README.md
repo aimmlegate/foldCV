@@ -27,10 +27,12 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 ## macOS app
 
 `tools/build-macos-dmg.sh` builds `foldCV Beta.app` and its DMG from this checkout in one step: the frontend, the
-local service frozen with PyInstaller, and the Electron window around it. It needs Apple Silicon, arm64 Node 22 and
-python.org Python 3.13, and writes to `output/foldcv-macos-<version>-<commit>/`. The app keeps its data in
-`~/Library/Application Support/foldCV Beta`, apart from the browser service's `FoldCV` root. The signature is ad
-hoc: on another Mac, allow the app once in System Settings → Privacy & Security.
+local service frozen with PyInstaller, and the Tauri window around it (`apps/desktop-tauri`), which shows the page in
+the system WebKit. It needs Apple Silicon, arm64 Node 22, python.org Python 3.13 and Rust from
+[rustup](https://rustup.rs), and writes to `output/foldcv-macos-<version>-<commit>/`. The app runs on macOS 12 or later
+with Safari 17.4 or later, whose WebKit it uses. It keeps its data in `~/Library/Application Support/foldCV Beta`, as
+the earlier Electron builds did, apart from the browser service's `FoldCV` root. The signature is ad hoc: on another
+Mac, allow the app once in System Settings → Privacy & Security.
 
 ## Windows app
 
@@ -47,7 +49,8 @@ other program and ends them with the app; unlike the macOS sandbox it does not l
 | Path | Contents |
 | --- | --- |
 | `apps/web` | React and TypeScript frontend |
-| `apps/desktop` | Electron window of the desktop apps |
+| `apps/desktop-tauri` | Tauri window of the macOS app |
+| `apps/desktop` | Electron window of the Windows app |
 | `services/api` | FastAPI local service, CLI providers, import and assistant |
 | `packages/resume_core` | Project storage, templates and DOCX rendering |
 | `contracts` | Generated JSON Schemas and contract examples |

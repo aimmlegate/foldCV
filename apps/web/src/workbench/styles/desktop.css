@@ -1,4 +1,4 @@
-/* The macOS app (apps/desktop) has no title bar: its window buttons sit over the top-left corner of the page,
+/* The macOS app (apps/desktop-tauri) has no title bar: its window buttons sit over the top-left corner of the page,
    and its preload adds the strip that drags the window. */
 html[data-desktop="macos"] .desktop-window-drag { position: fixed; inset: 0 0 auto; z-index: 1000; height: 30px; -webkit-app-region: drag; user-select: none; }
 html[data-desktop="macos"] .app-shell .history { padding-top: 39px; }

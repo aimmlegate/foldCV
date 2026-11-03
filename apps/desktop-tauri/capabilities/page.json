@@ -1,0 +1,7 @@
+{
+  "identifier": "service-page",
+  "description": "The page of the local service moves its window from the strip at the top, zooms it on a double click and opens the print window for the PDF export (Tauri's window.print on macOS asks for this command).",
+  "windows": ["main"],
+  "remote": { "urls": ["http://127.0.0.1:*"] },
+  "permissions": ["core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize", "core:webview:allow-print"]
+}

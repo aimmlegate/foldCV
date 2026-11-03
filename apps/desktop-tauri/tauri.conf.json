@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "foldCV Beta",
+  "version": "../desktop/package.json",
+  "identifier": "invalid.foldcv.beta",
+  "app": {
+    "windows": [],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["../../assets/branding/foldcv/liquid-glass-v2/macos/FoldCV-native-olive.iconset/icon_512x512.png"]
+  }
+}
