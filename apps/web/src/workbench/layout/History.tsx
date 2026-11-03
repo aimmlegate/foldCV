@@ -17,11 +17,11 @@ export function DeleteDialog({ open, busy, error, close, confirm }: { open: bool
   </Dialog>;
 }
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, connection, error, handle }: {
+export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, templates, connection, error, handle }: {
   projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void; handle?: ReactNode;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   archive: (id: string, archived: boolean) => Promise<boolean>;
-  openFile: () => void; settings: () => void; connection: string; error: string;
+  openFile: () => void; settings: () => void; templates: () => void; connection: string; error: string;
 }) {
   const [deleting, setDeleting] = useState<string | null>(null), [refused, setRefused] = useState(false);
   const closeDelete = () => { setDeleting(null); setRefused(false); };
@@ -62,6 +62,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
     <footer className="history-footer">
       <button className="history-file" disabled={busy} onClick={openFile}><Icon name="upload" />Открыть .foldcv</button>
       <div className="connection-mini"><span className="dot" /><span>{connection}</span></div>
+      <button className="history-settings history-templates" disabled={busy} onClick={templates}><Icon name="file" />Шаблоны<Icon name="chevron" /></button>
       <button className="history-settings" disabled={busy} onClick={settings}><Icon name="settings" />Настройки<Icon name="chevron" /></button>
     </footer>
     <DeleteDialog open={deleting !== null} busy={busy} error={refused ? error : ""} close={closeDelete} confirm={() => {

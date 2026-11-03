@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, pointerRange, technicalLines, withState } from "../src/workbench/settings/template/config";
+import { parseCheck, parseConfigState, pointerRange, technicalLines, withState } from "../src/workbench/templates/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",

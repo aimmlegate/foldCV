@@ -12,6 +12,7 @@ import { openEditor } from "./open-editor";
 import { WorkspaceReads, type ReadCapture } from "./read-capture";
 import type { ImportEntry } from "./import/progress";
 import { ImportTracker } from "./import/tracker";
+import type { Screen } from "./templates/screen";
 
 function label(error: unknown): string { return errorMessage(error); }
 export type TemplateOpening = { response: TemplateProjectResponseV1; connection: ProjectEditorConnection };
@@ -30,7 +31,8 @@ export function useResumeWorkspace() {
     setOperation(current => ({ label, startedAt: current?.startedAt ?? Date.now() }));
   }
   const [loading, setLoading] = useState(() => new URLSearchParams(location.search).has("project"));
-  const [settings, setSettings] = useState(false);
+  const [screen, setScreen] = useState<Screen>("resume");
+  const showResume = useCallback(() => setScreen("resume"), []);
   const templateEditor = useRef<TemplateEditorHandle>(null);
   const assistant = useRef<AssistantHandle>(null);
   const reads = useRef(new WorkspaceReads());
@@ -86,7 +88,7 @@ export function useResumeWorkspace() {
     try { await work(current); return current(); } catch (error) {
       if (!current()) return false;
       let message = label(error);
-      if (!settings && previousEditor?.background && templateEditor.current === previousEditor && activeProject.current === previousProject) {
+      if (screen === "resume" && previousEditor?.background && templateEditor.current === previousEditor && activeProject.current === previousProject) {
         try { await previousEditor.resume(); } catch (resumeError) { message += ` ${label(resumeError)}`; }
       }
       if (current()) setError(message); return false;
@@ -104,13 +106,13 @@ export function useResumeWorkspace() {
     await action(async current => {
       await leave(current);
       if (!current()) return;
-      clear(); setSettings(false);
+      clear(); showResume();
     }, "Готовим новое резюме");
   }
   async function open(id: string) {
     return action(async current => {
       // A shown pre-draft is read again: its import may have published it meanwhile.
-      if (activeProject.current === id && template?.response.workspace.project) { await templateEditor.current?.resume(); if (current()) setSettings(false); return; }
+      if (activeProject.current === id && template?.response.workspace.project) { await templateEditor.current?.resume(); if (current()) showResume(); return; }
       await leave(current);
       if (!current()) return;
       const capture = reads.current.beginSelection(id);
@@ -118,7 +120,7 @@ export function useResumeWorkspace() {
         const result = await load(id, capture);
         if (result && reads.current.selectionCurrent(capture)) {
           show(result, capture);
-          setStatus("Сохранено"); setSettings(false);
+          setStatus("Сохранено"); showResume();
         }
       } finally { reads.current.cancelSelection(capture); }
     }, "Открываем резюме");
@@ -235,7 +237,7 @@ export function useResumeWorkspace() {
       const capture = reads.current.beginSelection(id);
       try {
         const result = await load(id, capture);
-        if (result && reads.current.selectionCurrent(capture)) { show(result, capture); setSettings(false); }
+        if (result && reads.current.selectionCurrent(capture)) { show(result, capture); showResume(); }
       } finally { reads.current.cancelSelection(capture); }
       if (refused) throw refused;
     }, "Читаем файл");
@@ -251,7 +253,7 @@ export function useResumeWorkspace() {
         const connection = await openEditor(opened.workspace.projectId);
         if (!reads.current.replacementCurrent(version)) return;
         selectTemplate(connection, reads.current.beginSelection(opened.workspace.projectId));
-        setSettings(false);
+        showResume();
         const capture = reads.current.opening, catalog = await listProjects();
         if (reads.current.matchesOpening(capture)) setProjects(catalog);
       } finally { reads.current.cancelReplacement(version); }
@@ -295,6 +297,6 @@ export function useResumeWorkspace() {
     dismiss: (id: string) => tracker.current?.dismiss(id), reopen: (id: string) => void reopenImported(id),
   };
   return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects,
-    error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, settings, setSettings,
+    error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, screen, setScreen, showResume,
     assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, printPdf, dismissError };
 }

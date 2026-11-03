@@ -1,5 +1,5 @@
 import { errorMessage } from "../../errors/messages";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ConnectionWorkflow, modelGroups, type ConnectionView } from "../../connection/workflow";
 import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
 import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
@@ -10,20 +10,12 @@ import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import { textSizes, type Appearance, type PaneOrder } from "./interface";
-import { Dialog } from "../ui/Dialog";
 
-// Loaded on first visit: the YAML parser and Monaco stay out of the startup bundle.
-const TemplateSettings = lazy(() => import("./template/TemplateSettings"));
 const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
 export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder, appearance, changeAppearance }: { open: boolean; close: () => void;
   connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void;
   appearance: Appearance; changeAppearance: (value: Appearance) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "limits" | "interface">("model");
-  // The template editor stays mounted after its first visit so switching sections keeps unsaved YAML.
-  const [templateOpened, setTemplateOpened] = useState(false), [templateDirty, setTemplateDirty] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
-  const templateDirtyChange = useCallback((dirty: boolean) => setTemplateDirty(dirty), []);
-  const leave = () => { if (templateDirty) setConfirmClose(true); else close(); };
   const [view, setView] = useState<ConnectionView>(() => new ConnectionWorkflow(() => {}).view);
   const [workflow] = useState(() => new ConnectionWorkflow(value => { setView(value); connectionChanged(value); }));
   const [state, setState] = useState<SettingsState | null>(null);
@@ -49,12 +41,12 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
       <span className="settings-saved" role="status">{current.saving ? "" : dirty ? "Не сохранено" : current.staleRules ? "Команды изменились, загрузите их заново" : controller.ready ? "" : "Часть настроек не загрузилась"}</span>
     </div></>;
   return <section className="settings-screen" aria-label="Настройки">
-    <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={leave}>← К резюме</button></div>
+    <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← К резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
       {/* Limits have no menu item; their saved or default values still apply. */}
       {(["model", "rules", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}
-        aria-current={section === value ? "page" : undefined} onClick={() => { setSection(value); if (value === "rules") setTemplateOpened(true); }}>
-        {value === "model" ? "Модель и подключение" : value === "rules" ? "Правила и шаблон" : "Интерфейс"}
+        aria-current={section === value ? "page" : undefined} onClick={() => setSection(value)}>
+        {value === "model" ? "Модель и подключение" : value === "rules" ? "Команды" : "Интерфейс"}
       </button>)}
     </nav><div className="settings-content">
       <div className="settings-feedback">
@@ -140,12 +132,6 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
           всё окно целиком увеличивают ⌘ + и ⌘ − (Ctrl на Windows).</p>
       </>}
       {(section === "model" || section === "limits") && draftActions}
-      {templateOpened && <div className="uir-assistant-options" hidden={section !== "rules"}><Suspense fallback={<OperationStatus label="Загружаем шаблон" />}><TemplateSettings dirtyChange={templateDirtyChange} /></Suspense></div>}
     </div></div>
-    <Dialog open={confirmClose} close={() => setConfirmClose(false)} title="Выйти без сохранения?">
-      <p className="dialog-copy">Правки шаблона пропадут.</p>
-      <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmClose(false)}>Остаться</Button>
-        <Button variant="danger" onClick={() => { setConfirmClose(false); close(); }}>Выйти</Button></div>
-    </Dialog>
   </section>;
 }

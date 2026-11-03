@@ -2,7 +2,7 @@ import * as monaco from "monaco-editor";
 import { configureMonacoYaml } from "monaco-yaml";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useEffect, useRef } from "react";
-import schema from "../../../../../../contracts/template-source.schema.json";
+import schema from "../../../../../contracts/template-source.schema.json";
 import { pointerRange, technicalLines, type TemplateProblem } from "./config";
 import YamlWorker from "./yaml.worker?worker";
 

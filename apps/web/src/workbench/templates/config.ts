@@ -1,6 +1,6 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
-import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../../projects/api";
-import { ProjectApiFailure } from "../../../rich/v7-connection";
+import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../projects/api";
+import { ProjectApiFailure } from "../../rich/v7-connection";
 
 export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
 /** One template's YAML; `bundled` and `edited` as in its catalog entry. */
