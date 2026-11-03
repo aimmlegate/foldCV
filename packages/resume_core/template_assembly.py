@@ -53,14 +53,22 @@ def assemble_template(workspace, operation, remembered=None):
     for declaration in data.template_package.definition.blocks:
         if declaration.when is not None:
             gated.setdefault(declaration.when.operation, set()).add(declaration.id)
+    joined = {value.id: value.parameters.uncertain_group for value in data.template_package.definition.operations
+        if value.kind == 'assign_skills'}
     def placed(issue, value, target):
         if target.startswith('scope-'):
             return value.disposition == 'fallback' and any(overlaps(value.span, span) for span in fallback_spans.get(issue.task_id, []))
         return any(overlaps(value.span, span) for span in target_spans.get(target, []))
     for issue in issues:
-        blocks = {identifier for value in coverage if value.disposition != 'source_only'
-            and (not issue.target_ids or any(placed(issue, value, target) for target in issue.target_ids))
-            for identifier in value.block_ids}
+        # A skills remark asks to check the group its technology joined, so it points at that group, not at the jobs
+        # naming the technology; their lines share its source text.
+        group = joined.get(views.get(issue.task_id))
+        blocks = {block.id for block in document.blocks() if group is not None and block.presentation is not None
+            and block.presentation.view_key == group}
+        if not blocks:
+            blocks = {identifier for value in coverage if value.disposition != 'source_only'
+                and (not issue.target_ids or any(placed(issue, value, target) for target in issue.target_ids))
+                for identifier in value.block_ids}
         if not blocks and any(target.startswith('scope-') for target in issue.target_ids):
             # A step without a view of its own (the role branch) points at the views its result selects.
             wanted = {views.get(issue.task_id)} | gated.get(views.get(issue.task_id), set())
