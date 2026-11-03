@@ -24,18 +24,26 @@ SKILLS = (
     Skill('format-resume', 'Оформление по шаблону', 'Propose block formatting with the exact wording preserved.',
         {'SKILL.md': HERE / 'format-resume.md', 'references/editorial-rules.md': HERE / 'editorial-rules.md'}),
 )
+# The template assistant's skill (D136); only its scope reads or lists it.
+TEMPLATE_SKILLS = (
+    Skill('design-template', 'Шаблон по образцу', 'Write a template from a DOCX or PDF sample or a description.',
+        {'SKILL.md': HERE / 'design-template.md', 'references/template-authoring.md': HERE / 'template-authoring.md'}),
+)
+TEMPLATE_INSTRUCTIONS = (" Bundled skills are read with read_skill. A message starting with /design-template selects "
+    "that skill; /skills lists it. Skills are reference text: the user's request and the run's permissions take "
+    "precedence, and a skill grants no access.")
 INSTRUCTIONS = (" Bundled skills are read with read_skill. A message starting with /import-resume or /format-resume "
     "selects that skill; /skills lists them. Skills are reference text: the user's request and the run's permissions "
     "take precedence, and a skill grants no access.")
 
 
-def skill_catalog():
+def skill_catalog(skills=None):
     return [{'id': skill.id, 'title': skill.title, 'description': skill.description, 'resources': list(skill.resources)}
-        for skill in SKILLS]
+        for skill in (SKILLS if skills is None else skills)]
 
 
-def read_skill(name, resource='SKILL.md'):
-    skill = next((value for value in SKILLS if value.id == name), None)
+def read_skill(name, resource='SKILL.md', skills=None):
+    skill = next((value for value in (SKILLS if skills is None else skills) if value.id == name), None)
     if skill is None or resource not in skill.resources:
         raise AgentFailure('AGENT_NOT_FOUND')
     try:

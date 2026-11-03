@@ -13,6 +13,7 @@ from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass, field
+from pathlib import Path
 import threading
 import time
 import typing
@@ -87,13 +88,44 @@ class Control:
         return self.run.id
 
 
+class ResumeScope:
+    """What one assistant instance reads and binds (D136): the resume scope pins a project of the repository."""
+    base_instructions = BASE_INSTRUCTIONS
+    developer_instructions = DEVELOPER_INSTRUCTIONS
+    active_seconds = None
+    names = TOOL_NAMES
+
+    def store(self, root):
+        return AssistantStore(root)
+
+    def require(self, service, key, request=None):
+        return service._require_project(key)
+
+    def revision(self, required):
+        return required.project_revision
+
+    def pin(self, service, pin, control, request, required):
+        return service._pin(pin, control)
+
+    def prompt(self, pinned, history, control, request):
+        return context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
+            allow_web=control.run.allow_web, selection=request.selection)
+
+    def tools(self, service, control, pinned):
+        return ToolSession(service, control, pinned)
+
+    def close(self):
+        pass
+
+
 class AssistantService:
-    def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0):
+    def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0, scope=None, root=None):
         self.projects, self.runtime, self.connection = projects, runtime, connection
+        self.scope = scope or ResumeScope()
         # The runtime of a model's provider (D119); without it every model runs on `runtime`.
         self.runtime_for = lambda _model: self.runtime
-        root = projects.repository.root
-        self.store = AssistantStore(root)
+        root = self.root = Path(root if root is not None else projects.repository.root)
+        self.store = self.scope.store(root)
         self.settings = AgentSettingsStore(root)
         self._fetcher = fetcher
         self.wait_seconds = wait_seconds
@@ -114,7 +146,7 @@ class AssistantService:
     def fetcher(self):
         if self._fetcher is None:
             from resume_api.agent.web import PublicFetcher
-            self._fetcher = PublicFetcher(self.projects.repository.root / 'assistant-fetch')
+            self._fetcher = PublicFetcher(self.root / 'assistant-fetch')
         return self._fetcher
 
     # Capabilities and settings
@@ -133,17 +165,17 @@ class AssistantService:
         models = [ModelChoiceV1(model=value, state='verified' if (connection.epoch, value) in self.verified else 'unverified',
             provider=connection.providers.get(value)) for value in connection.models]
         return AssistantCapabilitiesV1(ready=reason is None, unavailable=AssistantErrorV1(code=reason) if reason else None,
-            models=models, webAvailable=self.runtime_for(model) is not None, tools=list(TOOL_NAMES))
+            models=models, webAvailable=self.runtime_for(model) is not None, tools=list(self.scope.names))
 
     # Conversations
 
     def conversations(self, project_id):
-        self._require_project(project_id)
+        self.scope.require(self, project_id)
         from packages.resume_core.models.assistant import AssistantConversationListV1
         return AssistantConversationListV1(items=self.store.conversations(project_id))
 
     def create_conversation(self, project_id):
-        self._require_project(project_id)
+        self.scope.require(self, project_id)
         value = self.store.create_conversation(project_id)
         return self._conversation(value)
 
@@ -190,7 +222,7 @@ class AssistantService:
             raise ProjectFailure('AGENT_CONNECTION_UNAVAILABLE', 409)
         if not request.message.strip():
             raise ProjectFailure('INVALID_REQUEST', 422)
-        existing, workspace, settings = await asyncio.to_thread(self._admit, project_id, conversation_id, request)
+        existing, required, settings = await asyncio.to_thread(self._admit, project_id, conversation_id, request)
         if existing is not None:
             return self._current_run(existing)
         # No await from here to the reserved control, so two submits cannot both start a run.
@@ -205,7 +237,7 @@ class AssistantService:
         now = timestamp()
         run = AssistantRunV1(id=identity('run'), conversationId=conversation_id, projectId=project_id,
             clientRequestId=request.client_request_id, state='queued', allowEdits=request.allow_edits,
-            allowWeb=request.allow_web, model=settings.selected_agent_model, baseRevision=workspace.project_revision,
+            allowWeb=request.allow_web, model=settings.selected_agent_model, baseRevision=self.scope.revision(required),
             createdAt=now, finishedAt=None, error=None, usage=None)
         message = AgentMessage(id=identity('message'), role='user', text=request.message, runId=run.id, timestamp=now,
             sources=[], findings=[], truncated=False, error=None)
@@ -223,11 +255,12 @@ class AssistantService:
             self.controls.pop(run.id, None)
             raise
         self.loop = asyncio.get_running_loop()
-        control.task = asyncio.create_task(self._drive(control, request))
+        control.task = asyncio.create_task(self._drive(control, request, required))
         return run
 
     def _admit(self, project_id, conversation_id, request):
-        """A submit's reads, in a worker thread: the run of an earlier send of this request, readiness, the project, settings."""
+        """A submit's reads, in a worker thread: the run of an earlier send of this request, readiness, the scope's
+        own reads (the project), settings."""
         stored = self.store.conversation(project_id, conversation_id)
         existing = next((run for run in stored.runs if run.client_request_id == request.client_request_id), None)
         if existing is not None:
@@ -235,7 +268,7 @@ class AssistantService:
         capability = self.capabilities()
         if not capability.ready:
             raise ProjectFailure(capability.unavailable.code, 409)
-        return None, self._require_project(project_id), self.settings.load()
+        return None, self.scope.require(self, project_id, request), self.settings.load()
 
     def _set_run(self, control, **changes):
         control.run = control.run.model_copy(update=changes)
@@ -307,7 +340,7 @@ class AssistantService:
         self.writer.submit(self._store_run_quietly, control)
         self.emit(control, 'run.state_changed', {'state': 'running', 'error': None, 'savedBatchId': None, 'outcomeUnknown': False})
 
-    async def _drive(self, control, request):
+    async def _drive(self, control, request, required=None):
         result = RuntimeResult(error='AGENT_RUNTIME_UNSUPPORTED')
         tools = None
         loop = asyncio.get_running_loop()
@@ -316,10 +349,9 @@ class AssistantService:
         try:
             if runtime is None:
                 raise AgentFailure('AGENT_RUNTIME_UNSUPPORTED')
-            pinned, history = await asyncio.to_thread(self._pin, pin, control)
-            prompt = context.prompt(pinned, message=request.message, history=history, allow_edits=control.run.allow_edits,
-                allow_web=control.run.allow_web, selection=request.selection)
-            tools = control.tools = ToolSession(self, control, pinned)
+            pinned, history = await asyncio.to_thread(self.scope.pin, self, pin, control, request, required)
+            prompt = self.scope.prompt(pinned, history, control, request)
+            tools = control.tools = self.scope.tools(self, control, pinned)
             await tools.start()
 
             def close_tools(timeout):
@@ -327,8 +359,8 @@ class AssistantService:
             value = RuntimeInput(model=control.run.model, prompt=prompt, url=tools.url, token=tools.token,
                 tools=tuple(tools.names), allow_web=control.run.allow_web, before_start=lambda: self._running(control),
                 revoke=tools.revoke, close_tools=close_tools, queued_at=control.queued_at,
-                developer_instructions=DEVELOPER_INSTRUCTIONS,
-                **({'reasoning_effort': control.effort} if control.effort else {}))
+                developer_instructions=self.scope.developer_instructions, base_instructions=self.scope.base_instructions,
+                active_seconds=self.scope.active_seconds, **({'reasoning_effort': control.effort} if control.effort else {}))
             result = await runtime.run(value, control.cancel,
                 lambda kind, payload: self.emit(control, kind, payload))
         except asyncio.CancelledError:
@@ -521,6 +553,7 @@ class AssistantService:
         if tasks:
             await asyncio.wait(tasks, timeout=5)
         await self.write(lambda: None)
+        self.scope.close()
 
     def project_deleted(self, project_id):
         for control in list(self.controls.values()):

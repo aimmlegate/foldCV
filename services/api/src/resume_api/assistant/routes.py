@@ -5,21 +5,23 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import Request
+from fastapi import Query, Request
 from fastapi.responses import JSONResponse
 
 from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentSettingsRequest
 from packages.resume_core.models.assistant import AssistantApplyRequestV1, AssistantRunRequestV2, AssistantSkillListV1, AssistantSkillV1
 from packages.resume_core.models.assistant import AssistantChangeProposalListV1
+from packages.resume_core.models.assistant import TemplateProposalListV1, TemplateProposalStateV1, TemplateRunRequestV1
 
 from resume_api.projects.errors import ProjectFailure
 from resume_api.projects.routes import file_reply, model_reply
 
-from . import proposals
+from . import proposals, template_tools
 from .skills import skill_catalog
 
 PREFIX = '/v2/projects/{project_id}/assistant'
+TEMPLATE_PREFIX = '/v2/templates/assistant'
 MISSING = {'AGENT_NOT_FOUND', 'ASSISTANT_PROPOSAL_NOT_FOUND'}
 
 
@@ -34,7 +36,7 @@ async def worker(function, *args, **kwargs):
         raise translated(error) from None
 
 
-def mount_assistant(app, service):
+def mount_assistant(app, service, *, companions=()):
     @app.exception_handler(AgentFailure)
     async def agent_error(_request: Request, error: AgentFailure):
         status = (404 if error.code == 'AGENT_NOT_FOUND' else 410 if error.code == 'AGENT_PROJECT_DELETED' else
@@ -54,7 +56,9 @@ def mount_assistant(app, service):
         connection = service.connection()
         saved = await worker(service.settings.save, payload, connection.models or None, connection.reasoning)
         if prior.enabled and not saved.enabled:
-            service.stop_all()
+            # One switch for every assistant instance (D136).
+            for value in (service, *companions):
+                value.stop_all()
         return settings_reply(saved)
 
     @app.get(PREFIX + '/capabilities')
@@ -121,3 +125,59 @@ def mount_assistant(app, service):
     async def file(project_id: str, file_id: str):
         filename, media, data = service.file(project_id, file_id)
         return file_reply(data, media, {'Content-Disposition': f'attachment; filename="{filename}"'})
+
+
+def mount_template_assistant(app, service):
+    """The template assistant (D136): the run routes of one fixed scope key and its proposals."""
+    key = template_tools.TEMPLATES
+
+    @app.get(TEMPLATE_PREFIX + '/capabilities')
+    async def template_capabilities():
+        return model_reply(await worker(service.capabilities))
+
+    @app.get(TEMPLATE_PREFIX + '/conversations')
+    async def template_conversations():
+        return model_reply(await worker(service.conversations, key))
+
+    @app.post(TEMPLATE_PREFIX + '/conversations')
+    async def template_create_conversation():
+        return model_reply(await worker(service.create_conversation, key), 201)
+
+    @app.get(TEMPLATE_PREFIX + '/conversations/{conversation_id}/messages')
+    async def template_messages(conversation_id: str):
+        return model_reply(await worker(service.messages, key, conversation_id))
+
+    @app.post(TEMPLATE_PREFIX + '/conversations/{conversation_id}/runs')
+    async def template_submit(conversation_id: str, payload: TemplateRunRequestV1):
+        try:
+            return model_reply(await service.submit(key, conversation_id, payload), 201)
+        except AgentFailure as error:
+            raise translated(error) from None
+
+    @app.get(TEMPLATE_PREFIX + '/runs/{run_id}/events/{after}')
+    async def template_events(run_id: str, after: int):
+        try:
+            return model_reply(await service.events(key, run_id, max(0, after)))
+        except AgentFailure as error:
+            raise translated(error) from None
+
+    @app.post(TEMPLATE_PREFIX + '/runs/{run_id}/cancel')
+    async def template_cancel(run_id: str):
+        try:
+            return model_reply(await service.cancel(key, run_id))
+        except AgentFailure as error:
+            raise translated(error) from None
+
+    # The boundary admits this one query string (conversationId) on this path.
+    @app.get(TEMPLATE_PREFIX + '/proposals')
+    async def template_proposals(conversation_id: str = Query(alias='conversationId', min_length=1, max_length=128)):
+        items = await worker(template_tools.proposals, service.store, conversation_id)
+        return model_reply(TemplateProposalListV1(items=items[-100:]))
+
+    @app.get(TEMPLATE_PREFIX + '/proposals/{proposal_id}')
+    async def template_proposal(proposal_id: str):
+        return model_reply((await worker(template_tools.proposal, service.store, proposal_id))[1])
+
+    @app.post(TEMPLATE_PREFIX + '/proposals/{proposal_id}/state')
+    async def template_proposal_state(proposal_id: str, payload: TemplateProposalStateV1):
+        return model_reply(await worker(template_tools.set_state, service.store, proposal_id, payload.state))
