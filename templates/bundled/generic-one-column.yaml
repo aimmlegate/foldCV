@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-one-column
-  revision: 1.2.0
+  revision: 1.3.0
   name: Одна колонка
   default_locale: ru
 model:
@@ -573,14 +573,16 @@ style:
     ink: '#000000'
     chip: '#EFEFEF'
     divider: '#888888'
+  # Regular and Bold only (D127): Google Docs knows these two faces of Source Sans Pro and replaced Light, Semibold and
+  # Black with Arial; the other faces stay in the package for marks and older projects.
   text:
     name:
-      font: black
+      font: bold
       size: 17
       line_height: 21
       color: ink
     profession:
-      font: semibold
+      font: bold
       size: 14
       line_height: 18
       color: ink
@@ -590,12 +592,12 @@ style:
       line_height: 15.5
       color: ink
     project:
-      font: semibold
+      font: bold
       size: 11
       line_height: 14
       color: ink
     body:
-      font: light
+      font: regular
       size: 9.5
       line_height: 12
       color: ink

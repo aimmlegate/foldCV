@@ -12,7 +12,7 @@ import { TaskProgress } from "./import/TaskProgress";
 import { TaskNotices } from "./import/TaskNotices";
 import { sourceSummary } from "./import/progress";
 import { Settings } from "./settings/Settings";
-import { readPaneOrder, savePaneOrder, type PaneOrder } from "./settings/interface";
+import { readPaneOrder, savePaneOrder, type PaneOrder, readAppearance, saveAppearance, type Appearance } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename } from "./files/filename";
 import { Icon } from "./ui/Icon";
@@ -32,6 +32,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const changeHistoryWidth = (value: number | null) => { setHistoryWidth(value); savePanelSize("history", value); };
   const [paneOrder, setPaneOrder] = useState(readPaneOrder);
   const changePaneOrder = (order: PaneOrder) => { savePaneOrder(order); setPaneOrder(order); };
+  const [appearance, setAppearance] = useState(readAppearance);
+  const changeAppearance = (value: Appearance) => { saveAppearance(value); setAppearance(value); };
   useEffect(() => {
     const narrow = matchMedia("(max-width: 600px)"), collapse = () => { if (narrow.matches) setCollapsed(true); };
     narrow.addEventListener("change", collapse); return () => narrow.removeEventListener("change", collapse);
@@ -111,7 +113,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "source" && !workspace.loading && <SourceForm active={!settings} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
-      {settingsVisited && <div className="screen" hidden={!settings}><Settings open={settings} close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} /></div>}
+      {settingsVisited && <div className="screen" hidden={!settings}><Settings open={settings} close={() => void action(async current => { await templateEditor.current?.resume(); if (current()) setSettings(false); })} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}

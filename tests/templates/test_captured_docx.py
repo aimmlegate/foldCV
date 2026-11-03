@@ -86,7 +86,7 @@ def test_actual_employment_preserves_text_order_geometry_and_captured_assets(cap
     assert canonical(captured_request) == before
     assert tree.xpath('string(//w:pgSz/@w:w)', namespaces=NS) == '11920'
     assert tree.xpath('string(//w:pgMar/@w:top)', namespaces=NS) == '480'
-    assert tree.xpath('//w:tblGrid/w:gridCol/@w:w', namespaces=NS) == ['2370', '105', '8895']
+    assert tree.xpath('//w:tblGrid/w:gridCol/@w:w', namespaces=NS) == ['2370', '105', '8600']
     assert not tree.xpath('//w:cantSplit', namespaces=NS)
     assert all(node.get(qn('w:w')) == '0' for node in tree.xpath('//w:tcMar/*', namespaces=NS))
     assert tree.xpath('//w:body/w:p/w:pPr/w:pBdr/w:bottom/@w:color', namespaces=NS) == ['888888']
@@ -304,7 +304,7 @@ def test_native_numbering_keeps_start_sequence_and_marker_style(captured_request
     abstract = numbering.xpath('w:abstractNum[@w:abstractNumId=$id]', namespaces=NS,
         id=number.xpath('string(w:abstractNumId/@w:val)', namespaces=NS))[0]
     assert abstract.xpath('string(.//w:start/@w:val)', namespaces=NS) == '7'
-    assert abstract.xpath('string(.//w:rFonts/@w:ascii)', namespaces=NS) == 'Source Sans Pro Light'
+    assert abstract.xpath('string(.//w:rFonts/@w:ascii)', namespaces=NS) == 'Source Sans Pro'
     assert abstract.xpath('string(.//w:sz/@w:val)', namespaces=NS) == '28'
     assert abstract.xpath('string(.//w:b/@w:val)', namespaces=NS) == '0'
 

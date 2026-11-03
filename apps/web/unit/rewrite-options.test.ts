@@ -15,7 +15,7 @@ const catalog = { provider: "codex_cli", providers: [codex], versionStatus: "sup
   modelReasoning: { "model-a": { supported: ["low", "medium"], default: "medium" }, "model-b": { supported: ["high"], default: "high" } },
   quota: { state: "available", usedPercent: null, resetsAt: null }, metadataReady: true, generationReady: true, experimentalMode: false } as ConnectionSnapshot;
 const render = (settings: Partial<RewriteSettings>, disabled = false) => renderToStaticMarkup(createElement(RewriteOptions, { disabled,
-  settings: { catalog, saved: { selectedRewriteModel: null, rewriteReasoningEffort: null }, saving: false, error: "",
+  settings: { catalog, saved: { selectedRewriteModel: null, rewriteReasoningEffort: null }, saving: false, error: "", checking: false,
     chooseModel: () => {}, chooseEffort: () => {}, ...settings } }));
 
 test("the rewrite popover offers the listed models and the levels of the model rewriting runs on", () => {

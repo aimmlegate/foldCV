@@ -9,13 +9,15 @@ import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
-import type { PaneOrder } from "./interface";
+import { textSizes, type Appearance, type PaneOrder } from "./interface";
 import { Dialog } from "../ui/Dialog";
 
 // Loaded on first visit: the YAML parser and Monaco stay out of the startup bundle.
 const TemplateSettings = lazy(() => import("./template/TemplateSettings"));
 const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
-export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder }: { open: boolean; close: () => void; connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
+export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder, appearance, changeAppearance }: { open: boolean; close: () => void;
+  connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void;
+  appearance: Appearance; changeAppearance: (value: Appearance) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "limits" | "interface">("model");
   // The template editor stays mounted after its first visit so switching sections keeps unsaved YAML.
   const [templateOpened, setTemplateOpened] = useState(false), [templateDirty, setTemplateDirty] = useState(false);
@@ -119,6 +121,23 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
           <option value="layout-first">Макет слева, оригинал справа</option>
           <option value="original-first">Оригинал слева, макет справа</option>
         </select><p>Сохраняется сразу.</p>
+        <h3>Читаемость</h3>
+        <label htmlFor="interface-text-size">Размер текста интерфейса</label>
+        <select id="interface-text-size" value={appearance.textSize} onChange={event => {
+          const value = textSizes.find(size => size === event.currentTarget.value);
+          if (value) changeAppearance({ ...appearance, textSize: value });
+        }}>
+          <option value="normal">Обычный</option>
+          <option value="large">Крупный</option>
+          <option value="x-large">Очень крупный</option>
+        </select>
+        <label htmlFor="interface-contrast">Контраст</label>
+        <select id="interface-contrast" value={appearance.contrast} onChange={event => changeAppearance({ ...appearance, contrast: event.currentTarget.value === "high" ? "high" : "normal" })}>
+          <option value="normal">Обычный</option>
+          <option value="high">Высокий: чёрный текст</option>
+        </select>
+        <p>Сохраняется сразу и действует на меню, панели и подсказки. Масштаб самого резюме задаёт список в панели редактора;
+          всё окно целиком увеличивают ⌘ + и ⌘ − (Ctrl на Windows).</p>
       </>}
       {(section === "model" || section === "limits") && draftActions}
       {templateOpened && <div className="uir-assistant-options" hidden={section !== "rules"}><Suspense fallback={<OperationStatus label="Загружаем шаблон" />}><TemplateSettings dirtyChange={templateDirtyChange} /></Suspense></div>}

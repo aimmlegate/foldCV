@@ -205,6 +205,7 @@ async def test_e10_yaml_styles_survive_new_block_ids_and_manual_marks_override_t
         return [(run.xpath('string(.//w:rFonts/@w:ascii)', namespaces=NS), run.xpath('string(.//w:b/@w:val)', namespaces=NS),
             run.xpath('string(.//w:sz/@w:val)', namespaces=NS)) for paragraph in tree.iter('{%s}p' % NS['w'])
             if emitted(paragraph) == wording for run in paragraph.iter('{%s}r' % NS['w'])]
-    # The bold mark selects the captured bold face over the light body style; the rest keeps the YAML style.
-    assert runs('about 2.5 years') == [('Source Sans Pro', '1', '20'), ('Source Sans Pro Light', '0', '20')]
-    assert runs('hon') == runs('Pyt') == [('Source Sans Pro Semibold', '0', '20')]
+    # The bold mark selects the captured bold face over the regular body style; the rest keeps the YAML style, and the
+    # emphasis style is the bold face itself since D127.
+    assert runs('about 2.5 years') == [('Source Sans Pro', '1', '20'), ('Source Sans Pro', '0', '20')]
+    assert runs('hon') == runs('Pyt') == [('Source Sans Pro', '1', '20')]

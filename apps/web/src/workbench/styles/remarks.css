@@ -7,3 +7,16 @@
 .fact-group-jump { position: absolute; top: 9px; right: 16px; width: 26px; height: 26px; padding: 5px; }
 .fact-group-jump svg { width: 15px; height: 15px; }
 .fcv-sheet .bn-block-outer { scroll-margin-top: 16px; }
+/* The tip beside a mark (D127): fixed in the window, above the page and the Facts panel, below dialogs. */
+.remark-tip { position: fixed; z-index: 150; width: min(320px, calc(100vw - 16px)); padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--paper); color: var(--ink); font-size: var(--ui-small); line-height: 1.5;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 16%, transparent); }
+.remark-tip strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: var(--ui-small); }
+.remark-tip p { margin: 0 0 6px; line-height: 1.5; }
+.remark-tip .text-button { padding: 4px 0 0; font-size: var(--ui-small); }
+/* «Изменить текст» beside the selection: the same look as the tools, above the page. */
+.selection-action { position: fixed; z-index: 160; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 7px; background: var(--paper); color: var(--ink); font-size: var(--ui-small); white-space: nowrap; cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 14%, transparent); }
+.selection-action:hover { background: var(--wash); }
+.selection-action svg { width: 14px; height: 14px; color: var(--accent); }

@@ -37,7 +37,7 @@ def test_absent_inline_ref_inherits_block_overrides_but_explicit_same_token_does
     assert inherited.selection.font.weight==900 and inherited.size==24
     inline.presentation=explicit
     own=resolver.run(block,inline)
-    assert own.selection.font.weight==300 and own.size==10
+    assert own.selection.font.weight==400 and own.size==10
     inline.presentation.overrides.size=14
     assert resolver.run(block,inline).size==14
     assert resolver.paragraph(block)[0]==pytest.approx(12.57*14/10)
@@ -50,8 +50,8 @@ def test_merged_distinct_inline_refs_keep_font_and_size_while_paragraph_alignmen
     block.content.append(PresentedText(type='text',text='Different title',styles={},presentation=other))
     block.props.alignment='center';block.presentation.overrides.alignment='justify'
     first,second=[resolver.run(block,span) for span in block.content]
-    assert (first.selection.font.weight,first.size)==(300,10)
-    assert (second.selection.font.weight,second.size)==(900,26)
+    assert (first.selection.font.weight,first.size)==(400,10)
+    assert (second.selection.font.weight,second.size)==(700,26)
     height,alignment=resolver.paragraph(block)
     assert height==pytest.approx(22.6*26/18) and alignment=='justify'
     block.presentation.overrides.alignment=None
@@ -60,7 +60,7 @@ def test_merged_distinct_inline_refs_keep_font_and_size_while_paragraph_alignmen
 
 def test_positive_marks_follow_nullable_presentation_overrides(captured):
     block=paragraph(captured,'name');span=block.content[0];resolver=CapturedStyleResolver(captured)
-    base=resolver.run(block,span);assert base.selection.font.weight==900 and not base.selection.italic
+    base=resolver.run(block,span);assert base.selection.font.weight==700 and not base.selection.italic
     block.presentation.overrides.bold=False;block.presentation.overrides.italic=False
     assert resolver.run(block,span).selection.font.weight==400
     span.styles.bold=True;span.styles.italic=True;span.styles.underline=True;span.styles.strike=True
@@ -156,7 +156,7 @@ def test_unsupported_reference_or_inline_font_capability_fails_explicitly(captur
 def test_actual_emitted_common_text_and_structural_controls_are_preserved(captured):
     text='Русский текст, Ελληνικά: 2020–2023 • mail@example.test\n\r\t'
     block=paragraph(captured,text=text);resolver=CapturedStyleResolver(captured)
-    assert resolver.run(block,block.content[0]).selection.font.weight==300
+    assert resolver.run(block,block.content[0]).selection.font.weight==400
     assert block.content[0].text==text
 
 
@@ -171,7 +171,7 @@ def test_missing_or_zero_glyph_mapping_fails_even_when_package_and_font_hashes_a
     def zero(font):
         for table in font['cmap'].tables:
             if table.isUnicode():table.cmap[ord('A')]='.notdef'
-    changed=changed_font(captured,'light',zero)
+    changed=changed_font(captured,'regular',zero)
     block=paragraph(changed,text='A');resolver=CapturedStyleResolver(changed)
     with pytest.raises(RenderFailure,match='FONT_UNAVAILABLE'):resolver.run(block,block.content[0])
     missing=paragraph(captured,text='Missing \U0010ffff')
@@ -182,7 +182,7 @@ def test_missing_or_zero_glyph_mapping_fails_even_when_package_and_font_hashes_a
 def test_italic_cyrillic_keeps_the_upright_face_and_leaves_the_slant_to_word(captured):
     block=paragraph(captured,text='Торговая система');span=block.content[0];span.styles.italic=True
     styled=CapturedStyleResolver(captured).run(block,span)
-    assert styled.slanted and not styled.selection.font.italic and styled.selection.font.weight==300
+    assert styled.slanted and not styled.selection.font.italic and styled.selection.font.weight==400
     span.styles.bold=True
     heavy=CapturedStyleResolver(captured).run(block,span)
     assert heavy.slanted and heavy.selection.font.weight==700
@@ -201,7 +201,8 @@ def test_a_character_no_face_holds_still_refuses_italic_text(captured):
 
 
 def test_bold_never_thins_a_heavier_style(captured):
-    block=paragraph(captured,'name');block.content[0].styles.bold=True
+    # The public styles stop at Bold since D127; the Black face is still in the package and reachable by override.
+    block=paragraph(captured,'name');block.content[0].styles.bold=True;block.presentation.overrides.font='black'
     assert CapturedStyleResolver(captured).run(block,block.content[0]).selection.font.weight==900
 
 
@@ -224,6 +225,6 @@ def test_resolver_owns_style_and_font_metadata_after_capture(captured):
 @pytest.mark.parametrize('text',['soft\u00adhyphen','zero\u200bwidth','\ufeffbom','\u00ad\u200b\ufeff'])
 def test_invisible_characters_without_content_do_not_refuse_their_block(captured,text):
     block=paragraph(captured,text=text);resolver=CapturedStyleResolver(captured)
-    assert resolver.run(block,block.content[0]).selection.font.weight==300
+    assert resolver.run(block,block.content[0]).selection.font.weight==400
     assert resolver.paragraph(block)
     assert block.content[0].text==text

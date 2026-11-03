@@ -445,13 +445,21 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
 
     def unavailable_code(field):
         """Why the model chosen in `field` cannot run: a known exhausted plan is named, because "connect a model" sent
-        the user to Settings for nothing (D104)."""
+        the user to Settings for nothing (D104). So are a check still running and limits the provider never reported
+        (D127): the model is connected in Settings, so a second try, not Settings, is the way out."""
         stored = stored_preferences()
         kind = catalog().get((getattr(stored, field) if stored else None) or processing_model())
         # Without a chosen model, the plan is named when every provider that is on has used it up.
         exhausted = ([kind] if kind else [item for item in kinds() if on(item) and states[item].metadataReady])
-        return ("QUOTA_EXHAUSTED" if exhausted and all(states[item].quota.state == "exhausted" for item in exhausted)
-                else "CONNECTION_REQUIRED")
+        if exhausted and all(states[item].quota.state == "exhausted" for item in exhausted):
+            return "QUOTA_EXHAUSTED"
+        # A provider that is on and not checked yet lists no models, so the chosen model names no provider either.
+        checked = [kind] if kind else [item for item in kinds() if on(item)]
+        if any(on(item) and (busy(item) or states[item].state == "unchecked") for item in checked):
+            return "CONNECTION_CHECKING"
+        if kind is not None and on(kind) and states[kind].state == "unknown_limits":
+            return "LIMITS_UNKNOWN"
+        return "CONNECTION_REQUIRED"
 
     from packages.resume_core.project_repository import ProjectRepository
     from .projects.exports import ExportService, production_render

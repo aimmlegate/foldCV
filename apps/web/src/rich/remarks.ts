@@ -95,7 +95,18 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
   return { cells, blocks: marked };
 }
 
-const markAttributes = (messages: readonly string[]) => ({ class: "fcv-remark", title: messages.join("\n") });
+/** The fact a cell ID names, for the tip's way into Facts; a block mark names none. */
+export function remarkRecord(cellId: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(cellId);
+    return Array.isArray(parsed) && parsed[0] === "fact" && typeof parsed[1] === "string" && parsed[1] ? parsed[1] : null;
+  } catch { return null; }
+}
+
+/** The tip beside a mark reads its messages from the element; a native title stayed unseen (D127). */
+export const remarkMessagesAttribute = "data-fcv-remark", remarkRecordAttribute = "data-fcv-record";
+const markAttributes = (messages: readonly string[], recordId: string | null) => ({ class: "fcv-remark",
+  [remarkMessagesAttribute]: JSON.stringify(messages), ...(recordId ? { [remarkRecordAttribute]: recordId } : {}) });
 
 /** Decorations for the marks `current` returns; null shows none. */
 export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
@@ -107,14 +118,15 @@ export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
       const name = node.type.name;
       if (name === "templateField" || name === "boundLink") {
         const cell: unknown = node.attrs["cellId"], messages = typeof cell === "string" ? marks.cells.get(cell) : undefined;
-        if (messages && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize, markAttributes(messages)));
+        if (messages && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize,
+          markAttributes(messages, typeof cell === "string" ? remarkRecord(cell) : null)));
         return false;
       }
       if (name !== "blockContainer") return true;
       const id: unknown = node.attrs["id"], messages = typeof id === "string" ? marks.blocks.get(id) : undefined;
       const size = node.firstChild?.content.size ?? 0;
       // The block's own content starts inside its content node, one step past the container's start.
-      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages)));
+      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages, null)));
       return true;
     });
     return DecorationSet.create(state.doc, decorations);
