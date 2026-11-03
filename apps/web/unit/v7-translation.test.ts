@@ -17,6 +17,21 @@ test("typing resolves the field from the last response without an address map", 
   assert.deepEqual(result.operation.range.insertionTarget, { kind: "field", bindingId: "fragment-paper-a" });
 });
 
+test("several empty fragments of one field are its one place to type; of two fields they stay ambiguous", () => {
+  const value = structuredClone(response), block = value.workspace.project?.document.regions[2]?.blocks[1];
+  assert.ok(block?.type === "paragraph");
+  const field = block.content[0]; assert.ok(field?.type === "fact_field");
+  block.content = [{ ...field, text: "" }, { ...field, bindingId: "older-empty", text: "" }];
+  const local: LocalContainer = { blockId: "block-paper-b", kind: "content", cellId: null };
+  const typing = () => translateIntent({ localId: "op", prior: new Map([[containerKey(local), ""]]),
+    operation: { kind: "replace_text", container: local, start: 0, end: 0, text: "New", styles, side: "anchor" } }, { response: value, locals: new Map() });
+  const one = typing();
+  assert.ok(one.kind === "operation" && one.operation.kind === "replace_text");
+  assert.deepEqual(one.operation.range.insertionTarget, { kind: "field", bindingId: "fragment-paper-b" });
+  block.content[1] = { ...field, bindingId: "other-empty", occurrenceId: "other-occurrence", text: "" };
+  assert.equal(typing().kind, "conflict");
+});
+
 test("changed text, missing containers and invalid ranges conflict", () => {
   assert.equal(translateIntent({ ...intent, prior: new Map([[containerKey(container), "different"]]) }, basis).kind, "conflict");
   assert.ok(intent.operation.kind === "replace_text");

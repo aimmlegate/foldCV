@@ -89,6 +89,30 @@ test("an emptied field keeps an anchor side and refuses structure-only removal",
   refused(caret(doc, b).tr.delete(b, b + 2), /structure-only/);
 });
 
+test("an emptied fragment beside text of its own field joins that text, where Python keeps no empty fragment", () => {
+  const document = documentOf(response), block = document.regions[2]?.blocks[0], other = document.regions[2]?.blocks[1];
+  assert.ok(block?.type === "paragraph" && other?.type === "paragraph");
+  const field = block.content[1], journal = block.content[3];
+  assert.ok(field?.type === "fact_field" && journal?.type === "fact_field");
+  // block-paper-a: "By " + "Shared" + "" + " title" (one field in three fragments) + " / " + "Journal North" + ".".
+  block.content.splice(1, 1, { ...field, bindingId: "left", text: "Shared" }, { ...field, bindingId: "emptied", text: "" },
+    { ...field, bindingId: "right", text: " title" });
+  // block-paper-b: another field, then an emptied fragment of this one.
+  const own = other.content[0]; assert.ok(own?.type === "fact_field");
+  other.content = [{ ...journal, bindingId: "journal-copy" }, { ...own, text: "" }];
+  const doc = docOf(projectTemplateDocument(document)), at = start(doc, "block-paper-a"), b = start(doc, "block-paper-b");
+  // "By " is at..at+3, "Shared" closes at at+11 and the emptied fragment's inside is at+12.
+  const joined = only(caret(doc, at + 12).tr.insertText("X", at + 12));
+  assert.deepEqual([replace(joined.operation).start, replace(joined.operation).side], [9, "before"]);
+  assert.deepEqual(record(record(translated(joined))["range"])["insertionTarget"], { kind: "field", bindingId: "fragment-paper-a" });
+  const leading = document.regions[2]?.blocks[0];
+  assert.ok(leading?.type === "paragraph"); leading.content.splice(1, 1);
+  const first = docOf(projectTemplateDocument(document)), firstAt = start(first, "block-paper-a");
+  assert.equal(replace(only(caret(first, firstAt + 4).tr.insertText("X", firstAt + 4)).operation).side, "after");
+  const alone = replace(only(caret(doc, b + 16).tr.insertText("X", b + 16)).operation);
+  assert.equal(alone.side, "anchor", "another field beside it is no neighbour of its own");
+});
+
 test("deletion and range replacement leave ownership to Python", () => {
   const removed = replace(only(caret(paperDoc, a).tr.delete(a + 10, a + 12)).operation);
   assert.deepEqual([removed.start, removed.end, removed.text, removed.side], [9, 11, "", null]);

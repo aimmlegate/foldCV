@@ -72,13 +72,24 @@ function stylesOf(marks: readonly Mark[]): Styles {
   try { return wireMarks(value); } catch { return unsupported("unsupported color"); }
 }
 
+/** An empty field fragment beside text of the same field: Python keeps no empty fragment there (only an emptied field keeps
+ * one), so the text joins that neighbour instead. */
+function emptyFieldSide(position: ResolvedPos): Side {
+  const field = position.parent, host = position.node(position.depth - 1), index = position.index(position.depth - 1);
+  const same = (node: Node) => node.type.name === "templateField" && node.attrs["occurrenceId"] === field.attrs["occurrenceId"]
+    && node.attrs["cellId"] === field.attrs["cellId"];
+  for (let at = index - 1; at >= 0 && same(host.child(at)); at--) if (host.child(at).content.size > 0) return "before";
+  for (let at = index + 1; at < host.childCount && same(host.child(at)); at++) if (host.child(at).content.size > 0) return "after";
+  return "anchor";
+}
+
 /** The editor node that received a collapsed insertion decides its side; text never decides ownership. */
 function sideAt(doc: Node, pos: number, insertedLink: boolean): Side {
   const position = doc.resolve(pos), parent = position.parent;
   if (identities.has(parent.type.name)) {
     if (parent.type.name === "boundLink") return unsupported("collapsed input inside a bound link");
     if (parent.type.name === "templateField" && parent.attrs["complete"] !== true) return unsupported("input in an incomplete field");
-    if (parent.content.size === 0) return "anchor";
+    if (parent.content.size === 0) return parent.type.name === "templateField" ? emptyFieldSide(position) : "anchor";
     return position.parentOffset === 0 ? "after" : position.parentOffset === parent.content.size ? "before" : "interior";
   }
   // Python inserts literal text only at an addressed literal; inside a link there is none.

@@ -82,7 +82,8 @@ function target(container: Container, offset: number, side: Side): Target {
   if (side === "anchor") {
     const anchors = container.leaves.filter(leaf => leaf.start === offset && leaf.end === offset);
     const [anchor] = anchors;
-    if (anchors.length !== 1 || !anchor) return conflict("ambiguous or missing empty anchor");
+    // Older saves left several empty fragments of one field in one place; any of them is that field's place.
+    if (!anchor || anchors.some(leaf => owner(leaf) !== owner(anchor))) return conflict("ambiguous or missing empty anchor");
     return chosen(leafTarget(anchor));
   }
   const inside = nonempty.find(leaf => leaf.start < offset && offset < leaf.end);

@@ -322,3 +322,64 @@ def test_a_copy_in_the_edited_block_goes_plain_with_the_edit():
     assert [part.type for part in changed.content] == ['fact_field', 'fact_field', 'text']
     assert changed.content[-1].text == span.text
     assert apply_rich_mutation(before, result.mutation)[0] == result.preview.workspace
+
+
+def typed(before, *changes, first=0):
+    """Each change prepared and committed in turn, as the editor sends typing; the edited block's content after each."""
+    value, shown = before, []
+    for index, (start, end, text, target) in enumerate(changes, first):
+        request = command(value, start=start, end=end, text=text, target=target).model_copy(
+            update={'client_mutation_id': f'text-edit-{index}'})
+        prepared = prepare_text_edit(response(value), request)
+        value, _ = apply_rich_mutation(value, prepared.mutation)
+        assert value == prepared.preview.workspace
+        shown.append(value.project.document.regions[2].blocks[0].content)
+    return value, shown
+
+
+def test_deleting_letters_of_a_field_leaves_no_empty_fragment_behind():
+    before, _ = workspace()
+    # Backspace at the end of «Shared title» and a letter inside it; then a typo typed into the field and taken back.
+    after, steps = typed(before, (11, 12, '', None), (10, 11, '', None), (2, 3, '', None))
+    cursor, binding = 0, None
+    for span in steps[-1]:
+        binding = binding or (span.binding_id if cursor <= 5 < cursor + len(span.text) else None)
+        cursor += len(span.text)
+    after, typo = typed(after, (5, 5, '!', {'kind': 'field', 'bindingId': binding}), (5, 6, '', None), first=3)
+    steps += typo
+    assert [''.join(span.text for span in content) for content in steps] == [
+        'Shared titl', 'Shared tit', 'Shred tit', 'Shred! tit', 'Shred tit']
+    for content in steps:
+        assert all(span.text for span in content), [span.text for span in content]
+        assert {span.occurrence_id for span in content} == {'occurrence-paper-a'}
+    assert after.project.facts.extensions[0].cells[0].raw_input == 'Shred tit'
+
+
+def test_an_emptied_field_keeps_one_place_to_type_into():
+    before, _ = workspace()
+    after, steps = typed(before, (11, 12, '', None), (0, 11, '', None))
+    [anchor] = steps[-1]
+    assert (anchor.text, anchor.occurrence_id) == ('', 'occurrence-paper-a')
+    again, steps = typed(after, (0, 0, 'New', {'kind': 'field', 'bindingId': anchor.binding_id}), (2, 3, '', None),
+        (0, 2, '', None), first=2)
+    # The typed text sits before the field's place, which stays its one empty fragment when the field is emptied again.
+    assert [[span.text for span in content] for content in steps] == [['New', ''], ['Ne', ''], ['']]
+    assert again.project.facts.extensions[0].cells[0].raw_input == ''
+    # An empty fragment an older save left stays the field's one place; emptying the field adds no second one.
+    before, _ = workspace()
+    block = before.project.document.regions[2].blocks[0]
+    block.content.append(block.content[0].model_copy(update={'binding_id': 'older-empty', 'text': ''}, deep=True))
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    _after, steps = typed(before, (0, 12, '', None))
+    assert [(span.text, span.binding_id) for span in steps[-1]] == [('', 'older-empty')]
+
+
+def test_undo_brings_a_deleted_letter_back():
+    before, _ = workspace()
+    prepared = prepare_text_edit(response(before), command(before, start=11, end=12, text=''))
+    assert prepared.mutation.steps[0].content == []
+    changed, _ = apply_rich_mutation(before, prepared.mutation)
+    inverse = inverse_template_mutation(before, changed, origin_action_id=prepared.mutation.action_id, mutation_id='undo-letter',
+        session_id='session', action_token=2)
+    restored, _ = apply_rich_mutation(changed, inverse, history_authorization=authorization(changed, inverse))
+    assert semantic(restored.project.document) == semantic(before.project.document)
