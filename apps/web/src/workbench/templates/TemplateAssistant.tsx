@@ -3,7 +3,7 @@ import { ConnectionWorkflow } from "../../connection/workflow";
 import { AgentApiFailure } from "../../assistant/api";
 import { AssistantRuns, terminal, type AssistantView } from "../../assistant/controller";
 import { drawerSize, errorText, rereadsCapabilities, shownFailure } from "../../assistant/presentation";
-import { proposalTarget, TemplateAssistantApi, textHash, type TemplateFields, type TemplateProposal } from "../../assistant/template";
+import { proposalTarget, TemplateAssistantApi, textHash, type TemplateFields, type TemplateProposal, type TemplateSample } from "../../assistant/template";
 import { DrawerView } from "../assistant/DrawerView";
 import { templateScope } from "../assistant/scope";
 import { Button } from "../ui/Button";
@@ -19,6 +19,7 @@ export type ApplyProposal = (proposal: TemplateProposal, force: boolean, assetsF
 const key = "foldcv.templates.assistant.drawer";
 function storedSize() { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null"); return drawerSize(value); } catch { return drawerSize(null); } }
 const code = (error: unknown) => error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED";
+const sampleTypes = ".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** The template assistant beside the YAML editor (D136): it reads templates and samples, never resumes, and its
  * proposals change only the editor text; the user saves. */
@@ -31,7 +32,9 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
   const [changed, setChanged] = useState<ReadonlySet<string>>(() => new Set());
   const [working, setWorking] = useState<string | null>(null), [confirm, setConfirm] = useState<TemplateProposal | null>(null);
   const api = useRef<TemplateAssistantApi | null>(null), controller = useRef<AssistantRuns<TemplateFields> | null>(null);
-  const log = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null), picker = useRef<HTMLInputElement>(null);
+  // The attached sample goes with every run until removed; the service keeps the last three in memory.
+  const [sample, setSample] = useState<TemplateSample | null>(null), [uploading, setUploading] = useState(false);
   const report = (work: Promise<void> | undefined) => { void work?.catch(error => setFailure(code(error))); };
   useEffect(() => {
     const port = new TemplateAssistantApi(), connection = new ConnectionWorkflow(() => {});
@@ -77,8 +80,14 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
     report(current.sendWith(async () => {
       const shown = context();
       if (!shown) throw new AgentApiFailure("REQUEST_FAILED");
-      return { templateId: shown.templateId, assetsFrom: shown.assetsFrom, text: shown.text, textHash: await textHash(shown.text), sampleId: null };
+      return { templateId: shown.templateId, assetsFrom: shown.assetsFrom, text: shown.text, textHash: await textHash(shown.text), sampleId: sample?.sampleId ?? null };
     }));
+  }
+  async function attach(file: File) {
+    const port = api.current;
+    if (!port) return;
+    setUploading(true); setFailure(null);
+    try { setSample(await port.uploadSample(file)); } catch (error) { setFailure(code(error)); } finally { setUploading(false); }
   }
   function replaced(proposal: TemplateProposal) { setProposals(items => items.map(item => item.id === proposal.id ? proposal : item)); }
   async function decide(proposal: TemplateProposal, force: boolean) {
@@ -109,7 +118,16 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
       model={model => report(controller.current?.chooseModel(model))} send={send} stop={() => report(controller.current?.stop())} clear={() => {}} settings={settings}
       select={id => report(controller.current?.select(id))} fresh={() => report(controller.current?.newConversation())}
       applyProposal={() => {}} discardProposal={() => {}} resource={(kind, id) => report(controller.current?.resource(kind, id))} focus={() => false}
-      scope={templateScope} context={<span className="chat-context-resume" title={shown?.name}><Icon name="file" />{shown?.name ?? "Шаблон не открыт"}</span>}
+      scope={templateScope} attachment={id => api.current?.runSamples.get(id) ?? null}
+      context={<><span className="chat-context-resume" title={shown?.name}><Icon name="file" />{shown?.name ?? "Шаблон не открыт"}</span>
+        {sample ? <span className="chat-attachment" title={sample.name}><Icon name="file" />{sample.name}
+          <button type="button" aria-label={`Убрать образец: ${sample.name}`} disabled={view.submitting} onClick={() => setSample(null)}><Icon name="close" /></button></span>
+          : <button type="button" className="chat-scope" disabled={uploading || view.submitting} onClick={() => picker.current?.click()}>
+            <Icon name="upload" />{uploading ? "Читаем образец…" : "Образец DOCX или PDF"}</button>}
+        <input ref={picker} type="file" accept={sampleTypes} hidden aria-label="Образец DOCX или PDF" onChange={event => {
+          const file = event.currentTarget.files?.[0]; event.currentTarget.value = "";
+          if (file) void attach(file);
+        }} /></>}
       extra={proposals.map(value => <TemplateProposalCard key={value.id} value={value} target={proposalTarget(value, names)} current={shown?.text ?? ""}
         busy={active || working !== null} applying={working === value.id} changed={changed.has(value.id)}
         apply={() => void decide(value, false)} replace={() => setConfirm(value)} discard={() => void discard(value)} />)} />

@@ -43,3 +43,5 @@
 .templates-list .templates-add { align-self: flex-start; margin-bottom: 8px; }
 .template-name-form { display: flex; flex-direction: column; gap: 6px; }
 .template-name-form input { width: 100%; padding: 9px 11px; }
+#template-chat-host .chat-context { flex-wrap: wrap; }
+#template-chat-host .chat-attachment { font-size: var(--ui-small); }
