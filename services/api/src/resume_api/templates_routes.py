@@ -10,11 +10,12 @@ from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.templates.models import asset_text, asset_type
-from packages.resume_core.templates.store import UnknownTemplate
+from packages.resume_core.templates.store import TemplateRefused, UnknownTemplate
 
 from .extracting import UploadFailure, parse_one_part
 from .host_models import EmptyRequest
-from .template_config import TemplateConfig, TemplateConfigRequest, TemplateDefaultRequest
+from .template_config import (TemplateConfig, TemplateConfigRequest, TemplateCopyRequest, TemplateDefaultRequest,
+    TemplateDraftRequest)
 from .template_responses import wire_response
 
 
@@ -41,6 +42,8 @@ def mount_template_routes(app, *, root, intake, projects, problem):
             reply = await asyncio.to_thread(method, *args)
         except UnknownTemplate:
             return problem('TEMPLATE_NOT_FOUND', 404, 'template')
+        except TemplateRefused as refused:
+            return problem(refused.code, 409, 'template')
         except StorageFailure:
             if not write:
                 raise
@@ -51,6 +54,20 @@ def mount_template_routes(app, *, root, intake, projects, problem):
     @app.get('/v1/rich/template-config')
     async def template_config_list():
         return config_reply({'schemaVersion': 1, **await asyncio.to_thread(TemplateConfig(root).catalog)})
+
+    @app.post('/v1/rich/template-config')
+    async def template_config_create(payload: TemplateCopyRequest | TemplateDraftRequest):
+        """A copy of a template under a new name, or an unsaved new text; the reply is the new id's config state."""
+        def create():
+            config = TemplateConfig(root)
+            created, refused = (config.copy(payload.copy_of, payload.name) if isinstance(payload, TemplateCopyRequest)
+                else config.create(payload.text, payload.assets_from))
+            return config_reply(refused, 422) if refused is not None else config_reply(created, 201)
+        return await config_call(create, write=True)
+
+    @app.delete('/v1/rich/template-config/{template_id}')
+    async def template_config_delete(template_id: str):
+        return await config_call(TemplateConfig(root).delete, template_id, write=True)
 
     @app.put('/v1/rich/template-default')
     async def template_default(payload: TemplateDefaultRequest):

@@ -111,6 +111,18 @@ class UnknownTemplate(LookupError):
     """No bundled template and no saved package has this id."""
 
 
+class TemplateRefused(Exception):
+    """A catalog change the store refuses; `code` is the public error code."""
+
+    def __init__(self, code):
+        self.code = code
+        super().__init__(code)
+
+
+class TemplateIdTaken(LookupError):
+    """Another template took the id between choosing it and storing it."""
+
+
 def bundled_package(template_id: str) -> TemplatePackage | None:
     path = BUNDLED_TEMPLATES.get(template_id)
     if path is None: return None
@@ -194,6 +206,39 @@ class TemplateStore:
         ids = [*BUNDLED_TEMPLATES, *sorted(set(current) - set(BUNDLED_TEMPLATES))]
         return self._default(default_id, current), [self._versions(template_id, current) for template_id in ids]
 
+    def _identities(self) -> dict:
+        registry_path = self.root / "identities.json"
+        registry = self._read(registry_path) if registry_path.exists() else {}
+        if not isinstance(registry,dict): raise SchemaFailure("/store/identities", "identity registry must be an object")
+        return registry
+
+    def taken_ids(self) -> set[str]:
+        """Ids a new template may not use: shipped, current, or recorded once and deleted since."""
+        recorded = set()
+        for key in self._identities():
+            try:
+                recorded.add(strict_json(key.encode("utf-8"))[0])
+            except (ValueError, TypeError, KeyError, IndexError):
+                continue
+        return {*BUNDLED_TEMPLATES, *self._pointer()[1], *recorded}
+
+    def create(self, package: TemplatePackage, *, keep_text: bool = True) -> None:
+        """Store the first version of a new id; refused when the id is taken, so a deleted id never returns."""
+        verify_package(package)
+        with locked_root(self.root, ".templates.lock"):
+            if package.id in self.taken_ids(): raise TemplateIdTaken(package.id)
+            self._save(package, False, keep_text)
+
+    def delete(self, template_id: str) -> None:
+        """Remove an id from the catalog. Identities, packages and assets stay: projects keep their captured copy."""
+        if template_id in BUNDLED_TEMPLATES: raise TemplateRefused("TEMPLATE_BUNDLED")
+        with locked_root(self.root, ".templates.lock"):
+            default_id, current = self._pointer()
+            if template_id not in current: raise UnknownTemplate(template_id)
+            if self._default(default_id, current) == template_id: raise TemplateRefused("TEMPLATE_DEFAULT")
+            del current[template_id]
+            self._write(default_id, current)
+
     def revision_taken(self, package: TemplatePackage) -> bool:
         """True when the package's ID/revision already names different stored bytes, so saving would refuse it."""
         registry_path = self.root / "identities.json"
@@ -207,29 +252,32 @@ class TemplateStore:
         `keep_text` records the text as saved last (the Settings editor); an activation shows the bundled form instead."""
         verify_package(package)
         with locked_root(self.root, ".templates.lock"):
-            registry_path = self.root / "identities.json"
-            registry = self._read(registry_path) if registry_path.exists() else {}
-            if not isinstance(registry,dict): raise SchemaFailure("/store/identities", "identity registry must be an object")
-            identity = canonical([package.id,package.revision]).decode("utf-8")
-            retained = registry.get(identity)
-            if retained is not None and retained != package.package_hash:
-                raise SchemaFailure("/template/revision", "ID/revision already identifies different package bytes")
-            default_id, current = self._pointer()
-            path = self.root / package.package_hash / "package.json"
-            if path.exists():
-                existing = verify_package(TemplatePackage.model_validate(self._read(path)))
-                if existing.package_hash != package.package_hash: raise SchemaFailure("/store", "package identity mismatch")
-            else:
-                atomic_write(path, canonical(package))
-            # The hash leaves the original text out (D106), so a change of comments or form is this same package; the
-            # text saved last stays beside it.
-            if keep_text:
-                atomic_write(path.parent / "original.json",
-                    canonical({"format":package.original_format,"base64":package.original_base64}))
-            registry[identity] = package.package_hash
-            atomic_write(registry_path, canonical(registry))
-            current[package.id] = package.package_hash
-            self._write(package.id if default else default_id, current)
+            self._save(package, default, keep_text)
+
+    def _save(self, package, default, keep_text):
+        """`save` under the store lock."""
+        registry_path = self.root / "identities.json"
+        registry = self._identities()
+        identity = canonical([package.id,package.revision]).decode("utf-8")
+        retained = registry.get(identity)
+        if retained is not None and retained != package.package_hash:
+            raise SchemaFailure("/template/revision", "ID/revision already identifies different package bytes")
+        default_id, current = self._pointer()
+        path = self.root / package.package_hash / "package.json"
+        if path.exists():
+            existing = verify_package(TemplatePackage.model_validate(self._read(path)))
+            if existing.package_hash != package.package_hash: raise SchemaFailure("/store", "package identity mismatch")
+        else:
+            atomic_write(path, canonical(package))
+        # The hash leaves the original text out (D106), so a change of comments or form is this same package; the
+        # text saved last stays beside it.
+        if keep_text:
+            atomic_write(path.parent / "original.json",
+                canonical({"format":package.original_format,"base64":package.original_base64}))
+        registry[identity] = package.package_hash
+        atomic_write(registry_path, canonical(registry))
+        current[package.id] = package.package_hash
+        self._write(package.id if default else default_id, current)
 
     def saved_original(self, package: TemplatePackage):
         """(format, bytes) of the text saved last for the current version `package`; None when the store has none."""

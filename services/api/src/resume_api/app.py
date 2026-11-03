@@ -100,7 +100,11 @@ def strict_json(raw: bytes) -> object:
 def takes_json(method: str, path: str) -> bool:
     """Every /v1/ PUT and every template-config write has one strict JSON body; the other /v1/ POSTs that do are listed."""
     return ((method == "POST" and path in JSON_POST_PATHS) or (method == "PUT" and path.startswith("/v1/"))
-            or (method in {"POST", "PUT"} and path.startswith(TEMPLATE_CONFIG_PATH)))
+            or (method in {"POST", "PUT"} and template_config(path)))
+
+
+def template_config(path: str) -> bool:
+    return path.startswith(TEMPLATE_CONFIG_PATH) or path == TEMPLATE_CONFIG_PATH.rstrip("/")
 
 
 def is_json_media_type(raw: bytes) -> bool:
@@ -176,7 +180,7 @@ class LocalBoundary:
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
                     # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
                     body_limit = MAX_BODY + 64 * 1024
-                if path.startswith(TEMPLATE_CONFIG_PATH):
+                if template_config(path):
                     # The compiler's own limit, plus the JSON escapes of a text of that size (its line ends and quotes).
                     body_limit = 2 * CONFIG_BYTES
                 if size > body_limit:
