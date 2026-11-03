@@ -1,6 +1,6 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
-import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../../projects/api";
-import { ProjectApiFailure } from "../../../rich/v7-connection";
+import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../projects/api";
+import { ProjectApiFailure } from "../../rich/v7-connection";
 
 export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
 /** One template's YAML; `bundled` and `edited` as in its catalog entry. */
@@ -65,14 +65,28 @@ export async function readTemplateConfig(templateId: string): Promise<TemplateCo
 export async function checkTemplateConfig(templateId: string, source: string): Promise<TemplateCheck> {
   return parseCheck((await call(`${one(templateId)}/check`, "POST", { text: source })).value);
 }
-export async function saveTemplateConfig(templateId: string, source: string): Promise<TemplateSave> {
-  const { status, value } = await call(one(templateId), "PUT", { text: source });
+/** A save or create reply: the new state, or on 422 the compile error in the check shape. */
+export function parseSave(status: number, value: unknown): TemplateSave {
   if (status === 422) {
     const check = parseCheck(value);
     if (check.valid) throw new ProjectApiFailure("INVALID_RESULT");
     return { saved: false, error: check.error };
   }
   return { saved: true, state: parseConfigState(value) };
+}
+export async function saveTemplateConfig(templateId: string, source: string): Promise<TemplateSave> {
+  const { status, value } = await call(one(templateId), "PUT", { text: source });
+  return parseSave(status, value);
+}
+/** A copy of a saved template under a new name, or a new template from unsaved text; the server picks the id. */
+export type TemplateCreate = { copyOf: string; name: string } | { text: string; assetsFrom: string | null };
+export async function createTemplate(body: TemplateCreate): Promise<TemplateSave> {
+  const { status, value } = await call(path, "POST", body);
+  return parseSave(status, value);
+}
+/** Removes an own template from the catalog; resumes made with it keep their captured copy. */
+export async function deleteTemplate(templateId: string): Promise<TemplateCatalog> {
+  return parseTemplateCatalog((await call(one(templateId), "DELETE")).value);
 }
 export async function resetTemplateConfig(templateId: string): Promise<TemplateConfigState> {
   return parseConfigState((await call(`${one(templateId)}/reset`, "POST", {})).value);

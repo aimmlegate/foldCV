@@ -1,0 +1,144 @@
+import type { AgentSettings } from "../contracts/generated/agent_settings";
+import type { AgentSettingsRequest } from "../contracts/generated/agent_settings_request";
+import type { AssistantCapabilitiesV1 } from "../contracts/generated/assistant_capabilities_v1";
+import type { AssistantChangeProposalListV1 } from "../contracts/generated/assistant_change_proposal_list_v1";
+import type { AssistantChangeProposalV1 } from "../contracts/generated/assistant_change_proposal_v1";
+import type { AssistantConversationListV1 } from "../contracts/generated/assistant_conversation_list_v1";
+import type { AssistantConversationV1 } from "../contracts/generated/assistant_conversation_v1";
+import type { AssistantEventsV1 } from "../contracts/generated/assistant_events_v1";
+import type { AssistantMessagesV1 } from "../contracts/generated/assistant_messages_v1";
+import type { AssistantRunV1 } from "../contracts/generated/assistant_run_v1";
+import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
+import { AssistantApi } from "./api";
+import type { Port, RunRequest } from "./controller";
+
+/** The template assistant (D136): the resume assistant's runs on its own routes, with no access to resumes. Its
+ * proposals are whole YAML texts that the templates screen applies into the editor; replies are parsed by hand. */
+export const templatePrefix = "/v2/templates/assistant";
+export type TemplateFields = { templateId: string | null; assetsFrom: string | null; text: string; textHash: string; sampleId: string | null };
+export type TemplateProposalState = "proposed" | "applied" | "discarded";
+export type TemplateProposal = { id: string; conversationId: string; runId: string; templateId: string | null; name: string | null;
+  baseHash: string; text: string; summary: string; state: TemplateProposalState };
+export type TemplateSample = { sampleId: string; name: string; pages: number | null; unitCount: number };
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+}
+function text(value: unknown, key: string): string {
+  const item = field(value, key);
+  if (typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
+  return item;
+}
+function optionalText(value: unknown, key: string): string | null {
+  const item = field(value, key);
+  if (item !== null && typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
+  return item;
+}
+const states: readonly TemplateProposalState[] = ["proposed", "applied", "discarded"];
+
+export function parseTemplateProposal(value: unknown): TemplateProposal {
+  const state = states.find(item => item === field(value, "state"));
+  if (!state) throw new ProjectApiFailure("INVALID_RESULT");
+  return { id: text(value, "id"), conversationId: text(value, "conversationId"), runId: text(value, "runId"),
+    templateId: optionalText(value, "templateId"), name: optionalText(value, "name"), baseHash: text(value, "baseHash"),
+    text: text(value, "text"), summary: text(value, "summary"), state };
+}
+export function parseTemplateProposals(value: unknown): TemplateProposal[] {
+  const items = field(value, "items");
+  if (!Array.isArray(items)) throw new ProjectApiFailure("INVALID_RESULT");
+  return items.map(parseTemplateProposal);
+}
+export function parseSample(value: unknown): TemplateSample {
+  const pages = field(value, "pages"), unitCount = field(value, "unitCount");
+  if (pages !== null && !Number.isInteger(pages) || !Number.isInteger(unitCount)) throw new ProjectApiFailure("INVALID_RESULT");
+  return { sampleId: text(value, "sampleId"), name: text(value, "name"), pages: pages as number | null, unitCount: unitCount as number };
+}
+
+/** SHA-256 of the UTF-8 text as lower-case hex, the proposal's base hash. */
+export async function textHash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function reply(response: Response): Promise<unknown> {
+  const body = await response.text();
+  let value: unknown = null;
+  try { value = body ? JSON.parse(body) : null; } catch { throw new ProjectApiFailure("INVALID_RESULT", response.status); }
+  if (!response.ok) {
+    const code = field(field(value, "error"), "code");
+    throw new ProjectApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
+  }
+  return value;
+}
+
+const defaultFetch: Fetcher = (input, init) => fetch(input, init);
+const path = (kind: string, id: string, tail = "") => `${templatePrefix}/${kind}/${encodeURIComponent(id)}${tail}`;
+
+export class TemplateAssistantApi implements Port<TemplateFields> {
+  readonly projectId = "templates";
+  private readonly runs: AssistantApi;
+  private readonly sampleNames = new Map<string, string>();
+  // Kept for the open screen only: the server stores neither the sample's name on the message nor the run's assets.
+  readonly runSamples = new Map<string, string>();
+  readonly runAssets = new Map<string, string | null>();
+  constructor(private readonly fetcher: Fetcher = defaultFetch) { this.runs = new AssistantApi(this.projectId, fetcher, templatePrefix); }
+  settings(): Promise<AgentSettings> { return this.runs.settings(); }
+  saveSettings(value: AgentSettingsRequest): Promise<AgentSettings> { return this.runs.saveSettings(value); }
+  capabilities(): Promise<AssistantCapabilitiesV1> { return this.runs.capabilities(); }
+  conversations(): Promise<AssistantConversationListV1> { return this.runs.conversations(); }
+  createConversation(): Promise<AssistantConversationV1> { return this.runs.createConversation(); }
+  messages(conversationId: string): Promise<AssistantMessagesV1> { return this.runs.messages(conversationId); }
+  events(runId: string, after: number, signal?: AbortSignal): Promise<AssistantEventsV1> { return this.runs.events(runId, after, signal); }
+  cancel(runId: string): Promise<AssistantRunV1> { return this.runs.cancel(runId); }
+  async submit(conversationId: string, request: RunRequest<TemplateFields>): Promise<AssistantRunV1> {
+    const run = await v2Request<AssistantRunV1>(path("conversations", conversationId, "/runs"), "POST", request, this.fetcher);
+    this.runAssets.set(run.id, request.assetsFrom);
+    const sample = request.sampleId === null ? undefined : this.sampleNames.get(request.sampleId);
+    if (sample !== undefined) this.runSamples.set(run.id, sample);
+    return run;
+  }
+  /** The run controller's resume proposals: none here, template proposals have their own list and card. */
+  proposals(): Promise<AssistantChangeProposalListV1> { return Promise.resolve({ items: [] }); }
+  discard(): Promise<AssistantChangeProposalV1> { return Promise.reject(new ProjectApiFailure("REQUEST_FAILED")); }
+  async templateProposals(conversationId: string): Promise<TemplateProposal[]> {
+    const query = `${templatePrefix}/proposals?conversationId=${encodeURIComponent(conversationId)}`;
+    return parseTemplateProposals(await v2Request<unknown>(query, "GET", undefined, this.fetcher));
+  }
+  async decide(proposalId: string, state: "applied" | "discarded"): Promise<TemplateProposal> {
+    return parseTemplateProposal(await v2Request<unknown>(path("proposals", proposalId, "/state"), "POST", { state }, this.fetcher));
+  }
+  /** The extraction worker reads the sample once; the service keeps its summary in memory for later runs. */
+  async uploadSample(file: File): Promise<TemplateSample> {
+    const body = new FormData();
+    body.append("file", file, file.name);
+    const sample = parseSample(await reply(await this.fetcher(`${templatePrefix}/samples`, { method: "POST", body, credentials: "same-origin", cache: "no-store" })));
+    this.sampleNames.set(sample.sampleId, sample.name);
+    return sample;
+  }
+}
+
+/** Where a proposal goes. The shown template must be its target: another one opens first (asking about unsaved
+ * edits); a new template opens as an unsaved entry with the text. On the target the editor text is replaced when it
+ * still has the hash the run started from, else only after a confirmation. */
+export type ApplyStep = { kind: "open"; ask: boolean } | { kind: "replace" } | { kind: "confirm" };
+export type ShownTarget = { templateId: string | null; draft: boolean; unsaved: boolean } | null;
+export function applyStep(proposal: Pick<TemplateProposal, "templateId" | "baseHash">, shown: ShownTarget, hash: string): ApplyStep {
+  // A new-template proposal refines the unsaved entry when that entry is shown; otherwise it makes one.
+  const onTarget = shown !== null && (proposal.templateId === null ? shown.draft : !shown.draft && shown.templateId === proposal.templateId);
+  if (!onTarget) return { kind: "open", ask: shown?.unsaved ?? false };
+  return hash === proposal.baseHash ? { kind: "replace" } : { kind: "confirm" };
+}
+
+export function proposalTarget(proposal: Pick<TemplateProposal, "templateId" | "name">, names: ReadonlyMap<string, string>): string {
+  if (proposal.templateId === null) return `новый шаблон «${proposal.name ?? "Без названия"}»`;
+  return names.get(proposal.templateId) ?? proposal.templateId;
+}
+
+/** The card: a proposed text can be applied or discarded; one whose base text changed says so and offers «Заменить». */
+export type ProposalCard = { heading: string; notice: string | null; apply: boolean; replace: boolean; discard: boolean };
+export function proposalCard(proposal: Pick<TemplateProposal, "state">, changed: boolean, busy: boolean): ProposalCard {
+  if (proposal.state === "applied") return { heading: "Применено", notice: "Текст перенесён в редактор. Сохраните его там.", apply: false, replace: false, discard: false };
+  if (proposal.state === "discarded") return { heading: "Отклонено", notice: null, apply: false, replace: false, discard: false };
+  return { heading: "Предложение шаблона", notice: changed ? "Текст изменился после запуска." : null,
+    apply: !busy && !changed, replace: !busy && changed, discard: !busy };
+}

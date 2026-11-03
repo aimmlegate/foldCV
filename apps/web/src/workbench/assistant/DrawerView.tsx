@@ -1,5 +1,5 @@
 import { errorMessage } from "../../errors/messages";
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Icon } from "../ui/Icon";
 import { PanelHandle } from "../ui/PanelHandle";
 import { Composer, type ComposerProps } from "./Composer";
@@ -10,14 +10,17 @@ import { ProposalPreview } from "../../assistant/proposal";
 import type { Proposal } from "../../assistant/api";
 import type { AssistantFinding } from "../../assistant/controller";
 import { drawerHeights, stopBusy } from "../../assistant/presentation";
+import { resumeScope } from "./scope";
 
 export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded: boolean; height: number; toggle: () => void; expand: () => void;
   resize: (height: number) => void;
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
   select: (id: string) => void; fresh: () => void;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean;
-  applyProposal: (value: Proposal) => void; discardProposal: (value: Proposal) => void }) {
-  const { view, active, collapsed, expanded, toggle, expand } = props;
+  applyProposal: (value: Proposal) => void; discardProposal: (value: Proposal) => void;
+  /** The template drawer's proposal cards; `attachment` as in the transcript. */
+  extra?: ReactNode; attachment?: (runId: string) => string | null }) {
+  const { view, active, collapsed, expanded, toggle, expand, scope = resumeScope } = props;
   const [threads, setThreads] = useState(false), menu = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const wasCollapsed = useRef(collapsed);
   useEffect(() => {
@@ -27,31 +30,32 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
     window.addEventListener("pointerdown", dismiss); return () => window.removeEventListener("pointerdown", dismiss);
   }, [threads]);
   useEffect(() => {
-    if (!collapsed) document.getElementById("chat-input")?.focus();
-    else if (!wasCollapsed.current) document.querySelector<HTMLButtonElement>("#agent-chat-host .chat-launcher")?.focus();
+    if (!collapsed) document.getElementById(scope.input)?.focus();
+    else if (!wasCollapsed.current) document.getElementById(scope.host)?.querySelector<HTMLButtonElement>(".chat-launcher")?.focus();
     wasCollapsed.current = collapsed;
-  }, [collapsed]);
-  return <section id="agent-chat-host" aria-label="Помощник" className={collapsed ? undefined : `chat-open${expanded ? " chat-expanded" : ""}`}
+  }, [collapsed, scope]);
+  return <section id={scope.host} aria-label="Помощник" className={collapsed ? undefined : `chat-open${expanded ? " chat-expanded" : ""}`}
     style={collapsed ? undefined : { "--chat-height": `${String(props.height)}px` } as CSSProperties}>
     {!collapsed && <PanelHandle className="chat-handle" label="Высота помощника" axis="y" sign={-1} value={props.height} minimum={drawerHeights.minimum}
       maximum={drawerHeights.maximum} change={props.resize} reset={() => props.resize(320)} />}
-    {collapsed ? <div className={active ? "uir-chat-active-bar" : undefined}><button className="chat-launcher" aria-expanded={false} aria-controls="assistant-content" onClick={toggle}><span><Icon name="chat" />Помощник</span>{active && <small><Spinner /><span className="agent-compact-label" role="status">{currentActivity(view, active)}</span>{view.run && <Elapsed key={view.run.id} startedAt={view.run.createdAt} />}</small>}<Icon name="chevron" /></button>
-      {active && <button className="chat-icon" aria-label="Остановить" title="Остановить" disabled={stopBusy(view)} onClick={props.stop}>{stopBusy(view) ? <Spinner /> : <Icon name="stop" />}</button>}</div> : <div className="agent-chat-panel" id="assistant-content">
-      <header className="chat-header"><div className="chat-title"><Icon name="chat" /><h2>Помощник</h2><span className="chat-access">{view.flags.allowEdits ? "Правки разрешены" : "Только чтение"}</span></div><div className="chat-header-actions">
+    {collapsed ? <div className={active ? "uir-chat-active-bar" : undefined}><button className="chat-launcher" aria-expanded={false} aria-controls={scope.content} onClick={toggle}><span><Icon name="chat" />Помощник</span>{active && <small><Spinner /><span className="agent-compact-label" role="status">{currentActivity(view, active)}</span>{view.run && <Elapsed key={view.run.id} startedAt={view.run.createdAt} />}</small>}<Icon name="chevron" /></button>
+      {active && <button className="chat-icon" aria-label="Остановить" title="Остановить" disabled={stopBusy(view)} onClick={props.stop}>{stopBusy(view) ? <Spinner /> : <Icon name="stop" />}</button>}</div> : <div className="agent-chat-panel" id={scope.content}>
+      <header className="chat-header"><div className="chat-title"><Icon name="chat" /><h2>Помощник</h2><span className="chat-access">{scope.access(view.flags.allowEdits)}</span></div><div className="chat-header-actions">
         <button className="chat-icon" title="Новый диалог" aria-label="Новый диалог" disabled={view.submitting || view.pendingSend} onClick={props.fresh}><Icon name="plus" /></button>
-        <button ref={trigger} className="chat-icon" title="Диалоги" aria-label="Диалоги" aria-expanded={threads} aria-controls="chat-threads" onClick={() => setThreads(value => !value)}><Icon name="list" /></button>
+        <button ref={trigger} className="chat-icon" title="Диалоги" aria-label="Диалоги" aria-expanded={threads} aria-controls={scope.threads} onClick={() => setThreads(value => !value)}><Icon name="list" /></button>
         <button className="chat-icon" title={expanded ? "Уменьшить панель" : "Развернуть панель"} aria-label={expanded ? "Уменьшить панель" : "Развернуть панель"} onClick={expand}><Icon name="expand" /></button>
         <button className="chat-icon" title="Свернуть помощника" aria-label="Свернуть помощника" onClick={() => { setThreads(false); toggle(); }}><Icon name="close" /></button></div></header>
-      {threads && <div className="chat-thread-menu" id="chat-threads" ref={menu} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setThreads(false); trigger.current?.focus(); } }}><span>Диалоги</span>
+      {threads && <div className="chat-thread-menu" id={scope.threads} ref={menu} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); setThreads(false); trigger.current?.focus(); } }}><span>Диалоги</span>
         <button disabled={view.submitting || view.pendingSend} onClick={() => { props.fresh(); setThreads(false); }}><Icon name="plus" /><span>Новый диалог</span></button>
         {view.conversations.map(item => <button key={item.id} disabled={view.submitting || view.pendingSend} aria-current={view.conversationId === item.id ? "true" : undefined}
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}</div>}
       <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
         <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
-        <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} />
+        <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} scope={scope} attachment={props.attachment} />
         {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null} applying={view.proposalBusy === value.id && view.proposalAction === "apply"}
           stale={view.staleProposals.includes(value.id)} allowEdits={view.flags.allowEdits}
           apply={() => props.applyProposal(value)} discard={() => props.discardProposal(value)} />)}
+        {props.extra}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {view.files.map(file => <p key={file.id} className="chat-project-file">
           <a href={file.url} download={file.filename}>{file.format === "docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}

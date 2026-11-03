@@ -1,0 +1,47 @@
+.templates-screen { overflow: auto; flex: 1; padding: 30px 32px; display: flex; flex-direction: column; min-height: 0; }
+.templates-screen > .settings-title { margin-bottom: 18px; }
+.templates-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 24px; align-items: start; min-height: 0; }
+.templates-list { display: flex; flex-direction: column; gap: 4px; }
+.templates-list .template-row { border: 1px solid transparent; background: none; border-radius: 6px; text-align: left; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 4px; color: var(--ink); }
+.templates-list .template-row:hover:not(:disabled) { background: var(--wash); }
+.templates-list .template-row[aria-current="page"] { background: #e5ecda; border-color: #dce4cf; }
+.templates-list .template-row strong { font-weight: 550; overflow-wrap: anywhere; }
+.templates-list .template-row small { color: var(--muted); }
+.templates-editor { min-width: 0; padding-left: 24px; border-left: 1px solid var(--line); }
+.templates-editor h3 { margin: 0; font-size: var(--ui-title); font-weight: 550; color: var(--ink); }
+.template-yaml-editor { height: max(420px, calc(100vh - 380px)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+.template-yaml-loading { height: max(420px, calc(100vh - 380px)); display: flex; align-items: center; justify-content: center; margin-top: 8px; border: 1px dashed var(--line); border-radius: 5px; }
+.template-active { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 8px; }
+.template-problem { overflow-wrap: anywhere; }
+.template-problem code { font-size: inherit; }
+.template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }
+.templates-assistant:empty { display: none; }
+/* The resume drawer's prototype rules are keyed to its own ids; this drawer is a column beside the editor. */
+#template-chat-host { background: #fafbf5; border: 1px solid #d5deca; border-radius: 8px; overflow: hidden; }
+#template-chat-host.chat-open { width: 380px; height: max(420px, calc(100vh - 300px)); }
+#template-chat-host.chat-expanded { width: 560px; }
+#template-chat-host .chat-handle { display: none; }
+#template-chat-host .chat-launcher { padding: 8px 14px; }
+#template-chat-host .chat-messages { padding: 14px 16px; }
+#template-chat-input { width: 100%; min-height: 36px; max-height: 115px; border: 0; padding: 0 3px; border-radius: 0; outline: none; background: transparent;
+  resize: vertical; line-height: 1.6; box-shadow: none; font-size: var(--ui-body); color: var(--ink); }
+#template-chat-input::placeholder { color: var(--muted); }
+#template-chat-model { border: 0; width: auto; max-width: 135px; font-size: 10px; padding: 5px 20px 5px 4px; color: #758966; background: transparent; }
+.template-proposal-target { font-size: var(--ui-small); color: var(--muted); }
+.template-proposal-diff { height: 260px; border: 1px solid var(--line); border-radius: 5px; margin-top: 8px; overflow: hidden; }
+@media (max-width: 1080px) {
+  .templates-layout { grid-template-columns: 180px minmax(0, 1fr); }
+  .templates-assistant { grid-column: 1 / -1; }
+  #template-chat-host.chat-open, #template-chat-host.chat-expanded { width: auto; height: min(70dvh, 620px); }
+}
+@media (max-width: 600px) {
+  .templates-screen { padding: 20px 14px; }
+  .templates-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .templates-editor { padding-left: 0; border-left: 0; }
+}
+.templates-list .templates-add { align-self: flex-start; margin-bottom: 8px; }
+.template-name-form { display: flex; flex-direction: column; gap: 6px; }
+.template-name-form input { width: 100%; padding: 9px 11px; }
+#template-chat-host .chat-context { flex-wrap: wrap; }
+#template-chat-host .chat-attachment { font-size: var(--ui-small); }
