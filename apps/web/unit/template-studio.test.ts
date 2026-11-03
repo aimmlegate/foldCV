@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { screenTitle, visit, type Screen } from "../src/workbench/templates/screen";
-import { draftLabel, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
+import { deleteControl, downloadName, draftLabel, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
 
 const state = { package: { id: "generic", name: "Две колонки", revision: "1.3.0", packageHash: "a".repeat(64) }, format: "yaml" as const,
   text: "template: {}\n", bundled: true, edited: false };
@@ -34,4 +34,12 @@ test("the list says shipped, edited or own, and the editor knows unsaved text", 
   assert.equal(unsaved(draft, ""), true);
   assert.equal(unsaved(null, "x"), false);
   assert.equal(draftLabel("Мой"), "Мой (не сохранён)");
+});
+
+test("delete is hidden on shipped templates and disabled on the default; downloads are named by id", () => {
+  assert.equal(deleteControl({ id: "generic", bundled: true }, "custom-moy"), "hidden");
+  assert.equal(deleteControl({ id: "custom-moy", bundled: false }, "custom-moy"), "disabled");
+  assert.equal(deleteControl({ id: "custom-moy", bundled: false }, "generic"), "enabled");
+  assert.equal(downloadName({ kind: "saved", state }), "generic.yaml");
+  assert.equal(downloadName({ kind: "draft", name: "Мой", assetsFrom: null }), "template.yaml");
 });

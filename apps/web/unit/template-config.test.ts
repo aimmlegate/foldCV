@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, pointerRange, technicalLines, withState } from "../src/workbench/templates/config";
+import { parseCheck, parseConfigState, parseSave, pointerRange, technicalLines, withState } from "../src/workbench/templates/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",
@@ -72,4 +72,15 @@ test("technical sections are found by their top-level keys only", () => {
   const text = ["schema_version: 4", "template:", "  id: generic", "blocks:", "- id: projects", "  assets: nested", "style:",
     "  page: {}", "fact_types:", "- id: identity", "assets:", "  logo: assets/logo.png", "provenance: {}", ""].join("\n");
   assert.deepEqual(technicalLines(text), [6, 8, 10, 12]);
+});
+
+test("a create or save reply is the new state, or on 422 the compile error", () => {
+  const summary = { id: "custom-moy", name: "Мой", revision: "1.0.0", packageHash: "b".repeat(64) };
+  const state = { schemaVersion: 1, package: summary, format: "yaml", text: "template: {}\n", bundled: false, edited: false };
+  assert.deepEqual(parseSave(201, state), { saved: true, state: { package: summary, format: "yaml", text: "template: {}\n", bundled: false, edited: false } });
+  assert.deepEqual(parseSave(422, { schemaVersion: 1, valid: false, package: null, error: { path: "/blocks/0", message: "bad" } }),
+    { saved: false, error: { path: "/blocks/0", message: "bad" } });
+  // A 422 that says valid, or a success without a state, is not trusted.
+  assert.throws(() => parseSave(422, { schemaVersion: 1, valid: true, package: summary, error: null }), /INVALID_RESULT/);
+  assert.throws(() => parseSave(201, { schemaVersion: 1, package: summary }), /INVALID_RESULT/);
 });

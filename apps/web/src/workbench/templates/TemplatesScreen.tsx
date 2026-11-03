@@ -3,14 +3,16 @@ import { errorMessage } from "../../errors/messages";
 import type { TemplateCatalog } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
-import { checkTemplateConfig, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig, setDefaultTemplate,
-  withState, type TemplateConfigState, type TemplateProblem } from "./config";
-import { shownId, templateKind, unsaved, type ShownTemplate } from "./studio";
+import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
+import { checkTemplateConfig, createTemplate, deleteTemplate, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig,
+  setDefaultTemplate, withState, type TemplateConfigState, type TemplateProblem, type TemplateSave } from "./config";
+import { deleteControl, downloadName, shownId, templateKind, unsaved, type ShownTemplate } from "./studio";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
-type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | null;
-type Outcome = "checked" | "saved" | "reset" | "default" | null;
+type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | null;
+type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" | null;
 
 /** The templates screen: the list, the YAML of the shown template and, later, the assistant. New imports use these
  * templates; existing resumes keep their own captured version. */
@@ -22,7 +24,10 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
   const [problem, setProblem] = useState<TemplateProblem | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false), [confirmDelete, setConfirmDelete] = useState(false);
+  // The name of a copy; null while the dialog is closed.
+  const [copyName, setCopyName] = useState<string | null>(null);
+  const [delivery, setDelivery] = useState<Delivery | null>(null);
   // Opening another template drops unsaved edits of the shown one, so it asks first.
   const [asking, setAsking] = useState(false);
   const answer = useRef<((open: boolean) => void) | null>(null);
@@ -30,7 +35,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
 
   async function run(kind: Exclude<Work, null>, task: () => Promise<void>) {
-    setWork(kind); setFailure(null); setOutcome(null);
+    setWork(kind); setFailure(null); setOutcome(null); setDelivery(null);
     try { await task(); } catch (error) { setFailure(error); } finally { setWork(null); }
   }
   function adopt(next: TemplateConfigState) { setShown({ kind: "saved", state: next }); setText(next.text); setProblem(null); }
@@ -70,12 +75,36 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
     if (!state) return;
     setCatalog(await setDefaultTemplate(state.package.id)); setOutcome("default");
   });
+  /** A new template opens at once; the catalog is read again because the server chose its id. */
+  async function created(result: TemplateSave): Promise<boolean> {
+    if (!result.saved) { setProblem(result.error); return false; }
+    adopt(result.state); setCatalog(await readTemplateCatalog());
+    return true;
+  }
+  const add = async () => {
+    const name = copyName?.trim();
+    if (!state || !name) return;
+    setCopyName(null);
+    if (!await mayLeave()) return;
+    await run("adding", async () => { if (await created(await createTemplate({ copyOf: state.package.id, name }))) setOutcome("added"); });
+  };
+  const remove = () => run("deleting", async () => {
+    if (!state) return;
+    const next = await deleteTemplate(state.package.id);
+    setCatalog(next); adopt(await readTemplateConfig(next.defaultId)); setOutcome("deleted");
+  });
+  const download = async () => {
+    setDelivery(null);
+    setDelivery(await deliverFile(new Blob([text], { type: "application/yaml" }), downloadName(shown)));
+  };
 
   const busy = work !== null;
   return <section className="templates-screen" aria-label="Шаблоны">
     <div className="settings-title"><button className="text-button" onClick={close}>← К резюме</button></div>
     <div className="templates-layout">
       <nav className="templates-list" aria-label="Список шаблонов">
+        <Button className="small templates-add" busy={work === "adding"} busyLabel="Добавляем…" disabled={busy || !state}
+          onClick={() => setCopyName(state ? `${state.package.name} — копия` : "")}><Icon name="plus" />Добавить</Button>
         {catalog?.templates.map(entry => <button key={entry.id} className="template-row" disabled={busy}
           aria-current={entry.id === selected ? "page" : undefined} onClick={() => void choose(entry.id)}>
           <strong>{entry.name}</strong>
@@ -88,6 +117,10 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
           <span className="small">Версия {state.package.revision}</span><span className="small muted">{templateKind(state)}</span>
           {state.package.id === catalog.defaultId ? <span className="small muted">основной</span>
             : <Button className="small" busy={work === "defaulting"} busyLabel="Сохраняем…" disabled={busy} onClick={() => void makeDefault()}>Сделать основным</Button>}
+          {deleteControl({ id: state.package.id, bundled: state.bundled }, catalog.defaultId) !== "hidden" && <Button className="small" variant="danger"
+            busy={work === "deleting"} busyLabel="Удаляем…" disabled={busy || deleteControl({ id: state.package.id, bundled: state.bundled }, catalog.defaultId) === "disabled"}
+            title={state.package.id === catalog.defaultId ? "Основной шаблон удалить нельзя: сначала сделайте основным другой" : undefined}
+            onClick={() => setConfirmDelete(true)}>Удалить</Button>}
         </div>}
         {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}
         {failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
@@ -96,6 +129,9 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
         {outcome === "saved" && <OperationStatus state="success" label="Сохранено. Изменения применятся к новым резюме." />}
         {outcome === "reset" && <OperationStatus state="success" label="Встроенный шаблон восстановлен." />}
         {outcome === "default" && state && <OperationStatus state="success" label={`Основной шаблон: ${state.package.name}.`} />}
+        {outcome === "added" && state && <OperationStatus state="success" label={`Добавлен шаблон «${state.package.name}».`} />}
+        {outcome === "deleted" && <OperationStatus state="success" label="Шаблон удалён. Готовые резюме сохранили свой вид." />}
+        {deliveryMessage(delivery) && <OperationStatus state="success" label={deliveryMessage(delivery)} />}
         {shown && <label className="template-technical small"><input type="checkbox" checked={technical} onChange={event => setTechnical(event.target.checked)} />
           Показать служебные разделы</label>}
         {shown && <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
@@ -111,6 +147,7 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
             {state.bundled && <Button variant="quiet" busy={work === "resetting"} busyLabel="Возвращаем…" disabled={busy || !state.edited}
               onClick={() => setConfirmReset(true)}>Вернуть встроенный</Button>}
           </>}
+          {shown && <Button variant="quiet" disabled={busy} onClick={() => void download()}><Icon name="download" />Скачать YAML</Button>}
           {dirty && <span className="settings-saved" role="status">Не сохранено</span>}
         </div>
       </div>
@@ -119,6 +156,20 @@ export default function TemplatesScreen({ close }: { close: () => void }) {
       <p className="dialog-copy">Ваши правки этого шаблона пропадут. Готовые резюме не изменятся.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmReset(false)}>Отмена</Button>
         <Button variant="primary" onClick={() => { setConfirmReset(false); void reset(); }}>Вернуть</Button></div>
+    </Dialog>
+    <Dialog open={copyName !== null} close={() => setCopyName(null)} title="Новый шаблон">
+      <form className="template-name-form" onSubmit={event => { event.preventDefault(); void add(); }}>
+        <p className="dialog-copy">Копия шаблона «{state?.package.name}». Она сохранится сразу, её можно будет изменить и удалить.</p>
+        <label htmlFor="template-copy-name">Название</label>
+        <input id="template-copy-name" value={copyName ?? ""} maxLength={120} autoFocus onChange={event => setCopyName(event.currentTarget.value)} />
+        <div className="dialog-actions"><Button type="button" variant="quiet" onClick={() => setCopyName(null)}>Отмена</Button>
+          <Button type="submit" variant="primary" disabled={!copyName?.trim()}>Добавить</Button></div>
+      </form>
+    </Dialog>
+    <Dialog open={confirmDelete} close={() => setConfirmDelete(false)} title={`Удалить шаблон «${state?.package.name ?? ""}»?`}>
+      <p className="dialog-copy">Новые резюме не смогут его выбрать. Готовые резюме сохранят свой вид.</p>
+      <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmDelete(false)}>Отмена</Button>
+        <Button variant="danger" onClick={() => { setConfirmDelete(false); void remove(); }}>Удалить</Button></div>
     </Dialog>
     <Dialog open={asking} close={() => answered(false)} title="Открыть другой шаблон?">
       <p className="dialog-copy">Несохранённые правки пропадут.</p>

@@ -21,3 +21,6 @@
   .templates-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .templates-editor { padding-left: 0; border-left: 0; }
 }
+.templates-list .templates-add { align-self: flex-start; margin-bottom: 8px; }
+.template-name-form { display: flex; flex-direction: column; gap: 6px; }
+.template-name-form input { width: 100%; padding: 9px 11px; }

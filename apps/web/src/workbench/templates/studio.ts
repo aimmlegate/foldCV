@@ -17,3 +17,12 @@ export function shownId(shown: ShownTemplate | null): string | null {
 export function unsaved(shown: ShownTemplate | null, text: string): boolean {
   return shown !== null && (shown.kind === "draft" || text !== shown.state.text);
 }
+
+/** Shipped templates cannot be deleted, so the button is hidden; the default one must be replaced as default first. */
+export function deleteControl(entry: Pick<TemplateEntry, "id" | "bundled">, defaultId: string): "hidden" | "disabled" | "enabled" {
+  return entry.bundled ? "hidden" : entry.id === defaultId ? "disabled" : "enabled";
+}
+/** The download name of the editor text; a new template has no id until it is saved. */
+export function downloadName(shown: ShownTemplate | null): string {
+  return `${shownId(shown) ?? "template"}.yaml`;
+}
