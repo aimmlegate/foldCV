@@ -4,7 +4,8 @@ from .models.template_facts import ExtensionCell, ExtensionRecord
 from .template_identity import empty_value, payload_value
 from .template_import import TemplateImportFailure, authorization, checked, digest, instant, task_in
 from .template_replacements import apply_accepted_records
-from .template_builtin_admission import apply_builtin_records, current_handles, human_authority, make_builtin_candidate
+from .template_builtin_admission import (apply_builtin_records, current_handles, human_authority, inferred_owner_relations,
+    make_builtin_candidate)
 from .template_mutations import _set_builtin_owner
 from .template_review import check_review_reply, decide_review
 from .templates.compiler import canonical, sha256
@@ -73,6 +74,10 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
     admitted_relations.difference_update(relation.id for relation in proposal.resolved_relations if relation.subject_id in human_subjects)
     candidate_relations = {relation.id: relation for relation in working.relations}
     candidate_relations.update({relation.id: relation for relation in proposal.resolved_relations if relation.id in admitted_relations})
+    task = task_in(result, next(attempt.task_id for attempt in result.attempts if attempt.id == proposal.attempt_id))
+    if task.entry is not None:
+        candidate_relations.update({relation.id: relation for relation in inferred_owner_relations(proposal, allocations,
+            declarations, working, sources, list(candidate_relations.values()))})
     observed = {(value.item_handle, value.field_key): value for value in working.observations
         if value.proposal_hash == proposal.proposal_hash}
     for field in proposal.resolved_fields:
@@ -228,6 +233,5 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
     proposal.admitted_relation_revisions = {relation.id: relation.revision for relation in working.relations
         if before_relations.get(relation.id) != relation.revision}
     proposal.state = 'accepted' if applied or proposal.admitted_relation_ids else 'rejected'
-    task = task_in(result, next(attempt.task_id for attempt in result.attempts if attempt.id == proposal.attempt_id))
     task.expected_checks = review.value.targets
     return checked(result), type(facts).model_validate(working.model_dump(by_alias=True))

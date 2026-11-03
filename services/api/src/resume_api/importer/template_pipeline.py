@@ -1101,9 +1101,14 @@ class TemplatePipeline:
             denied = {value.subject_id for value in owners if value.id in rejected}
             while grown := {value.subject_id for value in owners if value.target_id in denied} - denied:
                 denied |= grown
-            affected = [span for field in proposal.resolved_fields
-                if allocated[field.item_handle].cell_ids[field.field_key] in rejected
-                    or allocated[field.item_handle].record_id in denied for span in field.evidence] if proposal else []
+            # A technology name the review rejects has no line to show: its list cites the lines of the whole CV
+            # (a tester's import put 20 cited paragraphs under one invented name), and a names-only list shows no
+            # sentence. The notice names the rejected value; the admitted names stay.
+            kinds = {value.id: value.builtin_kind for value in owner(current).template_package.definition.fact_types}
+            names_only = {handle for handle, value in allocated.items() if kinds.get(value.semantic_type) == 'technology'}
+            affected = [span for field in proposal.resolved_fields if field.item_handle not in names_only
+                and (allocated[field.item_handle].cell_ids[field.field_key] in rejected
+                    or allocated[field.item_handle].record_id in denied) for span in field.evidence] if proposal else []
             if proposal is not None:
                 from packages.resume_core.template_proposals import relation_evidence
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
