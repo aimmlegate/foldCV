@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import resource
 import subprocess
 import sys
 
@@ -19,6 +18,10 @@ VM_HEADROOM = 256 * 1024**2
 
 
 def limit_virtual_memory() -> None:
+    if sys.platform == "win32":
+        return  # The service's job caps this worker's memory there.
+    import resource
+
     result = subprocess.run(("/bin/ps", "-o", "vsz=", "-p", str(os.getpid())), capture_output=True,
                             timeout=1, check=False, text=True)
     if result.returncode or not result.stdout.strip().isdigit():

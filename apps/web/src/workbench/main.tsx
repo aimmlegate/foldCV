@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { exchangeSession } from "../api/client";
 import { claimApplicationTab, type TabLease } from "./tab";
+import { APP_NAME } from "./app-name";
 import { App } from "./App";
 import { BlockedTab } from "./BlockedTab";
 import { applyAppearance, readAppearance, watchSystemScheme } from "./settings/interface";
@@ -30,7 +31,7 @@ async function mountApplication(lease: TabLease, host: HTMLElement): Promise<voi
     document.body.append(portalHost); root.render(<App portalHost={portalHost} />);
   } catch {
     lease.release();
-    if (!leaving) root.render(<p role="alert">Откройте FoldCV по ссылке, выданной при запуске.</p>);
+    if (!leaving) root.render(<p role="alert">Откройте {APP_NAME} по ссылке, выданной при запуске.</p>);
   }
 }
 

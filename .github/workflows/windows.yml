@@ -1,0 +1,253 @@
+name: Windows
+
+# The portable Windows zips, built and checked where they run: the Electron app (tools/build-windows-zip.sh builds the
+# same zip on a Mac) and the Tauri one, whose shell needs the Windows toolchain.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zip:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }};${{ github.workspace }}\services\api\src
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # The zip must carry the checkout's bytes: bundled templates and assets are checked by hash.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/desktop/package-lock.json
+      # No venv: a Windows venv's python.exe only starts the real interpreter as its child, which the jobs refuse.
+      - name: Python environment
+        run: python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+      - name: Template definition diagnostic
+        continue-on-error: true
+        run: python tools\desktop\template_diff.py
+      - name: Windows tests
+        run: >
+          python -m pytest -q -p no:cacheprovider -rfE
+          tests/service/test_host.py tests/service/test_process_runner.py tests/service/test_desktop.py
+          tests/service/test_lifecycle.py tests/service/test_extract_worker.py tests/repository
+          tests/projects/test_export.py tests/projects/test_project_catalog.py
+      - name: Web frontend
+        working-directory: apps/web
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund --loglevel=error
+          npm run build
+      - name: Desktop shell
+        working-directory: apps/desktop
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund --loglevel=error
+          npm run typecheck
+          npm test
+      - name: Helper and zip
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $helper = python tools\desktop\build_windows_helper.py "$env:RUNNER_TEMP\helper-work" | Select-Object -Last 1
+          node apps\desktop\scripts\package-windows.mjs $helper output\windows
+          Expand-Archive (Get-ChildItem output\windows\*.zip).FullName "$env:RUNNER_TEMP\app"
+      - name: Helper smoke check with both CLIs
+        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\foldCV Beta\resources\helper" --cli
+      - name: App start and close
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'
+          $env:FOLDCV_DESKTOP_ROOT = $root
+          $app = Start-Process -FilePath "$env:RUNNER_TEMP\app\foldCV Beta\foldCV Beta.exe" -PassThru
+          $port = Join-Path $root 'desktop-port'
+          $deadline = (Get-Date).AddMinutes(3)
+          while (-not (Test-Path $port)) {
+            if ((Get-Date) -gt $deadline -or $app.HasExited) { throw 'The helper did not start' }
+            Start-Sleep -Seconds 1
+          }
+          $page = Invoke-WebRequest "http://127.0.0.1:$((Get-Content $port).Trim())/" -UseBasicParsing
+          if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') { throw 'The page is not served' }
+          Start-Sleep -Seconds 15
+          try {
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+            [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save("$env:RUNNER_TEMP\app-window.png")
+          } catch { Write-Warning "No screenshot: $_" }
+          $app.Refresh()
+          if ($app.CloseMainWindow()) {
+            # Closing the window quits the app, which stops the helper through its stdin.
+            if (-not $app.WaitForExit(60000)) { Stop-Process -Id $app.Id -Force; throw 'The app did not close' }
+          } else {
+            # Without a visible desktop: killing the app must still end the helper (its job kills on close).
+            Write-Warning 'No main window to close; ending the app process'
+            Stop-Process -Id $app.Id -Force
+          }
+          Start-Sleep -Seconds 2
+          $left = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "$env:RUNNER_TEMP\app\*" }
+          Get-Content (Join-Path $root 'logs\helper.log') -Tail 40
+          if ($left) { $left | Format-List Name, ProcessId, ExecutablePath; throw 'Processes of the app are left running' }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: foldcv-windows
+          if-no-files-found: ignore
+          path: |
+            output/windows/*.zip
+            output/windows/build-info.json
+            ${{ runner.temp }}/app-window.png
+            ${{ runner.temp }}/foldcv-root/logs/*.log
+
+  tauri:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }};${{ github.workspace }}\services\api\src
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Tauri shell
+        working-directory: apps/desktop-tauri
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          rustup update --no-self-update stable
+          cargo --version
+          cargo test --release --locked
+          cargo build --release --locked
+      - name: Python environment
+        run: python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+      - name: Web frontend
+        working-directory: apps/web
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund --loglevel=error
+          npm run build
+      - name: Helper and zip
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $helper = python tools\desktop\build_windows_helper.py "$env:RUNNER_TEMP\helper-work" | Select-Object -Last 1
+          python tools\desktop\package_windows_tauri.py apps\desktop-tauri\target\release\foldcv-beta.exe $helper output\windows-tauri
+          Expand-Archive (Get-ChildItem output\windows-tauri\*.zip).FullName "$env:RUNNER_TEMP\app"
+      - name: Helper smoke check with both CLIs
+        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\foldCV Beta\helper" --cli
+      - name: App start, second start, close and kill
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'
+          $env:FOLDCV_DESKTOP_ROOT = $root
+          $exe = "$env:RUNNER_TEMP\app\foldCV Beta\foldCV Beta.exe"
+          $port = Join-Path $root 'desktop-port'
+          Add-Type -Namespace Win32 -Name User -MemberDefinition @'
+          [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
+          [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+          [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+          '@
+          # The port file stays from the last start, so the page itself must answer.
+          function Wait-Page($app) {
+            $deadline = (Get-Date).AddMinutes(3)
+            while ($true) {
+              if ($app.HasExited) { throw 'The app ended before its page was served' }
+              if ((Get-Date) -gt $deadline) { throw 'The page is not served' }
+              if (Test-Path $port) {
+                try {
+                  $page = Invoke-WebRequest "http://127.0.0.1:$((Get-Content $port).Trim())/" -UseBasicParsing -TimeoutSec 5
+                  if ($page.StatusCode -eq 200 -and $page.Content -match 'id="root"') { return }
+                } catch { }
+              }
+              Start-Sleep -Seconds 1
+            }
+          }
+          # The helper ends on EOF of its stdin, also when the shell is killed; its job ends the workers.
+          function Assert-Gone($after) {
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+              $left = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "$env:RUNNER_TEMP\app\*" })
+              if (-not $left) { return }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            $left | Format-List Name, ProcessId, ExecutablePath
+            throw "Processes of the app are left running after $after"
+          }
+          try {
+            $started = Get-Date
+            $app = Start-Process -FilePath $exe -PassThru
+            Wait-Page $app
+            Write-Host "Page served after $([int]((Get-Date) - $started).TotalSeconds) s"
+            # The window shows when the page has loaded, at the latest 10 s after it opened; WebView2's first start on a
+            # fresh runner can take a while.
+            $deadline = (Get-Date).AddMinutes(2)
+            while (-not [Win32.User]::IsWindowVisible([Win32.User]::FindWindow('Tauri Window', 'foldCV Beta'))) {
+              if ($app.HasExited -or (Get-Date) -gt $deadline) { throw 'The app window was not shown' }
+              Start-Sleep -Seconds 1
+            }
+            Write-Host "Window shown after $([int]((Get-Date) - $started).TotalSeconds) s"
+            Start-Sleep -Seconds 10
+            try {
+              Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+              $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+              $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+              [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+              $bitmap.Save("$env:RUNNER_TEMP\app-window.png")
+            } catch { Write-Warning "No screenshot: $_" }
+            if ([Win32.User]::FindWindow('#32770', 'foldCV Beta') -ne [IntPtr]::Zero) { throw 'The app shows an error box' }
+            # A second start hands over to the running app and ends.
+            $second = Start-Process -FilePath $exe -PassThru
+            if (-not $second.WaitForExit(30000)) { Stop-Process -Id $second.Id -Force; throw 'A second start kept running' }
+            if ($app.HasExited) { throw 'The app ended on a second start' }
+            # Closing the window quits the app, which stops the helper through its stdin. Tauri's hidden windows
+            # make Process.CloseMainWindow unreliable, so the window is found by its class and title (an error box
+            # has the title too).
+            $window = [Win32.User]::FindWindow('Tauri Window', 'foldCV Beta')
+            if ($window -eq [IntPtr]::Zero) { throw 'No app window' }
+            [void][Win32.User]::PostMessage($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+            if (-not $app.WaitForExit(60000)) { Stop-Process -Id $app.Id -Force; throw 'The app did not close' }
+            Assert-Gone 'closing the window'
+            $app = Start-Process -FilePath $exe -PassThru
+            Wait-Page $app
+            Stop-Process -Id $app.Id -Force
+            Assert-Gone 'killing the app'
+          } finally {
+            Get-Content (Join-Path $root 'logs\helper.log') -Tail 60 -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: foldcv-windows-tauri
+          if-no-files-found: ignore
+          path: |
+            output/windows-tauri/*.zip
+            output/windows-tauri/build-info.json
+            ${{ runner.temp }}/app-window.png
+            ${{ runner.temp }}/foldcv-root/logs/*.log

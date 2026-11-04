@@ -4,6 +4,7 @@ import { ConnectionWorkflow, connectionSummary, type ConnectionView } from "../c
 import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
 import { useResumeWorkspace } from "./useResumeWorkspace";
+import { APP_NAME } from "./app-name";
 import { History } from "./layout/History";
 import { Header } from "./layout/Header";
 import { SourceForm } from "./import/SourceForm";
@@ -88,7 +89,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       connection={connectionSummary(connection?.snapshot ?? null)} error={error} />
     <section className="main-area">
       <Header title={screenTitle(screen, shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме"))}
-        subtitle={!onResume ? "FoldCV" : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
+        subtitle={!onResume ? APP_NAME : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={onResume && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
         retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" ? () => void action(async current => { await templateEditor.current?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
         activity={<NotificationCenter />} />

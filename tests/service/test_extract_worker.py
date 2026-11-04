@@ -127,11 +127,11 @@ async def test_cancel_stops_the_real_worker_and_keeps_no_source(tmp_path, monkey
     loop = asyncio.get_running_loop()
     entered, release = asyncio.Event(), threading.Event()
 
-    def held_rss(pid: int) -> int | None:
+    def held_rss(process) -> int | None:
         # Holds the monitor thread so the cancel lands while the real worker runs.
         loop.call_soon_threadsafe(entered.set)
         release.wait(5)
-        return original_rss(pid)
+        return original_rss(process)
 
     monkeypatch.setattr(extracting, "_rss_kb", held_rss)
     task = asyncio.create_task(extract(tmp_path, (FIXTURES / "rich.docx").read_bytes(), "rich.docx"))

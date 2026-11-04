@@ -8,8 +8,8 @@ from html.parser import HTMLParser
 import http.client
 import ipaddress
 import json
+import os
 from pathlib import Path
-import resource
 import socket
 import ssl
 import sys
@@ -19,10 +19,11 @@ import zlib
 import certifi
 
 from packages.resume_core import agent_limits as limits
+from packages.resume_core.host import WINDOWS, Confined
 from packages.resume_core.assistant_store import AgentFailure, identity, timestamp
 from packages.resume_core.models.agent import AgentWebSource, wire_bytes
 from resume_api.cli.process_runner import ProcessRunner
-from resume_api.lifecycle import OperationFiles, SpikeError, safe_environment
+from resume_api.lifecycle import OperationFiles, SpikeError, python_worker, safe_environment
 
 BODY_BYTES = 2 * 1024 * 1024
 TEXT_BYTES = 32 * 1024
@@ -211,12 +212,14 @@ class PublicFetcher:
             module = Path(__file__).resolve()
             def launch(executable, args, operation):
                 environment = safe_environment(operation)
-                environment["PYTHONPATH"] = str(module.parents[5]) + ":" + str(module.parents[2])
-                return executable, args, environment
+                environment["PYTHONPATH"] = str(module.parents[5]) + os.pathsep + str(module.parents[2])
+                # Windows: the job takes RLIMIT_CPU's place.
+                return Confined(executable, cpu_seconds=3) if WINDOWS else executable, args, environment
             try:
                 with OperationFiles(self.root).open() as files:
-                    raw, _ = ProcessRunner(Path(sys.executable), launch=launch).run(files,
-                        ("-m", "resume_api.agent.web"), data=json.dumps({"url": url}).encode(),
+                    executable, arguments = python_worker("public-fetch", "-m", "resume_api.agent.web")
+                    raw, _ = ProcessRunner(executable, launch=launch).run(files,
+                        arguments, data=json.dumps({"url": url}).encode(),
                         deadline=time.monotonic() + 20, cancel=cancel, max_output=132096, max_stdout=131072, max_stderr=1024)
                 result = json.loads(raw)
                 if "error" in result:
@@ -234,8 +237,11 @@ class PublicFetcher:
             raise
 
 
-if __name__ == "__main__":
-    resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
+def worker_main() -> int:
+    if not WINDOWS:
+        import resource
+
+        resource.setrlimit(resource.RLIMIT_CPU, (3, 3))
     try:
         request = json.loads(sys.stdin.buffer.read(8193))
         value = {"source": fetch_page(request["url"]).model_dump(mode="json", by_alias=True)}
@@ -244,3 +250,8 @@ if __name__ == "__main__":
     except Exception:
         value = {"error": "AGENT_SOURCE_UNAVAILABLE"}
     sys.stdout.write(json.dumps(value, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(worker_main())

@@ -5,12 +5,14 @@ from __future__ import annotations
 import math
 import os
 from pathlib import Path
+import queue
 import selectors
 import subprocess
 import threading
 import time
 from typing import Callable
 
+from packages.resume_core import host
 from resume_api.lifecycle import OperationFiles, SpikeError
 
 
@@ -63,6 +65,9 @@ class ProcessRunner:
             if on_spawn is not None:
                 on_spawn()
             assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+            if host.WINDOWS:
+                return self._exchange_threads(process, pending, close_input, deadline, cancel, on_line,
+                                              poll_input, max_output, max_line, max_stdout, max_stderr)
             with selectors.DefaultSelector() as selector:
                 for stream, kind in ((process.stdin, "stdin"), (process.stdout, "stdout"), (process.stderr, "stderr")):
                     os.set_blocking(stream.fileno(), False)
@@ -141,6 +146,105 @@ class ProcessRunner:
                         before_cleanup()
                 finally:
                     files.stop_worker(final=False)
+
+    def _exchange_threads(self, process, pending, close_input, deadline, cancel, on_line, poll_input,
+                          max_output, max_line, max_stdout, max_stderr) -> tuple[bytes, bytes]:
+        """The selector loop above for Windows, where select() takes only sockets: threads move the pipe data.
+        A reply after stdin was asked to close is refused, as one after the close is on macOS."""
+        events: queue.Queue[tuple[str, bytes]] = queue.Queue()
+        writes: queue.Queue[bytes | None] = queue.Queue()
+
+        def read(stream, kind):
+            try:
+                while chunk := os.read(stream.fileno(), 4096):
+                    events.put((kind, chunk))
+            except (OSError, ValueError):
+                pass  # Closed by the cleanup.
+            events.put((kind, b""))
+
+        def write():
+            while (item := writes.get()) is not None:
+                try:
+                    view = memoryview(item)
+                    while view:
+                        view = view[os.write(process.stdin.fileno(), view[:65536]):]
+                except (OSError, ValueError):
+                    pass  # The child stopped reading; the rest is dropped, as BrokenPipeError does above.
+            try:
+                process.stdin.close()
+            except (OSError, ValueError):
+                pass
+
+        closing = False
+
+        def send(reply: bytes) -> None:
+            nonlocal closing
+            if closing:
+                raise SpikeError("INVALID_RESULT")
+            if reply:
+                writes.put(reply)
+            else:
+                writes.put(None)
+                closing = True
+
+        for target, arguments in ((read, (process.stdout, "stdout")), (read, (process.stderr, "stderr")),
+                                  (write, ())):
+            threading.Thread(target=target, args=arguments, daemon=True).start()
+        if pending:
+            writes.put(bytes(pending))
+        if close_input:
+            send(b"")
+        try:
+            return self._pump(process, events, send, deadline, cancel, on_line, poll_input, max_output, max_line,
+                              max_stdout, max_stderr)
+        finally:
+            if not closing:
+                writes.put(None)
+
+    def _pump(self, process, events, send, deadline, cancel, on_line, poll_input, max_output, max_line, max_stdout,
+              max_stderr) -> tuple[bytes, bytes]:
+        output, errors, line = bytearray(), bytearray(), bytearray()
+        open_streams = {"stdout", "stderr"}
+        while open_streams or process.poll() is None:
+            self._check(deadline, cancel)
+            if poll_input is not None:
+                reply = poll_input()
+                if reply is not None:
+                    send(reply)
+            try:
+                kind, chunk = events.get(timeout=min(0.02, max(0, deadline - self.clock())))
+            except queue.Empty:
+                continue
+            if not chunk:
+                open_streams.discard(kind)
+                continue
+            target = output if kind == "stdout" else errors
+            target.extend(chunk)
+            if len(output) + len(errors) > max_output:
+                raise SpikeError("OUTPUT_TOO_LARGE")
+            if ((max_stdout is not None and len(output) > max_stdout)
+                    or (max_stderr is not None and len(errors) > max_stderr)):
+                raise SpikeError("OUTPUT_TOO_LARGE")
+            if kind == "stdout" and on_line is not None:
+                line.extend(chunk)
+                while b"\n" in line:
+                    raw, _, rest = line.partition(b"\n")
+                    line = bytearray(rest)
+                    if not raw:
+                        raise SpikeError("INVALID_RESULT")
+                    if len(raw) > max_line:
+                        raise SpikeError("OUTPUT_TOO_LARGE")
+                    reply = on_line(bytes(raw))
+                    if reply is not None:
+                        send(reply)
+                if len(line) > max_line:
+                    raise SpikeError("OUTPUT_TOO_LARGE")
+        self._check(deadline, cancel)
+        if line:
+            raise SpikeError("INCOMPLETE_STREAM")
+        if process.returncode:
+            raise ProcessExit(bytes(output), bytes(errors))
+        return bytes(output), bytes(errors)
 
     def _check(self, deadline: float, cancel: threading.Event) -> None:
         if cancel.is_set():

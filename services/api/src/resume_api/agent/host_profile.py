@@ -16,7 +16,7 @@ from resume_api.cli.qualification import QualificationError, require_publisher
 TOKEN_ENV = "FOLDCV_AGENT_MCP_CAPABILITY"
 TOOLS = ("get_resume_context", "check_resume", "read_public_page")
 PACKAGE = BINARY.parents[3]
-CODE_MODE_HOST = PACKAGE / "bin/codex-code-mode-host"
+CODE_MODE_HOST = PACKAGE / distribution.HOST
 PACKAGE_MANIFEST = PACKAGE / "codex-package.json"
 APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 
@@ -24,7 +24,7 @@ APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 def check_host(package: Path | None = None, *, managed: bool = False) -> None:
     """The managed runtime keeps its release pins; a user-installed package needs the publisher's
     signed host and a manifest that names a qualifying version."""
-    host = CODE_MODE_HOST if package is None else package / "bin/codex-code-mode-host"
+    host = CODE_MODE_HOST if package is None else package / distribution.HOST
     manifest = PACKAGE_MANIFEST if package is None else package / "codex-package.json"
     try:
         for path in (host, manifest):
@@ -51,7 +51,7 @@ def check_host(package: Path | None = None, *, managed: bool = False) -> None:
 class AgentProofProfile(ExperimentalCliProfile):
     @property
     def host_path(self) -> Path:
-        return CODE_MODE_HOST if self.executable == BINARY else self.package_root / "bin/codex-code-mode-host"
+        return CODE_MODE_HOST if self.executable == BINARY else self.package_root / distribution.HOST
 
     @property
     def manifest_path(self) -> Path:
@@ -64,6 +64,10 @@ class AgentProofProfile(ExperimentalCliProfile):
             raise ExperimentalProfileError("AGENT_RUNTIME_ONLY")
         check_host() if self.executable == BINARY else check_host(self.package_root, managed=self.managed)
         return super().launch(executable, args, operation)
+
+    def children(self, args: tuple[str, ...]) -> int:
+        # The app server starts its code-mode host; check_owned_host verifies which program it is.
+        return 1 if args[:4] == APP_SERVER_PREFIX else 0
 
     def _policy(self, operation: Path, args: tuple[str, ...]) -> str:
         policy = super()._policy(operation, args)

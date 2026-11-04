@@ -25,11 +25,38 @@ The launcher starts one local service on `127.0.0.1` and opens the browser. Stop
 with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 [local setup](docs/gui/local-setup.md) for details.
 
+## macOS app
+
+`tools/build-macos-dmg.sh` builds `foldCV Beta.app` and its DMG from this checkout in one step: the frontend, the
+local service frozen with PyInstaller, and the Tauri window around it (`apps/desktop-tauri`), which shows the page in
+the system WebKit. It needs Apple Silicon, arm64 Node 22, python.org Python 3.13 and Rust from
+[rustup](https://rustup.rs), and writes to `output/foldcv-macos-<version>-<commit>/`. The app runs on macOS 12 or later
+with Safari 17.4 or later, whose WebKit it uses. It keeps its data in `~/Library/Application Support/foldCV Beta`, as
+the earlier Electron builds did, apart from the browser service's `FoldCV` root. The signature is ad hoc: on another
+Mac, allow the app once in System Settings → Privacy & Security.
+
+## Windows app
+
+`tools/build-windows-zip.sh` builds the portable `foldCV-Beta-<version>-win-x64.zip` on a Mac in one step (Node 22,
+python.org Python 3.13): the frontend, the python.org embeddable Python with the service's Windows wheels, and the
+Electron window. The `Windows` workflow builds the same zip on a Windows runner and checks it there (helper, both CLIs,
+app start). Unpack the zip anywhere and run `foldCV Beta.exe`; there is no installer. Data stays in
+`%LOCALAPPDATA%\foldCV Beta`, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed:
+Windows SmartScreen asks once (More info → Run anyway). Codex and Claude run in a Job Object that lets them start no
+other program and ends them with the app; unlike the macOS sandbox it does not limit which files they read or write.
+
+The same workflow also builds a test zip with the Tauri window instead (job `tauri`, artifact `foldcv-windows-tauri`,
+`foldCV-Beta-<version>-win-x64-tauri.zip`): the same helper and data folder, the page in the system WebView2, which
+Windows 11 has. Its shell needs the Windows toolchain, so it is built on the runner only. Do not run both apps at once:
+they share the data folder.
+
 ## Repository
 
 | Path | Contents |
 | --- | --- |
 | `apps/web` | React and TypeScript frontend |
+| `apps/desktop-tauri` | Tauri window of the macOS app and of the Windows test zip |
+| `apps/desktop` | Electron window of the Windows app |
 | `services/api` | FastAPI local service, CLI providers, import and assistant |
 | `packages/resume_core` | Project storage, templates and DOCX rendering |
 | `contracts` | Generated JSON Schemas and contract examples |
@@ -43,7 +70,7 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 
 Put a template YAML and its `assets/` folder into the ignored `templates/local/`. A local
 run or desktop build lists it first and uses it as the default. A clean clone ships only
-the bundled generic templates.
+the bundled generic templates; `FOLDCV_PUBLIC_TEMPLATES=1` keeps the private ones out of a run or desktop build.
 
 ## Documentation
 

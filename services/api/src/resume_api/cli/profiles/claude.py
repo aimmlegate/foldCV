@@ -1,4 +1,6 @@
-"""FoldCV-owned Claude Code profile: config directory, environment, sandbox and argv (MP00)."""
+"""FoldCV-owned Claude Code profile: config directory, environment, sandbox and argv (MP00).
+
+On Windows a Job Object takes sandbox-exec's place: no other programs, but no file or network rules."""
 
 from __future__ import annotations
 
@@ -8,8 +10,8 @@ import json
 import os
 from pathlib import Path
 import shutil
-import stat
 
+from packages.resume_core import host
 from resume_api.cli.qualification import Compatibility
 
 
@@ -75,7 +77,7 @@ def _private_directory(path: Path, *, create: bool) -> Path:
     if create:
         absolute.mkdir(parents=True, exist_ok=True, mode=0o700)
     info = absolute.stat()
-    if not absolute.is_dir() or stat.S_IMODE(info.st_mode) != 0o700 or info.st_uid != os.getuid():
+    if not absolute.is_dir() or not host.private_mode(info, 0o700) or not host.owned(info):
         raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
     return absolute.resolve(strict=True)
 
@@ -98,6 +100,11 @@ class ClaudeCliProfile:
         prompts. Temporary files stay under the operation directory."""
         return self.root / "cwd"
 
+    @property
+    def windows_home(self) -> Path:
+        """Home and app data of the CLI on Windows, so it does not read or write the user's own."""
+        return self.root / "home"
+
     def prepare(self) -> None:
         if self.root.exists() and not (self.root / MARKER).is_file():
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
@@ -111,18 +118,24 @@ class ClaudeCliProfile:
         _private_directory(self.root, create=True)
         marker = self.root / MARKER
         if not marker.exists():
-            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | host.O_NOFOLLOW | host.O_BINARY, 0o600)
+            with os.fdopen(descriptor, "w", encoding="ascii", newline="\n") as stream:
                 stream.write("foldcv-claude-profile-v1\n")
         if (marker.is_symlink() or marker.read_text(encoding="ascii") != "foldcv-claude-profile-v1\n"
-                or stat.S_IMODE(marker.stat().st_mode) != 0o600):
+                or not host.private_mode(marker.stat(), 0o600)):
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
         _private_directory(self.config_dir, create=True)
         _private_directory(self.workdir, create=True)
-        if not Path("/usr/bin/sandbox-exec").is_file():
+        if host.WINDOWS:
+            _private_directory(self.windows_home, create=True)
+        elif not Path("/usr/bin/sandbox-exec").is_file():
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
 
-    def environment(self, operation: Path) -> dict[str, str]:
+    def environment(self, operation: Path, *, temp: Path | None = None) -> dict[str, str]:
+        if host.WINDOWS:
+            return {**host.windows_environment(temp or operation / "tmp", self.windows_home),
+                    "CLAUDE_CODE_TMPDIR": str(operation / "tmp"), "CLAUDE_CONFIG_DIR": str(self.config_dir),
+                    **SWITCHES}
         # The desktop shell starts the service without USER, so the name also comes from the system account.
         try:
             user = getpass.getuser()
@@ -174,6 +187,17 @@ class ClaudeCliProfile:
             raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
         owned = _private_directory(operation, create=False)
         _private_directory(owned / "tmp", create=False)
+        if host.WINDOWS:
+            if network is not True:
+                # A Job Object cannot take the network away; only the macOS sandbox runs these checks.
+                raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
+            if args[:2] != ("auth", "login"):
+                return host.Confined(executable), args, self.environment(owned)
+            # A browser the sign-in starts inherits the folder and temp folder, so neither may be the operation's.
+            temp = self.windows_home / "AppData" / "Local" / "Temp"
+            temp.mkdir(parents=True, exist_ok=True)
+            return (host.Confined(executable, breakaway=True, cwd=self.root), args,
+                    self.environment(owned, temp=temp))
         command = ("-p", self.policy(owned, args, network=network), os.path.realpath(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, self.environment(owned)
 
@@ -184,7 +208,7 @@ class ClaudeCliProfile:
             if entry.name in KEEP and entry.is_file() and not entry.is_symlink():
                 continue
             if entry.is_dir() and not entry.is_symlink():
-                shutil.rmtree(entry)
+                host.remove_tree(entry)
             else:
                 entry.unlink()
             removed.append(entry.name)

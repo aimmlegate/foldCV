@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { errorMessage } from "../../errors/messages";
 import type { ProjectList, ProjectListEntry } from "../../projects/api";
+import { APP_BRAND, APP_NAME, APP_STAGE } from "../app-name";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
@@ -45,7 +46,7 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
   };
   return <aside className="history" aria-label="Список резюме" aria-busy={busy}>
     {handle}
-    <div className="brand-row"><button className="brand" disabled={busy} aria-label="FoldCV — новое резюме" onClick={fresh}><Icon name="fold" /><span className="brand-name">FoldCV<span>.</span></span></button>
+    <div className="brand-row"><button className="brand" disabled={busy} aria-label={`${APP_NAME} — новое резюме`} onClick={fresh}><Icon name="fold" /><span className="brand-name">{APP_BRAND}<span>.</span><small>{APP_STAGE}</small></span></button>
       <button className="icon" aria-label="Скрыть список резюме" onClick={collapse}><Icon name="panel" /></button></div>
     <Button className="new-button" disabled={busy} onClick={fresh}><Icon name="plus" />Новое резюме</Button>
     <div className="history-heading"><span className="eyebrow">Резюме</span><span>{current.length}</span></div>

@@ -1,24 +1,24 @@
 """Explicit, cancellable installation into an app-owned directory."""
 
 from contextlib import contextmanager
-import fcntl
 import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import platform
-import shutil
 import stat
 import tarfile
 import threading
 import time
 import uuid
 
+from packages.resume_core import host
 from . import claude_distribution, distribution as release
 from .process_runner import ProcessExit, ProcessRunner
 from ..lifecycle import SpikeError
 
 MARKER = ".foldcv-cli-runtime-v1"
-MAX_UNPACKED = 400_000_000
+# The Windows package unpacks to 458 MB (0.162.0-alpha.17.2).
+MAX_UNPACKED = 600_000_000 if host.WINDOWS else 400_000_000
 
 
 class InstallationFailure(Exception):
@@ -42,9 +42,15 @@ def private_directory(path, *, create=False):
     if create:
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
     info = path.stat()
-    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
-            or stat.S_IMODE(info.st_mode) != 0o700):
+    if not stat.S_ISDIR(info.st_mode) or not host.owned(info) or not host.private_mode(info, 0o700):
         raise InstallationFailure("unsafe_directory")
+
+
+def curl() -> Path:
+    """Windows 10 and later ship curl.exe in System32."""
+    if host.WINDOWS:
+        return Path(os.environ.get("SystemRoot") or r"C:\Windows") / "System32" / "curl.exe"
+    return Path("/usr/bin/curl")
 
 
 class CliInstallation:
@@ -59,7 +65,8 @@ class CliInstallation:
         self.lock = threading.Lock()
         self.value = {"state": "idle", "downloadedBytes": 0, "totalBytes": self.size,
                       "version": self.release, "error": None,
-                      "available": platform.system() == "Darwin" and platform.machine() == "arm64"}
+                      "available": (platform.system(), platform.machine()) in {("Darwin", "arm64"),
+                                                                                ("Windows", "AMD64")}}
 
     # Read on each use, so a test can patch the pinned module values.
     @property
@@ -97,18 +104,19 @@ class CliInstallation:
         private_directory(self.root, create=True)
         marker = self.root / MARKER
         if not marker.exists():
-            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(descriptor, "w") as stream:
+            descriptor = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL | host.O_NOFOLLOW | host.O_BINARY, 0o600)
+            with os.fdopen(descriptor, "w", newline="\n") as stream:
                 stream.write("foldcv-cli-runtime-v1\n")
-        if (marker.is_symlink() or marker.stat().st_uid != os.getuid()
+        if (marker.is_symlink() or not host.owned(marker.stat())
                 or marker.stat().st_size != 22 or marker.read_text() != "foldcv-cli-runtime-v1\n"):
             raise InstallationFailure("unsafe_directory")
-        descriptor = os.open(self.root / ".install.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        descriptor = os.open(self.root / ".install.lock", os.O_RDWR | os.O_CREAT | host.O_NOFOLLOW | host.O_BINARY,
+                             0o600)
         try:
-            if os.fstat(descriptor).st_uid != os.getuid() or os.fstat(descriptor).st_nlink != 1:
+            if not host.owned(os.fstat(descriptor)) or os.fstat(descriptor).st_nlink != 1:
                 raise InstallationFailure("unsafe_directory")
             try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                host.lock(descriptor, blocking=False)
             except BlockingIOError:
                 raise InstallationFailure("busy") from None
             yield
@@ -130,7 +138,7 @@ class CliInstallation:
             self.update(downloadedBytes=size)
 
         try:
-            ProcessRunner(Path("/usr/bin/curl")).run(files, (
+            ProcessRunner(curl()).run(files, (
                 "-q", "--fail", "--silent", "--show-error", "--location", "--proto", "=https",
                 "--proto-redir", "=https", "--connect-timeout", "15", "--max-time", str(self.seconds),
                 "--max-filesize", str(self.size), "--output", str(archive), self.url,
@@ -167,8 +175,8 @@ class CliInstallation:
                 target.chmod(0o700 if member.mode & 0o111 else 0o600)
 
     def verify(self, package):
-        for name, expected in (("bin/codex", release.CLI_SHA256),
-                               ("bin/codex-code-mode-host", release.HOST_SHA256),
+        for name, expected in ((release.CLI, release.CLI_SHA256),
+                               (release.HOST, release.HOST_SHA256),
                                ("codex-package.json", release.MANIFEST_SHA256)):
             path = package / name
             if (any(part.is_symlink() for part in (path, *path.parents))
@@ -227,7 +235,7 @@ class CliInstallation:
         finally:
             for path in (staging, previous if committed else None):
                 if path is not None and path.exists():
-                    shutil.rmtree(path)
+                    host.remove_tree(path)
         return None
 
 
@@ -259,7 +267,7 @@ class ClaudeInstallation(CliInstallation):
         return claude_distribution.managed_executable(self.root)
 
     def stage(self, download, staging):
-        target = staging / "bin/claude"
+        target = staging / "bin" / claude_distribution.BINARY
         target.parent.mkdir(mode=0o700)
         with download.open("rb") as source, target.open("xb") as output:
             while chunk := source.read(1024 * 1024):

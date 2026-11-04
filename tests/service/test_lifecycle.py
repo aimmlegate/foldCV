@@ -93,7 +93,10 @@ async def test_foreign_and_unsafe_markers_do_not_block_a_new_service(tmp_path):
     linked_intent = root / (".cleanup-intent-op-" + "c" * 32 + ".json")
     linked_intent.symlink_to(private)
     fifo_intent = root / (".cleanup-intent-op-" + "d" * 32 + ".json")
-    os.mkfifo(fifo_intent)
+    if hasattr(os, "mkfifo"):
+        os.mkfifo(fifo_intent)
+    else:
+        fifo_intent.mkdir()  # Windows has no FIFO; a directory is the other non-file entry.
     oversized_intent = root / (".cleanup-intent-op-" + "e" * 32 + ".json")
     oversized_intent.write_text("x" * 257)
     async with signed_in(make_app(tmp_path, connection_adapter=HealthyConnection())) as client:
@@ -103,6 +106,7 @@ async def test_foreign_and_unsafe_markers_do_not_block_a_new_service(tmp_path):
     assert private.read_text() == "synthetic private data"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups; test_host.py covers the Windows job")
 def test_a_failed_operation_stops_the_worker_group_and_removes_its_directory(tmp_path):
     files = OperationFiles(tmp_path / "ops")
     script = tmp_path / "worker.py"
@@ -129,5 +133,15 @@ def test_a_failed_operation_stops_the_worker_group_and_removes_its_directory(tmp
 
 def test_an_unsupported_host_fails_clearly(monkeypatch):
     monkeypatch.setattr(lifecycle.sys, "platform", "linux")
-    with pytest.raises(RuntimeError, match="macOS arm64 only"):
+    monkeypatch.setattr(lifecycle.host, "WINDOWS", False)
+    with pytest.raises(RuntimeError, match="macOS arm64 and Windows x64 only"):
+        lifecycle.require_supported_host()
+
+
+def test_windows_runs_on_x64_only(monkeypatch):
+    monkeypatch.setattr(lifecycle.host, "WINDOWS", True)
+    monkeypatch.setattr(lifecycle.platform, "machine", lambda: "AMD64")
+    lifecycle.require_supported_host()
+    monkeypatch.setattr(lifecycle.platform, "machine", lambda: "ARM64")
+    with pytest.raises(RuntimeError, match="Windows x64 only"):
         lifecycle.require_supported_host()
