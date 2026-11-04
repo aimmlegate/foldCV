@@ -7,3 +7,5 @@ html[data-desktop="macos"] .app-header { box-sizing: content-box; padding-top: 1
 html[data-desktop="macos"] .workspace-operation { top: 106px; }
 /* No focus frame around the logo in the app window. */
 html[data-desktop="macos"] .app-shell .history .brand:is(:focus, :focus-visible) { outline: none; }
+/* The Windows app keeps the system frame, so the page fills it: no corners or edge of its own. */
+html[data-desktop="windows"] .app-shell { border: 0; border-radius: 0; }
