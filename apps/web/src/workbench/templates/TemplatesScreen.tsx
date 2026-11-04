@@ -18,7 +18,7 @@ import { TemplateBranding } from "./TemplateBranding";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
 type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | "applying" | null;
-type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" | null;
+type Outcome = "checked" | "saved" | "branded" | "reset" | "default" | "added" | "deleted" | null;
 // Work the toolbar buttons do not show themselves goes to the status line.
 const progress: Partial<Record<Exclude<Work, null>, string>> = { loading: "Загружаем шаблон", resetting: "Возвращаем встроенный шаблон",
   defaulting: "Делаем шаблон основным", adding: "Добавляем копию", deleting: "Удаляем шаблон", applying: "Применяем предложение" };
@@ -39,7 +39,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   const [nextRevision, setNextRevision] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false), [confirmDelete, setConfirmDelete] = useState(false);
   // The name of a copy; null while the dialog is closed.
-  const [copyName, setCopyName] = useState<string | null>(null);
+  const [copyName, setCopyName] = useState<string | null>(null), [branding, setBranding] = useState(false);
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   // Opening another template drops unsaved edits of the shown one, so it asks first.
   const [asking, setAsking] = useState(false);
@@ -140,6 +140,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
 
   function pick(action: MenuAction) {
     if (action === "copy") setCopyName(state ? `${state.package.name} — копия` : "");
+    else if (action === "branding") setBranding(true);
     else if (action === "default") void makeDefault();
     else if (action === "download") void download();
     else if (action === "reset") setConfirmReset(true);
@@ -151,6 +152,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     ...(state.package.id === catalog.defaultId ? [{ label: "основной", main: true }] : [])] : [{ label: "новый" }];
   const done = outcome === "checked" ? nextRevision ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."
     : outcome === "saved" ? "Сохранено. Изменения применятся к новым резюме."
+    : outcome === "branded" && state ? `Сохранено как версия ${state.package.revision}. Новые резюме получат логотип и email; готовые не изменятся.`
     : outcome === "reset" ? "Встроенный шаблон восстановлен."
     : outcome === "default" && state ? `Основной шаблон: ${state.package.name}.`
     : outcome === "added" && state ? `Добавлен шаблон «${state.package.name}».`
@@ -172,8 +174,6 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
         {shown && <TemplateToolbar name={state ? state.package.name : draft ? draftLabel(draft.name) : ""} chips={chips}
           actions={menuActions(shown, catalog?.defaultId ?? null)} dirty={dirty} busy={busy} saving={work === "saving"} checking={work === "checking"}
           save={() => void save()} check={state ? () => void check() : undefined} more={more} choose={pick} />}
-        {state && <TemplateBranding templateId={state.package.id} packageHash={state.package.packageHash} blocked={dirty} disabled={busy}
-          saved={next => { adopt(next); setCatalog(value => value && withState(value, next)); }} />}
         {!shown && <div className="template-yaml-loading">
           {work === "loading" ? <OperationStatus label="Загружаем шаблон" timed />
             : <>{failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
@@ -202,6 +202,10 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
         <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} />
       </aside>
     </div>
+    <Dialog open={branding} close={() => setBranding(false)} title="Логотип и подвал" returnFocus={more.current}>
+      {branding && state && <TemplateBranding templateId={state.package.id} packageHash={state.package.packageHash} blocked={dirty} disabled={busy}
+        close={() => setBranding(false)} saved={next => { adopt(next); setCatalog(value => value && withState(value, next)); setBranding(false); setOutcome("branded"); }} />}
+    </Dialog>
     <Dialog open={confirmReset} close={() => setConfirmReset(false)} title="Вернуть встроенный шаблон?" returnFocus={more.current}>
       <p className="dialog-copy">Ваши правки этого шаблона пропадут. Готовые резюме не изменятся.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmReset(false)}>Отмена</Button>

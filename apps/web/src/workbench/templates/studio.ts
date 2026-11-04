@@ -27,15 +27,15 @@ export function downloadName(shown: ShownTemplate | null): string {
   return `${shownId(shown) ?? "template"}.yaml`;
 }
 
-export type MenuAction = "copy" | "default" | "download" | "reset" | "delete";
+export type MenuAction = "copy" | "branding" | "default" | "download" | "reset" | "delete";
 export type MenuChoice = "hidden" | "disabled" | "enabled";
 /** The «⋯» menu of the shown template: a new one can only be downloaded until it is saved; shipped templates keep
  * their file, so they offer the reset once edited instead of the delete. */
 export function menuActions(shown: ShownTemplate | null, defaultId: string | null): Record<MenuAction, MenuChoice> {
-  const none: Record<MenuAction, MenuChoice> = { copy: "hidden", default: "hidden", download: "hidden", reset: "hidden", delete: "hidden" };
+  const none: Record<MenuAction, MenuChoice> = { copy: "hidden", branding: "hidden", default: "hidden", download: "hidden", reset: "hidden", delete: "hidden" };
   if (!shown) return none;
   if (shown.kind === "draft") return { ...none, download: "enabled" };
   const { package: { id }, bundled, edited } = shown.state;
-  return { copy: "enabled", default: id === defaultId ? "hidden" : "enabled", download: "enabled",
+  return { copy: "enabled", branding: "enabled", default: id === defaultId ? "hidden" : "enabled", download: "enabled",
     reset: bundled && edited ? "enabled" : "hidden", delete: deleteControl({ id, bundled }, defaultId ?? "") };
 }

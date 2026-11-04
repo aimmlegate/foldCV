@@ -4,9 +4,9 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import type { MenuAction, MenuChoice } from "./studio";
 
-const labels: Record<MenuAction, string> = { copy: "Копировать…", default: "Сделать основным", download: "Скачать YAML",
-  reset: "Вернуть встроенный…", delete: "Удалить…" };
-const order: readonly MenuAction[] = ["copy", "default", "download", "reset", "delete"];
+const labels: Record<MenuAction, string> = { copy: "Копировать…", branding: "Логотип и подвал…", default: "Сделать основным",
+  download: "Скачать YAML", reset: "Вернуть встроенный…", delete: "Удалить…" };
+const order: readonly MenuAction[] = ["copy", "branding", "default", "download", "reset", "delete"];
 const reasons: Partial<Record<MenuAction, string>> = { delete: "Основной шаблон удалить нельзя: сначала сделайте основным другой" };
 
 /** The shown template's name and marks, Save and Check always in view, the rest in the «⋯» menu. `check` is absent for

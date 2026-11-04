@@ -73,14 +73,15 @@
 .template-name-form input { width: 100%; padding: 9px 11px; }
 #template-chat-host .chat-context { flex-wrap: wrap; }
 #template-chat-host .chat-attachment { font-size: var(--ui-small); }
-/* D145: the template's own logo and footer email. A logo is drawn for a light page, so its preview sits on the plate. */
-.template-branding { display: grid; gap: 8px; margin: 4px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-.template-branding h4 { margin: 0; color: var(--muted); font-size: var(--ui-small); font-weight: 600; letter-spacing: .6px; text-transform: uppercase; }
+/* D145: the template's own logo and footer email, a dialog from the «⋯» menu since D147. A logo is drawn for a light
+   page, so its preview sits on the plate. */
+.template-branding { display: grid; gap: 8px; }
+.template-branding .notice { margin: 4px 0 0; }
+.template-branding .dialog-actions { margin-top: 14px; }
 .template-branding small { color: var(--muted); font-size: var(--ui-small); line-height: 1.5; }
 .template-branding-fields { display: grid; gap: 6px; }
 .template-branding label { margin: 6px 0 0; font-size: var(--ui-small); }
 .template-branding input[type="email"] { max-width: 360px; }
-.template-branding > .button { justify-self: start; }
 .template-logo { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
 .template-logo-preview { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 160px; height: 58px; padding: 6px;
   border: 1px dashed var(--line-strong); border-radius: 6px; background: var(--paper); color: var(--muted); font-size: var(--ui-small); }
