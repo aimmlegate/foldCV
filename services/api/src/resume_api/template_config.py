@@ -26,10 +26,17 @@ FIRST_REVISION = '1.0.0'
 TRANSLIT = dict(zip('абвгдеёжзийклмнопрстуфхцчшщъыьэюя', ['a', 'b', 'v', 'g', 'd', 'e', 'e', 'zh', 'z', 'i', 'y', 'k',
     'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'f', 'kh', 'ts', 'ch', 'sh', 'shch', '', 'y', '', 'e', 'yu', 'ya']))
 HEADER_KEY = re.compile(r'^(\s+)(id|name|revision)\s*:')
+NUMBERED_REVISION = re.compile(r'(\d+)\.(\d+)\.(\d+)')
 
 
 class TemplateConfigRequest(Wire):
     text: str = Field(max_length=CONFIG_BYTES)
+
+
+class TemplateSaveRequest(Wire):
+    text: str = Field(max_length=CONFIG_BYTES)
+    # The free revision Save offered after the typed one was refused as taken; it replaces the text's revision line.
+    revision: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class TemplateDefaultRequest(Wire):
@@ -62,14 +69,22 @@ def new_id(name, taken):
     return found
 
 
-def with_header(text, template_id, name, revision):
-    """The text with new id, name and revision lines in its top `template:` mapping; comments and the short form stay.
-    None when the text has no such block mapping."""
+def next_revision(revisions):
+    """The patch after the highest X.Y.Z of `revisions`, so it names no version yet; 1.0.0 when none has that form."""
+    numbers = [tuple(int(part) for part in match.groups()) for value in revisions if (match := NUMBERED_REVISION.fullmatch(value))]
+    major, minor, patch = max(numbers, default=(1, 0, -1))
+    return f'{major}.{minor}.{patch + 1}'
+
+
+def with_header(text, **values):
+    """The text with the given `id`, `name` and `revision` lines in its top `template:` mapping; comments and the short
+    form stay. None when the text has no such block mapping."""
     lines = text.splitlines(keepends=True)
     top = next((index for index, line in enumerate(lines) if re.match(r'template\s*:\s*(#.*)?$', line.rstrip('\r\n'))), None)
     if top is None:
         return None
-    values = {'id': template_id, 'name': json.dumps(name, ensure_ascii=False), 'revision': revision}
+    if 'name' in values:
+        values['name'] = json.dumps(values['name'], ensure_ascii=False)
     indent, seen = None, set()
     for index in range(top + 1, len(lines)):
         line = lines[index]
@@ -83,12 +98,13 @@ def with_header(text, template_id, name, revision):
         if current == indent and match and match.group(2) not in seen:
             key = match.group(2)
             seen.add(key)
-            ending = '\r\n' if line.endswith('\r\n') else '\n' if line.endswith('\n') else ''
-            lines[index] = f'{match.group(1)}{key}: {values[key]}{ending}'
+            if key in values:
+                ending = '\r\n' if line.endswith('\r\n') else '\n' if line.endswith('\n') else ''
+                lines[index] = f'{match.group(1)}{key}: {values[key]}{ending}'
     if indent is None:
         return None
     ending = '\r\n' if lines[top].endswith('\r\n') else '\n'
-    missing = [f'{" " * indent}{key}: {values[key]}{ending}' for key in ('id', 'revision', 'name') if key not in seen]
+    missing = [f'{" " * indent}{key}: {values[key]}{ending}' for key in ('id', 'revision', 'name') if key in values and key not in seen]
     if not lines[top].endswith(('\n', '\r\n')):
         lines[top] += ending
     return ''.join([*lines[:top + 1], *missing, *lines[top + 1:]])
@@ -152,7 +168,10 @@ class TemplateConfig:
         # The bundled revision names the bundled bytes even before the store records them.
         bundled_taken = bundled is not None and package.revision == bundled.revision and package.package_hash != bundled.package_hash
         if bundled_taken or self.store.revision_taken(package):
-            return None, {'path': '/template/revision', 'message': REVISION_TAKEN}
+            known = {package.revision, current.revision, *self.store.revisions(template_id)}
+            if bundled is not None:
+                known.add(bundled.revision)
+            return None, {'path': '/template/revision', 'message': REVISION_TAKEN, 'nextRevision': next_revision(known)}
         return package, None
 
     def compile_new(self, text, assets):
@@ -176,7 +195,7 @@ class TemplateConfig:
         """Store `text` under a fresh id derived from `name`: (config state, None) or (None, check reply)."""
         for _attempt in range(3):
             template_id = new_id(name, self.store.taken_ids())
-            headed = with_header(text, template_id, name, FIRST_REVISION)
+            headed = with_header(text, id=template_id, name=name, revision=FIRST_REVISION)
             if headed is None:
                 return None, {'schemaVersion': 1, 'valid': False, 'package': None,
                     'error': {'path': '/template', 'message': NO_HEADER}}
@@ -215,8 +234,14 @@ class TemplateConfig:
             return {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
         return {'schemaVersion': 1, 'valid': True, 'package': summary(package), 'error': None}
 
-    def save(self, template_id, text):
-        """Save a new current version of the template; the default template stays as it is."""
+    def save(self, template_id, text, revision=None):
+        """Save a new current version of the template; the default template stays as it is. `revision` first replaces
+        the text's revision line: the free one offered after the typed revision was refused as taken."""
+        if revision is not None:
+            text = with_header(text, revision=revision)
+            if text is None:
+                return None, {'schemaVersion': 1, 'valid': False, 'package': None,
+                    'error': {'path': '/template', 'message': NO_HEADER}}
         package, error = self.compile(template_id, text)
         if error is not None:
             return None, {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}

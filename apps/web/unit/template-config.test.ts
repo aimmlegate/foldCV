@@ -84,3 +84,10 @@ test("a create or save reply is the new state, or on 422 the compile error", () 
   assert.throws(() => parseSave(422, { schemaVersion: 1, valid: true, package: summary, error: null }), /INVALID_RESULT/);
   assert.throws(() => parseSave(201, { schemaVersion: 1, package: summary }), /INVALID_RESULT/);
 });
+
+test("a taken revision brings the free one Save offers; an empty or odd value offers none", () => {
+  const refused = (nextRevision: unknown) => parseSave(422, { schemaVersion: 1, valid: false, package: null,
+    error: { path: "/template/revision", message: "taken", nextRevision } });
+  assert.deepEqual(refused("1.0.2"), { saved: false, error: { path: "/template/revision", message: "taken", nextRevision: "1.0.2" } });
+  for (const value of ["", 3, null]) assert.deepEqual(refused(value), { saved: false, error: { path: "/template/revision", message: "taken" } });
+});

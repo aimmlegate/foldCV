@@ -7,7 +7,8 @@ import yaml
 
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateRefused, TemplateStore, UnknownTemplate
-from resume_api.template_config import NO_HEADER, TemplateConfig, new_id, slug, with_header
+from resume_api.template_config import (NO_HEADER, REVISION_TAKEN, TemplateConfig, new_id, next_revision, slug,
+    with_header)
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import app_client, upload
 from tests.templates.test_template_store import GENERIC
@@ -29,16 +30,46 @@ def test_a_taken_id_gets_the_next_suffix_and_a_name_without_letters_a_number():
 
 
 def test_the_header_lines_change_and_comments_and_the_short_form_stay():
-    text = with_header(BUNDLED_TEXT, 'custom-moy', 'Мой', '1.0.0')
+    text = with_header(BUNDLED_TEXT, id='custom-moy', name='Мой', revision='1.0.0')
     head = text.splitlines()[:7]
     assert head == ['# yaml-language-server: $schema=../../contracts/template-source.schema.json', 'schema_version: 4',
         'template:', '  id: custom-moy', '  revision: 1.0.0', '  name: "Мой"', '  default_locale: ru']
     assert text.splitlines()[7:] == BUNDLED_TEXT.splitlines()[7:]
     # A key the mapping lacks is added at its indentation; nested keys named id are left alone.
-    assert with_header('template:\n    id: a\n    extra:\n      name: inner\n', 'b', 'N', '1.0.0') == (
+    assert with_header('template:\n    id: a\n    extra:\n      name: inner\n', id='b', name='N', revision='1.0.0') == (
         'template:\n    revision: 1.0.0\n    name: "N"\n    id: b\n    extra:\n      name: inner\n')
-    assert with_header('{"template": {"id": "a"}}', 'b', 'N', '1.0.0') is None
-    assert with_header('template: {id: a}\n', 'b', 'N', '1.0.0') is None
+    assert with_header('{"template": {"id": "a"}}', id='b', name='N', revision='1.0.0') is None
+    assert with_header('template: {id: a}\n', id='b', name='N', revision='1.0.0') is None
+    # Only the given lines change.
+    raised = with_header(BUNDLED_TEXT, revision='9.9.9').splitlines()
+    assert raised[4] == '  revision: 9.9.9' and raised[:4] + raised[5:] == BUNDLED_TEXT.splitlines()[:4] + BUNDLED_TEXT.splitlines()[5:]
+
+
+@pytest.mark.parametrize(('revisions', 'expected'), [({'1.0.0'}, '1.0.1'), ({'1.0.0', '1.0.1', '0.9.9'}, '1.0.2'),
+    ({'2.10.0', '2.9.7'}, '2.10.1'), ({'draft', '1.4.0'}, '1.4.1'), ({'draft'}, '1.0.0'), (set(), '1.0.0')])
+def test_the_next_revision_is_the_patch_after_the_highest_numbered_one(revisions, expected):
+    assert next_revision(revisions) == expected
+
+
+def test_a_taken_revision_is_refused_with_the_next_free_one_and_saved_under_it(tmp_path):
+    config = TemplateConfig(tmp_path)
+    copied = config.copy(GENERIC, 'Мой')[0]['text']
+    larger = copied.replace('      size: 18\n', '      size: 20\n', 1)
+    assert larger != copied
+    assert config.save('custom-moy', larger) == (None, {'schemaVersion': 1, 'valid': False, 'package': None,
+        'error': {'path': '/template/revision', 'message': REVISION_TAKEN, 'nextRevision': '1.0.1'}})
+    state, refused = config.save('custom-moy', larger, '1.0.1')
+    assert refused is None and state['package']['revision'] == '1.0.1'
+    assert state['text'] == larger.replace('  revision: 1.0.0\n', '  revision: 1.0.1\n', 1)
+    # A text still naming the first revision is offered the patch after the highest one ever saved.
+    largest = larger.replace('      size: 20\n', '      size: 22\n', 1)
+    assert config.save('custom-moy', largest)[1]['error']['nextRevision'] == '1.0.2'
+    # A shipped template edited under its own revision gets the patch after the shipped one; Check names it too.
+    shipped = yaml.safe_load(BUNDLED_TEXT)['template']['revision']
+    edited = BUNDLED_TEXT.replace('      size: 18\n', '      size: 20\n', 1)
+    assert config.check(GENERIC, edited)['error']['nextRevision'] == next_revision({shipped})
+    assert config.save('custom-moy', json.dumps({'template': {'id': 'custom-moy'}}), '1.0.3')[1]['error'] == {
+        'path': '/template', 'message': NO_HEADER}
 
 
 def test_a_copy_is_a_new_id_at_the_first_revision_with_the_source_assets(tmp_path):
@@ -133,6 +164,13 @@ async def test_routes_copy_and_delete_and_a_project_keeps_its_deleted_template(t
         assert (captured['id'], captured['packageHash']) == ('custom-moy', project['preDraft']['templatePackage']['packageHash'])
         again = await client.post('/v1/rich/template-config', json={'copyOf': GENERIC, 'name': 'Мой'})
         assert again.json()['package']['id'] == 'custom-moy-2'
+        # Save under the free revision the refusal offered; an empty revision is no request.
+        larger = again.json()['text'].replace('      size: 18\n', '      size: 20\n', 1)
+        refused = await client.put('/v1/rich/template-config/custom-moy-2', json={'text': larger})
+        assert refused.status_code == 422 and refused.json()['error']['nextRevision'] == '1.0.1'
+        assert (await client.put('/v1/rich/template-config/custom-moy-2', json={'text': larger, 'revision': ''})).status_code == 422
+        raised = await client.put('/v1/rich/template-config/custom-moy-2', json={'text': larger, 'revision': '1.0.1'})
+        assert raised.status_code == 200 and raised.json()['package']['revision'] == '1.0.1'
         store = TemplateStore(app.state.projects.repository.root)
         registry = json.loads((store.root / 'identities.json').read_text())
         assert json.dumps(['custom-moy', '1.0.0'], separators=(',', ':')) in registry

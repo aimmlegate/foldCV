@@ -222,6 +222,18 @@ class TemplateStore:
                 continue
         return {*BUNDLED_TEMPLATES, *self._pointer()[1], *recorded}
 
+    def revisions(self, template_id: str) -> set[str]:
+        """Every revision recorded for `template_id`, also of versions replaced or deleted since."""
+        found = set()
+        for key in self._identities():
+            try:
+                recorded, revision = strict_json(key.encode("utf-8"))
+            except (ValueError, TypeError):
+                continue
+            if recorded == template_id and isinstance(revision, str):
+                found.add(revision)
+        return found
+
     def create(self, package: TemplatePackage, *, keep_text: bool = True) -> None:
         """Store the first version of a new id; refused when the id is taken, so a deleted id never returns."""
         verify_package(package)

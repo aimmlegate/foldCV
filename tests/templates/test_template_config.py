@@ -38,8 +38,9 @@ def test_an_empty_store_offers_the_bundled_yaml_unchanged(tmp_path):
 
 def test_a_changed_template_needs_a_new_revision_even_before_the_store_records_the_bundled_one(tmp_path):
     result = TemplateConfig(tmp_path).check(GENERIC, revised(BUNDLED_TEXT, BUNDLED_REVISION, 'Renamed'))
-    assert result == {'schemaVersion': 1, 'valid': False, 'package': None,
-        'error': {'path': '/template/revision', 'message': REVISION_TAKEN}}
+    major, minor, patch = BUNDLED_REVISION.split('.')
+    assert result == {'schemaVersion': 1, 'valid': False, 'package': None, 'error': {'path': '/template/revision',
+        'message': REVISION_TAKEN, 'nextRevision': f'{major}.{minor}.{int(patch) + 1}'}}
     assert not (tmp_path / 'template-packages').exists()
 
 

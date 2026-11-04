@@ -5,7 +5,8 @@ import { ProjectApiFailure } from "../../rich/v7-connection";
 export type TemplateSummary = { id: string; name: string; revision: string; packageHash: string };
 /** One template's YAML; `bundled` and `edited` as in its catalog entry. */
 export type TemplateConfigState = { package: TemplateSummary; format: "yaml" | "json"; text: string; bundled: boolean; edited: boolean };
-export type TemplateProblem = { path: string; message: string };
+/** `nextRevision`: the free revision the server offers when the text's revision is saved already with other bytes. */
+export type TemplateProblem = { path: string; message: string; nextRevision?: string };
 export type TemplateCheck = { valid: true; package: TemplateSummary } | { valid: false; error: TemplateProblem };
 export type TemplateSave = { saved: true; state: TemplateConfigState } | { saved: false; error: TemplateProblem };
 
@@ -34,8 +35,9 @@ export function parseCheck(value: unknown): TemplateCheck {
   const valid = field(value, "valid");
   if (valid === true) return { valid: true, package: summary(field(value, "package")) };
   if (valid !== false) throw new ProjectApiFailure("INVALID_RESULT");
-  const error = field(value, "error");
-  return { valid: false, error: { path: text(error, "path"), message: text(error, "message") } };
+  const error = field(value, "error"), next = field(error, "nextRevision");
+  const problem: TemplateProblem = { path: text(error, "path"), message: text(error, "message") };
+  return { valid: false, error: typeof next === "string" && next ? { ...problem, nextRevision: next } : problem };
 }
 
 /** The catalog after a save or reset of one template: its entry follows the new state, the others stay. */
@@ -74,8 +76,9 @@ export function parseSave(status: number, value: unknown): TemplateSave {
   }
   return { saved: true, state: parseConfigState(value) };
 }
-export async function saveTemplateConfig(templateId: string, source: string): Promise<TemplateSave> {
-  const { status, value } = await call(one(templateId), "PUT", { text: source });
+/** `revision`: the offered free revision; the server writes it into the text's revision line before it saves. */
+export async function saveTemplateConfig(templateId: string, source: string, revision?: string): Promise<TemplateSave> {
+  const { status, value } = await call(one(templateId), "PUT", revision ? { text: source, revision } : { text: source });
   return parseSave(status, value);
 }
 /** A copy of a saved template under a new name, or a new template from unsaved text; the server picks the id. */

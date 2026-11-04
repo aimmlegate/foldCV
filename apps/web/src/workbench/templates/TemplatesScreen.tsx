@@ -25,6 +25,8 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
   const [text, setText] = useState("");
   const [work, setWork] = useState<Work>("loading");
   const [problem, setProblem] = useState<TemplateProblem | null>(null);
+  // A save refused for a taken revision offers the next free one instead of the bare refusal.
+  const [offer, setOffer] = useState<TemplateProblem | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [confirmReset, setConfirmReset] = useState(false), [confirmDelete, setConfirmDelete] = useState(false);
@@ -68,11 +70,11 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
     const result = await checkTemplateConfig(state.package.id, text);
     if (result.valid) { setProblem(null); setOutcome("checked"); } else setProblem(result.error);
   });
-  const save = () => run("saving", async () => {
+  const save = (revision?: string) => run("saving", async () => {
     if (draft) { if (await created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
     if (!state) return;
-    const result = await saveTemplateConfig(state.package.id, text);
-    if (!result.saved) { setProblem(result.error); return; }
+    const result = await saveTemplateConfig(state.package.id, text, revision);
+    if (!result.saved) { if (result.error.nextRevision) setOffer(result.error); else setProblem(result.error); return; }
     adopt(result.state); setCatalog(value => value && withState(value, result.state)); setOutcome("saved");
   });
   const reset = () => run("resetting", async () => {
@@ -199,6 +201,12 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
       <p className="dialog-copy">Новые резюме не смогут его выбрать. Готовые резюме сохранят свой вид.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmDelete(false)}>Отмена</Button>
         <Button variant="danger" onClick={() => { setConfirmDelete(false); void remove(); }}>Удалить</Button></div>
+    </Dialog>
+    <Dialog open={offer !== null} close={() => { setProblem(offer); setOffer(null); }} title="Сохранить как новую версию?">
+      <p className="dialog-copy">Эта версия шаблона уже сохранена с другим содержимым. Сохранить правки как версию {offer?.nextRevision}?</p>
+      <div className="dialog-actions"><Button variant="quiet" onClick={() => { setProblem(offer); setOffer(null); }}>Отмена</Button>
+        <Button variant="primary" onClick={() => { const next = offer?.nextRevision; setOffer(null); if (next) void save(next); }}>
+          Сохранить как {offer?.nextRevision}</Button></div>
     </Dialog>
     <Dialog open={asking} close={() => answered(false)} title="Открыть другой шаблон?">
       <p className="dialog-copy">Несохранённые правки пропадут.</p>
