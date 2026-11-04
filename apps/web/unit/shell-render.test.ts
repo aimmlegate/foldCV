@@ -13,7 +13,7 @@ const { DeleteDialog, History } = await import("../src/workbench/layout/History"
 const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
 const { Composer } = await import("../src/workbench/assistant/Composer");
-const { Connections } = await import("../src/workbench/settings/Connection");
+const { Connections, quotaText } = await import("../src/workbench/settings/Connection");
 const { FileDialog } = await import("../src/workbench/files/FileDialog");
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -128,4 +128,23 @@ test("the error of a provider that is off shows on its card", () => {
 test("a provider that is on says that sign-in and install stop model work (D119)", () => {
   assert.match(connections(provider), /останавливают работу моделей/u);
   assert.ok(!connections({ ...provider, enabled: false }).includes("останавливают работу моделей"), "nothing to stop on a provider that is off");
+});
+
+test("an update offer has its own row and the update button in the card's head (D146, D147)", () => {
+  const installation = { available: true, downloadedBytes: 0, error: null, installed: "2.1.310", latest: "2.1.318", state: "idle" as const, totalBytes: 0, update: true };
+  const card = connections({ ...provider, state: "connected", plan: "max", version: "2.1.310", installation });
+  assert.match(card, /Доступна новая версия Claude: 2\.1\.318\. Установлена 2\.1\.310\./u);
+  assert.match(card, /<div class="provider-actions">.*Обновить Claude/u);
+  assert.match(card, /по подписке Claude · max · 2\.1\.310/u);
+  const latest = connections({ ...provider, state: "connected", installation: { ...installation, latest: "2.1.310", update: false } });
+  assert.match(latest, /Установлена последняя версия Claude/u); assert.ok(!latest.includes("Обновить Claude"));
+  // A provider that is off shows its name and one line, no actions.
+  assert.ok(!connections({ ...provider, enabled: false }).includes("provider-actions"));
+});
+
+test("the usage line says the share used and the reset, or that the provider reports none", () => {
+  assert.equal(quotaText({ state: "not_provided", usedPercent: null, resetsAt: null }), "Расход не сообщается");
+  assert.equal(quotaText({ state: "available", usedPercent: 12, resetsAt: null }), "Использовано 12 %");
+  assert.equal(quotaText({ state: "unknown", usedPercent: null, resetsAt: null }), "Расход неизвестен");
+  assert.match(quotaText({ state: "exhausted", usedPercent: 100, resetsAt: Date.UTC(2026, 10, 5, 9, 0) / 1000 }), /^Использовано 100 % · лимит исчерпан · сброс \d+ нояб\./u);
 });

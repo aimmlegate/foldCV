@@ -26,6 +26,32 @@
   font-size: var(--ui-small); line-height: 1.5; }
 .app-shell .settings-content .settings-row-error .text-button { padding: 0; color: var(--accent); font-size: var(--ui-small); }
 
+/* D119 one card per provider, D147 in one block: the head row with the switch, name and actions; under it, indented
+   to the name, the status with the usage and only the rows that apply. */
+.provider-card { margin: 0 0 12px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.provider-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.app-shell .settings-content .provider-name { display: flex; flex: 1 1 180px; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; margin: 0; cursor: pointer; }
+.app-shell .settings-content .provider-name strong { color: var(--ink); font-size: var(--ui-body); font-weight: 600; }
+.app-shell .settings-content .provider-name small { color: var(--muted); font-size: var(--ui-small); }
+.provider-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.app-shell .settings-content .provider-actions .text-button { padding: 0 4px; color: var(--accent); font-size: var(--ui-small); }
+.provider-card > :not(.provider-head) { margin: 8px 0 0 50px; }
+.provider-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+.provider-state { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.provider-state > :is(svg, .operation-spinner) { flex: 0 0 auto; width: 14px; height: 14px; }
+.provider-state > svg { color: var(--accent); }
+.provider-state:not([data-state="connected"]) > svg { color: var(--warn); }
+.app-shell .settings-content .provider-state strong { color: var(--ink); font-size: var(--ui-small); font-weight: 500; }
+.app-shell .settings-content .provider-card .quota-line { margin: 0; color: var(--muted); font-size: var(--ui-small); }
+.app-shell .settings-content .provider-line { color: var(--muted); font-size: var(--ui-small); line-height: 1.5; }
+.app-shell .settings-content .provider-update { color: var(--ink); }
+.provider-legal summary { cursor: pointer; list-style: none; }
+.provider-legal summary::-webkit-details-marker { display: none; }
+.provider-legal summary > span { color: var(--accent); white-space: nowrap; }
+.provider-legal[open] summary > span { display: none; }
+.provider-card .login-code input { max-width: 320px; }
+.app-shell .settings-content .provider-note { margin-top: 4px; }
+
 /* The text size as three segments; native radios keep the arrow keys. */
 .segmented { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .app-shell .settings-content .segmented label { position: relative; margin: 0; color: var(--muted); font-size: var(--ui-small); font-weight: 500; cursor: pointer; }
@@ -40,6 +66,8 @@
   .app-shell .settings-content { padding-left: 0; border-left: 0; }
 }
 @media (max-width: 600px) {
+  .provider-card > :not(.provider-head) { margin-left: 0; }
+  .provider-actions { margin-left: 0; }
   .settings-row { flex-direction: column; align-items: stretch; }
   .settings-row-copy { flex: none; }
   .settings-row-control { justify-content: flex-start; margin-left: 0; }
