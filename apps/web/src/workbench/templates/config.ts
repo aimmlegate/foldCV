@@ -157,13 +157,23 @@ export function problemLine(source: string, pointer: string): number {
   return line;
 }
 
-// Top-level sections people rarely edit: fonts and files, fact storage, operations, provenance.
-const TECHNICAL = new Set(["style", "layout", "source", "content_definitions", "fact_types", "operations", "assets", "provenance"]);
+/** The editor's tabs (D147): each shows its top-level YAML keys and folds the others. «Шаблон» also holds the leading
+ * comments; keys the list does not name are service ones. */
+export type SectionTab = "template" | "model" | "blocks" | "style" | "service";
+export const sectionTabs: readonly { id: SectionTab; label: string }[] = [{ id: "template", label: "Шаблон" }, { id: "model", label: "Правила" },
+  { id: "blocks", label: "Блоки" }, { id: "style", label: "Стили" }, { id: "service", label: "Служебные" }];
+const keyTabs: Readonly<Record<string, SectionTab>> = { schema_version: "template", template: "template", model: "model", blocks: "blocks", style: "style" };
+export function sectionTab(key: string): SectionTab { return Object.hasOwn(keyTabs, key) ? keyTabs[key] as SectionTab : "service"; }
 
-/** 0-based lines of the technical top-level keys, folded in the editor by default. */
-export function technicalLines(source: string): number[] {
+/** The top-level keys of a YAML text with their 0-based lines. A JSON text has none, so it shows without tabs. */
+export function topLevelSections(source: string): { key: string; line: number }[] {
   return source.split("\n").flatMap((line, index) => {
-    const key = /^([a-z_]+):/.exec(line)?.[1];
-    return key !== undefined && TECHNICAL.has(key) ? [index] : [];
+    const key = /^([A-Za-z_][\w-]*)\s*:/.exec(line)?.[1];
+    return key === undefined ? [] : [{ key, line: index }];
   });
+}
+/** The tab of a server problem: its pointer's first key; a problem of the whole text opens «Шаблон». */
+export function problemTab(pointer: string): SectionTab {
+  const key = tokens(pointer)[0];
+  return key === undefined ? "template" : sectionTab(key);
 }

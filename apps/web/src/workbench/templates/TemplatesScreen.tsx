@@ -1,3 +1,4 @@
+import * as Tabs from "@radix-ui/react-tabs";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage } from "../../errors/messages";
 import type { TemplateCatalog } from "../../projects/api";
@@ -6,8 +7,9 @@ import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
 import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
-import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig,
-  setDefaultTemplate, withState, type TemplateConfigState, type TemplateProblem, type TemplateSave } from "./config";
+import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, problemTab, readTemplateCatalog, readTemplateConfig, resetTemplateConfig,
+  saveTemplateConfig, sectionTab, sectionTabs, setDefaultTemplate, topLevelSections, withState, type SectionTab, type TemplateConfigState,
+  type TemplateProblem, type TemplateSave } from "./config";
 import { downloadName, draftLabel, menuActions, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
 import { TemplateToolbar } from "./TemplateToolbar";
 import type { YamlEditorHandle } from "./YamlEditor";
@@ -44,7 +46,8 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   // Opening another template drops unsaved edits of the shown one, so it asks first.
   const [asking, setAsking] = useState(false);
   const answer = useRef<((open: boolean) => void) | null>(null);
-  const [technical, setTechnical] = useState(false);
+  // The design part first: blocks, not the model's English prompt text at the top of the file.
+  const [tab, setTab] = useState<SectionTab>("blocks");
   const yaml = useRef<YamlEditorHandle>(null), more = useRef<HTMLButtonElement>(null);
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
   const draft = shown?.kind === "draft" ? shown : null;
@@ -52,6 +55,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   const live = useRef({ shown, text });
   live.current = { shown, text };
   const names = useMemo(() => new Map(catalog?.templates.map(entry => [entry.id, entry.name]) ?? []), [catalog]);
+  const present = useMemo(() => new Set(topLevelSections(text).map(section => sectionTab(section.key))), [text]);
 
   function begin(kind: Exclude<Work, null>) { setWork(kind); setFailure(null); setOutcome(null); setNextRevision(null); setDelivery(null); }
   async function run(kind: Exclude<Work, null>, task: () => Promise<void>) {
@@ -59,6 +63,8 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     try { await task(); } catch (error) { setFailure(error); } finally { setWork(null); }
   }
   function adopt(next: TemplateConfigState) { setShown({ kind: "saved", state: next }); setText(next.text); setProblem(null); }
+  /** A problem opens the tab that holds its key, so its marked line shows. */
+  function showProblem(value: TemplateProblem) { setTab(problemTab(value.path)); setProblem(value); }
   const load = () => run("loading", async () => {
     const listed = catalog ?? await readTemplateCatalog();
     setCatalog(listed);
@@ -80,13 +86,13 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     const result = await checkTemplateConfig(state.package.id, text);
     // A taken revision is no error in the text: Save resolves it with the offered one.
     if (result.valid || result.error.nextRevision) { setProblem(null); setOutcome("checked"); setNextRevision(result.valid ? null : result.error.nextRevision ?? null); }
-    else setProblem(result.error);
+    else showProblem(result.error);
   });
   const save = (revision?: string) => run("saving", async () => {
     if (draft) { if (created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
     if (!state) return;
     const result = await saveTemplateConfig(state.package.id, text, revision);
-    if (!result.saved) { if (result.error.nextRevision) setOffer(result.error); else setProblem(result.error); return; }
+    if (!result.saved) { if (result.error.nextRevision) setOffer(result.error); else showProblem(result.error); return; }
     adopt(result.state); setCatalog(value => value && withState(value, result.state)); setOutcome("saved");
   });
   const reset = () => run("resetting", async () => {
@@ -100,7 +106,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   });
   /** A new template opens at once and joins the list under the id the server chose. */
   function created(result: TemplateSave): boolean {
-    if (!result.saved) { setProblem(result.error); return false; }
+    if (!result.saved) { showProblem(result.error); return false; }
     adopt(result.state); setCatalog(value => value && withState(value, result.state));
     return true;
   }
@@ -179,12 +185,18 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
             : <>{failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
               <Button className="small" onClick={() => void load()}>Загрузить снова</Button></>}
         </div>}
-        {shown && <label className="template-technical small"><input type="checkbox" checked={technical} onChange={event => setTechnical(event.target.checked)} />
-          Показать служебные разделы</label>}
-        {shown && <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
-          <YamlEditor ref={yaml} value={text} problem={problem} readOnly={busy} technical={technical}
-            change={value => { setText(value); setProblem(null); setOutcome(null); }} />
-        </Suspense>}
+        {shown && <Tabs.Root className="template-tabs" value={tab} onValueChange={value => setTab(value as SectionTab)}>
+          {present.size > 0 && <div className="template-tab-row"><Tabs.List className="template-tab-list" aria-label="Разделы шаблона">
+            {sectionTabs.map(item => <Tabs.Trigger key={item.id} value={item.id} disabled={!present.has(item.id)}>{item.label}</Tabs.Trigger>)}
+          </Tabs.List></div>}
+          {/* One editor for every tab: the panel follows the chosen tab instead of holding a copy per tab. */}
+          <Tabs.Content className="template-tab-panel" value={tab} forceMount>
+            <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
+              <YamlEditor ref={yaml} value={text} problem={problem} readOnly={busy} tab={tab}
+                change={value => { setText(value); setProblem(null); setOutcome(null); }} />
+            </Suspense>
+          </Tabs.Content>
+        </Tabs.Root>}
         {shown && <div className="template-status">
           <div className="template-status-message">
             {running ? <OperationStatus label={running} />
@@ -225,9 +237,9 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmDelete(false)}>Отмена</Button>
         <Button variant="danger" onClick={() => { setConfirmDelete(false); void remove(); }}>Удалить</Button></div>
     </Dialog>
-    <Dialog open={offer !== null} close={() => { setProblem(offer); setOffer(null); }} title="Сохранить как новую версию?">
+    <Dialog open={offer !== null} close={() => { if (offer) showProblem(offer); setOffer(null); }} title="Сохранить как новую версию?">
       <p className="dialog-copy">Эта версия шаблона уже сохранена с другим содержимым. Сохранить правки как версию {offer?.nextRevision}?</p>
-      <div className="dialog-actions"><Button variant="quiet" onClick={() => { setProblem(offer); setOffer(null); }}>Отмена</Button>
+      <div className="dialog-actions"><Button variant="quiet" onClick={() => { if (offer) showProblem(offer); setOffer(null); }}>Отмена</Button>
         <Button variant="primary" onClick={() => { const next = offer?.nextRevision; setOffer(null); if (next) void save(next); }}>
           Сохранить как {offer?.nextRevision}</Button></div>
     </Dialog>

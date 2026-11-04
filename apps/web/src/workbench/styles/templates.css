@@ -37,8 +37,18 @@
 .template-problem:hover > span { text-decoration: underline; }
 .template-problem > svg { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 2px; }
 .template-status > .settings-saved { flex: 0 0 auto; margin-left: auto; }
-.template-status > .text-button { flex: 0 0 auto; padding: 0; color: var(--accent); font-size: var(--ui-small); }
-.template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }
+.templates-editor .template-status > .text-button { flex: 0 0 auto; padding: 0; color: var(--accent); font-size: var(--ui-small); }
+/* Tabs by top-level key: the chosen tab's keys stay open, the others fold. One panel holds the one editor. */
+.template-tabs { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.template-tab-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.template-tab-list { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+.template-tab-list [role="tab"] { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: var(--ui-body); white-space: nowrap; }
+.template-tab-list [role="tab"]:hover:not(:disabled, [data-state="active"]) { color: var(--ink); background: var(--desk); }
+.template-tab-list [role="tab"][data-state="active"] { background: var(--wash); color: var(--ink); }
+.template-tab-list [role="tab"]:disabled { opacity: .5; }
+.template-tab-list [role="tab"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.template-tab-panel { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.template-tab-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 5px; }
 .templates-assistant:empty { display: none; }
 /* The resume drawer's prototype rules are keyed to its own ids; this drawer is a column beside the editor. */
 #template-chat-host { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }

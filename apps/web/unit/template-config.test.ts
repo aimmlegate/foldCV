@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, parseSave, pointerRange, problemLine, technicalLines, withState } from "../src/workbench/templates/config";
+import { readdirSync, readFileSync } from "node:fs";
+import { parseCheck, parseConfigState, parseSave, pointerRange, problemLine, problemTab, sectionTab, topLevelSections, withState } from "../src/workbench/templates/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",
@@ -83,10 +84,37 @@ test("the status line names the line where the editor marks a problem", () => {
   assert.equal(problemLine("", "/blocks"), 1);
 });
 
-test("technical sections are found by their top-level keys only", () => {
-  const text = ["schema_version: 4", "template:", "  id: generic", "blocks:", "- id: projects", "  assets: nested", "style:",
-    "  page: {}", "fact_types:", "- id: identity", "assets:", "  logo: assets/logo.png", "provenance: {}", ""].join("\n");
-  assert.deepEqual(technicalLines(text), [6, 8, 10, 12]);
+test("the editor tabs take top-level keys only; unknown keys are service ones", () => {
+  const text = ["# yaml-language-server: $schema=x", "schema_version: 4", "template:", "  id: generic", "blocks:", "- id: projects", "  style: nested",
+    "style:", "  page: {}", "fact_types:", "- id: identity", "custom_key: 1", ""].join("\n");
+  assert.deepEqual(topLevelSections(text), [{ key: "schema_version", line: 1 }, { key: "template", line: 2 }, { key: "blocks", line: 4 },
+    { key: "style", line: 7 }, { key: "fact_types", line: 9 }, { key: "custom_key", line: 11 }]);
+  assert.deepEqual(["schema_version", "template", "model", "blocks", "style", "layout", "provenance", "custom_key", "constructor"].map(sectionTab),
+    ["template", "template", "model", "blocks", "style", "service", "service", "service", "service"]);
+  // A JSON text has no YAML keys at the line start, so it shows without tabs.
+  assert.deepEqual(topLevelSections('{\n  "schema_version": 4\n}\n'), []);
+});
+
+test("a problem opens the tab of its first key; a problem of the whole text opens «Шаблон»", () => {
+  assert.equal(problemTab("/style/paragraph_styles/name"), "style");
+  assert.equal(problemTab("/blocks/3/view"), "blocks");
+  assert.equal(problemTab("/model/extract"), "model");
+  assert.equal(problemTab("/fact_types/0"), "service");
+  assert.equal(problemTab(""), "template");
+  assert.equal(problemTab("/"), "template");
+});
+
+test("every bundled template splits into the five tabs with each key in one of them", () => {
+  const bundled = new URL("../../../templates/bundled/", import.meta.url);
+  const files = readdirSync(bundled).filter(name => name.endsWith(".yaml"));
+  assert.equal(files.length, 5);
+  for (const file of files) {
+    const text = readFileSync(new URL(file, bundled), "utf8"), sections = topLevelSections(text);
+    assert.ok(text.startsWith("#"), `${file} starts with its schema comment, shown under «Шаблон»`);
+    assert.deepEqual(sections.map(section => section.key), ["schema_version", "template", "model", "blocks", "style", "layout", "source",
+      "content_definitions", "fact_types", "operations", "assets", "provenance"], file);
+    assert.deepEqual([...new Set(sections.map(section => sectionTab(section.key)))], ["template", "model", "blocks", "style", "service"], file);
+  }
 });
 
 test("a create or save reply is the new state, or on 422 the compile error", () => {
