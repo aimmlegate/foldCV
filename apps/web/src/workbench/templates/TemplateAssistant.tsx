@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AgentApiFailure } from "../../assistant/api";
 import { AssistantRuns, terminal } from "../../assistant/controller";
 import { errorText, shownFailure } from "../../assistant/presentation";
@@ -10,6 +11,7 @@ import { templateScope } from "../assistant/scope";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
+import { Spinner } from "../ui/Spinner";
 import type { ApplyOutcome } from "./apply";
 import { TemplateProposalCard } from "./ProposalCard";
 
@@ -21,9 +23,11 @@ const code = (error: unknown) => error instanceof AgentApiFailure ? error.code :
 const sampleTypes = ".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** The template assistant beside the YAML editor (D141): it reads templates and samples, never resumes, and its
- * proposals change only the editor text; the user saves. */
-export function TemplateAssistant({ open, context, names, apply, settings }: {
+ * proposals change only the editor text; the user saves. Its toggle goes into `toggleHost` over the editor (D147); the
+ * pane shows only while open, and the remembered drawer size keeps that choice. */
+export function TemplateAssistant({ open, context, names, apply, settings, toggleHost }: {
   open: boolean; context: () => TemplateContext | null; names: ReadonlyMap<string, string>; apply: ApplyProposal; settings: () => void;
+  toggleHost: HTMLElement | null;
 }) {
   const [proposals, setProposals] = useState<TemplateProposal[]>([]);
   const [working, setWorking] = useState<string | null>(null), [confirm, setConfirm] = useState<TemplateProposal | null>(null);
@@ -63,6 +67,9 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
   }, [shownText]);
   const target: ShownTarget = shown && { templateId: shown.templateId, draft: shown.templateId === null, unsaved: false };
   const changedFor = (proposal: TemplateProposal) => onTarget(proposal, target) && hashed !== null && hashed.text === shownText && hashed.hash !== proposal.baseHash;
+  const paneOpen = !size.collapsed, toggleButton = useRef<HTMLButtonElement>(null), wasOpen = useRef(paneOpen);
+  // The pane's own close button goes away with it: the focus moves to the toggle, which stays.
+  useEffect(() => { if (wasOpen.current && !paneOpen) toggleButton.current?.focus(); wasOpen.current = paneOpen; }, [paneOpen]);
 
   function send() {
     const current = controller.current, before = current?.view.run?.id ?? null;
@@ -103,9 +110,13 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
 
   if (!view?.settings?.enabled) return null;
   const active = controller.current?.active ?? false, failed = shownFailure(failure, view.run), frozen = view.submitting || view.pendingSend;
+  const toggle = () => setSize(value => ({ ...value, collapsed: !value.collapsed }));
   return <>
-    <DrawerView view={view} active={active} title={shown?.name ?? "Шаблон"} collapsed={size.collapsed} expanded={size.height >= 500} height={size.height}
-      toggle={() => setSize(value => ({ ...value, collapsed: !value.collapsed }))} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
+    {toggleHost && createPortal(<Button ref={toggleButton} className="small template-assistant-toggle" aria-pressed={paneOpen} aria-controls={templateScope.host}
+      title={paneOpen ? "Скрыть помощника" : "Показать помощника"} onClick={toggle}><Icon name="chat" /><span>Помощник</span>
+      {active && <Spinner />}</Button>, toggleHost)}
+    {paneOpen && <DrawerView view={view} active={active} title={shown?.name ?? "Шаблон"} collapsed={false} expanded={size.height >= 500} height={size.height}
+      toggle={toggle} expand={() => setSize(value => ({ ...value, height: value.height >= 500 ? 320 : 520 }))}
       resize={height => setSize(value => ({ ...value, height }))} log={log} captured={null} applying={working !== null}
       failure={failed ? errorText(failed) : view.error ? errorText(view.error) : null} fence={null}
       draft={value => controller.current?.draft(value)} flags={(_edits, allowWeb) => controller.current?.flags({ allowEdits: false, allowWeb })}
@@ -124,7 +135,7 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
         }} /></>}
       extra={proposals.map(value => <TemplateProposalCard key={value.id} value={value} target={proposalTarget(value, names)} onTarget={onTarget(value, target)}
         current={() => context()?.text ?? ""} busy={active || working !== null} applying={working === value.id} changed={changedFor(value)}
-        apply={() => void decide(value, false)} replace={() => setConfirm(value)} discard={() => void discard(value)} />)} />
+        apply={() => void decide(value, false)} replace={() => setConfirm(value)} discard={() => void discard(value)} />)} />}
     <Dialog open={confirm !== null} close={() => setConfirm(null)} title="Заменить текст шаблона?">
       <p className="dialog-copy">Текст в редакторе изменился после запуска. Эти правки пропадут, текст станет предложенным. Сохранить можно будет потом.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirm(null)}>Отмена</Button>

@@ -14,5 +14,5 @@ export const resumeScope: ChatScope = { host: "agent-chat-host", content: "assis
   placeholder: "Что проверить или изменить? / — команды", commandList: assistantCommands, edits: true };
 export const templateScope: ChatScope = { host: "template-chat-host", content: "template-assistant-content", threads: "template-chat-threads",
   input: "template-chat-input", commands: "template-assistant-commands", option: "template-assistant-command", model: "template-chat-model", access: () => "Без доступа к резюме",
-  empty: "Чат по шаблону", question: "Что вы хотите изменить или проверить в шаблоне? Напишите вопрос ниже.",
+  empty: "Что изменить в шаблоне?", question: "Например: «имя крупнее, без линии под шапкой». Помощник видит шаблоны и образцы, но не резюме; правка придёт предложением с разницей.",
   placeholder: "Что изменить в шаблоне? / — команды", commandList: templateCommands, edits: false };

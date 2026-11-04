@@ -49,6 +49,8 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   // The design part first: blocks, not the model's English prompt text at the top of the file.
   const [tab, setTab] = useState<SectionTab>("blocks");
   const yaml = useRef<YamlEditorHandle>(null), more = useRef<HTMLButtonElement>(null);
+  // The assistant puts its toggle here, at the end of the tab row.
+  const [assistantSlot, setAssistantSlot] = useState<HTMLElement | null>(null);
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
   const draft = shown?.kind === "draft" ? shown : null;
   // The assistant reads and applies after renders: these hold what the editor shows now.
@@ -186,16 +188,22 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
               <Button className="small" onClick={() => void load()}>Загрузить снова</Button></>}
         </div>}
         {shown && <Tabs.Root className="template-tabs" value={tab} onValueChange={value => setTab(value as SectionTab)}>
-          {present.size > 0 && <div className="template-tab-row"><Tabs.List className="template-tab-list" aria-label="Разделы шаблона">
+          <div className="template-tab-row">{present.size > 0 && <Tabs.List className="template-tab-list" aria-label="Разделы шаблона">
             {sectionTabs.map(item => <Tabs.Trigger key={item.id} value={item.id} disabled={!present.has(item.id)}>{item.label}</Tabs.Trigger>)}
-          </Tabs.List></div>}
-          {/* One editor for every tab: the panel follows the chosen tab instead of holding a copy per tab. */}
-          <Tabs.Content className="template-tab-panel" value={tab} forceMount>
-            <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
-              <YamlEditor ref={yaml} value={text} problem={problem} readOnly={busy} tab={tab}
-                change={value => { setText(value); setProblem(null); setOutcome(null); }} />
-            </Suspense>
-          </Tabs.Content>
+          </Tabs.List>}<span className="template-assistant-slot" ref={setAssistantSlot} /></div>
+          {/* The assistant pane sits under the toolbar beside the editor; on a narrow window it lies over the editor only. */}
+          <div className="template-work">
+            {/* One editor for every tab: the panel follows the chosen tab instead of holding a copy per tab. */}
+            <Tabs.Content className="template-tab-panel" value={tab} forceMount>
+              <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
+                <YamlEditor ref={yaml} value={text} problem={problem} readOnly={busy} tab={tab}
+                  change={value => { setText(value); setProblem(null); setOutcome(null); }} />
+              </Suspense>
+            </Tabs.Content>
+            <aside className="templates-assistant" aria-label="Помощник по шаблонам">
+              <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} toggleHost={assistantSlot} />
+            </aside>
+          </div>
         </Tabs.Root>}
         {shown && <div className="template-status">
           <div className="template-status-message">
@@ -210,9 +218,6 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
             onClick={() => { setText(state.text); setProblem(null); setOutcome(null); }}>Отменить правки</button>}
         </div>}
       </div>
-      <aside className="templates-assistant" aria-label="Помощник по шаблонам">
-        <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} />
-      </aside>
     </div>
     <Dialog open={branding} close={() => setBranding(false)} title="Логотип и подвал" returnFocus={more.current}>
       {branding && state && <TemplateBranding templateId={state.package.id} packageHash={state.package.packageHash} blocked={dirty} disabled={busy}
