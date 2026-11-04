@@ -83,12 +83,22 @@ class CapturedMetrics:
             with TTFont(BytesIO(font.content), lazy=False) as decoded:
                 cmap = decoded.getBestCmap()
                 advances = decoded['hmtx'].metrics
+                hhea, os2 = decoded['hhea'], decoded['OS/2']
+                single = (hhea.ascent - hhea.descent + hhea.lineGap) / font.units_per_em
+                # Editors take the single line from hhea or from the win metrics; a multiple of it is one height only
+                # where both agree.
+                shared = abs(single - (os2.usWinAscent + os2.usWinDescent) / font.units_per_em) <= .005
                 self.fonts[font.sha256] = ({point: advances[name][0] / font.units_per_em
-                    for point, name in cmap.items()}, decoded['hhea'].ascent / font.units_per_em)
+                    for point, name in cmap.items()}, hhea.ascent / font.units_per_em, single, shared)
         return self.fonts[font.sha256]
 
     def ascent(self, style):
         return self.metrics(style.selection)[1] * style.size
+
+    def single_line(self, style):
+        """The run's single line height, or None when editors read the face's line differently."""
+        _advances, _ascent, single, shared = self.metrics(style.selection)
+        return single * style.size if shared else None
 
     def paragraph_height(self, runs, width, empty_height):
         if width <= 0:
@@ -96,7 +106,7 @@ class CapturedMetrics:
         height, used, line = 0.0, 0.0, 0.0
         previous_cr = False
         for text, style in runs:
-            advances, _ascent = self.metrics(style.selection)
+            advances = self.metrics(style.selection)[0]
             emitted = text[1:] if previous_cr and text.startswith('\n') else text
             previous_cr = text.endswith('\r')
             for token in re.split(r'(\r\n|\r|\n|\t)', emitted):

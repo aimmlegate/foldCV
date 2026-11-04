@@ -13,7 +13,8 @@ from packages.resume_core.models.template_document import (PresentedText, Manual
     TemplateNumberedBlock, PresentedHyperlink)
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateRenderAsset, presentation_value
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
-from packages.resume_core.rendering.captured_layout import half_points, native_units
+from packages.resume_core.rendering.captured_fonts import FontRequest
+from packages.resume_core.rendering.captured_layout import CapturedMetrics, half_points, native_units
 from packages.resume_core.rendering.captured_styles import CapturedStyleResolver, authored_spans, visible_text
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.template_assembly import assemble_template
@@ -96,8 +97,20 @@ def test_actual_employment_preserves_text_order_geometry_and_captured_assets(cap
     assert tree.xpath('//w:pPr/w:shd/@w:fill', namespaces=NS) == ['EFEFEF']
     assert tree.xpath('//w:pPr[w:shd]/w:ind/@w:left', namespaces=NS) == ['0']
     assert tree.xpath('//w:pPr[w:shd]/w:ind/@w:firstLine', namespaces=NS) == ['105']
-    assert tree.xpath('//w:pPr[w:shd]/w:spacing/@w:line', namespaces=NS) == ['560']
+    # The 28 pt band is one single 14 pt line inside borders of its own color, so the text stays centered in Docs too.
+    assert tree.xpath('//w:pPr[w:shd]/w:spacing/@w:line', namespaces=NS) == ['240']
+    assert tree.xpath('//w:pPr[w:shd]/w:spacing/@w:lineRule', namespaces=NS) == ['auto']
+    assert [(side.get(qn('w:color')), side.get(qn('w:space')), side.get(qn('w:sz')))
+        for side in tree.xpath('//w:pPr[w:shd]/w:pBdr/*', namespaces=NS)] == [('EFEFEF', '5', '2')] * 2
     assert tree.xpath('//w:rPr/w:shd[@w:fill="EFEFEF"]', namespaces=NS)
+    # A chip line stays exact, since a multiple grows with chip borders; its mark carries only the face and size.
+    chips = next(node for node in tree.iter(qn('w:p')) if node.xpath('w:r/w:rPr/w:bdr', namespaces=NS))
+    assert chips.xpath('string(w:pPr/w:spacing/@w:lineRule)', namespaces=NS) == 'exact'
+    assert chips.xpath('w:pPr/w:rPr/w:sz', namespaces=NS) and not chips.xpath('w:pPr/w:rPr/w:bdr|w:pPr/w:rPr/w:shd', namespaces=NS)
+    # Google Docs reads an exact spacer as a multiple of its mark's single line, which is 12 pt at 9.5 pt.
+    spacers = tree.xpath('//w:body/w:p', namespaces=NS)
+    assert spacers and all(node.xpath('string(w:pPr/w:spacing/@w:lineRule)', namespaces=NS) == 'exact' and
+        node.xpath('string(w:pPr/w:rPr/w:sz/@w:val)', namespaces=NS) == '19' for node in spacers)
     assert tree.xpath('//w:numPr', namespaces=NS)
     archive = parts(content)
     import base64
@@ -142,6 +155,7 @@ def test_a_footer_text_repeats_on_the_first_and_following_pages(captured_request
     assert int(xml(content).xpath('string(//w:pgMar/@w:footer)', namespaces=NS)) > 0
     footers = [name for name in parts(content) if name.startswith('word/footer')]
     assert len(footers) == 2 and all(emitted(xml(content, name)) == 'Synthetic footer' for name in footers)
+    assert all(xml(content, name).xpath('string(//w:pPr/w:spacing/@w:lineRule)', namespaces=NS) == 'auto' for name in footers)
 
 
 def test_changed_recipe_optional_logo_divider_footer_and_geometry(captured_request, tmp_path):
@@ -269,7 +283,11 @@ def test_explicit_header_slots_copy_order_and_growth_move_body(captured_request,
     # Google Docs drops Word frames, so the lines flow; the body starts below them and reaches the grown position.
     assert not header.xpath('//w:framePr', namespaces=NS)
     spacing = header.xpath('//w:p/w:pPr/w:spacing', namespaces=NS)
-    bottom = sum(int(value.get(qn('w:before')) or 0) + int(value.get(qn('w:line'))) for value in spacing)
+    # Each text line is one single line of its style, which Google Docs reads as the same height as Word.
+    assert [(value.get(qn('w:line')), value.get(qn('w:lineRule'))) for value in spacing[1:]] == [('240', 'auto')] * 3
+    text = request.package.recipe.style.text
+    heights = [1] + [native_units(text[token].line_height) for token in ('name', 'profession', 'name')]
+    bottom = sum(int(value.get(qn('w:before')) or 0) for value in spacing) + sum(heights)
     body = xml(content)
     assert bottom + int(body.xpath('string(//w:body/w:p[1]/w:pPr/w:spacing/@w:line)', namespaces=NS)) > 1420
 
@@ -321,7 +339,8 @@ def test_native_numbering_keeps_start_sequence_and_marker_style(captured_request
         id=number.xpath('string(w:abstractNumId/@w:val)', namespaces=NS))[0]
     assert abstract.xpath('string(.//w:start/@w:val)', namespaces=NS) == '7'
     assert abstract.xpath('string(.//w:rFonts/@w:ascii)', namespaces=NS) == 'Source Sans Pro'
-    assert abstract.xpath('string(.//w:sz/@w:val)', namespaces=NS) == '28'
+    # The template's 14 pt marker is drawn at the item's 10 pt.
+    assert abstract.xpath('string(.//w:sz/@w:val)', namespaces=NS) == '20'
     assert abstract.xpath('string(.//w:b/@w:val)', namespaces=NS) == '0'
 
 
@@ -393,6 +412,32 @@ def test_a_single_native_line_or_band_must_fit_the_continuation_body(captured_re
     assert canonical(request) == before
 
 
+@pytest.mark.parametrize(('line_height', 'height', 'line'), [(16, 17, '232'), (19, 120, '1637')])
+def test_a_band_without_room_for_borders_keeps_its_height_in_the_line(captured_request, tmp_path, line_height, height, line):
+    """Borders pad 1/4 to 43 pt; a 14 pt band text taller than its band, or a band past that, sets the line alone."""
+    def edit(config):
+        config['style']['text']['section']['line_height'] = line_height
+        config['style']['section_band']['height'] = height
+    tree = xml(render_captured_docx(configured(captured_request, edit), tmp_path))
+    assert not tree.xpath('//w:pPr[w:shd]/w:pBdr', namespaces=NS)
+    assert tree.xpath('//w:pPr[w:shd]/w:spacing/@w:line', namespaces=NS) == [line]
+
+
+def test_a_face_whose_line_tables_disagree_has_no_single_line(captured_request):
+    """Editors take the single line from hhea or the win metrics; where they differ an exact line stays."""
+    from dataclasses import replace
+    from types import SimpleNamespace
+    from fontTools.ttLib import TTFont
+    selection = CapturedStyleResolver(captured_request.package).fonts.select(FontRequest('regular'))
+    assert CapturedMetrics().single_line(SimpleNamespace(selection=selection, size=10)) == pytest.approx(12.57)
+    font = TTFont(BytesIO(selection.font.content))
+    font['OS/2'].usWinAscent += 100
+    raw = BytesIO()
+    font.save(raw)
+    changed = replace(selection, font=replace(selection.font, content=raw.getvalue(), sha256='changed'))
+    assert CapturedMetrics().single_line(SimpleNamespace(selection=changed, size=10)) is None
+
+
 def test_empty_spans_validate_metadata_without_selecting_unemitted_faces(captured_request, tmp_path):
     from tests.templates.test_captured_assets import changed_asset
     package = changed_asset(captured_request.package, captured_request.package.recipe.style.fonts['black'],
@@ -420,30 +465,33 @@ def test_empty_body_paragraph_still_requires_its_block_face(captured_request, tm
 
 
 def list_lines(content, request):
-    """Each list paragraph's exact line beside the natural line of its own text."""
+    """Each list paragraph's line and rule, with its marker's size beside its text's size, in half-points."""
     resolver = CapturedStyleResolver(request.package)
     blocks = {block.id: block for block in request.document.blocks() if block.type in {'bullet_list', 'numbered_list'}}
-    tree = xml(content)
-    pairs = []
+    tree, numbering = xml(content), xml(content, 'word/numbering.xml')
+    lines = []
     for block in blocks.values():
         text = ''.join(visible_text(span.text) for span, _link in authored_spans(block))
         paragraph = next(node for node in tree.iter(qn('w:p')) if text and text in emitted(node))
-        assert paragraph.find(f'{qn("w:pPr")}/{qn("w:numPr")}') is not None
-        pairs.append((paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS),
-            str(native_units(resolver.paragraph(block)[0], positive=True))))
-    return pairs
+        number = paragraph.xpath('string(w:pPr/w:numPr/w:numId/@w:val)', namespaces=NS)
+        marker = numbering.xpath('string(//w:abstractNum[@w:abstractNumId=$id]/w:lvl/w:rPr/w:sz/@w:val)',
+            namespaces=NS, id=number)
+        size = next(resolver.run(block, span).size for span, _link in authored_spans(block) if visible_text(span.text))
+        lines.append((paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS),
+            paragraph.xpath('string(w:pPr/w:spacing/@w:lineRule)', namespaces=NS), marker, str(half_points(size))))
+    return lines
 
 
-def test_list_lines_keep_the_text_height_under_a_bigger_marker(captured_request, tmp_path):
-    """The tester's sparse lists: the 14 pt marker had set every line of a 10 pt item to its own 17.6 pt."""
-    bullets = captured_request.package.recipe.style.bullets
-    pairs = list_lines(render_captured_docx(captured_request, tmp_path), captured_request)
-    assert pairs and all(actual == natural for actual, natural in pairs)
-    assert all(bullets.marker_size * 20 > int(natural) for _actual, natural in pairs)
+def test_list_lines_keep_the_text_line_and_the_marker_its_size(captured_request, tmp_path):
+    """The tester's sparse lists in Google Docs: Docs scales a line by its biggest glyph, so the 14 pt marker made the
+    first line of a 10 pt item 18.4 pt; the marker is the text's size and each line one single line of the text."""
+    assert captured_request.package.recipe.style.bullets.marker_size == 14
+    lines = list_lines(render_captured_docx(captured_request, tmp_path), captured_request)
+    assert lines and all(line == ('240', 'auto', '20', '20') for line in lines)
 
 
-@pytest.mark.parametrize('size', [30, 700])
-def test_generated_marker_scales_without_changing_the_list_line(captured_request, tmp_path, size):
+@pytest.mark.parametrize(('size', 'drawn'), [(8, '16'), (30, '20'), (700, '20')])
+def test_a_marker_is_never_bigger_than_its_text(captured_request, tmp_path, size, drawn):
     request = configured(captured_request, lambda config: config['style']['bullets'].update(marker_size=size))
     document = request.document.model_copy(deep=True)
     source = next(block for block in document.blocks() if block.type == 'bullet_list')
@@ -451,17 +499,11 @@ def test_generated_marker_scales_without_changing_the_list_line(captured_request
     data.update(type='numbered_list', id='marker-height', props={'start': 1},
         content=[{'type': 'text', 'text': 'Actual numbered marker', 'styles': {}}])
     document.regions[2].blocks = [TemplateNumberedBlock.model_validate(data)]
-    request = recapture(request, document=document)
-    if size == 700:
-        with pytest.raises(RenderFailure, match='RICH_EXPORT_UNSUPPORTED'):
-            render_captured_docx(request, tmp_path)
-        return
-    content = render_captured_docx(request, tmp_path)
+    content = render_captured_docx(recapture(request, document=document), tmp_path)
     paragraph = next(node for node in xml(content).iter(qn('w:p')) if 'Actual numbered marker' in emitted(node))
-    natural = native_units(CapturedStyleResolver(request.package).paragraph(document.regions[2].blocks[0])[0], positive=True)
-    assert paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS) == str(natural) and natural < 600
+    assert paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS) == '240'
     numbering = xml(content, 'word/numbering.xml')
-    assert numbering.xpath('//w:abstractNum[@w:abstractNumId="6000"]/w:lvl/w:rPr/w:sz/@w:val', namespaces=NS) == ['60']
+    assert numbering.xpath('//w:abstractNum[@w:abstractNumId="6000"]/w:lvl/w:rPr/w:sz/@w:val', namespaces=NS) == [drawn]
 
 
 def test_logo_containment_uses_actual_native_page_size(captured_request, tmp_path):

@@ -89,6 +89,14 @@ def run_properties(style):
     return props
 
 
+def mark_properties(style):
+    """Only the face and size of the paragraph mark: Word counts the mark in the last line of a paragraph."""
+    kept = {qn('w:' + tag) for tag in ('rFonts', 'b', 'bCs', 'i', 'iCs', 'sz', 'szCs')}
+    props = run_properties(style)
+    props[:] = [child for child in props if child.tag in kept]
+    return props
+
+
 class CapturedWriter:
     compact = Writer.compact
 
@@ -235,12 +243,49 @@ class CapturedWriter:
         native_text(run, text)
         return run
 
+    def line_spacing(self, props, height, style, *, exact=False):
+        """Google Docs reads w:line as a multiple of the single line whatever the rule says, so an exact 19 pt heading
+        came out 28 pt there; a multiple of the font's single line gives Word and Docs one height."""
+        single = self.metrics.single_line(style)
+        spacing = props.find(qn('w:spacing'))
+        if single is None or exact:
+            spacing.set(qn('w:line'), str(native_units(height, positive=True)))
+            spacing.set(qn('w:lineRule'), 'exact')
+            return
+        spacing.set(qn('w:line'), str(native_units(height / single, 240, positive=True)))
+        spacing.set(qn('w:lineRule'), 'auto')
+
+    def line_style(self, block):
+        """The run that sets the paragraph's line, as CapturedStyleResolver.paragraph measures it."""
+        styles = [style for _text, style in self.runs[block.id]]
+        return max(styles, key=lambda style: style.line_height) if styles else self.generated(block, '')
+
+    def band_padding(self, props, height, style, color):
+        """Borders of the band's color pad its one text line to the band height, so the text stays centered as on
+        screen: a line of the band's height left the heading at its top in Google Docs."""
+        single = self.metrics.single_line(style)
+        pad = (height - single) / 2 if single is not None else 0
+        # A paragraph border is 1/4 to 12 pt wide and stands up to 31 whole points from the text.
+        if not .25 <= pad <= 43:
+            self.line_spacing(props, height, style)
+            return
+        space = min(31, round(pad - .25))
+        borders = element('w:pBdr')
+        for side in ('top', 'bottom'):
+            borders.append(element('w:' + side, val='single', sz=max(2, round((pad - space) * 8)), space=space,
+                color=color.removeprefix('#')))
+        props.append(borders)
+        self.line_spacing(props, single, style)
+
     def paragraph(self, container, block, *, header=False, depth=0, sequence=None, celled=False):
         self.block = block
         paragraph = container.add_paragraph()
         height, alignment = self.paragraphs[block.id]
+        line = self.line_style(block)
         props = paragraph._p.get_or_add_pPr()
-        props.append(element('w:spacing', before=0, after=0, line=native_units(height, positive=True), lineRule='exact'))
+        props.append(element('w:spacing', before=0, after=0))
+        # A multiple grows with chip borders in LibreOffice, so a chip line keeps its exact height.
+        self.line_spacing(props, height, line, exact=any(style.chip for _text, style in self.runs[block.id]))
         props.append(element('w:jc', val='both' if alignment == 'justify' else alignment))
         props.append(element('w:widowControl', val=0))
         props.append(element('w:keepLines', val=0))
@@ -264,20 +309,19 @@ class CapturedWriter:
                     self.metrics.paragraph_height(self.runs[block.id], usable, height) > height):
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             props.find(qn('w:ind')).set(qn('w:firstLine'), str(native_units(band_style.text_inset)))
-            fill(props, self.recipe.style.colors[self.recipe.style.section_band.background])
-            spacing = props.find(qn('w:spacing'))
-            spacing.set(qn('w:line'), str(native_units(band_style.height, positive=True)))
+            color = self.recipe.style.colors[band_style.background]
+            fill(props, color)
+            self.band_padding(props, band_style.height, line, color)
         if is_heading:
             props.append(element('w:outlineLvl', val=block.props.level - 1))
         if block.type in {'bullet_list', 'numbered_list'}:
             if header:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-            # The marker keeps its own size, but every line of the item stays at the text's height, as on screen.
-            marker_height = self.list_marker(paragraph, block, inset, depth, sequence)
-            if native_units(marker_height, positive=True) > self.geometry.bottom - self.geometry.continuation_top:
-                raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+            self.list_marker(paragraph, block, inset, depth, sequence)
         if not self.runs[block.id]:
             props.append(run_properties(self.generated(block, '')))
+        else:
+            props.append(mark_properties(line))
         previous_cr, current, hyperlink = False, None, None
         for (text, style), link in zip(self.runs[block.id], self.links[block.id], strict=True):
             run = self.emit_run(paragraph, text[1:] if previous_cr and text.startswith('\n') else text, style)
@@ -307,7 +351,10 @@ class CapturedWriter:
         if not 1 <= index <= 2147483647:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         marker = f'{index}.' if numbered else bullets.marker
-        style = resize_run(self.generated(block, marker), bullets.marker_size)
+        # A marker above the text's size sets a taller first line in Google Docs, which keeps no exact line; the
+        # screen draws it at the text's size.
+        text = self.generated(block, marker)
+        style = resize_run(text, min(bullets.marker_size, text.size))
         self.remember(style)
         left = native_units(inset + bullets.text_offset * (depth + 1))
         marker_left = native_units(inset + bullets.text_offset * depth + bullets.marker_offset)
@@ -351,7 +398,6 @@ class CapturedWriter:
         number.append(element('w:ilvl', val=0))
         number.append(element('w:numId', val=identifier))
         props.insert(0, number)
-        return style.line_height
 
     def blocks(self, container, blocks, depth=0):
         sequence = {}
@@ -423,6 +469,17 @@ class CapturedWriter:
         self.compact(paragraph, height / 20)
         paragraph.paragraph_format.line_spacing = Twips(height)
         paragraph.paragraph_format.widow_control = False
+        if self.selections:
+            # Google Docs takes the exact height as a multiple of the mark's single line: a mark whose single line is
+            # 12 pt keeps the gap there too.
+            selection = next(iter(self.selections.values()))
+            size = max(2, round(24 / self.metrics.metrics(selection)[2]))
+            family = selection.font.family
+            props = element('w:rPr')
+            props.append(element('w:rFonts', ascii=family, hAnsi=family, eastAsia=family, cs=family))
+            props.append(element('w:sz', val=size))
+            props.append(element('w:szCs', val=size))
+            paragraph._p.get_or_add_pPr().append(props)
         return paragraph
 
     def header_line(self, paragraph, x, width, before):
@@ -505,9 +562,11 @@ class CapturedWriter:
         for footer in (self.document.sections[0].footer, self.document.sections[0].first_page_footer):
             paragraph = footer.paragraphs[0]
             self.compact(paragraph, style.line_height)
-            paragraph.paragraph_format.line_spacing = Twips(native_units(style.line_height, positive=True))
-            paragraph._p.get_or_add_pPr().append(element('w:jc', val='center'))
-            paragraph._p.get_or_add_pPr().append(element('w:ind', left=left, right=right))
+            props = paragraph._p.get_or_add_pPr()
+            self.line_spacing(props, style.line_height, style)
+            props.append(element('w:jc', val='center'))
+            props.append(element('w:ind', left=left, right=right))
+            props.append(mark_properties(style))
             self.emit_run(paragraph, recipe.text, style)
 
     def first_page_spacer(self, growth, header_bottom):
