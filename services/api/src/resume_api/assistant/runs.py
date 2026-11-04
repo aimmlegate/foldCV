@@ -89,7 +89,7 @@ class Control:
 
 
 class ResumeScope:
-    """What one assistant instance reads and binds (D136): the resume scope pins a project of the repository."""
+    """What one assistant instance reads and binds (D140): the resume scope pins a project of the repository."""
     base_instructions = BASE_INSTRUCTIONS
     developer_instructions = DEVELOPER_INSTRUCTIONS
     active_seconds = None

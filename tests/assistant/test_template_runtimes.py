@@ -1,4 +1,4 @@
-"""RuntimeInput.base_instructions (D136) is what Codex gets as baseInstructions and Claude as its system prompt."""
+"""RuntimeInput.base_instructions (D140) is what Codex gets as baseInstructions and Claude as its system prompt."""
 
 import threading
 

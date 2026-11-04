@@ -111,7 +111,7 @@ class RuntimeInput:
     queued_at: float | None = None
     close_tools: Callable[[float], None] = lambda _seconds: None
     developer_instructions: str = DEVELOPER_INSTRUCTIONS
-    # Codex `baseInstructions` and the Claude system prompt; the template assistant has its own (D136).
+    # Codex `baseInstructions` and the Claude system prompt; the template assistant has its own (D140).
     base_instructions: str = BASE_INSTRUCTIONS
     elapsed_clock: Callable[[], float] = time.monotonic
     child_started: Callable[[], None] = lambda: None

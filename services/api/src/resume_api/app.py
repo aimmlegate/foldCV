@@ -532,7 +532,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                                            else slots[catalog().get(model, "codex_cli")].runtime)
     projects.on_deleted = assistant.project_deleted
     app.state.assistant = assistant
-    # The template assistant (D136) has no project repository, so its tools cannot reach a resume.
+    # The template assistant (D140) has no project repository, so its tools cannot reach a resume.
     template_assistant = AssistantService(None, resolved_agent_runtime, agent_connection,
         scope=TemplateScope(rules_store.root), root=rules_store.root)
     template_assistant.runtime_for = assistant.runtime_for

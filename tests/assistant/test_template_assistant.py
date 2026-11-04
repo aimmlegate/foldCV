@@ -1,4 +1,4 @@
-"""The template assistant (D136): its own scope without the repository, the draft tools, proposals, concurrency with
+"""The template assistant (D140): its own scope without the repository, the draft tools, proposals, concurrency with
 a resume run, and the run routes under /v2/templates/assistant."""
 
 import asyncio

@@ -1,4 +1,4 @@
-"""The template assistant (D136): a second assistant instance whose tools read templates, one draft and one sample.
+"""The template assistant (D140): a second assistant instance whose tools read templates, one draft and one sample.
 
 It is built without the project repository, so no tool can reach a resume. The draft is the editor text sent with
 the request; the assistant never writes the template store: a proposal is text the user applies and saves.
