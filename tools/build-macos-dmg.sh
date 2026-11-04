@@ -33,7 +33,7 @@ PYTHON=${FOLDCV_PYTHON:-/Library/Frameworks/Python.framework/Versions/3.13/bin/p
 NAME="foldCV Beta"
 # Monterey is the oldest macOS whose Safari updates bring the WebKit the page needs (pdf.js: Safari 17.4).
 MINIMUM_MACOS=12.0
-VERSION=$(node -p 'require("./apps/desktop/package.json").version')
+VERSION=$(node -p 'require("./apps/desktop-tauri/tauri.conf.json").version')
 TAURI=$(awk '/^name = "tauri"$/ { found = 1; next } found { gsub(/[^0-9.]/, ""); print; exit }' apps/desktop-tauri/Cargo.lock)
 COMMIT=$(git rev-parse --short HEAD)
 [[ -z $(git status --porcelain) ]] || COMMIT+="-dirty"

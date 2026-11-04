@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "foldCV Beta",
-  "version": "../desktop/package.json",
+  "version": "0.2.0",
   "identifier": "invalid.foldcv.beta",
   "app": {
     "windows": [],

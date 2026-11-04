@@ -37,26 +37,21 @@ Mac, allow the app once in System Settings → Privacy & Security.
 
 ## Windows app
 
-`tools/build-windows-zip.sh` builds the portable `foldCV-Beta-<version>-win-x64.zip` on a Mac in one step (Node 22,
-python.org Python 3.13): the frontend, the python.org embeddable Python with the service's Windows wheels, and the
-Electron window. The `Windows` workflow builds the same zip on a Windows runner and checks it there (helper, both CLIs,
-app start). Unpack the zip anywhere and run `foldCV Beta.exe`; there is no installer. Data stays in
-`%LOCALAPPDATA%\foldCV Beta`, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed:
-Windows SmartScreen asks once (More info → Run anyway). Codex and Claude run in a Job Object that lets them start no
-other program and ends them with the app; unlike the macOS sandbox it does not limit which files they read or write.
-
-The same workflow also builds a test zip with the Tauri window instead (job `tauri`, artifact `foldcv-windows-tauri`,
-`foldCV-Beta-<version>-win-x64-tauri.zip`): the same helper and data folder, the page in the system WebView2, which
-Windows 11 has. Its shell needs the Windows toolchain, so it is built on the runner only. Do not run both apps at once:
-they share the data folder.
+The `Windows` workflow builds the portable `foldCV-Beta-<version>-win-x64.zip` on a Windows runner and checks it there
+(helper, both CLIs, app start, second start, close and kill; artifact `foldcv-windows`): the frontend, the python.org
+embeddable Python with the service's Windows wheels, and the Tauri window (`apps/desktop-tauri`), which shows the page in
+the system WebView2 that Windows 11 has. Its shell needs the Windows toolchain, so the zip is built on the runner only.
+Unpack the zip anywhere and run `foldCV Beta.exe`; there is no installer. Data stays in `%LOCALAPPDATA%\foldCV Beta`, so
+a newer zip in another folder keeps projects and sign-ins. The zip is not signed: Windows SmartScreen asks once (More
+info → Run anyway). Codex and Claude run in a Job Object that lets them start no other program and ends them with the
+app; unlike the macOS sandbox it does not limit which files they read or write.
 
 ## Repository
 
 | Path | Contents |
 | --- | --- |
 | `apps/web` | React and TypeScript frontend |
-| `apps/desktop-tauri` | Tauri window of the macOS app and of the Windows test zip |
-| `apps/desktop` | Electron window of the Windows app |
+| `apps/desktop-tauri` | Tauri window of the macOS and Windows apps |
 | `services/api` | FastAPI local service, CLI providers, import and assistant |
 | `packages/resume_core` | Project storage, templates and DOCX rendering |
 | `contracts` | Generated JSON Schemas and contract examples |

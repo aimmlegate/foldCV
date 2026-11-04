@@ -1,5 +1,4 @@
-"""Serve FoldCV for the desktop app: its shell (Tauri on macOS, Electron on Windows) starts this process and opens the
-page.
+"""Serve FoldCV for the desktop app: its Tauri shell starts this process and opens the page.
 
 The shell passes the data root as the only argument. When the service listens, it writes one JSON line with the
 origin and the startup secret to stdout. Closing stdin, or SIGTERM, stops it.

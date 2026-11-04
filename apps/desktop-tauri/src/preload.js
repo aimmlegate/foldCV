@@ -1,5 +1,5 @@
-// What apps/desktop/src/preload.ts gives the page, for the Tauri window: how a download ended, the desktop styles
-// and, on macOS, the strip that drags the window, which has no title bar. The shell calls it with "macos" or "windows".
+// What the Tauri window gives the page: how a download ended, the desktop styles and, on macOS, the strip that drags
+// the window, which has no title bar. The shell calls it with "macos" or "windows".
 (desktop => {
   const listeners = new Set();
   Object.defineProperty(window, "foldcvDesktop", { value: Object.freeze({

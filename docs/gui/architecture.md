@@ -44,18 +44,17 @@ flowchart LR
 ```
 
 Define ports for `Extractor`, `ContentProvider`, `DocumentRenderer`,
-`CliRuntime`, and `HostBridge`. The browser must not import Electron APIs,
+`CliRuntime`, and `HostBridge`. The browser must not import desktop shell APIs,
 spawn processes, read arbitrary filesystem paths, or receive provider secrets.
 The macOS app (`apps/desktop-tauri`) is a Tauri window over the system WebKit that
 starts the same service, frozen with PyInstaller (`packaging/helper_entry.py`,
 `resume_api.desktop`), and loads the page it serves; the page needs no shell API beyond
-the download report that both shells give it. Workers run as modes of the frozen helper.
-Build: `tools/build-macos-dmg.sh` (README). The Windows app (`apps/desktop`) is an
-Electron window; its zip runs the service on the python.org embeddable Python instead
+the download report that the shell gives it. Workers run as modes of the frozen helper.
+Build: `tools/build-macos-dmg.sh` (README). The Windows app is the same Tauri window over
+WebView2; its zip runs the service on the python.org embeddable Python instead
 (`tools/desktop/build_windows_helper.py`);
 its workers run as scripts, each process in its own Job Object (`packages/resume_core/winjob.py`,
-`host.py`). Build: `tools/build-windows-zip.sh` or the `Windows` workflow, which also
-builds a test zip with the Tauri window around the same helper.
+`host.py`). Build: the `Windows` workflow.
 A remote deployment keeps the data contracts but needs an explicit execution
 decision: a protected local companion for the user's CLI, or a different approved
 provider adapter. A shared server cannot use a CLI installed on the user's laptop

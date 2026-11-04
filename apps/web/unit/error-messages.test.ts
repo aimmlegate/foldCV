@@ -30,9 +30,9 @@ function sources(directory: string): string[] {
   });
 }
 
-test("every explicit frontend and desktop code has a public description or a documented non-error meaning", () => {
+test("every explicit frontend code has a public description or a documented non-error meaning", () => {
   const missing: string[] = [];
-  for (const path of [...sources(join(root, "apps/web/src")), ...sources(join(root, "apps/desktop/src"))]) {
+  for (const path of sources(join(root, "apps/web/src"))) {
     const source = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
     const visit = (node: ts.Node): void => {
       const errorLiteral = ts.isStringLiteralLike(node) && ts.isNewExpression(node.parent)

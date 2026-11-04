@@ -35,13 +35,12 @@ def package(shell: Path, helper: Path, output: Path) -> Path:
             raise SystemExit(f"The helper directory has no {part}")
     if output.exists():
         raise SystemExit("The output directory must not exist yet")
-    name = json.loads((ROOT / "apps/desktop-tauri/tauri.conf.json").read_text(encoding="utf-8"))["productName"]
-    version = json.loads((ROOT / "apps/desktop/package.json").read_text(encoding="utf-8"))["version"]
+    config = json.loads((ROOT / "apps/desktop-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+    name, version = config["productName"], config["version"]
     lock = (ROOT / "apps/desktop-tauri/Cargo.lock").read_text(encoding="utf-8")
     tauri = re.search(r'^name = "tauri"\nversion = "([^"]+)"$', lock, re.MULTILINE)[1]
     output.mkdir(parents=True)
-    # "-tauri" keeps it apart from the Electron zip while both are built.
-    archive = output / f"{name.replace(' ', '-')}-{version}-win-x64-tauri.zip"
+    archive = output / f"{name.replace(' ', '-')}-{version}-win-x64.zip"
     with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as bundle:
         bundle.write(shell, f"{name}/{name}.exe")
         for path in sorted(helper.rglob("*")):

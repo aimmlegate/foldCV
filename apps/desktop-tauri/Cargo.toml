@@ -1,6 +1,6 @@
 [package]
 name = "foldcv-desktop-tauri"
-# The app version comes from apps/desktop/package.json, as for the Windows app.
+# The app version is the one in tauri.conf.json.
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -30,7 +30,7 @@ objc2-app-kit = { version = "0.3", default-features = false, features = ["std", 
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSString"] }
 
 [target.'cfg(windows)'.dependencies]
-# A second start shows the running window, as Electron's single instance lock does.
+# A second start shows the running window.
 tauri-plugin-single-instance = "=2.5.5"
 # The error message box, links for the default browser and a helper without a console window.
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Threading",

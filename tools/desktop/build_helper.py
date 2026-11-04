@@ -62,7 +62,7 @@ def build(work: Path) -> Path:
     if not (ROOT / "apps/web/dist/index.html").is_file():
         raise SystemExit("Build the frontend first: npm run build in apps/web")
     work.mkdir(parents=True, exist_ok=True)
-    version = json.loads((ROOT / "apps/desktop/package.json").read_text(encoding="utf-8"))["version"]
+    version = json.loads((ROOT / "apps/desktop-tauri/tauri.conf.json").read_text(encoding="utf-8"))["version"]
     (work / "helper.spec").write_text(spec(work, version), encoding="utf-8")
     environment = {**os.environ, "PYTHONPATH": f"{ROOT}:{ROOT / 'services/api/src'}", "PYTHONDONTWRITEBYTECODE": "1",
                    "PYINSTALLER_CONFIG_DIR": str(work / "cache")}

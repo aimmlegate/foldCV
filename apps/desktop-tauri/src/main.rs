@@ -1,5 +1,5 @@
-// The desktop app: a Tauri window that starts the frozen service and shows its page, as apps/desktop does with
-// Electron. The page uses no Tauri API; preload.js gives it what the Electron preload gives.
+// The desktop app: a Tauri window that starts the frozen service and shows its page. The page uses no Tauri API;
+// preload.js gives it the download report and the desktop styles.
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 mod helper;
@@ -152,8 +152,8 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
         .title(&app.package_info().name)
         .inner_size(width, height)
         .min_inner_size(800.0, 600.0)
-        // Electron sized the whole window, Tauri sizes the page: the Windows title bar would push the bottom of the
-        // window under the taskbar.
+        // Tauri sizes the page, not the window: the Windows title bar would push the bottom of the window under the
+        // taskbar.
         .prevent_overflow()
         .center()
         .visible(false)
@@ -174,8 +174,8 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
             open_external(url.as_str());
             NewWindowResponse::Deny
         })
-        // The page needs no permission, so the shell refuses them, as the Electron one does. Files go through the
-        // shell's save dialog, so a second download in a row is not held back.
+        // The page needs no permission, so the shell refuses them. Files go through the shell's save dialog, so a
+        // second download in a row is not held back.
         .on_permission_request(|_, kind| match kind {
             PermissionKind::AutomaticDownloads => PermissionResponse::Allow,
             _ => PermissionResponse::Deny,

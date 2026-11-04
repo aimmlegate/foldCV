@@ -1,5 +1,5 @@
 """Assemble the Windows helper of the desktop zip on any build host: the python.org embeddable CPython, the service's
-win_amd64 wheels and the checkout files the service reads, in the layout `apps/desktop` starts.
+win_amd64 wheels and the checkout files the service reads, in the layout the Tauri shell starts.
 
 Usage: `<build python 3.13> tools/desktop/build_windows_helper.py <empty work directory>`; prints the helper path.
 Build the frontend first. Downloads are kept in .tools/windows and checked against the pins below. PyInstaller cannot
