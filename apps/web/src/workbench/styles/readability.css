@@ -27,7 +27,6 @@
 .uir-rewrite .rewrite-after textarea:focus-visible { outline: none; }
 .uir-rewrite .rewrite-marks { color: transparent; }
 .uir-rewrite .rewrite-marks ins { background: var(--ok-bg); text-decoration: none; }
-.settings-content > #workspace-pane-order { display: block; width: 100%; max-width: 420px; margin-top: 8px; padding: 10px 12px; }
 .settings-content > .limit-input { display: block; max-width: 160px; }
 .settings-screen .settings-nav { flex-shrink: 0; }
 .app-shell :is(.chat-title h2, .chat-message, .chat-empty p, .chat-findings strong, .chat-receipt strong), .app-shell :is(#chat-input, #template-chat-input) { font-size: var(--ui-body); color: var(--ink); }
@@ -36,12 +35,10 @@
 .app-shell :is(.chat-message-heading > span, .chat-empty h3, .chat-launcher small) { color: var(--ink); }
 .app-shell .chat-composer :is(#chat-input, #template-chat-input)::placeholder { color: var(--muted); }
 .settings-screen .settings-nav button { white-space: normal; line-height: 1.5; text-align: left; }
-.app-shell .settings-layout { grid-template-columns: 210px minmax(0, 1fr); }
 .app-shell .workspace-views button { min-height: 34px; }
 .app-shell .notice.error { color: var(--danger); }
 .app-shell .notice.warning { color: var(--warn); }
 @media (max-width: 800px) {
-  .app-shell .settings-layout { display: block; }
   .settings-screen .settings-nav button { white-space: nowrap; }
 }
 @media (max-width: 600px) {

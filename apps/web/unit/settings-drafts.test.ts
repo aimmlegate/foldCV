@@ -5,6 +5,7 @@ import type { Preferences } from "../src/contracts/generated/preferences";
 import type { RulesSettings } from "../src/contracts/generated/rules_settings";
 import type { AgentSettings } from "../src/contracts/generated/agent_settings";
 import { projectFilename } from "../src/workbench/files/filename";
+import { settingsSections } from "../src/workbench/settings/Rows";
 
 function gate() { let release = () => {}; const wait = new Promise<void>(resolve => { release = resolve; }); return { wait, release }; }
 function setup() {
@@ -256,4 +257,9 @@ test("reopened Settings shows rewrite choices saved in the popover and keeps its
   await h.controller.refreshPreferences();
   assert.equal(h.controller.state.draft.rewriteModel, "model-b"); assert.equal(h.controller.state.draft.reasoning, "high");
   assert.equal(h.controller.state.draft.importModel, "model-c"); assert.deepEqual(h.controller.dirty, ["import"]);
+});
+
+test("Settings lists five sections in nav order; limits have no item (D147)", () => {
+  assert.deepEqual(settingsSections.map(item => `${item.id}:${item.label}`),
+    ["connection:Подключение", "models:Модели", "assistant:Помощник", "rules:Команды", "appearance:Оформление"]);
 });

@@ -10,13 +10,13 @@ export function defaultReasoningLabel(value: ReasoningEffort | null | undefined)
   return value ? `По умолчанию (${reasoningLabels[value].toLowerCase()})` : "По умолчанию";
 }
 
-export function ReasoningSelect({ value, metadata, disabled, change, id = "rewrite-reasoning", label = "Рассуждения при правке текста" }: {
+export function ReasoningSelect({ value, metadata, disabled, change, id = "rewrite-reasoning", label = "Рассуждения при правке текста", labelled = true }: {
   value: ReasoningEffort | null; metadata: ModelReasoning | undefined; disabled: boolean;
-  change: (value: ReasoningEffort | null) => void; id?: string; label?: string;
+  change: (value: ReasoningEffort | null) => void; id?: string; label?: string; labelled?: boolean;
 }) {
   const supported = metadata?.supported ?? [];
   const choices = value && !supported.includes(value) ? [value, ...supported] : supported;
-  return <><label htmlFor={id}>{label}</label>
+  return <>{labelled && <label htmlFor={id}>{label}</label>}
     <select className="model-select" id={id} aria-label={label} value={value ?? ""}
       disabled={disabled} onChange={event => {
         const next = event.currentTarget.value;

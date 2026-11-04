@@ -13,6 +13,7 @@ import { TaskProgress } from "./import/TaskProgress";
 import { TaskNotices } from "./import/TaskNotices";
 import { sourceSummary } from "./import/progress";
 import { Settings } from "./settings/Settings";
+import type { SettingsSection } from "./settings/Rows";
 import { readPaneOrder, savePaneOrder, type PaneOrder, readAppearance, saveAppearance, type Appearance } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename, projectStem } from "./files/filename";
@@ -45,6 +46,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   }, []);
   const [connection, setConnection] = useState<ConnectionView | null>(null);
   const [visited, setVisited] = useState<ReadonlySet<Screen>>(() => new Set()), [fileMode, setFileMode] = useState<FileMode | null>(null);
+  // A link into one section of Settings; without one Settings keeps the section it showed last.
+  const [settingsRequest, setSettingsRequest] = useState<{ section: SettingsSection; at: number } | null>(null);
   const onResume = screen === "resume";
   useEffect(() => {
     const workflow = new ConnectionWorkflow(setConnection);
@@ -69,7 +72,8 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
     if (!current()) return;
     setVisited(value => visit(value, next)); setScreen(next); if (innerWidth <= 600) setCollapsed(true);
   });
-  const openSettings = () => openScreen("settings");
+  const openSettings = (section?: SettingsSection) => { if (section) setSettingsRequest({ section, at: Date.now() }); openScreen("settings"); };
+  const assistantSettings = () => openSettings("assistant");
   const backToResume = () => void action(async current => { await templateEditor.current?.resume(); if (current()) showResume(); });
   const back = useRef(backToResume);
   back.current = backToResume;
@@ -133,13 +137,13 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
           onStatus={setStatus} onShown={workspace.acknowledgeTemplate} ref={templateEditor} portalHost={portalHost} paneOrder={paneOrder}
           assistant={<AssistantDrawer key={template.response.workspace.projectId} projectId={template.response.workspace.projectId} editor={templateEditor}
             settingsOpen={!onResume} ref={assistant} onProjectLifecycle={kind => workspace.projectLifecycle(template.response.workspace.projectId, kind)}
-            title={projectTitle} settings={openSettings} />} />}
+            title={projectTitle} settings={assistantSettings} />} />}
         {view === "source" && !workspace.loading && <SourceForm active={onResume} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
-      {visited.has("settings") && <div className="screen" hidden={screen !== "settings"}><Settings open={screen === "settings"} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
+      {visited.has("settings") && <div className="screen" hidden={screen !== "settings"}><Settings open={screen === "settings"} request={settingsRequest} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
       {visited.has("templates") && <div className="screen" hidden={screen !== "templates"}>
-        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen open={screen === "templates"} settings={openSettings} /></Suspense></div>}
+        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen open={screen === "templates"} settings={assistantSettings} /></Suspense></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}

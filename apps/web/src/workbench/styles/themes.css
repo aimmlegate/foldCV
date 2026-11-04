@@ -60,13 +60,7 @@
 .theme-name { padding: 4px; border: 0; border-radius: 5px; background: none; color: var(--ink); font-size: var(--ui-body); cursor: pointer; }
 .theme-name:hover { background: var(--wash); }
 
-/* Контраст и плотность: a row each, the copy left and the value with its slider right. */
-.interface-rows { display: grid; margin: 8px 0 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.slider-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 18px; }
-.slider-row + .slider-row { border-top: 1px solid var(--line); }
-.slider-copy { min-width: 0; }
-.slider-copy label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: var(--ui-body); font-weight: 550; }
-.slider-copy p { margin: 4px 0 0; color: var(--muted); font-size: var(--ui-small); line-height: 1.6; }
+/* Контраст и плотность: settings rows (settings.css) with the value and its slider at the right. */
 .slider-reset { width: 24px; height: 24px; padding: 4px; }
 .slider-control { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .slider-control output { min-width: 52px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); text-align: center;
@@ -74,6 +68,6 @@
 .slider-control input[type="range"] { width: 180px; margin: 0; accent-color: var(--accent); }
 @media (max-width: 800px) {
   .scheme-cards, .theme-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .slider-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .slider-control { flex: 1; }
   .slider-control input[type="range"] { flex: 1; width: auto; }
 }

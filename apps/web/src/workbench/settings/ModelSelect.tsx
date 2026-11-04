@@ -12,11 +12,12 @@ export function ModelOptions({ groups, value }: { groups: readonly ModelGroup[];
   </>;
 }
 
-export function ModelSelect({ id, label, value, groups, change, disabled, defaultLabel }: {
+/** `labelled={false}` leaves the label to a settings row that points at `id`. */
+export function ModelSelect({ id, label, value, groups, change, disabled, defaultLabel, labelled = true }: {
   id: string; label: string; value: string | null; groups: readonly ModelGroup[];
-  change: (value: string | null) => void; disabled: boolean; defaultLabel?: string;
+  change: (value: string | null) => void; disabled: boolean; defaultLabel?: string; labelled?: boolean;
 }) {
-  return <><label htmlFor={id}>{label}</label>
+  return <>{labelled && <label htmlFor={id}>{label}</label>}
     <select className="model-select" id={id} aria-label={label} value={value ?? ""} disabled={disabled}
       onChange={event => change(event.currentTarget.value || null)}>
       <option value="" disabled={!defaultLabel}>{defaultLabel ?? "Выберите модель"}</option>

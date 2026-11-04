@@ -111,7 +111,7 @@ test("the interface stylesheets carry no raw colors outside the document views",
   const documentFiles = ["sheet-light.css", "reference-document.css", "template-sheet.css", "remarks.css", "export.css", "themes.css"];
   const files = ["../../../design/future-editor/visual/interface.css", "../../../design/future-editor/visual/chat.css",
     ...["aliases", "accessibility", "readability", "history", "editor-adapter", "assistant-proposals", "import-progress", "polish", "operation-feedback",
-      "comparison-workspace", "original-source", "panel-handles", "assistant-commands", "templates", "frame", "utilities"].map(name => `../src/workbench/styles/${name}.css`)];
+      "comparison-workspace", "original-source", "panel-handles", "assistant-commands", "templates", "settings", "frame", "utilities"].map(name => `../src/workbench/styles/${name}.css`)];
   for (const file of files) {
     assert.ok(!documentFiles.some(name => file.endsWith(name)));
     assert.deepEqual(here(file).match(/#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d/g) ?? [], [], file);

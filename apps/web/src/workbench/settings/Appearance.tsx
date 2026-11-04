@@ -1,9 +1,11 @@
 import { useMemo, type CSSProperties } from "react";
 import { Icon } from "../ui/Icon";
 import { palette, themes, type Palette, type ThemeId } from "./themes";
-import { contrastRange, glassRange, schemes, textSizes, type Appearance, type Scheme } from "./interface";
+import { contrastRange, glassRange, schemes, textSizes, type Appearance, type PaneOrder, type Scheme, type TextSize } from "./interface";
+import { SettingsGroup, SettingsRow } from "./Rows";
 
 const schemeNames: Record<Scheme, string> = { system: "Как в системе", light: "Светлое", dark: "Тёмное" };
+const sizeNames: Record<TextSize, string> = { normal: "Обычный", large: "Крупный", "x-large": "Очень крупный" };
 
 /** A small window drawn from a palette: sidebar, chip, text lines, a floating card and the composer. */
 function Preview({ colors, half }: { colors: Palette; half?: boolean }) {
@@ -31,25 +33,23 @@ const Moon = () => <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 14.5
 
 function SliderRow({ id, label, description, value, range, change }: { id: string; label: string; description: string; value: number;
   range: { minimum: number; maximum: number; step: number; initial: number }; change: (value: number) => void }) {
-  return <div className="slider-row">
-    <div className="slider-copy"><label htmlFor={id}>{label}
-      {value !== range.initial && <button type="button" className="icon slider-reset" aria-label={`${label}: вернуть ${String(range.initial)} %`} onClick={() => change(range.initial)}><Icon name="undo" /></button>}
-    </label><p>{description}</p></div>
+  return <SettingsRow label={label} hint={description} htmlFor={id}>
+    {value !== range.initial && <button type="button" className="icon slider-reset" aria-label={`${label}: вернуть ${String(range.initial)} %`} onClick={() => change(range.initial)}><Icon name="undo" /></button>}
     <div className="slider-control"><output htmlFor={id}>{value}%</output>
       <input id={id} type="range" min={range.minimum} max={range.maximum} step={range.step} value={value}
         onChange={event => change(Number(event.currentTarget.value))} /></div>
-  </div>;
+  </SettingsRow>;
 }
 
-/** Settings → Интерфейс (D140): scheme, a theme for each side, contrast, glass and the text size. Every change saves
- * at once and shows at once; the resume page is not touched. */
-export function AppearanceSettings({ value, change }: { value: Appearance; change: (value: Appearance) => void }) {
+/** Settings → Оформление (D140, D147): scheme, a theme for each side, then one group with contrast, glass, the text
+ * size and the pane order. Every change saves at once and shows at once; the resume page is not touched. */
+export function AppearanceSettings({ value, change, paneOrder, changePaneOrder }: { value: Appearance; change: (value: Appearance) => void;
+  paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void }) {
   const light = useMemo(() => palette(value.lightTheme, "light", value.contrast), [value.lightTheme, value.contrast]);
   const dark = useMemo(() => palette(value.darkTheme, "dark", value.contrast), [value.darkTheme, value.contrast]);
   const pick = (id: ThemeId, side: "light" | "dark" | "both") => change({ ...value, lightTheme: side === "dark" ? value.lightTheme : id, darkTheme: side === "light" ? value.darkTheme : id });
   return <>
-    <h3>Оформление</h3>
-    <div className="scheme-cards" role="radiogroup" aria-label="Оформление">
+    <div className="scheme-cards" role="radiogroup" aria-label="Схема">
       {schemes.map(scheme => <button key={scheme} type="button" role="radio" aria-checked={value.scheme === scheme} className="scheme-card"
         onClick={() => change({ ...value, scheme })}>
         <span className="scheme-preview" aria-hidden="true">
@@ -59,8 +59,8 @@ export function AppearanceSettings({ value, change }: { value: Appearance; chang
         <span className="scheme-name">{schemeNames[scheme]}</span>
       </button>)}
     </div>
-    <h3>Темы</h3>
-    <p>Слева светлый вариант, справа тёмный. Нажмите на круг, чтобы выбрать тему для одной стороны, или на название — для обеих.</p>
+    <h3 className="settings-subtitle">Темы</h3>
+    <p className="settings-lead">Круг слева — светлый вариант, справа — тёмный; название выбирает тему для обоих.</p>
     <div className="theme-cards">
       {themes.map(theme => {
         const lightColors = palette(theme.id, "light", value.contrast), darkColors = palette(theme.id, "dark", value.contrast);
@@ -76,23 +76,23 @@ export function AppearanceSettings({ value, change }: { value: Appearance; chang
         </div>;
       })}
     </div>
-    <h3>Интерфейс</h3>
-    <div className="interface-rows">
+    <SettingsGroup title="Интерфейс">
       <SliderRow id="interface-contrast" label="Контраст" description="Сила цветов и линий во всём интерфейсе." value={value.contrast} range={contrastRange}
         change={contrast => change({ ...value, contrast })} />
       <SliderRow id="interface-glass" label="Плотность панелей" description="Чем выше, тем меньше просвечивают меню, окна и подсказки." value={value.glass} range={glassRange}
         change={glass => change({ ...value, glass })} />
-    </div>
-    <label htmlFor="interface-text-size">Размер текста интерфейса</label>
-    <select id="interface-text-size" value={value.textSize} onChange={event => {
-      const size = textSizes.find(candidate => candidate === event.currentTarget.value);
-      if (size) change({ ...value, textSize: size });
-    }}>
-      <option value="normal">Обычный</option>
-      <option value="large">Крупный</option>
-      <option value="x-large">Очень крупный</option>
-    </select>
-    <p>Сохраняется сразу и действует на меню, панели и подсказки. Страница резюме остаётся светлой при любой теме; её масштаб задаёт
-      список в панели редактора, всё окно целиком увеличивают ⌘ + и ⌘ − (Ctrl на Windows).</p>
+      <SettingsRow label="Размер текста" hint="Меню, панели и подсказки; масштаб резюме — в панели редактора.">
+        {/* Native radios: the arrow keys move the choice as in any radio group. */}
+        <div className="segmented" role="radiogroup" aria-label="Размер текста">
+          {textSizes.map(size => <label key={size}><input type="radio" name="interface-text-size" value={size} checked={value.textSize === size}
+            onChange={() => change({ ...value, textSize: size })} /><span>{sizeNames[size]}</span></label>)}
+        </div></SettingsRow>
+      <SettingsRow label="Порядок панелей при сравнении" htmlFor="workspace-pane-order">
+        <select id="workspace-pane-order" value={paneOrder} onChange={event => changePaneOrder(event.currentTarget.value === "original-first" ? "original-first" : "layout-first")}>
+          <option value="layout-first">Макет слева, оригинал справа</option>
+          <option value="original-first">Оригинал слева, макет справа</option>
+        </select></SettingsRow>
+    </SettingsGroup>
+    <p className="settings-lead">Всё окно увеличивают ⌘ + и ⌘ − (Ctrl на Windows).</p>
   </>;
 }
