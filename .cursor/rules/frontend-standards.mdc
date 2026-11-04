@@ -21,13 +21,14 @@ alwaysApply: false
   overrides; prototype globals must not break menus, handles, icons or focus.
   Native dialog/showModal and nonmodal rewrite show are allowed; do not add a
   Radix Dialog Portal/focus trap. Engine-owned DOM may use a narrow adapter.
-- The adopted rich UI is light-only, including its assistant. This supersedes
-  earlier light/dark/system requirements in the AG plan and AG07 contract for
-  the new presentation; keep their historical evidence unchanged. Remove old
-  theme bootstraps from both rich HTML entries in UIR02, detach rich theme
-  listeners and remove the Settings theme selector. Set root `color-scheme: light`
-  on the proof and adopted entries. Keep the legacy entry/theme/specs until
-  UIR09 separately audits their consumers and test mappings.
+- Themes (D140): the interface follows the system or a fixed light/dark scheme with
+  a theme per side, a contrast slider and a glass opacity. Every interface color
+  is a token from `settings/themes.ts`, written to the root by `applyAppearance`;
+  `tokens.css` and `sheet-light.css` are generated from it by
+  `apps/web/tools/theme-tokens.ts`. Stylesheets reference tokens only; raw colors
+  stay only in the resume sheet, the original document views and print, which
+  keep the light look under every theme (the page is a document, not interface).
+  Set `color-scheme` from the root's `data-mode`, never fixed in markup.
 - Use complete Tailwind class names or explicit variant maps; do not construct
   class fragments dynamically.
 

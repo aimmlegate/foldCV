@@ -16,7 +16,7 @@
 .uir-rewrite .rewrite-source, .uir-rewrite .rewrite-original, .uir-rewrite .rewrite-adjust { color: var(--muted); font-size: var(--ui-small); }
 /* Было over Станет. The new text's box holds the field and its marked copy in one grid cell; both layers share every
    metric that affects wrapping, the box grows with the text and scrolls past its limit, so the marks stay under the words. */
-.uir-rewrite .rewrite-before h3 { margin: 16px 0 5px; color: #748265; font-size: var(--ui-small); font-weight: 500; }
+.uir-rewrite .rewrite-before h3 { margin: 16px 0 5px; color: var(--accent-text); font-size: var(--ui-small); font-weight: 500; }
 .uir-rewrite .rewrite-before .rewrite-source { max-height: 240px; font-size: var(--ui-body); line-height: 1.65; }
 .uir-rewrite :is(.rewrite-before del, .rewrite-marks ins) { border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .uir-rewrite .rewrite-before del { background: var(--danger-bg); color: var(--danger); text-decoration-thickness: 1px; }
@@ -26,7 +26,7 @@
 .uir-rewrite .rewrite-after textarea { overflow: hidden; resize: none; background: transparent; }
 .uir-rewrite .rewrite-after textarea:focus-visible { outline: none; }
 .uir-rewrite .rewrite-marks { color: transparent; }
-.uir-rewrite .rewrite-marks ins { background: #d9eac6; text-decoration: none; }
+.uir-rewrite .rewrite-marks ins { background: var(--ok-bg); text-decoration: none; }
 .settings-content > #workspace-pane-order { display: block; width: 100%; max-width: 420px; margin-top: 8px; padding: 10px 12px; }
 .settings-content > .limit-input { display: block; max-width: 160px; }
 .settings-screen .settings-nav { flex-shrink: 0; }

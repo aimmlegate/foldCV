@@ -1,11 +1,8 @@
 :root {
-  color-scheme: light;
   --panel: var(--paper);
   --content: var(--ink);
   --outline: var(--line);
   --soft: var(--wash);
-  --danger: #8b4230;
-  --danger-bg: #f8eee6;
   --background: var(--paper);
   --foreground: var(--ink);
   --popover: var(--paper);

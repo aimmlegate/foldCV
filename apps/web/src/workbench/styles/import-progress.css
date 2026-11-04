@@ -51,7 +51,7 @@
 .import-stage-copy small { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
 .import-rotating { color: var(--accent); font-style: italic; white-space: nowrap; }
 .import-signs { margin: 4px 0 0 15px; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.import-problem { margin-top: 18px; padding: 14px 16px; border: 1px solid #e7d5cb; border-radius: 8px; background: #f8eee6; color: #8a4f35; }
+.import-problem { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--danger-line); border-radius: 8px; background: var(--danger-bg); color: var(--danger); }
 .import-problem.neutral { border-color: var(--line); background: var(--wash); color: var(--ink); }
 .import-problem strong { display: block; font-size: 13px; font-weight: 600; }
 .import-problem p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; }

@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import schema from "../../../../../../contracts/template-source.schema.json";
 import { pointerRange, technicalLines, type TemplateProblem } from "./config";
 import YamlWorker from "./yaml.worker?worker";
+import { appearanceEvent } from "../interface";
 
 // The repository layout: the template's "# yaml-language-server: $schema=../../contracts/..." line resolves to SCHEMA_URI.
 const MODEL_URI = monaco.Uri.parse("file:///templates/active/template.yaml");
@@ -18,6 +19,8 @@ configureMonacoYaml(monaco, { enableSchemaRequest: false, validate: true, hover:
 
 export type YamlEditorProps = { value: string; change: (value: string) => void; problem: TemplateProblem | null; readOnly: boolean;
   technical: boolean };
+
+function monacoTheme(): "vs" | "vs-dark" { return document.documentElement.dataset["mode"] === "dark" ? "vs-dark" : "vs"; }
 
 function foldTechnical(instance: monaco.editor.IStandaloneCodeEditor, show: boolean) {
   const model = instance.getModel(), selectionLines = model ? technicalLines(model.getValue()) : [];
@@ -34,7 +37,7 @@ export default function YamlEditor({ value, change, problem, readOnly, technical
   useEffect(() => {
     if (!host.current) return;
     const model = monaco.editor.getModel(MODEL_URI) ?? monaco.editor.createModel(value, "yaml", MODEL_URI);
-    const instance = monaco.editor.create(host.current, { model, theme: "vs", automaticLayout: true, minimap: { enabled: false },
+    const instance = monaco.editor.create(host.current, { model, theme: monacoTheme(), automaticLayout: true, minimap: { enabled: false },
       fontSize: 13, tabSize: 2, insertSpaces: true, scrollBeyondLastLine: false, wordWrap: "off", renderWhitespace: "none" });
     const listener = model.onDidChangeContent(() => { if (!external.current) changeRef.current(model.getValue()); });
     editor.current = instance;
@@ -51,6 +54,12 @@ export default function YamlEditor({ value, change, problem, readOnly, technical
   }, [value]);
   useEffect(() => { if (editor.current) foldTechnical(editor.current, technical); }, [technical]);
   useEffect(() => { editor.current?.updateOptions({ readOnly }); }, [readOnly]);
+  // The editor's own colors follow the interface mode (D140).
+  useEffect(() => {
+    const follow = () => monaco.editor.setTheme(monacoTheme());
+    document.documentElement.addEventListener(appearanceEvent, follow);
+    return () => document.documentElement.removeEventListener(appearanceEvent, follow);
+  }, []);
   useEffect(() => {
     const model = editor.current?.getModel();
     if (!model) return;
