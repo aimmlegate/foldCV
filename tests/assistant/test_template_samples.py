@@ -1,11 +1,12 @@
-"""TS4b: a sample DOCX or PDF read once by the extraction worker, its summary in memory (three at most), and the run
-that reads it. The summary builder is lane C's; these tests stand in for it."""
+"""A sample DOCX or PDF read once by the extraction worker, its summary in memory (three at most), and the run that
+reads it."""
 
 from pathlib import Path
 
 from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from resume_api.assistant import template_tools
+from resume_api.lifecycle import SpikeError
 from tests.assistant.support import assistant_app
 from tests.assistant.template_support import (TBASE, template_conversation, template_finish, template_start,
     upload_sample, using)
@@ -69,6 +70,22 @@ def test_three_samples_are_kept_and_a_run_reads_its_own(tmp_path, monkeypatch):
         monkeypatch.setattr(template_tools, 'summarize', lambda _result: {'units': ['x' * 40000]})
         oversized = upload_sample(client, b'%PDF-1.7', 'big.pdf')
         assert (oversized.status_code, oversized.json()['error']['code']) == (422, 'EXTRACT_TEXT_LIMIT')
+        # The limit is the compact form the tool reply carries: a summary that fits it is kept.
+        monkeypatch.setattr(template_tools, 'summarize', lambda _result: {'units': ['x' * 1000] * 32})
+        assert upload_sample(client, b'%PDF-1.7', 'fits.pdf').status_code == 201
         scope = application.state.template_assistant.scope
     # Samples live in memory only and go with the service.
     assert scope.samples == {}
+
+
+def test_a_worker_that_cannot_be_cleaned_up_latches_the_service_like_an_import(tmp_path, monkeypatch):
+    async def stuck(_data, _name, _pasted, _files):
+        raise SpikeError('PROCESS_CLEANUP_FAILED')
+    monkeypatch.setattr(template_tools, 'run_extract', stuck)
+    with assistant_app(tmp_path) as (client, _application, _runtime):
+        failed = upload_sample(client, b'PK\x03\x04 docx', 'stuck.docx')
+        assert (failed.status_code, failed.json()['error']['code']) == (503, 'PROCESS_CLEANUP_FAILED')
+        # Latched: no further worker starts, and the assistant reports the cleanup failure.
+        again = upload_sample(client, b'PK\x03\x04 docx', 'next.docx')
+        assert (again.status_code, again.json()['error']['code']) == (503, 'PROCESS_CLEANUP_FAILED')
+        assert client.get(TBASE + '/capabilities').json()['unavailable']['code'] == 'AGENT_CLEANUP_FAILED'

@@ -6,9 +6,10 @@ import pytest
 import yaml
 
 from packages.resume_core.templates.compiler import compile_template
+from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateRefused, TemplateStore, UnknownTemplate
 from resume_api.template_config import (NO_HEADER, REVISION_TAKEN, TemplateConfig, new_id, next_revision, slug,
-    with_header)
+    stated_name, with_header)
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import app_client, upload
 from tests.templates.test_template_store import GENERIC
@@ -38,11 +39,34 @@ def test_the_header_lines_change_and_comments_and_the_short_form_stay():
     # A key the mapping lacks is added at its indentation; nested keys named id are left alone.
     assert with_header('template:\n    id: a\n    extra:\n      name: inner\n', id='b', name='N', revision='1.0.0') == (
         'template:\n    revision: 1.0.0\n    name: "N"\n    id: b\n    extra:\n      name: inner\n')
-    assert with_header('{"template": {"id": "a"}}', id='b', name='N', revision='1.0.0') is None
-    assert with_header('template: {id: a}\n', id='b', name='N', revision='1.0.0') is None
     # Only the given lines change.
     raised = with_header(BUNDLED_TEXT, revision='9.9.9').splitlines()
     assert raised[4] == '  revision: 9.9.9' and raised[:4] + raised[5:] == BUNDLED_TEXT.splitlines()[:4] + BUNDLED_TEXT.splitlines()[5:]
+
+
+def test_the_header_values_change_in_any_scalar_form_and_a_text_without_a_header_is_told_apart():
+    # A folded or quoted value, a trailing comment and an empty value: the value changes, the rest of the line stays.
+    folded = 'template:\n  id: generic  # keep\n  name: >-\n    Мой\n    шаблон\n  revision: "1.0.0"\n  default_locale: ru\n'
+    assert with_header(folded, name='Мой шаблон', revision='1.0.1') == (
+        'template:\n  id: generic  # keep\n  name: "Мой шаблон"\n  revision: 1.0.1\n  default_locale: ru\n')
+    assert with_header('template:\n  id:\n  name: ""\n', id='x', name='Y') == 'template:\n  id: x\n  name: "Y"\n'
+    # Flow and JSON headers are headers too; inside braces every value is quoted, so JSON stays JSON.
+    assert with_header('template: {id: a, name: "N"}\nx: 1\n', id='b', revision='1.0.0') == (
+        'template: {"revision": "1.0.0", id: "b", name: "N"}\nx: 1\n')
+    headed = with_header('{"template": {"id": "a"}, "x": 1}', id='b', name='N', revision='1.0.0')
+    assert json.loads(headed) == {'template': {'revision': '1.0.0', 'name': 'N', 'id': 'b'}, 'x': 1}
+    # Windows line endings, a comment above the first key, a line separator inside a value and a duplicate key.
+    assert with_header('template:\r\n  id: a\r\n', revision='2.0.0') == 'template:\r\n  revision: 2.0.0\r\n  id: a\r\n'
+    assert with_header('template:\n  # header\n  id: a\n', revision='1.0.0') == 'template:\n  # header\n  revision: 1.0.0\n  id: a\n'
+    assert with_header('template:\n  id: a\n  name: "N\u2028M"\n  revision: 1\n', revision='1.0.0') == (
+        'template:\n  id: a\n  name: "N\u2028M"\n  revision: 1.0.0\n')
+    assert with_header('template:\n  name: N\n  name: M\n', name='Z') == 'template:\n  name: "Z"\n  name: M\n'
+    # No template mapping: None. Unreadable YAML comes back as it is, so the compiler names the real error.
+    assert with_header('template:\n', revision='1.0.0') is None and with_header('- a list\n', revision='1.0.0') is None
+    assert with_header('template: [\n', revision='1.0.0') == 'template: [\n'
+    # The stated name is read as the compiler reads the text: aliases and duplicate keys do not load.
+    assert stated_name('template:\n  name: " N "\n') == 'N' and stated_name('template:\n  name: ""\n') is None
+    assert stated_name('template:\n  name: &a N\n  other: *a\n') is None and stated_name('template:\n  name: N\n  name: M\n') is None
 
 
 @pytest.mark.parametrize(('revisions', 'expected'), [({'1.0.0'}, '1.0.1'), ({'1.0.0', '1.0.1', '0.9.9'}, '1.0.2'),
@@ -68,8 +92,9 @@ def test_a_taken_revision_is_refused_with_the_next_free_one_and_saved_under_it(t
     shipped = yaml.safe_load(BUNDLED_TEXT)['template']['revision']
     edited = BUNDLED_TEXT.replace('      size: 18\n', '      size: 20\n', 1)
     assert config.check(GENERIC, edited)['error']['nextRevision'] == next_revision({shipped})
-    assert config.save('custom-moy', json.dumps({'template': {'id': 'custom-moy'}}), '1.0.3')[1]['error'] == {
-        'path': '/template', 'message': NO_HEADER}
+    assert config.save('custom-moy', 'template: []\n', '1.0.3')[1]['error'] == {'path': '/template', 'message': NO_HEADER}
+    # A JSON header takes the revision too; the compiler then names what the text lacks.
+    assert config.save('custom-moy', json.dumps({'template': {'id': 'custom-moy'}}), '1.0.3')[1]['error']['path'] == '/schema_version'
 
 
 def test_a_copy_is_a_new_id_at_the_first_revision_with_the_source_assets(tmp_path):
@@ -121,10 +146,26 @@ def test_an_unsaved_text_gets_an_id_from_its_name_and_the_assets_of_its_source(t
     broken, error = config.create(draft.replace('  default_locale: ru\n', '  default_locale: ru\n  colour: red\n', 1), None)
     assert broken is None and error['valid'] is False and error['error']['path'] == '/template/colour'
     assert config.create('- a list\n', None)[1]['valid'] is False
-    # A JSON text has no block mapping whose lines could change.
-    assert config.create(json.dumps({'template': {'name': 'J'}}), None)[1]['error'] == {'path': '/template', 'message': NO_HEADER}
+    assert config.create(json.dumps({'template': {'name': 'J'}}), None)[1]['error']['path'] == '/schema_version'
     with pytest.raises(UnknownTemplate):
         config.create(draft, 'missing')
+
+
+def test_a_new_id_is_chosen_and_recorded_under_one_store_lock(tmp_path):
+    config = TemplateConfig(tmp_path)
+    seen = []
+
+    def build(taken):
+        seen.append(set(taken))
+        return None
+    # The builder sees the taken ids under the lock; refusing stores nothing.
+    assert config.store.create(build) is None and seen == [{GENERIC, 'generic-one-column'}]
+    assert [item['id'] for item in config.catalog()['templates']] == [GENERIC, 'generic-one-column']
+    # A package under an id of the taken set is a programming error the store refuses.
+    with pytest.raises(SchemaFailure):
+        config.store.create(lambda _taken: compile_template(BUNDLED_TEMPLATE))
+    state, refused = config.copy(GENERIC, 'Мой')
+    assert refused is None and state['package']['id'] == 'custom-moy' and 'custom-moy' in config.store.taken_ids()
 
 
 @pytest.mark.asyncio

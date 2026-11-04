@@ -11,8 +11,9 @@ TEXT_LIMIT = 120
 LIST_SHOWN = 2
 
 
-def _size(value) -> int:
-    return len(json.dumps(value, ensure_ascii=False).encode("utf-8"))
+def summary_bytes(value) -> int:
+    """The size of a summary (or one of its entries) as the tool reply carries it: compact JSON in UTF-8."""
+    return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
 
 
 def _cut(text: str) -> str:
@@ -70,11 +71,12 @@ def sample_summary(result: ExtractResult, *, limit: int = 32 * 1024) -> dict:
     gaps = list(dict.fromkeys((gap.code, gap.location.page) for gap in result.gaps))
     summary = {"name": result.original_name, "pages": result.page_count, "unitCount": len(entries),
         "listed": len(entries), "units": [], "gaps": [{"code": code, "page": page} for code, page in gaps]}
-    while summary["gaps"] and _size(summary) > limit:
+    while summary["gaps"] and summary_bytes(summary) > limit:
         summary["gaps"].pop()
-    used = _size(summary)
+    used = summary_bytes(summary)
     for entry in entries:
-        cost = _size(entry) + (1 if summary["units"] else 0)
+        # The compact form writes one comma between units, so the count is exact.
+        cost = summary_bytes(entry) + (1 if summary["units"] else 0)
         if used + cost > limit:
             break
         summary["units"].append(entry)

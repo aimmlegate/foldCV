@@ -1,14 +1,12 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
-import { ConnectionWorkflow } from "../connection/workflow";
 import type { TemplateEditorHandle } from "../rich/TemplateEditor";
 import { AgentApiFailure, AssistantApi } from "./api";
-import { AssistantController, type AssistantSelection, type AssistantView } from "./controller";
-import { drawerSize, errorText, rereadsCapabilities, shownFailure } from "./presentation";
+import { AssistantController, type AssistantSelection } from "./controller";
+import { errorText, shownFailure } from "./presentation";
+import { useAutoscroll, useDrawer } from "./useDrawer";
 import { DrawerView } from "../workbench/assistant/DrawerView";
 
 export type AssistantHandle = { stop: () => Promise<void> };
-const key = "foldcv.assistant.drawer";
-function storedSize() { try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null"); return drawerSize(value); } catch { return drawerSize(null); } }
 
 function blocksText(count: number): string {
   const last = count % 10, tens = count % 100;
@@ -21,15 +19,12 @@ function blocksText(count: number): string {
 export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref, title = "Резюме", onProjectLifecycle }: {
   projectId: string; editor: RefObject<TemplateEditorHandle | null>; settingsOpen: boolean; settings: () => void; ref: Ref<AssistantHandle>;
   title?: string; onProjectLifecycle?: (kind: "archive" | "delete") => Promise<boolean> }) {
-  const [view, setView] = useState<AssistantView | null>(null), [size, setSize] = useState(storedSize);
   const [captured, setCaptured] = useState<AssistantSelection | null>(null);
-  const controller = useRef<AssistantController | null>(null), selectionKey = useRef(""), log = useRef<HTMLDivElement>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const selectionKey = useRef("");
   const lifecycle = useRef(onProjectLifecycle);
   lifecycle.current = onProjectLifecycle;
-  const report = (work: Promise<void> | undefined) => { void work?.catch(error => setFailure(error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED")); };
-  useEffect(() => {
-    const api = new AssistantApi(projectId), connection = new ConnectionWorkflow(() => {});
+  const { view, size, setSize, failure, setFailure, controller, log, report } = useDrawer("foldcv.assistant.drawer", projectId, changed => {
+    const api = new AssistantApi(projectId);
     const current = new AssistantController(api, {
       applyProposal: (id, allowEdits) => {
         const mounted = editor.current;
@@ -38,25 +33,10 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
       actionApplied: async action => {
         if (action.action === "archive" || action.action === "delete") { await lifecycle.current?.(action.action); return; }
         if (action.action !== "restore") await editor.current?.refresh();
-      } }, setView);
-    controller.current = current; setView(current.view);
-    void (async () => {
-      // Providers not checked yet are checked only when the assistant is on.
-      await connection.peek(false);
-      if ((await api.settings()).enabled) await connection.checkUnchecked();
-      await current.init();
-    })().catch(() => setFailure("REQUEST_FAILED"));
-    return () => { connection.close(); current.close(); if (controller.current === current) controller.current = null; };
-  }, [projectId, editor]);
+      } }, changed);
+    return { controller: current, settings: () => api.settings() };
+  });
   useEffect(() => { if (!settingsOpen) report(controller.current?.refresh()); }, [settingsOpen]);
-  // A connection check can still be running when the panel shows a refusal; re-read until it settles.
-  const refused = rereadsCapabilities(view);
-  useEffect(() => {
-    if (!refused) return;
-    const timer = setInterval(() => { report(controller.current?.refreshCapabilities()); }, 2000);
-    return () => clearInterval(timer);
-  }, [refused]);
-  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(size)); } catch { /* Size is optional when browser storage is unavailable. */ } }, [size]);
   useEffect(() => {
     const timer = setInterval(() => {
       if (!document.activeElement?.closest(".cv-document")) return;
@@ -66,10 +46,7 @@ export function AssistantDrawer({ projectId, editor, settingsOpen, settings, ref
     }, 200);
     return () => clearInterval(timer);
   }, [editor]);
-  useEffect(() => {
-    const element = log.current;
-    if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 180) element.scrollTop = element.scrollHeight;
-  }, [view?.messages, view?.partial, view?.findings, view?.sources, view?.activity, view?.proposals]);
+  useAutoscroll(log, [view?.messages, view?.partial, view?.findings, view?.sources, view?.activity, view?.proposals]);
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [view?.conversationId, view?.run?.id]);
   useImperativeHandle(ref, () => ({ stop: async () => { if (controller.current?.active) await controller.current.stop(); } }), []);
   function send() {

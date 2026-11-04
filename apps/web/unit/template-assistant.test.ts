@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantRuns } from "../src/assistant/controller";
-import { applyStep, parseSample, parseTemplateProposal, proposalCard, proposalTarget, TemplateAssistantApi, textHash,
-  type TemplateFields, type TemplateProposal } from "../src/assistant/template";
+import { applyStep, onTarget, parseSample, parseTemplateProposal, proposalCard, proposalTarget, TEMPLATE_TEXT_BYTES, TemplateAssistantApi,
+  textBytes, textHash, type TemplateFields, type TemplateProposal } from "../src/assistant/template";
 import type { Fetcher } from "../src/rich/v7-connection";
 import { applyProposal, type ApplyEditor } from "../src/workbench/templates/apply";
 import type { ShownTemplate } from "../src/workbench/templates/studio";
@@ -31,9 +31,11 @@ function editor(shown: ShownTemplate | null, text: string, stored: Record<string
   return { port, log, state };
 }
 
-test("the SHA-256 of the editor text is lower-case hex of its UTF-8 bytes", async () => {
+test("the SHA-256 of the editor text is lower-case hex of its UTF-8 bytes, and its size counts those bytes", async () => {
   assert.equal(await textHash("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   assert.equal((await textHash("шаблон")).length, 64);
+  assert.equal(textBytes("шаблон"), 12);
+  assert.equal(TEMPLATE_TEXT_BYTES, 256 * 1024);
 });
 
 test("apply replaces the shown template's text only while it has the run's base hash", async () => {
@@ -83,6 +85,10 @@ test("a new-template proposal opens an unsaved entry with the run's assets, or r
 
 test("the step rule: target, then the hash", () => {
   const value = { templateId: "generic", baseHash: "h" };
+  assert.equal(onTarget(value, { templateId: "generic", draft: false, unsaved: false }), true);
+  assert.equal(onTarget(value, { templateId: "other", draft: false, unsaved: false }), false);
+  assert.equal(onTarget({ templateId: null }, { templateId: null, draft: true, unsaved: true }), true);
+  assert.equal(onTarget({ templateId: null }, null), false);
   assert.deepEqual(applyStep(value, null, "h"), { kind: "open", ask: false });
   assert.deepEqual(applyStep(value, { templateId: "generic", draft: false, unsaved: true }, "h"), { kind: "replace" });
   assert.deepEqual(applyStep(value, { templateId: "generic", draft: false, unsaved: true }, "other"), { kind: "confirm" });
@@ -131,7 +137,7 @@ function server(proposals: unknown[] = []) {
     if (url.endsWith("/messages")) return reply({ conversation, messages: [], sources: [], findings: [], runs: [], files: [] });
     if (url.endsWith("/runs")) return reply({ ...run("running", "run-7"), projectId: "templates", allowEdits: false, baseRevision: 0 });
     if (url.includes("/events/")) return reply({ run: { ...run("completed", "run-7"), projectId: "templates" }, events: [], next: 0 });
-    if (url.includes("/proposals?")) return reply({ items: proposals });
+    if (url.endsWith("/proposals")) return reply({ items: proposals });
     if (url.endsWith("/state")) return reply({ ...(proposals[0] as object), state: (body as { state: string }).state });
     if (url.endsWith("/samples")) return reply({ sampleId: "sample-1", name: "Образец.docx", pages: null, unitCount: 12 });
     return reply({ error: { code: "REQUEST_FAILED" } }, 404);
@@ -171,7 +177,7 @@ test("template proposals are listed per conversation and decided on their own ro
   const { fetcher, calls } = server([stored]);
   const api = new TemplateAssistantApi(fetcher);
   assert.deepEqual(await api.templateProposals("conversation-1"), [stored]);
-  assert.equal(calls.at(-1)?.url, "/v2/templates/assistant/proposals?conversationId=conversation-1");
+  assert.equal(calls.at(-1)?.url, "/v2/templates/assistant/conversations/conversation-1/proposals");
   assert.equal((await api.decide("proposal-1", "applied")).state, "applied");
   assert.deepEqual(calls.at(-1), { url: "/v2/templates/assistant/proposals/proposal-1/state", method: "POST", body: { state: "applied" } });
   // The run controller's resume proposal list stays empty in this scope.

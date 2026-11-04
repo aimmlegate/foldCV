@@ -1,3 +1,5 @@
+import { sha256Hex } from "../../api/hash";
+
 export type OriginalKind = "pdf" | "docx" | "text" | "markdown" | "unsupported";
 
 export function originalKind(name: string): OriginalKind {
@@ -15,9 +17,7 @@ export async function loadOriginal(url: string, hash: string, signal: AbortSigna
   const response = await fetch(url, { credentials: "same-origin", cache: "no-store", signal });
   if (!response.ok) throw new Error("Не удалось загрузить оригинал.");
   const bytes = await response.arrayBuffer();
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-  if (actual !== hash) throw new Error("Сохранённый оригинал повреждён.");
+  if (await sha256Hex(bytes) !== hash) throw new Error("Сохранённый оригинал повреждён.");
   signal.throwIfAborted();
   return new Blob([bytes], { type: response.headers.get("Content-Type") ?? "application/octet-stream" });
 }

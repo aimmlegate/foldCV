@@ -90,6 +90,9 @@ test("a sample goes with one run: it leaves after a started run, and stays after
     } finally { runs.close(); }
   }
   assert.equal(sampleSpent("run-1", { run: run("running", "run-1"), error: null }), false, "Send did nothing while a run was shown");
+  // The run started, so the service took the sample, even when the read after it failed; no run, no sample taken.
+  assert.equal(sampleSpent("run-1", { run: run("running", "run-2"), error: "AGENT_UNAVAILABLE" }), true);
+  assert.equal(sampleSpent(null, { run: null, error: "AGENT_UNAVAILABLE" }), false);
 });
 
 function reply(value: unknown, status = 200) { return Promise.resolve(new Response(JSON.stringify(value), { status })); }

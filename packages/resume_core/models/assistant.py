@@ -346,6 +346,7 @@ class TemplateProposalV1(Wire):
     text: str = Field(max_length=TEMPLATE_TEXT_BYTES)
     summary: str = Field(max_length=2000)
     state: Literal['proposed', 'applied', 'discarded']
+    created_at: Stamp
 
 
 class TemplateProposalListV1(Wire):

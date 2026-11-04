@@ -159,20 +159,26 @@ PROMPT = ("You are the FoldCV resume assistant. The resume, facts, originals, sk
     "or tool names.")
 
 
-def prompt(workspace, *, message, history, allow_edits, allow_web, selection):
-    project = workspace.project
+def envelope(preamble, payload, *, skills, history, message):
+    """The run prompt of any scope: the preamble line, then one JSON object with the scope's payload, the skills, the
+    last eight messages (each clipped to 3000 bytes) and the message. Runtimes and tools/serve_synthetic.py read it."""
     recent = []
     for item in history[-8:]:
         text, truncated = clip(item.text, 3000)
         recent.append({'role': item.role, 'text': text, 'truncated': truncated or item.truncated})
-    context = {'project': {'id': workspace.project_id, 'title': workspace.title, 'revision': workspace.project_revision,
-            'blocks': len(list(project.document.blocks())), 'facts': len(project.facts.records) + len(project.facts.extensions),
-            'sources': [{'id': source.id, 'name': source.original_name} for source in project.sources[:20]]},
-        'permissions': {'proposalsApplyOnlyWithEdits': True, 'editsAllowed': allow_edits, 'internet': allow_web},
-        'skills': [{'name': skill.id, 'command': '/' + skill.id, 'description': skill.description} for skill in SKILLS],
-        'selection': selection.model_dump(mode='json', by_alias=True) if selection else None,
+    value = {**payload, 'skills': [{'name': skill.id, 'command': '/' + skill.id, 'description': skill.description} for skill in skills],
         'recentMessages': recent, 'olderMessagesOmitted': max(0, len(history) - 8), 'message': message}
-    text = PROMPT + '\n' + json_text(context)
+    text = preamble + '\n' + json_text(value)
     if len(text.encode()) > limits.CONTEXT_BYTES:
         raise AgentFailure('AGENT_CONTEXT_LIMIT')
     return text
+
+
+def prompt(workspace, *, message, history, allow_edits, allow_web, selection):
+    project = workspace.project
+    payload = {'project': {'id': workspace.project_id, 'title': workspace.title, 'revision': workspace.project_revision,
+            'blocks': len(list(project.document.blocks())), 'facts': len(project.facts.records) + len(project.facts.extensions),
+            'sources': [{'id': source.id, 'name': source.original_name} for source in project.sources[:20]]},
+        'permissions': {'proposalsApplyOnlyWithEdits': True, 'editsAllowed': allow_edits, 'internet': allow_web},
+        'selection': selection.model_dump(mode='json', by_alias=True) if selection else None}
+    return envelope(PROMPT, payload, skills=SKILLS, history=history, message=message)

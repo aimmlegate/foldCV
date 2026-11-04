@@ -6,7 +6,7 @@ import docx
 import pymupdf
 
 from packages.resume_core.extraction.parser import extract
-from packages.resume_core.sample_summary import sample_summary
+from packages.resume_core.sample_summary import sample_summary, summary_bytes
 
 PHONE, MAIL = "+7 915 123-45-67", "sample.person@example.com"
 
@@ -79,13 +79,28 @@ def test_pdf_summary_keeps_columns_sizes_and_bold_title(tmp_path):
 def test_long_document_stays_under_the_byte_limit(tmp_path):
     result = docx_sample(tmp_path / "long.docx", items=40, paragraphs=400)
     summary = sample_summary(result)
-    assert len(json.dumps(summary, ensure_ascii=False).encode("utf-8")) <= 32 * 1024
+    # The limit is the size the tool reply carries: compact JSON.
+    assert summary_bytes(summary) <= 32 * 1024
+    assert summary_bytes(summary) == len(json.dumps(summary, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     assert summary["unitCount"] > summary["listed"] == len(summary["units"]) > 0
     assert_masked_and_short(summary)
     assert [text for text in texts(summary) if text.startswith("Пункт")] == ["Пункт списка 1", "Пункт списка 2"]
     small = sample_summary(result, limit=2048)
-    assert len(json.dumps(small, ensure_ascii=False).encode("utf-8")) <= 2048
+    assert summary_bytes(small) <= 2048
     assert small["listed"] < summary["listed"]
+
+
+def test_the_summary_fills_its_limit_exactly_with_many_short_units(tmp_path):
+    # Hundreds of short units: a separator counted short once left the finished JSON past the limit.
+    result = docx_sample(tmp_path / "short.docx", items=2, paragraphs=600)
+    every = sample_summary(result, limit=10 ** 7)
+    for limit in (32 * 1024, 4096, 1500):
+        summary = sample_summary(result, limit=limit)
+        assert summary_bytes(summary) <= limit
+        assert summary["listed"] < summary["unitCount"] == every["listed"]
+        # The next unit would not fit.
+        fuller = {**summary, "units": [*summary["units"], every["units"][summary["listed"]]]}
+        assert summary_bytes(fuller) > limit
 
 
 def test_gaps_are_listed_once_per_code_and_page(tmp_path):

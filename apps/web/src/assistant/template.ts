@@ -8,6 +8,8 @@ import type { AssistantConversationV1 } from "../contracts/generated/assistant_c
 import type { AssistantEventsV1 } from "../contracts/generated/assistant_events_v1";
 import type { AssistantMessagesV1 } from "../contracts/generated/assistant_messages_v1";
 import type { AssistantRunV1 } from "../contracts/generated/assistant_run_v1";
+import { field, optionalText, text } from "../api/fields";
+import { sha256Hex } from "../api/hash";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
 import { AssistantApi } from "./api";
 import type { Port, RunRequest } from "./controller";
@@ -15,25 +17,14 @@ import type { Port, RunRequest } from "./controller";
 /** The template assistant (D141): the resume assistant's runs on its own routes, with no access to resumes. Its
  * proposals are whole YAML texts that the templates screen applies into the editor; replies are parsed by hand. */
 export const templatePrefix = "/v2/templates/assistant";
+/** The most a run request carries as the editor text (the server's TEMPLATE_TEXT_BYTES); the editor itself takes 2 MiB. */
+export const TEMPLATE_TEXT_BYTES = 256 * 1024;
 export type TemplateFields = { templateId: string | null; assetsFrom: string | null; text: string; textHash: string; sampleId: string | null };
 export type TemplateProposalState = "proposed" | "applied" | "discarded";
 export type TemplateProposal = { id: string; conversationId: string; runId: string; templateId: string | null; name: string | null;
   baseHash: string; text: string; summary: string; state: TemplateProposalState };
 export type TemplateSample = { sampleId: string; name: string; pages: number | null; unitCount: number };
 
-function field(value: unknown, key: string): unknown {
-  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
-}
-function text(value: unknown, key: string): string {
-  const item = field(value, key);
-  if (typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
-  return item;
-}
-function optionalText(value: unknown, key: string): string | null {
-  const item = field(value, key);
-  if (item !== null && typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
-  return item;
-}
 const states: readonly TemplateProposalState[] = ["proposed", "applied", "discarded"];
 
 export function parseTemplateProposal(value: unknown): TemplateProposal {
@@ -54,28 +45,18 @@ export function parseSample(value: unknown): TemplateSample {
   return { sampleId: text(value, "sampleId"), name: text(value, "name"), pages: pages as number | null, unitCount: unitCount as number };
 }
 
-/** Whether the attached sample leaves the composer after a send: it goes with one run only (2026-11-04), and a sample
- * the service no longer keeps must be attached again. `before`: the run shown when Send was pressed. */
+/** Whether the attached sample leaves the composer after a send: it goes with one run only (2026-11-04), so a run
+ * that started took it even when a later read failed, and a sample the service no longer keeps must be attached
+ * again. `before`: the run shown when Send was pressed. */
 export function sampleSpent(before: string | null, after: { run: { id: string } | null; error: string | null }): boolean {
-  return after.error === "SAMPLE_NOT_FOUND" || after.error === null && after.run !== null && after.run.id !== before;
+  return after.error === "SAMPLE_NOT_FOUND" || after.run !== null && after.run.id !== before;
 }
+
+/** The UTF-8 size of the editor text, what the run limit counts. */
+export function textBytes(value: string): number { return new TextEncoder().encode(value).length; }
 
 /** SHA-256 of the UTF-8 text as lower-case hex, the proposal's base hash. */
-export async function textHash(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function reply(response: Response): Promise<unknown> {
-  const body = await response.text();
-  let value: unknown = null;
-  try { value = body ? JSON.parse(body) : null; } catch { throw new ProjectApiFailure("INVALID_RESULT", response.status); }
-  if (!response.ok) {
-    const code = field(field(value, "error"), "code");
-    throw new ProjectApiFailure(typeof code === "string" ? code : "REQUEST_FAILED", response.status);
-  }
-  return value;
-}
+export function textHash(value: string): Promise<string> { return sha256Hex(new TextEncoder().encode(value)); }
 
 const defaultFetch: Fetcher = (input, init) => fetch(input, init);
 const path = (kind: string, id: string, tail = "") => `${templatePrefix}/${kind}/${encodeURIComponent(id)}${tail}`;
@@ -107,8 +88,7 @@ export class TemplateAssistantApi implements Port<TemplateFields> {
   proposals(): Promise<AssistantChangeProposalListV1> { return Promise.resolve({ items: [] }); }
   discard(): Promise<AssistantChangeProposalV1> { return Promise.reject(new ProjectApiFailure("REQUEST_FAILED")); }
   async templateProposals(conversationId: string): Promise<TemplateProposal[]> {
-    const query = `${templatePrefix}/proposals?conversationId=${encodeURIComponent(conversationId)}`;
-    return parseTemplateProposals(await v2Request<unknown>(query, "GET", undefined, this.fetcher));
+    return parseTemplateProposals(await v2Request<unknown>(path("conversations", conversationId, "/proposals"), "GET", undefined, this.fetcher));
   }
   async decide(proposalId: string, state: "applied" | "discarded"): Promise<TemplateProposal> {
     return parseTemplateProposal(await v2Request<unknown>(path("proposals", proposalId, "/state"), "POST", { state }, this.fetcher));
@@ -117,7 +97,7 @@ export class TemplateAssistantApi implements Port<TemplateFields> {
   async uploadSample(file: File): Promise<TemplateSample> {
     const body = new FormData();
     body.append("file", file, file.name);
-    const sample = parseSample(await reply(await this.fetcher(`${templatePrefix}/samples`, { method: "POST", body, credentials: "same-origin", cache: "no-store" })));
+    const sample = parseSample(await v2Request<unknown>(`${templatePrefix}/samples`, "POST", body, this.fetcher));
     this.sampleNames.set(sample.sampleId, sample.name);
     return sample;
   }
@@ -128,10 +108,13 @@ export class TemplateAssistantApi implements Port<TemplateFields> {
  * still has the hash the run started from, else only after a confirmation. */
 export type ApplyStep = { kind: "open"; ask: boolean } | { kind: "replace" } | { kind: "confirm" };
 export type ShownTarget = { templateId: string | null; draft: boolean; unsaved: boolean } | null;
+/** Whether the editor shows the proposal's target. A new-template proposal refines the unsaved entry when that entry
+ * is shown; otherwise it makes one. */
+export function onTarget(proposal: Pick<TemplateProposal, "templateId">, shown: ShownTarget): boolean {
+  return shown !== null && (proposal.templateId === null ? shown.draft : !shown.draft && shown.templateId === proposal.templateId);
+}
 export function applyStep(proposal: Pick<TemplateProposal, "templateId" | "baseHash">, shown: ShownTarget, hash: string): ApplyStep {
-  // A new-template proposal refines the unsaved entry when that entry is shown; otherwise it makes one.
-  const onTarget = shown !== null && (proposal.templateId === null ? shown.draft : !shown.draft && shown.templateId === proposal.templateId);
-  if (!onTarget) return { kind: "open", ask: shown?.unsaved ?? false };
+  if (!onTarget(proposal, shown)) return { kind: "open", ask: shown?.unsaved ?? false };
   return hash === proposal.baseHash ? { kind: "replace" } : { kind: "confirm" };
 }
 

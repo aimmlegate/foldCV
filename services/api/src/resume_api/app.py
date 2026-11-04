@@ -10,7 +10,6 @@ from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
 import json
-import re
 from pathlib import Path
 import secrets
 import threading
@@ -65,8 +64,6 @@ JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 TEMPLATE_ASSISTANT_PATH = "/v2/templates/assistant/"
 TEMPLATE_SAMPLES_PATH = TEMPLATE_ASSISTANT_PATH + "samples"
-# The one query string the API admits: the conversation whose template proposals are listed.
-TEMPLATE_PROPOSALS_QUERY = re.compile(rb"conversationId=[A-Za-z0-9_-]{1,128}")
 
 
 @dataclass
@@ -112,10 +109,6 @@ def template_config(path: str) -> bool:
     return path.startswith(TEMPLATE_CONFIG_PATH) or path == TEMPLATE_CONFIG_PATH.rstrip("/")
 
 
-def template_proposals(method: str, path: str, query: bytes) -> bool:
-    return method == "GET" and path == TEMPLATE_ASSISTANT_PATH + "proposals" and TEMPLATE_PROPOSALS_QUERY.fullmatch(query) is not None
-
-
 def is_json_media_type(raw: bytes) -> bool:
     media = raw.split(b";", 1)[0].strip(b" \t").lower()
     return media == b"application/json" or (media.startswith(b"application/") and media.endswith(b"+json"))
@@ -152,8 +145,7 @@ class LocalBoundary:
         response = None
         if host != self.host or b"forwarded" in headers or b"x-forwarded-host" in headers or b"x-forwarded-proto" in headers:
             response = problem("HOST_DENIED", 403)
-        elif is_api and ((scope.get("query_string") and not template_proposals(method, path, scope["query_string"]))
-                or (origin and origin != self.origin) or (method != "GET" and origin != self.origin)):
+        elif is_api and (scope.get("query_string") or (origin and origin != self.origin) or (method != "GET" and origin != self.origin)):
             response = problem("ORIGIN_DENIED", 403)
         elif is_api and path != "/v1/session/exchange" and not self._authorized(headers):
             response = problem("AUTH_REQUIRED", 401)
@@ -538,7 +530,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     template_assistant.runtime_for = assistant.runtime_for
     app.state.template_assistant = template_assistant
     mount_assistant(app, assistant, companions=(template_assistant,))
-    mount_template_assistant(app, template_assistant, problem=problem, temp_root=temp_root, worker_slot=worker_slot)
+    mount_template_assistant(app, template_assistant, problem=problem, temp_root=temp_root, worker_slot=worker_slot,
+        cleanup_error=lifecycle_code)
 
     def template_import_model(effort=None):
         # The capture records the selected import model with the effort the import start chose, else its catalog

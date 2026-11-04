@@ -88,6 +88,9 @@ def _fit(conversation):
 
 
 class AssistantStore:
+    # The proposal file's model; the template assistant stores its own kind under the same layout.
+    proposal_model = AssistantChangeProposalV1
+
     def __init__(self, root: Path):
         self.root = Path(root) / "assistant"
         self.lock = threading.RLock()
@@ -215,10 +218,15 @@ class AssistantStore:
 
     # Proposals
 
+    def owner(self, proposal):
+        """The scope key whose files hold the proposal: the project of a resume proposal."""
+        return proposal.project_id
+
     def save_proposal(self, proposal):
         with self.lock:
-            self._write(self.directory(proposal.project_id, "proposals", _safe(proposal.id) + ".json"), proposal)
-            self._trim_proposals(proposal.project_id)
+            owner = self.owner(proposal)
+            self._write(self.directory(owner, "proposals", _safe(proposal.id) + ".json"), proposal)
+            self._trim_proposals(owner)
 
     def _trim_proposals(self, project_id):
         folder = self.directory(project_id, "proposals")
@@ -228,15 +236,15 @@ class AssistantStore:
 
     def proposal(self, project_id, proposal_id):
         with self.lock:
-            value = self._read(self.directory(project_id, "proposals", _safe(proposal_id) + ".json"), AssistantChangeProposalV1)
-        if value is None or value.project_id != project_id:
+            value = self._read(self.directory(project_id, "proposals", _safe(proposal_id) + ".json"), self.proposal_model)
+        if value is None or self.owner(value) != project_id:
             raise AgentFailure("ASSISTANT_PROPOSAL_NOT_FOUND")
         return value
 
     def proposals(self, project_id, conversation_id=None):
         folder = self.directory(project_id, "proposals")
         with self.lock:
-            items = [self._read(path, AssistantChangeProposalV1) for path in folder.glob("*.json")] if folder.exists() else []
+            items = [self._read(path, self.proposal_model) for path in folder.glob("*.json")] if folder.exists() else []
         items = [item for item in items if item is not None and (conversation_id is None or item.conversation_id == conversation_id)]
         return sorted(items, key=lambda item: item.created_at)
 

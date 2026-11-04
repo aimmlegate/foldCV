@@ -9,12 +9,13 @@ import re
 
 from pydantic import Field
 import yaml
+from yaml.nodes import MappingNode, ScalarNode
 
 from packages.resume_core.models.contracts import Wire
 from packages.resume_core.templates.compiler import compile_bytes
-from packages.resume_core.templates.loading import CONFIG_BYTES
+from packages.resume_core.templates.loading import CONFIG_BYTES, load_definition
 from packages.resume_core.templates.projection import SchemaFailure
-from packages.resume_core.templates.store import TemplateIdTaken, TemplateStore, bundled_folder
+from packages.resume_core.templates.store import TemplateStore, bundled_folder
 
 from .template_reasons import reason_text
 
@@ -25,8 +26,8 @@ FIRST_REVISION = '1.0.0'
 # Russian letters of a copy's name become ASCII in its id.
 TRANSLIT = dict(zip('абвгдеёжзийклмнопрстуфхцчшщъыьэюя', ['a', 'b', 'v', 'g', 'd', 'e', 'e', 'zh', 'z', 'i', 'y', 'k',
     'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'f', 'kh', 'ts', 'ch', 'sh', 'shch', '', 'y', '', 'e', 'yu', 'ya']))
-HEADER_KEY = re.compile(r'^(\s+)(id|name|revision)\s*:')
 NUMBERED_REVISION = re.compile(r'(\d+)\.(\d+)\.(\d+)')
+HEADER_KEYS = ('id', 'revision', 'name')
 
 
 class TemplateConfigRequest(Wire):
@@ -76,46 +77,56 @@ def next_revision(revisions):
     return f'{major}.{minor}.{patch + 1}'
 
 
+def _scalar(key, value, flow):
+    # Ids and revisions are plain ASCII; a name is quoted. Inside braces every value is quoted, so JSON stays JSON.
+    return json.dumps(value, ensure_ascii=False) if flow or key == 'name' else value
+
+
 def with_header(text, **values):
-    """The text with the given `id`, `name` and `revision` lines in its top `template:` mapping; comments and the short
-    form stay. None when the text has no such block mapping."""
-    lines = text.splitlines(keepends=True)
-    top = next((index for index, line in enumerate(lines) if re.match(r'template\s*:\s*(#.*)?$', line.rstrip('\r\n'))), None)
-    if top is None:
+    """The text with the given `id`, `name` and `revision` set in its top `template:` mapping. Values are replaced
+    in place, whatever their scalar style, and missing keys are added first; comments and the short form stay.
+    None when the text has no `template` mapping. Invalid YAML comes back unchanged: the compiler names the error."""
+    try:
+        root = yaml.compose(text, Loader=yaml.SafeLoader)
+    except (yaml.YAMLError, RecursionError):
+        return text
+    pairs = root.value if isinstance(root, MappingNode) else []
+    header = next((value for key, value in pairs if isinstance(key, ScalarNode) and key.value == 'template'), None)
+    if not isinstance(header, MappingNode):
         return None
-    if 'name' in values:
-        values['name'] = json.dumps(values['name'], ensure_ascii=False)
-    indent, seen = None, set()
-    for index in range(top + 1, len(lines)):
-        line = lines[index]
-        if not line.strip() or line.lstrip().startswith('#'):
-            continue
-        if not line[0].isspace():
-            break
-        current = len(line) - len(line.lstrip())
-        indent = current if indent is None else indent
-        match = HEADER_KEY.match(line)
-        if current == indent and match and match.group(2) not in seen:
-            key = match.group(2)
-            seen.add(key)
-            if key in values:
-                ending = '\r\n' if line.endswith('\r\n') else '\n' if line.endswith('\n') else ''
-                lines[index] = f'{match.group(1)}{key}: {values[key]}{ending}'
-    if indent is None:
-        return None
-    ending = '\r\n' if lines[top].endswith('\r\n') else '\n'
-    missing = [f'{" " * indent}{key}: {values[key]}{ending}' for key in ('id', 'revision', 'name') if key in values and key not in seen]
-    if not lines[top].endswith(('\n', '\r\n')):
-        lines[top] += ending
-    return ''.join([*lines[:top + 1], *missing, *lines[top + 1:]])
+    flow, present, edits = header.flow_style, set(), []
+    for key, value in header.value:
+        if isinstance(key, ScalarNode) and key.value in values and key.value not in present:
+            present.add(key.value)
+            start, end = value.start_mark.index, value.end_mark.index
+            # A block scalar's span ends past its line breaks; they stay in the text.
+            while end > start and text[end - 1] in '\r\n':
+                end -= 1
+            replacement = _scalar(key.value, values[key.value], flow)
+            if start == end and text[start - 1:start] not in (' ', '\t'):
+                replacement = ' ' + replacement
+            edits.append((start, end, replacement))
+    missing = [key for key in HEADER_KEYS if key in values and key not in present]
+    if missing and flow:
+        added = ', '.join(f'{json.dumps(key)}: {_scalar(key, values[key], True)}' for key in missing)
+        edits.append((header.start_mark.index + 1, header.start_mark.index + 1, added + (', ' if header.value else '')))
+    elif missing:
+        first = header.value[0][0].start_mark.index
+        line = text.rfind('\n', 0, first) + 1
+        ending = '\r\n' if '\r\n' in text else '\n'
+        edits.append((line, line, ''.join(f'{text[line:first]}{key}: {_scalar(key, values[key], False)}{ending}' for key in missing)))
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = text[:start] + replacement + text[end:]
+    return text
 
 
 def stated_name(text):
+    """`template.name` of a text as the compiler reads it; None when it is missing or blank, or the text does not load."""
     try:
-        loaded = yaml.safe_load(text)
-    except yaml.YAMLError:
+        loaded = load_definition(text.encode('utf-8'))
+    except SchemaFailure:
         return None
-    header = loaded.get('template') if isinstance(loaded, dict) else None
+    header = loaded.get('template')
     name = header.get('name') if isinstance(header, dict) else None
     return name.strip() if isinstance(name, str) and name.strip() else None
 
@@ -127,6 +138,15 @@ def summary(package):
 
 def original(package):
     return package.original_format, base64.b64decode(package.original_base64)
+
+
+def decoded_assets(package):
+    return {asset.path: base64.b64decode(asset.bytes_base64) for asset in package.assets}
+
+
+def refused(error):
+    """The check reply of a text that does not compile; a refused save or create answers 422 with it."""
+    return {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
 
 
 class TemplateConfig:
@@ -151,63 +171,58 @@ class TemplateConfig:
         (text_format, text), state = self.flags(package, bundled)
         return {'schemaVersion': 1, 'package': summary(package), 'format': text_format, 'text': text.decode('utf-8'), **state}
 
-    def compile(self, template_id, text):
-        """Return (package, None) or (None, error). Assets keep the current package's bytes; new paths read the bundled
-        folder."""
-        current, bundled = self.store.versions(template_id)
-        captured = {asset.path: base64.b64decode(asset.bytes_base64) for asset in current.assets}
+    def compile_new(self, text, assets, folder=None):
+        """Compile a text with no id or revision check: (package, None) or (None, error). `assets` maps a path to
+        captured bytes; other paths read `folder`, by default the first shipped one (a template the store lacks)."""
         try:
-            package = compile_bytes(text.encode('utf-8'), bundled_folder(template_id), original_format='yaml', assets=captured)
+            package = compile_bytes(text.encode('utf-8'), folder or bundled_folder(''), original_format='yaml', assets=assets)
         except SchemaFailure as error:
             return None, {'path': error.path, 'message': reason_text(error.reason)}
         except (ValueError, UnicodeError) as error:
             first = str(error).splitlines()[0] if str(error) else ''
             return None, {'path': '/', 'message': reason_text(first)}
-        if package.id != template_id:
-            return None, {'path': '/template/id', 'message': ID_CHANGED.format(template_id)}
+        return package, None
+
+    def compile(self, template_id, text):
+        """An edit of a saved template as Save checks it: (package, None) or (None, error)."""
+        return self.compile_saved(text, *self.store.versions(template_id))
+
+    def compile_saved(self, text, current, bundled, assets=None):
+        """Compile an edit of `current` (`bundled`: its shipped package or None): the id must stay and the revision
+        must be free. Assets keep the current package's bytes unless given; new paths read the bundled folder."""
+        package, error = self.compile_new(text, decoded_assets(current) if assets is None else assets, bundled_folder(current.id))
+        if error is not None:
+            return None, error
+        if package.id != current.id:
+            return None, {'path': '/template/id', 'message': ID_CHANGED.format(current.id)}
         # The bundled revision names the bundled bytes even before the store records them.
         bundled_taken = bundled is not None and package.revision == bundled.revision and package.package_hash != bundled.package_hash
         if bundled_taken or self.store.revision_taken(package):
-            known = {package.revision, current.revision, *self.store.revisions(template_id)}
+            known = {package.revision, current.revision, *self.store.revisions(current.id)}
             if bundled is not None:
                 known.add(bundled.revision)
             return None, {'path': '/template/revision', 'message': REVISION_TAKEN, 'nextRevision': next_revision(known)}
         return package, None
 
-    def compile_new(self, text, assets):
-        """Compile the text of a template the store does not have yet: (package, None) or (None, error). `assets` maps a
-        path to captured bytes; other paths read the first shipped folder. No id or revision check."""
-        try:
-            return compile_bytes(text.encode('utf-8'), bundled_folder(''), original_format='yaml', assets=assets), None
-        except SchemaFailure as error:
-            return None, {'path': error.path, 'message': reason_text(error.reason)}
-        except (ValueError, UnicodeError) as error:
-            first = str(error).splitlines()[0] if str(error) else ''
-            return None, {'path': '/', 'message': reason_text(first)}
-
     def captured(self, template_id):
         """Asset bytes of the current package of `template_id`; no template, no assets."""
-        if template_id is None:
-            return {}
-        return {asset.path: base64.b64decode(asset.bytes_base64) for asset in self.store.current(template_id).assets}
+        return {} if template_id is None else decoded_assets(self.store.current(template_id))
 
     def _create(self, text, name, assets):
         """Store `text` under a fresh id derived from `name`: (config state, None) or (None, check reply)."""
-        for _attempt in range(3):
-            template_id = new_id(name, self.store.taken_ids())
-            headed = with_header(text, id=template_id, name=name, revision=FIRST_REVISION)
+        error = {}
+
+        def build(taken):
+            headed = with_header(text, id=new_id(name, taken), name=name, revision=FIRST_REVISION)
             if headed is None:
-                return None, {'schemaVersion': 1, 'valid': False, 'package': None,
-                    'error': {'path': '/template', 'message': NO_HEADER}}
-            package, error = self.compile_new(headed, assets)
-            if error is not None:
-                return None, {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
-            try:
-                self.store.create(package, keep_text=True)
-            except TemplateIdTaken:
-                continue
-            return self.read(template_id), None
-        raise TemplateIdTaken(name)
+                error['value'] = {'path': '/template', 'message': NO_HEADER}
+                return None
+            package, error['value'] = self.compile_new(headed, assets)
+            return package
+        package = self.store.create(build)
+        if package is None:
+            return None, refused(error['value'])
+        return self.read(package.id), None
 
     def copy(self, copy_of, name):
         """A new template from the current text and assets of `copy_of`, named `name`, at revision 1.0.0."""
@@ -220,8 +235,7 @@ class TemplateConfig:
         name = stated_name(text)
         if name is None:
             _package, error = self.compile_new(text, assets)
-            return None, {'schemaVersion': 1, 'valid': False, 'package': None,
-                'error': error or {'path': '/template/name', 'message': NO_HEADER}}
+            return None, refused(error or {'path': '/template/name', 'message': NO_HEADER})
         return self._create(text, name, assets)
 
     def delete(self, template_id):
@@ -231,7 +245,7 @@ class TemplateConfig:
     def check(self, template_id, text):
         package, error = self.compile(template_id, text)
         if error is not None:
-            return {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
+            return refused(error)
         return {'schemaVersion': 1, 'valid': True, 'package': summary(package), 'error': None}
 
     def save(self, template_id, text, revision=None):
@@ -240,11 +254,10 @@ class TemplateConfig:
         if revision is not None:
             text = with_header(text, revision=revision)
             if text is None:
-                return None, {'schemaVersion': 1, 'valid': False, 'package': None,
-                    'error': {'path': '/template', 'message': NO_HEADER}}
+                return None, refused({'path': '/template', 'message': NO_HEADER})
         package, error = self.compile(template_id, text)
         if error is not None:
-            return None, {'schemaVersion': 1, 'valid': False, 'package': None, 'error': error}
+            return None, refused(error)
         self.store.save(package, keep_text=True)
         return self.read(template_id), None
 

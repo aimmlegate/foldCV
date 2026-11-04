@@ -66,6 +66,12 @@ test("a save or reset updates only its own template in the list and keeps the de
     text: "", bundled: true, edited: true };
   assert.deepEqual(withState(catalog, saved), { defaultId: "second", templates: [
     { id: "generic", name: "Generic edited", revision: "9.0.0", packageHash: "b".repeat(64), bundled: true, edited: true }, catalog.templates[1]] });
+  // A created template joins the list as the server lists it: after the shipped ones, own templates by id.
+  const own = { package: { id: "custom-moy", name: "Мой", revision: "1.0.0", packageHash: "c".repeat(64) }, format: "yaml" as const, text: "", bundled: false, edited: true };
+  const created = withState(catalog, own);
+  assert.deepEqual(created.templates.map(entry => entry.id), [...catalog.templates.map(entry => entry.id), "custom-moy"]);
+  const earlier = withState(created, { ...own, package: { ...own.package, id: "custom-a" } });
+  assert.deepEqual(earlier.templates.map(entry => entry.id), [...catalog.templates.map(entry => entry.id), "custom-a", "custom-moy"]);
 });
 
 test("technical sections are found by their top-level keys only", () => {

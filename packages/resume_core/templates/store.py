@@ -119,10 +119,6 @@ class TemplateRefused(Exception):
         super().__init__(code)
 
 
-class TemplateIdTaken(LookupError):
-    """Another template took the id between choosing it and storing it."""
-
-
 def bundled_package(template_id: str) -> TemplatePackage | None:
     path = BUNDLED_TEMPLATES.get(template_id)
     if path is None: return None
@@ -234,12 +230,18 @@ class TemplateStore:
                 found.add(revision)
         return found
 
-    def create(self, package: TemplatePackage, *, keep_text: bool = True) -> None:
-        """Store the first version of a new id; refused when the id is taken, so a deleted id never returns."""
-        verify_package(package)
+    def create(self, build, *, keep_text: bool = True):
+        """Store the first version of a new template: `build(taken_ids)` chooses a free id and returns the package, or
+        None when its text does not compile. The choice and the save share the lock, so a deleted id never returns and
+        two creates never take one id."""
         with locked_root(self.root, ".templates.lock"):
-            if package.id in self.taken_ids(): raise TemplateIdTaken(package.id)
+            taken = self.taken_ids()
+            package = build(taken)
+            if package is None: return None
+            if package.id in taken: raise SchemaFailure("/template/id", "template id already taken")
+            verify_package(package)
             self._save(package, False, keep_text)
+        return package
 
     def delete(self, template_id: str) -> None:
         """Remove an id from the catalog. Identities, packages and assets stay: projects keep their captured copy."""

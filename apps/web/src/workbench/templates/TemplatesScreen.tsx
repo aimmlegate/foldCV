@@ -14,7 +14,7 @@ import { applyProposal, type ApplyOutcome } from "./apply";
 import { TemplateAssistant, type TemplateContext } from "./TemplateAssistant";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
-type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | null;
+type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | "applying" | null;
 type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" | null;
 
 /** The templates screen: the list, the YAML of the shown template and the template assistant. New imports use these
@@ -29,6 +29,8 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
   const [offer, setOffer] = useState<TemplateProblem | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
+  // Check found no error, but the text's revision is saved with other content: Save will offer this one.
+  const [nextRevision, setNextRevision] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false), [confirmDelete, setConfirmDelete] = useState(false);
   // The name of a copy; null while the dialog is closed.
   const [copyName, setCopyName] = useState<string | null>(null);
@@ -44,8 +46,9 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
   live.current = { shown, text };
   const names = useMemo(() => new Map(catalog?.templates.map(entry => [entry.id, entry.name]) ?? []), [catalog]);
 
+  function begin(kind: Exclude<Work, null>) { setWork(kind); setFailure(null); setOutcome(null); setNextRevision(null); setDelivery(null); }
   async function run(kind: Exclude<Work, null>, task: () => Promise<void>) {
-    setWork(kind); setFailure(null); setOutcome(null); setDelivery(null);
+    begin(kind);
     try { await task(); } catch (error) { setFailure(error); } finally { setWork(null); }
   }
   function adopt(next: TemplateConfigState) { setShown({ kind: "saved", state: next }); setText(next.text); setProblem(null); }
@@ -68,10 +71,12 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
   const check = () => run("checking", async () => {
     if (!state) return;
     const result = await checkTemplateConfig(state.package.id, text);
-    if (result.valid) { setProblem(null); setOutcome("checked"); } else setProblem(result.error);
+    // A taken revision is no error in the text: Save resolves it with the offered one.
+    if (result.valid || result.error.nextRevision) { setProblem(null); setOutcome("checked"); setNextRevision(result.valid ? null : result.error.nextRevision ?? null); }
+    else setProblem(result.error);
   });
   const save = (revision?: string) => run("saving", async () => {
-    if (draft) { if (await created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
+    if (draft) { if (created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
     if (!state) return;
     const result = await saveTemplateConfig(state.package.id, text, revision);
     if (!result.saved) { if (result.error.nextRevision) setOffer(result.error); else setProblem(result.error); return; }
@@ -86,10 +91,10 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
     if (!state) return;
     setCatalog(await setDefaultTemplate(state.package.id)); setOutcome("default");
   });
-  /** A new template opens at once; the catalog is read again because the server chose its id. */
-  async function created(result: TemplateSave): Promise<boolean> {
+  /** A new template opens at once and joins the list under the id the server chose. */
+  function created(result: TemplateSave): boolean {
     if (!result.saved) { setProblem(result.error); return false; }
-    adopt(result.state); setCatalog(await readTemplateCatalog());
+    adopt(result.state); setCatalog(value => value && withState(value, result.state));
     return true;
   }
   const add = async () => {
@@ -97,7 +102,7 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
     if (!state || !name) return;
     setCopyName(null);
     if (!await mayLeave()) return;
-    await run("adding", async () => { if (await created(await createTemplate({ copyOf: state.package.id, name }))) setOutcome("added"); });
+    await run("adding", async () => { if (created(await createTemplate({ copyOf: state.package.id, name }))) setOutcome("added"); });
   };
   const remove = () => run("deleting", async () => {
     if (!state) return;
@@ -110,12 +115,16 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
     return current.kind === "saved" ? { templateId: current.state.package.id, assetsFrom: current.state.package.id, text: source, name: current.state.package.name }
       : { templateId: null, assetsFrom: current.assetsFrom, text: source, name: draftLabel(current.name) };
   }
-  function apply(proposal: TemplateProposal, force: boolean, runAssets: string | null): Promise<ApplyOutcome> {
+  async function apply(proposal: TemplateProposal, force: boolean, runAssets: string | null): Promise<ApplyOutcome> {
     const replace = (value: string) => { setText(value); setProblem(null); setOutcome(null); };
-    return applyProposal(proposal, force, runAssets, { current: () => live.current, mayLeave,
-      open: async templateId => { const opened = await readTemplateConfig(templateId); adopt(opened); return opened.text; },
-      showDraft: (name, assetsFrom, value) => { setShown({ kind: "draft", name, assetsFrom }); replace(value); },
-      renameDraft: name => setShown(value => value?.kind === "draft" ? { ...value, name } : value), replace });
+    // The list and the editor wait while the target opens, so nothing typed meanwhile is overwritten.
+    begin("applying");
+    try {
+      return await applyProposal(proposal, force, runAssets, { current: () => live.current, mayLeave,
+        open: async templateId => { const opened = await readTemplateConfig(templateId); adopt(opened); return opened.text; },
+        showDraft: (name, assetsFrom, value) => { setShown({ kind: "draft", name, assetsFrom }); replace(value); },
+        renameDraft: name => setShown(value => value?.kind === "draft" ? { ...value, name } : value), replace });
+    } finally { setWork(null); }
   }
   const download = async () => {
     setDelivery(null);
@@ -152,7 +161,8 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
         {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}
         {failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
         {problem && <p className="notice error template-problem" role="alert">Ошибка в <code>{problem.path}</code>: {problem.message}</p>}
-        {outcome === "checked" && <OperationStatus state="success" label="Ошибок нет." />}
+        {outcome === "checked" && <OperationStatus state="success" label={nextRevision
+          ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."} />}
         {outcome === "saved" && <OperationStatus state="success" label="Сохранено. Изменения применятся к новым резюме." />}
         {outcome === "reset" && <OperationStatus state="success" label="Встроенный шаблон восстановлен." />}
         {outcome === "default" && state && <OperationStatus state="success" label={`Основной шаблон: ${state.package.name}.`} />}

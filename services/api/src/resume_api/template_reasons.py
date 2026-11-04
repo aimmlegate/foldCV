@@ -37,6 +37,7 @@ REASONS = {
     'invalid active template pointer': 'неверная ссылка на текущую версию шаблона',
     'identity registry must be an object': 'список версий шаблона повреждён',
     'ID/revision already identifies different package bytes': 'эта версия уже сохранена с другим содержимым',
+    'template id already taken': 'шаблон с таким идентификатором уже есть',
     'package identity mismatch': 'версия шаблона не совпадает с сохранённой',
     # Layout.
     'header, optional sidebar and main reading order required': 'нужен порядок чтения: шапка, при необходимости боковая колонка, основная часть',

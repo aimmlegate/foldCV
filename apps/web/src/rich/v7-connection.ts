@@ -27,7 +27,9 @@ export class ProjectApiFailure extends Error {
 
 export async function v2Request<T>(path: string, method = "GET", body?: unknown, fetcher: Fetcher = (input, init) => fetch(input, init)): Promise<T> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
-  if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
+  // A form (one uploaded file) sets its own content type.
+  if (body instanceof FormData) init.body = body;
+  else if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
   const response = await fetcher(path, init);
   const text = await response.text();
   let value: unknown = null;

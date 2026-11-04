@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import Query, Request
+from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from packages.resume_core.assistant_store import AgentFailure
@@ -129,7 +129,7 @@ def mount_assistant(app, service, *, companions=()):
         return file_reply(data, media, {'Content-Disposition': f'attachment; filename="{filename}"'})
 
 
-def mount_template_assistant(app, service, *, problem, temp_root, worker_slot):
+def mount_template_assistant(app, service, *, problem, temp_root, worker_slot, cleanup_error):
     """The template assistant (D141): the run routes of one fixed scope key, its samples and its proposals."""
     key, scope = template_tools.TEMPLATES, service.scope
 
@@ -176,20 +176,20 @@ def mount_template_assistant(app, service, *, problem, temp_root, worker_slot):
             data, name, pasted = parse_one_part(await request.body(), request.headers.get('content-type', ''))
             if pasted:
                 raise UploadFailure('EXTRACT_UNSUPPORTED')
-            sample = await template_tools.attach_sample(scope, data, name, temp_root=temp_root, worker_slot=worker_slot)
+            sample = await template_tools.attach_sample(scope, data, name, temp_root=temp_root, worker_slot=worker_slot,
+                cleanup_error=cleanup_error)
         except UploadFailure as error:
             return problem(error.code, 413 if error.code == 'INPUT_TOO_LARGE' else 422, 'input')
         return JSONResponse(sample.reply(), status_code=201, headers={'Cache-Control': 'no-store'})
 
-    # The boundary admits this one query string (conversationId) on this path.
-    @app.get(TEMPLATE_PREFIX + '/proposals')
-    async def template_proposals(conversation_id: str = Query(alias='conversationId', min_length=1, max_length=128)):
+    @app.get(TEMPLATE_PREFIX + '/conversations/{conversation_id}/proposals')
+    async def template_proposals(conversation_id: str):
         items = await worker(template_tools.proposals, service.store, conversation_id)
         return model_reply(TemplateProposalListV1(items=items[-100:]))
 
     @app.get(TEMPLATE_PREFIX + '/proposals/{proposal_id}')
     async def template_proposal(proposal_id: str):
-        return model_reply((await worker(template_tools.proposal, service.store, proposal_id))[1])
+        return model_reply(await worker(template_tools.proposal, service.store, proposal_id))
 
     @app.post(TEMPLATE_PREFIX + '/proposals/{proposal_id}/state')
     async def template_proposal_state(proposal_id: str, payload: TemplateProposalStateV1):

@@ -1,4 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { field, text } from "../../api/fields";
 import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../projects/api";
 import { ProjectApiFailure } from "../../rich/v7-connection";
 
@@ -13,14 +14,6 @@ export type TemplateSave = { saved: true; state: TemplateConfigState } | { saved
 const path = "/v1/rich/template-config";
 const one = (templateId: string) => `${path}/${encodeURIComponent(templateId)}`;
 
-function field(value: unknown, key: string): unknown {
-  return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
-}
-function text(value: unknown, key: string): string {
-  const item = field(value, key);
-  if (typeof item !== "string") throw new ProjectApiFailure("INVALID_RESULT");
-  return item;
-}
 function summary(value: unknown): TemplateSummary {
   return { id: text(value, "id"), name: text(value, "name"), revision: text(value, "revision"), packageHash: text(value, "packageHash") };
 }
@@ -40,10 +33,13 @@ export function parseCheck(value: unknown): TemplateCheck {
   return { valid: false, error: typeof next === "string" && next ? { ...problem, nextRevision: next } : problem };
 }
 
-/** The catalog after a save or reset of one template: its entry follows the new state, the others stay. */
+/** The catalog after a save, reset or create of one template: its entry follows the new state, the others stay. A
+ * new id joins the list where the server lists it: after the shipped templates, own ones by id. */
 export function withState(catalog: TemplateCatalog, state: TemplateConfigState): TemplateCatalog {
   const entry: TemplateEntry = { ...state.package, bundled: state.bundled, edited: state.edited };
-  return { ...catalog, templates: catalog.templates.map(value => value.id === entry.id ? entry : value) };
+  if (catalog.templates.some(value => value.id === entry.id)) return { ...catalog, templates: catalog.templates.map(value => value.id === entry.id ? entry : value) };
+  const shipped = catalog.templates.filter(value => value.bundled), own = [...catalog.templates.filter(value => !value.bundled), entry];
+  return { ...catalog, templates: [...shipped, ...own.sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0)] };
 }
 
 /** A refused save answers 422 with the same body as a failed check; other failures carry an error code. */

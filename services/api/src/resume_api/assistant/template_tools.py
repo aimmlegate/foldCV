@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from dataclasses import dataclass
-import json
 from pathlib import Path
 import threading
 from typing import Literal
@@ -17,18 +16,16 @@ from typing import Literal
 from mcp.types import CallToolResult
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_store import AgentFailure, AssistantStore, identity
+from packages.resume_core.assistant_store import AgentFailure, AssistantStore, identity, timestamp
 from packages.resume_core.models.assistant import TEMPLATE_TEXT_BYTES, DraftEditV1, TemplateProposalV1
-from packages.resume_core.project_store import SAFE_ID
-from packages.resume_core.storage import StorageFailure, atomic_write
+from packages.resume_core.sample_summary import sample_summary, summary_bytes
 from packages.resume_core.templates.store import UnknownTemplate
 
-from resume_api.agent.mcp import PrivateMcp
 from resume_api.extracting import UploadFailure, run_extract
 from resume_api.inference_admission import AdmissionCancelled
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.projects.errors import ProjectFailure
-from resume_api.template_config import TemplateConfig, stated_name
+from resume_api.template_config import TemplateConfig, decoded_assets
 
 from . import context
 from .skills import TEMPLATE_INSTRUCTIONS, TEMPLATE_SKILLS, read_skill
@@ -40,9 +37,9 @@ TEMPLATE_TOOL_NAMES = ('list_templates', 'read_template', 'read_draft', 'edit_dr
 # Reading three pages, several edits and checks exceed the resume scope's 180 s on slower models.
 ACTIVE_SECONDS = 600
 EDITS = 20
+NAME_CHARS = 200
 SAMPLES_KEPT = 3
 SAMPLE_BYTES = 32 * 1024
-PROPOSALS_KEPT = 100
 
 TEMPLATE_BASE_INSTRUCTIONS = (
     "You are the FoldCV template assistant. Your goal is a valid FoldCV resume template in YAML that does what the "
@@ -68,11 +65,15 @@ TEMPLATE_PROMPT = (
 
 
 class TemplateAssistantStore(AssistantStore):
-    """Conversations and runs of the template assistant, under `<root>/assistant-templates/templates/`."""
+    """Conversations, runs and proposals of the template assistant, under `<root>/assistant-templates/templates/`."""
+    proposal_model = TemplateProposalV1
 
     def __init__(self, root):
         super().__init__(root)
         self.root = Path(root) / 'assistant-templates'
+
+    def owner(self, _proposal):
+        return TEMPLATES
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,8 @@ class Sample:
 @dataclass(frozen=True)
 class Admitted:
     sample: Sample | None
+    # (current, bundled) of the saved template the draft edits; None for a new template.
+    versions: tuple | None
     assets: dict
 
 
@@ -99,13 +102,11 @@ class Pinned:
     base_hash: str
     draft: str
     sample: Sample | None
+    versions: tuple | None
     assets: dict
-    directory: Path
 
 
 def summarize(result):
-    """The sample summary builder (lane C); a seam so the route is tested before it exists."""
-    from packages.resume_core.sample_summary import sample_summary
     return sample_summary(result, limit=SAMPLE_BYTES)
 
 
@@ -124,7 +125,7 @@ class TemplateScope:
         return TemplateAssistantStore(root)
 
     def require(self, service, key, request=None):
-        """Nothing to read for conversations; a run needs its sample and the templates it names."""
+        """Nothing to read for conversations; a run needs its sample and the templates it names, loaded once."""
         if key != TEMPLATES:
             raise ProjectFailure('AGENT_NOT_FOUND', 404)
         if request is None:
@@ -136,40 +137,30 @@ class TemplateScope:
             if sample is None:
                 raise ProjectFailure('SAMPLE_NOT_FOUND', 404)
         try:
-            if request.template_id is not None:
-                self.config.store.versions(request.template_id)
-            assets = self.config.captured(request.assets_from)
+            versions = None if request.template_id is None else self.config.store.versions(request.template_id)
+            if versions is not None and request.assets_from == request.template_id:
+                assets = decoded_assets(versions[0])
+            else:
+                assets = self.config.captured(request.assets_from)
         except UnknownTemplate:
             raise ProjectFailure('TEMPLATE_NOT_FOUND', 404) from None
-        return Admitted(sample, assets)
+        return Admitted(sample, versions, assets)
 
     def revision(self, _required):
         # The wire's baseRevision is a revision (at least 1); no template scope handler reads it.
         return 1
 
     def pin(self, service, _pin, control, request, required):
-        directory = service.store.directory(TEMPLATES, 'runs', control.run_id)
         pinned = Pinned(request.template_id, request.assets_from, request.text_hash, request.text, required.sample,
-            required.assets, directory)
-        store_draft(pinned)
+            required.versions, required.assets)
         return pinned, service.store.conversation(TEMPLATES, control.conversation_id).messages[:-1]
 
     def prompt(self, pinned, history, control, request):
-        recent = []
-        for item in history[-8:]:
-            text, truncated = context.clip(item.text, 3000)
-            recent.append({'role': item.role, 'text': text, 'truncated': truncated or item.truncated})
-        sample = pinned.sample.reply() if pinned.sample is not None else None
-        value = {'draft': {'templateId': pinned.template_id, 'newTemplate': pinned.template_id is None,
+        payload = {'draft': {'templateId': pinned.template_id, 'newTemplate': pinned.template_id is None,
                 'assetsFrom': pinned.assets_from, 'bytes': len(pinned.draft.encode())},
-            'sample': sample, 'permissions': {'internet': control.run.allow_web},
-            'skills': [{'name': skill.id, 'command': '/' + skill.id, 'description': skill.description}
-                for skill in TEMPLATE_SKILLS],
-            'recentMessages': recent, 'olderMessagesOmitted': max(0, len(history) - 8), 'message': request.message}
-        text = TEMPLATE_PROMPT + '\n' + context.json_text(value)
-        if len(text.encode()) > limits.CONTEXT_BYTES:
-            raise AgentFailure('AGENT_CONTEXT_LIMIT')
-        return text
+            'sample': pinned.sample.reply() if pinned.sample is not None else None,
+            'permissions': {'internet': control.run.allow_web}}
+        return context.envelope(TEMPLATE_PROMPT, payload, skills=TEMPLATE_SKILLS, history=history, message=request.message)
 
     def tools(self, service, control, pinned):
         return TemplateToolSession(service, control, pinned, self.config)
@@ -187,13 +178,6 @@ class TemplateScope:
             while len(self.samples) > SAMPLES_KEPT:
                 self.samples.popitem(last=False)
         return sample
-
-
-def store_draft(pinned):
-    try:
-        atomic_write(pinned.directory / 'draft.yaml', pinned.draft.encode('utf-8'))
-    except (OSError, StorageFailure):
-        raise AgentFailure('AGENT_SAVE_FAILED') from None
 
 
 def text_page(text, page, budget=limits.PAGE_BYTES - 1024):
@@ -219,13 +203,22 @@ def text_page(text, page, budget=limits.PAGE_BYTES - 1024):
     return {'page': page, 'pages': len(pages), 'text': pages[page], 'nextPage': page + 1 if page + 1 < len(pages) else None}
 
 
+def occurrences(text, find):
+    """'none', 'one' or 'several': how often `find` starts in `text`, overlapping starts counted."""
+    first = text.find(find)
+    if first < 0:
+        return 'none'
+    return 'one' if text.find(find, first + 1) < 0 else 'several'
+
+
 def apply_edits(draft, edits):
     """The draft with every edit applied in order; each `find` must occur exactly once in the text it applies to."""
     for index, edit in enumerate(edits):
-        count = draft.count(edit.find)
-        if count != 1:
-            raise context.refusal('AGENT_EDIT_INVALID', f'edit {index}: find occurs {count} time(s) in the draft; give '
-                'a longer find that occurs exactly once. No edit was applied.')
+        found = occurrences(draft, edit.find)
+        if found != 'one':
+            raise context.refusal('AGENT_EDIT_INVALID', f'edit {index}: find occurs '
+                f'{"0 times" if found == "none" else "more than once"} in the draft; give a longer find that occurs '
+                'exactly once. No edit was applied.')
         draft = draft.replace(edit.find, edit.replace, 1)
     if len(draft.encode()) > TEMPLATE_TEXT_BYTES:
         raise context.refusal('AGENT_EDIT_LIMIT', f'the draft may hold at most {TEMPLATE_TEXT_BYTES} bytes; '
@@ -233,47 +226,17 @@ def apply_edits(draft, edits):
     return draft
 
 
-class TemplateToolSession(PrivateMcp):
-    # The envelope, limits and the web fetch are the resume session's; only the names and the tools differ.
-    revoke = ToolSession.revoke
-    preflight_failure = ToolSession.preflight_failure
-    wire = ToolSession.wire
-    failure = ToolSession.failure
-    guard = ToolSession.guard
-    call = ToolSession.call
-    fetch = ToolSession.fetch
+class TemplateToolSession(ToolSession):
+    """The resume session's envelope, limits and web fetch with the template tools instead of the resume ones."""
 
     def __init__(self, service, control, pinned, config):
-        self.service, self.control, self.pinned, self.config = service, control, pinned, config
+        self.config = config
+        self.proposed = False
+        # The compile result of the draft as it is; check_draft after edit_draft does not compile again.
+        self.last = None
         # Without internet the page tool is not offered at all, so the model never sees it.
         self.names = tuple(name for name in TEMPLATE_TOOL_NAMES if control.run.allow_web or name != 'read_public_page')
-        self.calls = self.fetches = self.result_bytes = 0
-        self.proposed = False
-        self.fetch_cancel = threading.Event()
-        self.gate = asyncio.Lock()
-        super().__init__(self)
-        self.register()
-
-    async def _close(self):
-        try:
-            await ToolSession._close(self)
-        finally:
-            # The draft lives as long as its run.
-            (self.pinned.directory / 'draft.yaml').unlink(missing_ok=True)
-
-    def preflight(self, params, size):
-        if not self.active or self.control.cancel.is_set():
-            return 'AGENT_CANCELLED'
-        if self.calls >= limits.TOOL_CALLS:
-            return 'AGENT_TOOL_LIMIT'
-        if (not isinstance(params, dict) or params.keys() - {'name', 'arguments', '_meta'} or params.get('name') not in self.names
-                or not isinstance(params.get('arguments', {}), dict)):
-            self.calls += 1
-            return 'AGENT_ARGUMENT_INVALID'
-        if size > limits.CALL_BYTES:
-            self.calls += 1
-            return 'AGENT_CALL_TOO_LARGE'
-        return None
+        super().__init__(service, control, pinned)
 
     def register(self):
         tool = self.sdk.tool(structured_output=False)
@@ -302,7 +265,8 @@ class TemplateToolSession(PrivateMcp):
 
         @tool
         async def check_draft() -> CallToolResult:
-            """Compile the draft and return valid, the template id, name and revision, or the error path and message."""
+            """Compile the draft as Save will: valid with the template id, name and revision, or the error path and
+            message (a taken revision names the next free one as nextRevision)."""
             return await self.call('check_draft', self.check)
 
         @tool
@@ -320,7 +284,7 @@ class TemplateToolSession(PrivateMcp):
         @tool
         async def read_skill(name: Literal['design-template'], resource: str = 'SKILL.md') -> CallToolResult:
             """Read a bundled skill (SKILL.md) or one of its listed references. Skills grant no permission."""
-            return await self.call('read_skill', lambda: read_skill_resource(name, resource))
+            return await self.call('read_skill', lambda: read_skill(name, resource, TEMPLATE_SKILLS))
 
         if 'read_public_page' in self.names:
             @tool
@@ -340,11 +304,19 @@ class TemplateToolSession(PrivateMcp):
             raise context.refusal('AGENT_NOT_FOUND', 'unknown templateId; use an id from list_templates') from None
         return {'templateId': template_id, 'revision': state['package']['revision'], **text_page(state['text'], page)}
 
+    def compile_draft(self, draft):
+        """The draft compiled as Save would: a saved template keeps its id and needs a free revision; a new one is
+        only compiled. (package, error)."""
+        if self.pinned.versions is None:
+            return self.config.compile_new(draft, self.pinned.assets)
+        return self.config.compile_saved(draft, *self.pinned.versions, assets=self.pinned.assets)
+
     async def compiled(self, draft):
-        package, error = await asyncio.to_thread(self.config.compile_new, draft, self.pinned.assets)
-        summary = {key: getattr(package, key) for key in ('id', 'revision')} if package is not None else None
-        if summary is not None:
-            summary['name'] = package.definition.template.name
+        if self.last is None or self.last[0] != draft:
+            self.last = (draft, await asyncio.to_thread(self.compile_draft, draft))
+        package, error = self.last[1]
+        summary = None if package is None else {'id': package.id, 'revision': package.revision,
+            'name': package.definition.template.name}
         return {'valid': error is None, 'template': summary, 'error': error}
 
     async def check(self):
@@ -358,15 +330,13 @@ class TemplateToolSession(PrivateMcp):
 
         def commit():
             self.pinned.draft = draft
-            store_draft(self.pinned)
-        return Stored({'applied': len(edits), 'draftBytes': len(draft.encode()), **result},
-            lambda: self.service.write(commit))
+        return Stored({'applied': len(edits), 'draftBytes': len(draft.encode()), **result}, lambda: self.service.write(commit))
 
     async def propose(self, summary, name):
         if self.proposed:
             raise context.refusal('AGENT_EDIT_LIMIT', 'one proposal per task is stored already; tell the user about it')
-        if not 0 < len(summary) <= 2000 or name is not None and not 0 < len(name) <= 200:
-            raise context.refusal('AGENT_ARGUMENT_INVALID', 'summary takes 1 to 2000 characters, name 1 to 200')
+        if not 0 < len(summary) <= 2000 or name is not None and not 0 < len(name) <= NAME_CHARS:
+            raise context.refusal('AGENT_ARGUMENT_INVALID', f'summary takes 1 to 2000 characters, name 1 to {NAME_CHARS}')
         draft = self.pinned.draft
         result = await self.compiled(draft)
         if not result['valid']:
@@ -374,15 +344,18 @@ class TemplateToolSession(PrivateMcp):
             raise context.refusal('AGENT_EDIT_INVALID', f"the draft does not compile at {error['path']}: "
                 f"{error['message']}; fix it with edit_draft and check_draft first")
         if name is None and self.pinned.template_id is None:
-            name = stated_name(draft)
+            name = result['template']['name'].strip() or None
+            if name is not None and len(name) > NAME_CHARS:
+                raise context.refusal('AGENT_EDIT_INVALID', f'template.name has {len(name)} characters; a template name '
+                    f'takes at most {NAME_CHARS}; shorten it with edit_draft')
         proposal = TemplateProposalV1(id=identity('proposal'), conversationId=self.control.conversation_id,
             runId=self.control.run_id, templateId=self.pinned.template_id, name=name, baseHash=self.pinned.base_hash,
-            text=draft, summary=summary, state='proposed')
+            text=draft, summary=summary, state='proposed', createdAt=timestamp())
 
         def save():
             if getattr(self.control, 'deleted', False):
                 return
-            save_proposal(self.service.store, proposal)
+            self.service.store.save_proposal(proposal)
             self.proposed = True
             # The run event names the proposal; the panel reads it from the proposals list.
             self.service.emit(self.control, 'proposal.ready', {'id': proposal.id})
@@ -397,54 +370,23 @@ class TemplateToolSession(PrivateMcp):
         return self.pinned.sample.summary
 
 
-def read_skill_resource(name, resource):
-    return read_skill(name, resource, TEMPLATE_SKILLS)
-
-
-# Proposals: one JSON file in the directory of the run that made it.
-
-def _proposal_files(store):
-    folder = store.directory(TEMPLATES, 'runs')
-    return list(folder.glob('*/proposal.json')) if folder.exists() else []
-
-
-def save_proposal(store, proposal):
-    with store.lock:
-        path = store.directory(TEMPLATES, 'runs', proposal.run_id, 'proposal.json')
-        store._write(path, proposal)
-        kept = sorted(_proposal_files(store), key=lambda value: value.stat().st_mtime_ns, reverse=True)
-        for stale in kept[PROPOSALS_KEPT:]:
-            stale.unlink(missing_ok=True)
-
+# Proposals: the store's proposal files under the templates key.
 
 def proposals(store, conversation_id):
-    """The proposals of one conversation in the order of its runs."""
-    stored = store.conversation(TEMPLATES, conversation_id)
-    items = []
-    with store.lock:
-        for run in stored.runs:
-            if SAFE_ID.fullmatch(run.id):
-                value = store._read(store.directory(TEMPLATES, 'runs', run.id, 'proposal.json'), TemplateProposalV1)
-                if value is not None and value.conversation_id == conversation_id:
-                    items.append(value)
-    return items
+    """The proposals of one conversation, oldest first; an unknown conversation is not found."""
+    store.conversation(TEMPLATES, conversation_id)
+    return store.proposals(TEMPLATES, conversation_id)
 
 
 def proposal(store, proposal_id):
-    with store.lock:
-        for path in _proposal_files(store):
-            value = store._read(path, TemplateProposalV1)
-            if value is not None and value.id == proposal_id:
-                return path, value
-    raise AgentFailure('ASSISTANT_PROPOSAL_NOT_FOUND')
+    return store.proposal(TEMPLATES, proposal_id)
 
 
 def set_state(store, proposal_id, state):
     """Record that the user applied or discarded the proposal in the editor; the template store is not touched."""
     with store.lock:
-        path, value = proposal(store, proposal_id)
-        value = value.model_copy(update={'state': state})
-        store._write(path, value)
+        value = store.proposal(TEMPLATES, proposal_id).model_copy(update={'state': state})
+        store.save_proposal(value)
         return value
 
 
@@ -454,8 +396,9 @@ def signature_ok(data):
     return data.startswith(b'PK\x03\x04') or data.startswith(b'%PDF-')
 
 
-async def attach_sample(scope, data, name, *, temp_root, worker_slot):
-    """Extract the file in the worker process and keep its summary; an UploadFailure names a bad file."""
+async def attach_sample(scope, data, name, *, temp_root, worker_slot, cleanup_error):
+    """Extract the file in the worker process and keep its summary. An UploadFailure names a bad file; a worker that
+    could not be cleaned up latches the service through `cleanup_error`, as imports and exports do."""
     if not signature_ok(data):
         raise UploadFailure('EXTRACT_UNSUPPORTED')
     files, cancel = OperationFiles(temp_root), threading.Event()
@@ -463,9 +406,15 @@ async def attach_sample(scope, data, name, *, temp_root, worker_slot):
         async with worker_slot(cancel):
             with files.open():
                 result = await run_extract(data, name, False, files)
-    except (SpikeError, AdmissionCancelled):
+    except AdmissionCancelled:
         raise UploadFailure('EXTRACT_INTERRUPTED') from None
+    except SpikeError as error:
+        cleanup_error(error)
+        raise ProjectFailure(error.code, 503) from None
+    finally:
+        if files.cleanup_failed:
+            cleanup_error(SpikeError('PROCESS_CLEANUP_FAILED'))
     summary = await asyncio.to_thread(summarize, result)
-    if len(json.dumps(summary, ensure_ascii=False).encode()) > SAMPLE_BYTES:
+    if summary_bytes(summary) > SAMPLE_BYTES:
         raise UploadFailure('EXTRACT_TEXT_LIMIT')
     return scope.add_sample(name, summary)

@@ -143,7 +143,7 @@ class ToolSession(PrivateMcp):
             return 'AGENT_CANCELLED'
         if self.calls >= limits.TOOL_CALLS:
             return 'AGENT_TOOL_LIMIT'
-        if (not isinstance(params, dict) or params.keys() - {'name', 'arguments', '_meta'} or params.get('name') not in TOOL_NAMES
+        if (not isinstance(params, dict) or params.keys() - {'name', 'arguments', '_meta'} or params.get('name') not in self.names
                 or not isinstance(params.get('arguments', {}), dict)):
             self.calls += 1
             return 'AGENT_ARGUMENT_INVALID'

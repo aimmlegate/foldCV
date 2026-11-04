@@ -1,3 +1,4 @@
+import { sha256Hex } from "../api/hash";
 import type { TemplateSnapshotIdentity } from "./generated/template_snapshot_identity";
 
 const snapshotFields = ["projectId", "projectRevision", "documentRevision", "documentHash", "factsHash", "packageHash", "presentationHash"] as const;
@@ -44,8 +45,6 @@ Promise<{ blob: Blob; attemptId: string; snapshot: TemplateSnapshotIdentity }> {
   try { snapshot = JSON.parse(source); } catch { throw new Error("INVALID_RESULT"); }
   if (!sameSnapshot(snapshot, captured)) throw new Error("INVALID_RESULT");
   const blob = await boundedArtifact(response);
-  const hash = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-  const sha256 = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, "0")).join("");
-  if (sha256 !== response.headers.get("X-FoldCV-Sha256")) throw new Error("ARTIFACT_BYTES_MISMATCH");
+  if (await sha256Hex(await blob.arrayBuffer()) !== response.headers.get("X-FoldCV-Sha256")) throw new Error("ARTIFACT_BYTES_MISMATCH");
   return { blob, attemptId, snapshot };
 }
