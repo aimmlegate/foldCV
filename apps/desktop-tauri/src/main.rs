@@ -152,6 +152,9 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
         .title(&app.package_info().name)
         .inner_size(width, height)
         .min_inner_size(800.0, 600.0)
+        // Electron sized the whole window, Tauri sizes the page: the Windows title bar would push the bottom of the
+        // window under the taskbar.
+        .prevent_overflow()
         .center()
         .visible(false)
         .background_color(Color(0xea, 0xe9, 0xe2, 0xff))
