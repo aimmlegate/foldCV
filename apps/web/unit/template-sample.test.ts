@@ -5,9 +5,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantRuns } from "../src/assistant/controller";
-import { TemplateAssistantApi, type TemplateFields } from "../src/assistant/template";
+import { sampleSpent, TemplateAssistantApi, type TemplateFields } from "../src/assistant/template";
 import type { Fetcher } from "../src/rich/v7-connection";
-import { capabilities, message, settings, view } from "./support/assistant";
+import { capabilities, message, run, settings, view } from "./support/assistant";
 
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);
 const { Transcript } = await import("../src/workbench/assistant/Transcript");
@@ -55,5 +55,30 @@ test("a run with a replaced sample is refused before it starts and the panel sho
     assert.equal(runs.view.pendingSend, false, "a refusal is final, not a retry");
     assert.equal(runs.view.run, null);
     assert.equal(runs.view.draft, "По образцу", "the message stays for another try");
+    assert.equal(sampleSpent(null, runs.view), true, "a sample the service lost leaves the composer");
   } finally { runs.close(); }
 });
+
+test("a sample goes with one run: it leaves after a started run, and stays after a lost reply or no send", async () => {
+  const conversation = { id: "conversation-1", title: "", createdAt: "2026-11-03T12:00:00+00:00", updatedAt: "2026-11-03T12:00:00+00:00" };
+  for (const [answer, spent] of [[() => reply(run("completed", "run-2"), 201), true], [() => reply({ error: { code: "AGENT_UNAVAILABLE" } }, 503), false]] as const) {
+    const fetcher: Fetcher = input => {
+      const url = String(input);
+      if (url === "/v1/settings/assistant") return reply(settings);
+      if (url.endsWith("/capabilities")) return reply(capabilities);
+      if (url.endsWith("/conversations")) return reply({ items: [conversation] });
+      if (url.endsWith("/messages")) return reply({ conversation, messages: [], sources: [], findings: [], runs: [], files: [] });
+      if (url.endsWith("/runs")) return answer();
+      return reply({ items: [] });
+    };
+    const runs = new AssistantRuns<TemplateFields>(new TemplateAssistantApi(fetcher), { applyProposal: () => Promise.reject(new AgentApiFailure("REQUEST_FAILED")) }, () => {}, 1);
+    try {
+      await runs.init(); runs.draft("По образцу");
+      await runs.sendWith(() => Promise.resolve({ templateId: "generic", assetsFrom: "generic", text: "x", textHash: "h", sampleId: "sample-1" }));
+      assert.equal(sampleSpent(null, runs.view), spent);
+    } finally { runs.close(); }
+  }
+  assert.equal(sampleSpent("run-1", { run: run("running", "run-1"), error: null }), false, "Send did nothing while a run was shown");
+});
+
+function reply(value: unknown, status = 200) { return Promise.resolve(new Response(JSON.stringify(value), { status })); }

@@ -12,7 +12,7 @@ import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connectio
 import { AssistantApi } from "./api";
 import type { Port, RunRequest } from "./controller";
 
-/** The template assistant (D136): the resume assistant's runs on its own routes, with no access to resumes. Its
+/** The template assistant (D140): the resume assistant's runs on its own routes, with no access to resumes. Its
  * proposals are whole YAML texts that the templates screen applies into the editor; replies are parsed by hand. */
 export const templatePrefix = "/v2/templates/assistant";
 export type TemplateFields = { templateId: string | null; assetsFrom: string | null; text: string; textHash: string; sampleId: string | null };
@@ -52,6 +52,12 @@ export function parseSample(value: unknown): TemplateSample {
   const pages = field(value, "pages"), unitCount = field(value, "unitCount");
   if (pages !== null && !Number.isInteger(pages) || !Number.isInteger(unitCount)) throw new ProjectApiFailure("INVALID_RESULT");
   return { sampleId: text(value, "sampleId"), name: text(value, "name"), pages: pages as number | null, unitCount: unitCount as number };
+}
+
+/** Whether the attached sample leaves the composer after a send: it goes with one run only (2026-11-04), and a sample
+ * the service no longer keeps must be attached again. `before`: the run shown when Send was pressed. */
+export function sampleSpent(before: string | null, after: { run: { id: string } | null; error: string | null }): boolean {
+  return after.error === "SAMPLE_NOT_FOUND" || after.error === null && after.run !== null && after.run.id !== before;
 }
 
 /** SHA-256 of the UTF-8 text as lower-case hex, the proposal's base hash. */
@@ -107,7 +113,7 @@ export class TemplateAssistantApi implements Port<TemplateFields> {
   async decide(proposalId: string, state: "applied" | "discarded"): Promise<TemplateProposal> {
     return parseTemplateProposal(await v2Request<unknown>(path("proposals", proposalId, "/state"), "POST", { state }, this.fetcher));
   }
-  /** The extraction worker reads the sample once; the service keeps its summary in memory for later runs. */
+  /** The extraction worker reads the sample once; the service keeps the summaries of the last three in memory. */
   async uploadSample(file: File): Promise<TemplateSample> {
     const body = new FormData();
     body.append("file", file, file.name);

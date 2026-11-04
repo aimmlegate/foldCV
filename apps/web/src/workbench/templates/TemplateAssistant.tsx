@@ -3,7 +3,7 @@ import { ConnectionWorkflow } from "../../connection/workflow";
 import { AgentApiFailure } from "../../assistant/api";
 import { AssistantRuns, terminal, type AssistantView } from "../../assistant/controller";
 import { drawerSize, errorText, rereadsCapabilities, shownFailure } from "../../assistant/presentation";
-import { proposalTarget, TemplateAssistantApi, textHash, type TemplateFields, type TemplateProposal, type TemplateSample } from "../../assistant/template";
+import { proposalTarget, sampleSpent, TemplateAssistantApi, textHash, type TemplateFields, type TemplateProposal, type TemplateSample } from "../../assistant/template";
 import { DrawerView } from "../assistant/DrawerView";
 import { templateScope } from "../assistant/scope";
 import { Button } from "../ui/Button";
@@ -21,7 +21,7 @@ function storedSize() { try { const value: unknown = JSON.parse(localStorage.get
 const code = (error: unknown) => error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED";
 const sampleTypes = ".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-/** The template assistant beside the YAML editor (D136): it reads templates and samples, never resumes, and its
+/** The template assistant beside the YAML editor (D140): it reads templates and samples, never resumes, and its
  * proposals change only the editor text; the user saves. */
 export function TemplateAssistant({ open, context, names, apply, settings }: {
   open: boolean; context: () => TemplateContext | null; names: ReadonlyMap<string, string>; apply: ApplyProposal; settings: () => void;
@@ -33,7 +33,7 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
   const [working, setWorking] = useState<string | null>(null), [confirm, setConfirm] = useState<TemplateProposal | null>(null);
   const api = useRef<TemplateAssistantApi | null>(null), controller = useRef<AssistantRuns<TemplateFields> | null>(null);
   const log = useRef<HTMLDivElement>(null), picker = useRef<HTMLInputElement>(null);
-  // The attached sample goes with every run until removed; the service keeps the last three in memory.
+  // The attached sample goes with the next run only; the service keeps the last three in memory.
   const [sample, setSample] = useState<TemplateSample | null>(null), [uploading, setUploading] = useState(false);
   const report = (work: Promise<void> | undefined) => { void work?.catch(error => setFailure(code(error))); };
   useEffect(() => {
@@ -76,12 +76,13 @@ export function TemplateAssistant({ open, context, names, apply, settings }: {
     const current = controller.current;
     if (!current || !context()) return;
     setFailure(null);
+    const attached = sample, before = current.view.run?.id ?? null;
     // The editor text is read when the request is built, so typing up to that moment goes with the run.
     report(current.sendWith(async () => {
       const shown = context();
       if (!shown) throw new AgentApiFailure("REQUEST_FAILED");
-      return { templateId: shown.templateId, assetsFrom: shown.assetsFrom, text: shown.text, textHash: await textHash(shown.text), sampleId: sample?.sampleId ?? null };
-    }));
+      return { templateId: shown.templateId, assetsFrom: shown.assetsFrom, text: shown.text, textHash: await textHash(shown.text), sampleId: attached?.sampleId ?? null };
+    }).then(() => { if (attached && sampleSpent(before, current.view)) setSample(value => value === attached ? null : value); }));
   }
   async function attach(file: File) {
     const port = api.current;
