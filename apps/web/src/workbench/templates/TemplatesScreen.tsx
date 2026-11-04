@@ -1,7 +1,7 @@
 import * as Tabs from "@radix-ui/react-tabs";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { errorMessage } from "../../errors/messages";
-import type { TemplateCatalog } from "../../projects/api";
+import type { TemplateCatalog, TemplateEntry } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
@@ -10,7 +10,7 @@ import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
 import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, problemTab, readTemplateCatalog, readTemplateConfig, resetTemplateConfig,
   saveTemplateConfig, sectionTab, sectionTabs, setDefaultTemplate, topLevelSections, withState, type SectionTab, type TemplateConfigState,
   type TemplateProblem, type TemplateSave } from "./config";
-import { downloadName, draftLabel, menuActions, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
+import { downloadName, draftLabel, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
 import { TemplateToolbar } from "./TemplateToolbar";
 import type { YamlEditorHandle } from "./YamlEditor";
 import type { TemplateProposal } from "../../assistant/template";
@@ -156,6 +156,12 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   }
 
   const busy = work !== null;
+  const groups = catalog && groupedCatalog(catalog);
+  const row = (entry: TemplateEntry) => <button key={entry.id} className="template-row" disabled={busy}
+    aria-current={entry.id === selected ? "page" : undefined} onClick={() => void choose(entry.id)}>
+    <strong>{entry.name}{entry.id === catalog?.defaultId && <span className="template-default" title="Основной шаблон"><Icon name="star" /></span>}</strong>
+    <small>{rowNote(entry, catalog?.defaultId ?? "")}</small>
+  </button>;
   const chips = state && catalog ? [{ label: state.package.revision }, { label: templateKind(state) },
     ...(state.package.id === catalog.defaultId ? [{ label: "основной", main: true }] : [])] : [{ label: "новый" }];
   const done = outcome === "checked" ? nextRevision ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."
@@ -169,13 +175,12 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   return <section className="templates-screen" aria-label="Шаблоны">
     <div className="templates-layout">
       <nav className="templates-list" aria-label="Список шаблонов">
-        <Button className="small templates-add" busy={work === "adding"} busyLabel="Добавляем…" disabled={busy || !state}
-          onClick={() => setCopyName(state ? `${state.package.name} — копия` : "")}><Icon name="plus" />Добавить</Button>
-        {catalog?.templates.map(entry => <button key={entry.id} className="template-row" disabled={busy}
-          aria-current={entry.id === selected ? "page" : undefined} onClick={() => void choose(entry.id)}>
-          <strong>{entry.name}</strong>
-          <small>{entry.revision}{entry.id === catalog.defaultId ? " · основной" : ""} · {templateKind(entry)}</small>
-        </button>)}
+        <div className="templates-list-heading"><span className="eyebrow">Встроенные</span>
+          <button type="button" className="icon templates-add" aria-label="Копия выбранного" title="Копия выбранного" disabled={busy || !state}
+            onClick={() => setCopyName(state ? `${state.package.name} — копия` : "")}><Icon name="plus" /></button></div>
+        {groups?.bundled.map(row)}
+        {groups && (groups.own.length > 0 || draft) && <div className="templates-list-heading"><span className="eyebrow">Свои</span></div>}
+        {groups?.own.map(row)}
         {draft && <button className="template-row" aria-current="page" disabled={busy}><strong>{draftLabel(draft.name)}</strong><small>новый</small></button>}
       </nav>
       <div className="templates-editor">

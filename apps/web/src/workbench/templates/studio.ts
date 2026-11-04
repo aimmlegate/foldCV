@@ -1,4 +1,4 @@
-import type { TemplateEntry } from "../../projects/api";
+import type { TemplateCatalog, TemplateEntry } from "../../projects/api";
 import type { TemplateConfigState } from "./config";
 
 /** What the editor shows: a saved template, or a new one that exists only here until «Сохранить». */
@@ -8,6 +8,15 @@ export function templateKind(entry: Pick<TemplateEntry, "bundled" | "edited">): 
   return !entry.bundled ? "свой" : entry.edited ? "изменён" : "встроенный";
 }
 export function draftLabel(name: string): string { return `${name} (не сохранён)`; }
+
+/** The list's two groups, each in the catalog's order; a new unsaved template shows at the end of the own ones. */
+export function groupedCatalog(catalog: TemplateCatalog): { bundled: TemplateEntry[]; own: TemplateEntry[] } {
+  return { bundled: catalog.templates.filter(entry => entry.bundled), own: catalog.templates.filter(entry => !entry.bundled) };
+}
+/** A row's second line: the version, then an edited shipped template, then the default. The group says the rest. */
+export function rowNote(entry: Pick<TemplateEntry, "id" | "revision" | "bundled" | "edited">, defaultId: string): string {
+  return [entry.revision, entry.bundled && entry.edited ? "изменён" : null, entry.id === defaultId ? "основной" : null].filter(Boolean).join(" · ");
+}
 
 /** The saved id the editor shows; null for a new template. */
 export function shownId(shown: ShownTemplate | null): string | null {

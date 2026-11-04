@@ -7,6 +7,14 @@
 .templates-list .template-row:hover:not(:disabled) { background: var(--wash); }
 .templates-list .template-row[aria-current="page"] { background: var(--wash); border-color: var(--wash-strong); }
 .templates-list .template-row strong { font-weight: 550; overflow-wrap: anywhere; }
+/* Two groups under eyebrows; «+» copies the selected template; a star marks the default for new imports. */
+.templates-list-heading { display: flex; align-items: center; justify-content: space-between; min-height: 30px; margin-top: 12px; padding: 0 2px 0 12px; }
+.templates-list-heading:first-child { margin-top: 0; }
+.templates-list .templates-add { width: 28px; height: 28px; padding: 5px; color: var(--muted); }
+.templates-list .templates-add:hover:not(:disabled) { background: var(--wash); color: var(--ink); }
+.template-default { display: inline-flex; margin-left: 6px; color: var(--accent); vertical-align: -1px; }
+.template-default > svg, .template-chip > svg { width: 12px; height: 12px; }
+.icon-star { fill: currentColor; }
 .templates-list .template-row small { color: var(--muted); }
 .templates-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding-left: 24px; border-left: 1px solid var(--line); }
 .templates-editor h3 { margin: 0; font-size: var(--ui-title); font-weight: 550; color: var(--ink); }
@@ -93,7 +101,6 @@
   .template-yaml-editor { flex: none; height: 70dvh; }
   #template-chat-host.chat-open, #template-chat-host.chat-expanded { position: fixed; inset: auto 8px 8px; width: auto; height: min(78dvh, 640px); }
 }
-.templates-list .templates-add { align-self: flex-start; margin-bottom: 8px; }
 .template-name-form { display: flex; flex-direction: column; gap: 6px; }
 .template-name-form input { width: 100%; padding: 9px 11px; }
 #template-chat-host .chat-context { flex-wrap: wrap; }

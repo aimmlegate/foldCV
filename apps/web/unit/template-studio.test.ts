@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { screenTitle, visit, type Screen } from "../src/workbench/templates/screen";
-import { deleteControl, downloadName, draftLabel, menuActions, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
+import { deleteControl, downloadName, draftLabel, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
 
 const state = { package: { id: "generic", name: "Две колонки", revision: "1.3.0", packageHash: "a".repeat(64) }, format: "yaml" as const,
   text: "template: {}\n", bundled: true, edited: false };
@@ -59,4 +59,17 @@ test("the «⋯» menu offers only what applies to the shown template", () => {
   // A new template exists only in the editor until saved.
   assert.deepEqual(offered({ kind: "draft", name: "Мой", assetsFrom: "generic" }, "generic"), ["download:enabled"]);
   assert.deepEqual(offered(null, "generic"), []);
+});
+
+test("the list groups shipped and own templates in the catalog's order; a row says version, edit and default", () => {
+  const entry = (id: string, bundled: boolean, edited = false) => ({ id, name: id, revision: "1.0.0", packageHash: "a".repeat(64), bundled, edited });
+  const catalog = { defaultId: "custom-b", templates: [entry("generic", true, true), entry("second", true), entry("custom-a", false, true), entry("custom-b", false, true)] };
+  const groups = groupedCatalog(catalog);
+  assert.deepEqual(groups.bundled.map(item => item.id), ["generic", "second"]);
+  assert.deepEqual(groups.own.map(item => item.id), ["custom-a", "custom-b"]);
+  assert.deepEqual(groupedCatalog({ defaultId: "generic", templates: [entry("generic", true)] }).own, []);
+  assert.equal(rowNote(catalog.templates[0]!, catalog.defaultId), "1.0.0 · изменён");
+  assert.equal(rowNote(catalog.templates[1]!, catalog.defaultId), "1.0.0");
+  // An own template is always «edited» in the catalog; the group already says it is own.
+  assert.equal(rowNote(catalog.templates[3]!, catalog.defaultId), "1.0.0 · основной");
 });

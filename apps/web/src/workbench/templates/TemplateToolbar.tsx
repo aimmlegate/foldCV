@@ -20,7 +20,7 @@ export function TemplateToolbar({ name, chips, actions, dirty, busy, saving, che
   const offered = order.filter(action => actions[action] !== "hidden");
   return <div className="template-toolbar">
     <div className="template-heading"><h3 title={name}>{name}</h3>
-      {chips.map(chip => <span key={chip.label} className={`template-chip${chip.main ? " main" : ""}`}>{chip.label}</span>)}</div>
+      {chips.map(chip => <span key={chip.label} className={`template-chip${chip.main ? " main" : ""}`}>{chip.main && <Icon name="star" />}{chip.label}</span>)}</div>
     <div className="template-actions">
       <Button variant="primary" busy={saving} busyLabel="Сохраняем…" disabled={busy || !dirty} onClick={save}>Сохранить</Button>
       {check && <Button busy={checking} busyLabel="Проверяем…" disabled={busy} onClick={check}>Проверить</Button>}
