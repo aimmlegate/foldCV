@@ -1,5 +1,4 @@
 .templates-screen { overflow: auto; flex: 1; padding: 30px 32px; display: flex; flex-direction: column; min-height: 0; }
-.templates-screen > .settings-title { margin-bottom: 18px; }
 .templates-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 24px; align-items: start; min-height: 0; }
 .templates-list { display: flex; flex-direction: column; gap: 4px; }
 .templates-list .template-row { border: 1px solid transparent; background: none; border-radius: 6px; text-align: left; padding: 10px 12px;

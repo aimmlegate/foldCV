@@ -13,7 +13,7 @@ import { type Appearance, type PaneOrder } from "./interface";
 import { AppearanceSettings } from "./Appearance";
 
 const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
-export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder, appearance, changeAppearance }: { open: boolean; close: () => void;
+export function Settings({ open, connectionChanged, paneOrder, changePaneOrder, appearance, changeAppearance }: { open: boolean;
   connectionChanged: (view: ConnectionView) => void; paneOrder: PaneOrder; changePaneOrder: (order: PaneOrder) => void;
   appearance: Appearance; changeAppearance: (value: Appearance) => void }) {
   const [section, setSection] = useState<"model" | "rules" | "limits" | "interface">("model");
@@ -42,7 +42,6 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
       <span className="settings-saved" role="status">{current.saving ? "" : dirty ? "Не сохранено" : current.staleRules ? "Команды изменились, загрузите их заново" : controller.ready ? "" : "Часть настроек не загрузилась"}</span>
     </div></>;
   return <section className="settings-screen" aria-label="Настройки">
-    <div className="settings-title"><button className="text-button" disabled={current.saving} onClick={close}>← К резюме</button></div>
     <div className="settings-layout"><nav className="settings-nav" aria-label="Разделы настроек">
       {/* Limits have no menu item; their saved or default values still apply. */}
       {(["model", "rules", "interface"] as const).map(value => <button key={value} data-settings={value} className={section === value ? "active" : ""}

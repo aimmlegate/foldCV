@@ -1,5 +1,5 @@
 import { errorMessage } from "../errors/messages";
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ConnectionWorkflow, connectionSummary, updateNotice, type ConnectionView } from "../connection/workflow";
 import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
@@ -71,6 +71,18 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   });
   const openSettings = () => openScreen("settings");
   const backToResume = () => void action(async current => { await templateEditor.current?.resume(); if (current()) showResume(); });
+  const back = useRef(backToResume);
+  back.current = backToResume;
+  // Escape leaves Settings and Templates unless a dialog, a menu or a text field takes it.
+  useEffect(() => {
+    if (onResume) return;
+    const leave = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || busy || document.querySelector("dialog[open]")) return;
+      if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable], .monaco-editor")) return;
+      back.current();
+    };
+    window.addEventListener("keydown", leave); return () => window.removeEventListener("keydown", leave);
+  }, [onResume, busy]);
   function openFile(mode: FileMode) {
     workspace.dismissError();
     if (mode !== "export") { setFileMode(mode); return; }
@@ -86,7 +98,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   return <NotificationProvider><main className={`app-shell${collapsed ? " history-collapsed" : ""}`} data-app="foldcv" data-busy={busy}
     data-history-sized={historyWidth === null ? undefined : "true"}
     style={historyWidth === null ? undefined : { "--history-width": `${String(historyWidth)}px` } as CSSProperties}>
-    <History projects={projects} activeId={shown?.workspace.projectId ?? null} busy={busy} collapse={() => setCollapsed(true)}
+    <History projects={projects} activeId={shown?.workspace.projectId ?? null} screen={screen} busy={busy} collapse={() => setCollapsed(true)}
       handle={<PanelHandle className="history-handle" label="Ширина списка резюме" axis="x" sign={1} value={historyWidth ?? (innerWidth <= 1280 ? 187 : 208)}
         minimum={historyWidths.minimum} maximum={historyWidths.maximum} change={changeHistoryWidth} reset={() => changeHistoryWidth(null)} />}
       fresh={() => { void fresh(); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings} templates={() => openScreen("templates")}
@@ -96,7 +108,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         subtitle={!onResume ? APP_NAME : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}
         ready={onResume && view === "editor"} busy={busy} save={() => openFile("save")} exportFile={() => openFile("export")}
         retrySave={status !== "Сохранено" && status !== "Изменения сохраняются…" ? () => void action(async current => { await templateEditor.current?.flush(); if (current()) setStatus("Сохранено"); }) : undefined}
-        activity={<NotificationCenter />} />
+        activity={<NotificationCenter />} back={onResume ? undefined : backToResume} />
       <NotificationSection count={Number(!!error && !fileMode)}>
         <section className="notice-group" aria-label="Ошибки"><h3>Ошибки</h3>
           {error && !fileMode && <div className="notification-error" role="alert"><p>{errorMessage(error)}</p>
@@ -125,9 +137,9 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
         {view === "source" && !workspace.loading && <SourceForm active={onResume} busy={busy} connection={connection?.snapshot ?? null}
           process={(file, options, templateId) => void process(file, options, templateId)} />}
       </div>
-      {visited.has("settings") && <div className="screen" hidden={screen !== "settings"}><Settings open={screen === "settings"} close={backToResume} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
+      {visited.has("settings") && <div className="screen" hidden={screen !== "settings"}><Settings open={screen === "settings"} connectionChanged={setConnection} paneOrder={paneOrder} changePaneOrder={changePaneOrder} appearance={appearance} changeAppearance={changeAppearance} /></div>}
       {visited.has("templates") && <div className="screen" hidden={screen !== "templates"}>
-        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen open={screen === "templates"} close={backToResume} settings={openSettings} /></Suspense></div>}
+        <Suspense fallback={<OperationStatus label="Загружаем шаблоны" />}><TemplatesScreen open={screen === "templates"} settings={openSettings} /></Suspense></div>}
     </section>
     {fileMode && <FileDialog key={fileMode} mode={fileMode} title={projectTitle} subtitle={shown?.identity?.subtitle ?? ""} filename={filename}
       templateName={templatePackage ? `${templatePackage.template.name} · ${templatePackage.template.revision}` : undefined}

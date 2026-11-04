@@ -20,7 +20,7 @@ type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" |
 
 /** The templates screen: the list, the YAML of the shown template and the template assistant. New imports use these
  * templates; existing resumes keep their own captured version. */
-export default function TemplatesScreen({ open, close, settings }: { open: boolean; close: () => void; settings: () => void }) {
+export default function TemplatesScreen({ open, settings }: { open: boolean; settings: () => void }) {
   const [catalog, setCatalog] = useState<TemplateCatalog | null>(null);
   const [shown, setShown] = useState<ShownTemplate | null>(null);
   const [text, setText] = useState("");
@@ -134,7 +134,6 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
 
   const busy = work !== null;
   return <section className="templates-screen" aria-label="Шаблоны">
-    <div className="settings-title"><button className="text-button" onClick={close}>← К резюме</button></div>
     <div className="templates-layout">
       <nav className="templates-list" aria-label="Список шаблонов">
         <Button className="small templates-add" busy={work === "adding"} busyLabel="Добавляем…" disabled={busy || !state}

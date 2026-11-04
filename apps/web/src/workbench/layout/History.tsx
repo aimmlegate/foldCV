@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { historyGroups } from "./history-groups";
+import type { Screen } from "../templates/screen";
 
 /** The refusal shows here: behind this modal dialog the notification badge cannot be reached. */
 export function DeleteDialog({ open, busy, error, close, confirm }: { open: boolean; busy: boolean; error: string; close: () => void; confirm: () => void }) {
@@ -18,8 +19,8 @@ export function DeleteDialog({ open, busy, error, close, confirm }: { open: bool
   </Dialog>;
 }
 
-export function History({ projects, activeId, busy, collapse, fresh, open, remove, archive, openFile, settings, templates, connection, update = null, error, handle }: {
-  projects: ProjectList | null; activeId: string | null; busy: boolean; collapse: () => void; handle?: ReactNode;
+export function History({ projects, activeId, screen = "resume", busy, collapse, fresh, open, remove, archive, openFile, settings, templates, connection, update = null, error, handle }: {
+  projects: ProjectList | null; activeId: string | null; screen?: Screen; busy: boolean; collapse: () => void; handle?: ReactNode;
   fresh: () => void; open: (id: string) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
   archive: (id: string, archived: boolean) => Promise<boolean>;
   openFile: () => void; settings: () => void; templates: () => void; connection: string; update?: string | null; error: string;
@@ -28,12 +29,15 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
   const closeDelete = () => { setDeleting(null); setRefused(false); };
   const [archiveOpen, setArchiveOpen] = useState(false);
   const { current, archived } = historyGroups(projects?.entries ?? []);
+  // One current place: the open resume on its screen, else the Settings or Templates button.
+  const shownId = screen === "resume" ? activeId : null;
+  const place = (target: Exclude<Screen, "resume">) => screen === target ? { "aria-current": "page" as const } : {};
   const row = (item: ProjectListEntry) => {
     const inArchive = Boolean(item.archived), archiveLabel = inArchive ? "Вернуть из архива" : "В архив";
     const status = item.tombstoned ? "Удалено не до конца — удалите снова"
       : projects?.errors.some(error => error.projectId === item.projectId) ? "Не удалось прочитать" : null;
-    return <div className={`project-row${item.projectId === activeId ? " active" : ""}`} key={item.projectId}>
-      <button className="project-select" disabled={busy || item.tombstoned} aria-current={item.projectId === activeId ? "page" : undefined}
+    return <div className={`project-row${item.projectId === shownId ? " active" : ""}`} key={item.projectId}>
+      <button className="project-select" disabled={busy || item.tombstoned} aria-current={item.projectId === shownId ? "page" : undefined}
         title={item.subtitle ? `${item.title} — ${item.subtitle}` : item.title} onClick={() => void open(item.projectId)}>
         <strong>{item.title}</strong>{item.subtitle && <small>{item.subtitle}</small>}{status && <em>{status}</em>}
       </button>
@@ -64,8 +68,8 @@ export function History({ projects, activeId, busy, collapse, fresh, open, remov
       <button className="history-file" disabled={busy} onClick={openFile}><Icon name="upload" />Открыть .foldcv</button>
       <div className="connection-mini"><span className="dot" /><span>{connection}</span></div>
       {update && <button className="history-update" disabled={busy} onClick={settings}><Icon name="download" />{update}</button>}
-      <button className="history-settings history-templates" disabled={busy} onClick={templates}><Icon name="file" />Шаблоны<Icon name="chevron" /></button>
-      <button className="history-settings" disabled={busy} onClick={settings}><Icon name="settings" />Настройки<Icon name="chevron" /></button>
+      <button className="history-settings history-templates" disabled={busy} onClick={templates} {...place("templates")}><Icon name="file" />Шаблоны<Icon name="chevron" /></button>
+      <button className="history-settings" disabled={busy} onClick={settings} {...place("settings")}><Icon name="settings" />Настройки<Icon name="chevron" /></button>
     </footer>
     <DeleteDialog open={deleting !== null} busy={busy} error={refused ? error : ""} close={closeDelete} confirm={() => {
       if (deleting) { setRefused(false); void remove(deleting).then(done => { if (done) closeDelete(); else setRefused(true); }); }

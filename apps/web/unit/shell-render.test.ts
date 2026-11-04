@@ -9,7 +9,7 @@ import { capabilities, settings, view } from "./support/assistant";
 
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);
 const { Header } = await import("../src/workbench/layout/Header");
-const { DeleteDialog } = await import("../src/workbench/layout/History");
+const { DeleteDialog, History } = await import("../src/workbench/layout/History");
 const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
 const { Composer } = await import("../src/workbench/assistant/Composer");
@@ -35,6 +35,29 @@ test("the export dialog offers DOCX and PDF; DOCX is chosen first and the print 
   assert.deepEqual(inputs.map(input => [/value="(\w+)"/u.exec(input)?.[1], input.includes('checked=""')]), [["docx", true], ["pdf", false]]);
   assert.ok(dialog.includes("Скачать DOCX"));
   assert.ok(!dialog.includes("Печать в PDF") && !dialog.includes("Откроется окно печати"));
+});
+
+test("Settings and Templates show the way back in the header; the resume screen does not", () => {
+  const props = { title: "Настройки", subtitle: "foldCV Beta", collapsed: false, expand: () => {}, status: "Сохранено", ready: false,
+    busy: false, save: () => {}, exportFile: () => {} };
+  const away = renderToStaticMarkup(createElement(Header, { ...props, back: () => {} }));
+  assert.match(away, /class="button header-back"[^>]*aria-keyshortcuts="Escape"/u);
+  assert.ok(away.includes("К резюме"));
+  assert.ok(!renderToStaticMarkup(createElement(Header, { ...props, ready: true })).includes("header-back"));
+});
+
+test("the sidebar marks one current place: the open resume, or the Settings or Templates button", () => {
+  const entry = { projectId: "p1", title: "Alex Example", updatedAt: "2026-10-01T10:00:00+00:00", tombstoned: false, cleanupStatus: "none" as const };
+  const sidebar = (screen: "resume" | "settings" | "templates") => renderToStaticMarkup(createElement(History, {
+    projects: { entries: [entry], errors: [] }, activeId: "p1", screen, busy: false, collapse: () => {}, fresh: () => {},
+    open: () => Promise.resolve(true), remove: () => Promise.resolve(true), archive: () => Promise.resolve(true), openFile: () => {},
+    settings: () => {}, templates: () => {}, connection: "Codex подключён", error: "" }));
+  const current = (markup: string) => (markup.match(/<button[^>]*aria-current="page"[^>]*>.*?<\/button>/gu) ?? []).map(button => button.replace(/<[^>]+>/gu, ""));
+  assert.deepEqual(current(sidebar("resume")), ["Alex Example"]);
+  assert.match(sidebar("resume"), /class="project-row active"/u);
+  assert.deepEqual(current(sidebar("settings")), ["Настройки"]);
+  assert.deepEqual(current(sidebar("templates")), ["Шаблоны"]);
+  assert.ok(!sidebar("templates").includes("project-row active"));
 });
 
 test("a refused delete says why inside its dialog, and an open dialog carries no old error", () => {
