@@ -58,7 +58,7 @@ def mount_assistant(app, service, *, companions=()):
         connection = service.connection()
         saved = await worker(service.settings.save, payload, connection.models or None, connection.reasoning)
         if prior.enabled and not saved.enabled:
-            # One switch for every assistant instance (D140).
+            # One switch for every assistant instance (D141).
             for value in (service, *companions):
                 value.stop_all()
         return settings_reply(saved)
@@ -130,7 +130,7 @@ def mount_assistant(app, service, *, companions=()):
 
 
 def mount_template_assistant(app, service, *, problem, temp_root, worker_slot):
-    """The template assistant (D140): the run routes of one fixed scope key, its samples and its proposals."""
+    """The template assistant (D141): the run routes of one fixed scope key, its samples and its proposals."""
     key, scope = template_tools.TEMPLATES, service.scope
 
     @app.get(TEMPLATE_PREFIX + '/capabilities')

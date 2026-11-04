@@ -12,7 +12,7 @@ import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connectio
 import { AssistantApi } from "./api";
 import type { Port, RunRequest } from "./controller";
 
-/** The template assistant (D140): the resume assistant's runs on its own routes, with no access to resumes. Its
+/** The template assistant (D141): the resume assistant's runs on its own routes, with no access to resumes. Its
  * proposals are whole YAML texts that the templates screen applies into the editor; replies are parsed by hand. */
 export const templatePrefix = "/v2/templates/assistant";
 export type TemplateFields = { templateId: string | null; assetsFrom: string | null; text: string; textHash: string; sampleId: string | null };

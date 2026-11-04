@@ -230,7 +230,7 @@ NAME_SIZE = re.compile(r'\n    name:\n      font: \w+\n      size: (\d+(?:\.\d+)
 
 
 async def template_script(call, value, message, cancel, emit, counter):
-    """The template scope (D140): reads the draft, then the attached sample, a stored page, or proposes the name style
+    """The template scope (D141): reads the draft, then the attached sample, a stored page, or proposes the name style
     2 pt larger as one changed line."""
     emit('activity.updated', {'itemId': 'read', 'kind': 'summary', 'text': 'Читаю шаблон'})
     first = await call('read_draft', {'page': 0})
@@ -347,7 +347,7 @@ def install_live_limits(app, ledger, limit):
     rewrites, so they are refused here, before a native process starts."""
     assistant = app.app.state.assistant
     budget = LiveBudget(assistant.runtime_for, ledger, limit)
-    # The template assistant (D140) starts the same native models, so it is charged to the same budget.
+    # The template assistant (D141) starts the same native models, so it is charged to the same budget.
     for service in (assistant, app.app.state.template_assistant):
         service.runtime = budget
         service.runtime_for = lambda model: None if budget.runtime_for(model) is None else budget

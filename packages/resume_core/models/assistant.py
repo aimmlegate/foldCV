@@ -312,7 +312,7 @@ class AssistantSkillListV1(Wire):
     items: list[AssistantSkillV1] = Field(max_length=20)
 
 
-# The template assistant (D140). Hand-parsed on the client; not in the contracts registry.
+# The template assistant (D141). Hand-parsed on the client; not in the contracts registry.
 
 TEMPLATE_TEXT_BYTES = 256 * 1024
 

@@ -21,7 +21,7 @@ function storedSize() { try { const value: unknown = JSON.parse(localStorage.get
 const code = (error: unknown) => error instanceof AgentApiFailure ? error.code : "REQUEST_FAILED";
 const sampleTypes = ".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-/** The template assistant beside the YAML editor (D140): it reads templates and samples, never resumes, and its
+/** The template assistant beside the YAML editor (D141): it reads templates and samples, never resumes, and its
  * proposals change only the editor text; the user saves. */
 export function TemplateAssistant({ open, context, names, apply, settings }: {
   open: boolean; context: () => TemplateContext | null; names: ReadonlyMap<string, string>; apply: ApplyProposal; settings: () => void;

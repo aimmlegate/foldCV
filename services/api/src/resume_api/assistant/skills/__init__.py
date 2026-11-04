@@ -24,7 +24,7 @@ SKILLS = (
     Skill('format-resume', 'Оформление по шаблону', 'Propose block formatting with the exact wording preserved.',
         {'SKILL.md': HERE / 'format-resume.md', 'references/editorial-rules.md': HERE / 'editorial-rules.md'}),
 )
-# The template assistant's skill (D140); only its scope reads or lists it.
+# The template assistant's skill (D141); only its scope reads or lists it.
 TEMPLATE_SKILLS = (
     Skill('design-template', 'Шаблон по образцу', 'Write a template from a DOCX or PDF sample or a description.',
         {'SKILL.md': HERE / 'design-template.md', 'references/template-authoring.md': HERE / 'template-authoring.md'}),
