@@ -19,7 +19,7 @@ from ..models.template_render import TemplateRendererIdentity, TemplateRenderReq
 from ..rich_limits import DOCX_BYTES
 from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES, canonical
 from ..templates.focus import icon_catalog, row_icon
-from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target
+from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target, table_rows
 from ..templates.materialize_nodes import reference
 from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts
@@ -192,6 +192,22 @@ class CapturedWriter:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             if not actual and emitted:
                 self.remember(self.generated(block, ''))
+        self.block = None
+        # Table rows (D143): each row's label in the table's label style, checked like any text before writing.
+        self.table_rows = table_rows(request.document, self.recipe, request.package.definition.template.default_locale)
+        self.row_labels = {}
+        for block in request.document.blocks():
+            row = self.table_rows.get(block.id)
+            if row is None:
+                continue
+            self.block = block
+            if self.regions[block.id] == 'header':
+                raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+            table = self.recipe.style.tables[row['table']]
+            ref = block.presentation.model_copy(update={'style_token': table.label_style}, deep=True)
+            style = self.resolver.run(block, PresentedText(type='text', text=row['label'], styles={}, presentation=ref))
+            self.remember(style)
+            self.row_labels[block.id] = (visible_text(row['label']), style)
         self.block = None
         self.rows, self.icons, self.placed = {}, {}, []
         catalog = None
@@ -399,13 +415,29 @@ class CapturedWriter:
         number.append(element('w:numId', val=identifier))
         props.insert(0, number)
 
-    def blocks(self, container, blocks, depth=0):
+    def blocks(self, container, blocks, depth=0, *, in_row=False):
         sequence = {}
         unfilled = unfilled_lines(blocks, self.resolver, self.runs)
         table = None
-        for block in blocks:
+        index, tabled = 0, False
+        while index < len(blocks):
+            block = blocks[index]
+            index += 1
             if block.id in unfilled:
                 continue
+            if block.id in self.table_rows:
+                # Rows of one table style that follow each other are one table; two tables stay apart by a paragraph.
+                run, style = [block], self.table_rows[block.id]['table']
+                while index < len(blocks) and self.table_rows.get(blocks[index].id, {}).get('table') == style:
+                    run.append(blocks[index])
+                    index += 1
+                if tabled:
+                    self.spacer(container, 1)
+                self.key_value_table(container, run, depth)
+                table, tabled = None, True
+                sequence.clear()
+                continue
+            tabled = False
             if block.type not in {'bullet_list', 'numbered_list'}:
                 sequence.clear()
             if block.type != 'section' or block.content:
@@ -416,11 +448,88 @@ class CapturedWriter:
                 self.blocks(self.focus_row(table, block, row, icon, depth), block.children[len(row):], depth)
                 continue
             table = None
-            self.blocks(container, block.children, depth + (block.type in {'bullet_list', 'numbered_list'}))
-            if block.type == 'section' and block.children:
+            self.blocks(container, block.children, depth + (block.type in {'bullet_list', 'numbered_list'}), in_row=in_row)
+            # An item inside a table cell keeps no gap of its own; the table ends with it.
+            if block.type == 'section' and block.children and not in_row:
                 gap = self.resolver.views[block.presentation.view_key].item_gap
                 if gap:
                     self.spacer(container, native_units(gap, positive=True))
+
+    def key_value_table(self, container, rows, depth):
+        """A run of table rows as one table: the label cell in the table's label style, the content cell with the row's
+        own blocks, borders and cell margins from the table style (D143)."""
+        first = rows[0]
+        style = self.recipe.style.tables[self.table_rows[first.id]['table']]
+        inset = native_units(self.resolver.views[first.presentation.view_key].inset)
+        width = self.widths[first.id] - inset
+        label = native_units(style.label_width)
+        widths = [label, width - label] if label else [width]
+        padding = native_units(style.padding_x)
+        if widths[-1] <= 2 * padding:
+            raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
+        table = container.add_table(0, len(widths))
+        if not isinstance(container, type(self.document)):
+            container.paragraphs[-1]._p.getparent().remove(container.paragraphs[-1]._p)
+        self.borderless(table, widths)
+        props = table._tbl.tblPr
+        if inset:
+            props.find(qn('w:tblInd')).set(qn('w:w'), str(inset))
+        if style.border_width > 0:
+            color = self.recipe.style.colors[style.border_color].removeprefix('#')
+            size = native_units(style.border_width, 8, positive=True, maximum=96)
+            for side in props.find(qn('w:tblBorders')):
+                side.set(qn('w:val'), 'single')
+                side.set(qn('w:sz'), str(size))
+                side.set(qn('w:space'), '0')
+                side.set(qn('w:color'), color)
+        margins = element('w:tblCellMar')
+        for side, value in (('top', style.padding_y), ('left', style.padding_x), ('bottom', style.padding_y), ('right', style.padding_x)):
+            margins.append(element('w:' + side, w=native_units(value), type='dxa'))
+        props.append(margins)
+        for block in rows:
+            self.block = block
+            cells = table.add_row().cells
+            for cell, cell_width in zip(cells, widths, strict=True):
+                cell.width = Twips(cell_width)
+            if label:
+                self.label_cell(cells[0], block, style)
+            content = cells[-1]
+            if style.background is not None:
+                fill(content._tc.get_or_add_tcPr(), self.recipe.style.colors[style.background])
+            # A new cell holds one empty paragraph; the row's blocks take its place, and a cell still ends in a paragraph.
+            for paragraph in content.paragraphs:
+                paragraph._p.getparent().remove(paragraph._p)
+            self.assign_width(block.children, widths[-1] - 2 * padding)
+            self.blocks(content, block.children, depth, in_row=True)
+            if content._tc[-1].tag != qn('w:p'):
+                self.spacer(content, 1)
+        self.block = None
+        gap = self.table_rows[rows[-1].id].get('gap')
+        if gap:
+            self.spacer(container, native_units(gap, positive=True))
+
+    def assign_width(self, blocks, width):
+        for block in blocks:
+            self.widths[block.id] = width
+            self.assign_width(block.children, width)
+
+    def label_cell(self, cell, block, table):
+        text, style = self.row_labels[block.id]
+        props = cell._tc.get_or_add_tcPr()
+        if table.label_background is not None:
+            fill(props, self.recipe.style.colors[table.label_background])
+        if table.label_align == 'center':
+            props.append(element('w:vAlign', val='center'))
+        paragraph = cell.paragraphs[0]
+        pprops = paragraph._p.get_or_add_pPr()
+        pprops.append(element('w:spacing', before=0, after=0))
+        self.line_spacing(pprops, style.line_height, style)
+        pprops.append(element('w:jc', val='left'))
+        pprops.append(element('w:widowControl', val=0))
+        pprops.append(element('w:ind', left=0, right=0))
+        pprops.append(mark_properties(style))
+        if text:
+            self.emit_run(paragraph, text, style)
 
     def focus_table(self, container, section):
         """Focus rows as one borderless table: Google Docs moves floating pictures, a cell keeps an icon beside its text."""
@@ -650,6 +759,9 @@ class CapturedWriter:
             # One column: the body itself is the main column, in reading order, with no layout table.
             for region in self.request.document.regions[1:]:
                 self.blocks(self.document, region.blocks)
+            body = self.document.element.body
+            if len(body) > 1 and body[-2].tag == qn('w:tbl'):
+                self.spacer(self.document, 1)
         logo = self.recipe.style.header.logo
         if logo is not None:
             asset = next(asset for asset in self.request.package.assets if asset.id == logo.asset)
@@ -695,6 +807,11 @@ class CapturedWriter:
             table_order = {qn('w:' + name): index for index, name in enumerate(table_names)}
             for props in root.iter(qn('w:tblPr')):
                 props[:] = sorted(props, key=lambda child: table_order.get(child.tag, len(table_order)))
+            cell_names = ('cnfStyle', 'tcW', 'gridSpan', 'hMerge', 'vMerge', 'tcBorders', 'shd', 'noWrap', 'tcMar',
+                'textDirection', 'tcFitText', 'vAlign', 'hideMark')
+            cell_order = {qn('w:' + name): index for index, name in enumerate(cell_names)}
+            for props in root.iter(qn('w:tcPr')):
+                props[:] = sorted(props, key=lambda child: cell_order.get(child.tag, len(cell_order)))
 
 
 def unfilled_lines(blocks, resolver, runs):

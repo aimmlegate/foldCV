@@ -108,7 +108,8 @@ class EmptyProps(Wire):
 
 class SectionProps(ParagraphProps):
     record_id: Id | None
-    presentation: Literal["standard", "focus"] = "standard"
+    # row: a table row of a template view (D143); its children fill the content cell beside the view's label.
+    presentation: Literal["standard", "focus", "row"] = "standard"
     manual_order: bool = Field(default=False, exclude_if=lambda value: not value)
     # The template icon the user chose for a Focus row (D122); None shows the catalog's icon or the placeholder.
     icon: Id | None = Field(default=None, max_length=128, exclude_if=lambda value: value is None)

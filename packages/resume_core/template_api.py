@@ -18,6 +18,8 @@ class EditorFaces(Wire):
     bold: Id | None
     italic: Id | None
     bold_italic: Id | None
+    # The upright face behind an italic base font (D143): it carries the letters the italic face lacks, slanted.
+    upright: Id | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class EditorStyle(Wire):
@@ -33,10 +35,22 @@ class EditorFocus(Wire):
     icon: Id | None
 
 
+class EditorRow(Wire):
+    """A table row (D143): its table style, its label, and whether it opens or closes the table it shares with its
+    neighbours."""
+    table: Id
+    label: str
+    first: bool
+    last: bool
+    # Points of space after the table, the last row's item gap; absent inside an entry, which keeps its own gap.
+    gap: float | None = Field(default=None, gt=0, exclude_if=lambda value: value is None)
+
+
 class EditorBlock(Wire):
     style: str
     band: Literal[True] | None = Field(default=None, exclude_if=lambda value: value is None)
     focus: EditorFocus | None = Field(default=None, exclude_if=lambda value: value is None)
+    row: EditorRow | None = Field(default=None, exclude_if=lambda value: value is None)
     inline: dict[str, str] = Field(default_factory=dict, exclude_if=lambda value: not value)
     links: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
     # Binding or fragment id of each span shown as a chip, with its background.

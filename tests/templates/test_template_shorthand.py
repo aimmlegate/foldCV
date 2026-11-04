@@ -44,7 +44,9 @@ def test_the_bundled_short_template_is_the_same_package_as_its_full_form():
     assert len(BUNDLED_TEMPLATE.read_text(encoding='utf-8').splitlines()) < 1100
 
 
-@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC, PUBLICATIONS], ids=['two-column', 'generic', 'publications'])
+@pytest.mark.parametrize('path', [BUNDLED_TEMPLATE, GENERIC, PUBLICATIONS, *(BUNDLED_TEMPLATES[key] for key in
+    ('generic-skills-table', 'generic-questionnaire', 'generic-project-cards'))],
+    ids=['two-column', 'generic', 'publications', 'skills-table', 'questionnaire', 'project-cards'])
 def test_shortening_any_template_expands_back_to_the_same_definition(path):
     document = full(path)
     shortened = shorten(document)

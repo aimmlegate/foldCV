@@ -11,7 +11,7 @@ export const presentationMeta = "foldcv-v7-presentation";
 
 /** What the mounted editor draws: Python's plan, the captured recipe and blob URLs of verified captured bytes. */
 export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url: string; style: CSSProperties } | null;
-  presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string> };
+  presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string>; tables: ReadonlyMap<string, string> };
 
 /** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
 export function assetUrl(asset: Pick<Asset, "sha256">): string {
@@ -56,9 +56,12 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
     styles.set(key, name);
     // Each styled element sets its own faces; marks inside it read the nearest ones. A missing face keeps the regular one.
     const face = (id: string | null) => family(id) ?? regular;
+    // An italic base font falls back to its slanted upright face for the letters it lacks, as the DOCX does (D143).
+    const upright = family(style.faces.upright ?? null);
+    const stack = upright ? `var(--fcv-regular), ${upright}, sans-serif` : "var(--fcv-regular), sans-serif";
     rules.push(`.fcv-sheet [data-fcv-style="${name}"] { --fcv-regular: ${regular}; --fcv-bold: ${face(style.faces.bold)};`
       + ` --fcv-italic: ${face(style.faces.italic)}; --fcv-bold-italic: ${face(style.faces.boldItalic)};`
-      + ` font-family: var(--fcv-regular), sans-serif; font-size: ${pt(style.size)}; line-height: ${pt(style.lineHeight)};`
+      + ` font-family: ${stack};${upright ? " font-style: italic;" : ""} font-size: ${pt(style.size)}; line-height: ${pt(style.lineHeight)};`
       + ` color: ${style.color};${style.alignment ? ` text-align: ${style.alignment};` : ""} }`);
   });
   // A packed icon has no asset entry; the plan names its PNG by hash.
@@ -69,6 +72,19 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
   const recipe = presentation.recipe, style = recipe.style, columns = sheetColumns(recipe.layout.regions);
   const header = recipe.layout.regions.find(region => region.id === "header");
   if (!header || !columns) return null;
+  // A table style (D143) per row: the label column, the borders, the fills and the cell padding, all from the recipe.
+  const tables = new Map<string, string>();
+  const color = (id: string | null | undefined): string => (id ? style.colors[id] : undefined) ?? "transparent";
+  Object.entries(style.tables ?? {}).forEach(([key, table], index) => {
+    const name = `t${String(index)}`;
+    tables.set(key, name);
+    rules.push(`.fcv-sheet [data-fcv-table="${name}"] { --fcv-row-label-width: ${pt(table.label_width)};`
+      + ` --fcv-row-label-display: ${table.label_width > 0 ? "flex" : "none"};`
+      + ` --fcv-row-border: ${table.border_width > 0 ? `${pt(table.border_width)} solid ${color(table.border_color)}` : "0"};`
+      + ` --fcv-row-label-fill: ${color(table.label_background)}; --fcv-row-fill: ${color(table.background)};`
+      + ` --fcv-row-pad-x: ${pt(table.padding_x)}; --fcv-row-pad-y: ${pt(table.padding_y)};`
+      + ` --fcv-row-label-align: ${table.label_align === "center" ? "center" : "flex-start"}; }`);
+  });
   const band = style.section_band, focus = style.focus, divider = style.header.divider, logoValue = style.header.logo;
   const variables = {
     "--fcv-page-width": pt(style.page.width), "--fcv-top": pt(style.header.name_top), ...columns,
@@ -85,7 +101,7 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
   const logoAsset = logoValue ? assets.get(logoValue.asset) : undefined;
   const logo = logoValue && logoAsset ? { url: assetUrl(logoAsset), style: { left: pt(logoValue.x), top: pt(logoValue.top),
     width: pt(logoValue.width), height: pt(logoValue.height) } } : null;
-  return { css: rules.join("\n"), variables, logo, presentation, styles, icons };
+  return { css: rules.join("\n"), variables, logo, presentation, styles, icons, tables };
 }
 
 /** Literal spans have no binding id. The plan stores them as `literal@start@end` in UTF-16 units. */
@@ -146,15 +162,30 @@ export function templatePresentationPlugin(current: () => TemplateSheet | null):
       if (!entry || !ref) return;
       const view = views[ref.viewKey], attributes: Record<string, string> = { "data-fcv-style": sheet.styles.get(entry.style) ?? "" };
       const properties: string[] = [];
+      // A centered or justified style needs the line to span its block; BlockNote lays the text out as a shrunk flex item.
+      const alignment = plan.styles[entry.style]?.alignment;
+      if (alignment && alignment !== "left") attributes["data-fcv-align"] = alignment;
       if (entry.band) attributes["data-fcv-band"] = "true";
       else if (view && content.type.name !== "section") {
         attributes["data-fcv-inset"] = "true";
         properties.push(`--fcv-inset: ${pt(view.inset + (rows.has(String(id)) ? sheet.presentation.recipe.style.focus.text_x : 0))}`);
       }
       if (content.type.name === "section" && content.childCount === 0) attributes["data-fcv-item"] = "true";
-      if (content.type.name === "section" && view && node.childCount > 1) {
+      // An item inside a table cell keeps no gap of its own; a table of whole blocks ends with its last row's gap.
+      const $pos = state.doc.resolve(position), holder: unknown = $pos.depth > 1 ? $pos.node($pos.depth - 1).attrs["id"] : null;
+      const inRow = typeof holder === "string" && plan.blocks[holder]?.row !== undefined;
+      if (content.type.name === "section" && view && node.childCount > 1 && !entry.row && !inRow) {
         attributes["data-fcv-gap"] = "true";
         properties.push(`--fcv-item-gap: ${pt(view.item_gap)}`);
+      }
+      if (entry.row) {
+        // A table row: its label is drawn from the plan, never typed; the first and last rows carry the table's edges.
+        attributes["data-fcv-row"] = "true";
+        attributes["data-fcv-table"] = sheet.tables.get(entry.row.table) ?? "";
+        if (entry.row.first) attributes["data-fcv-row-first"] = "true";
+        if (entry.row.last) attributes["data-fcv-row-last"] = "true";
+        properties.push(`--fcv-row-label: ${JSON.stringify(entry.row.label)}`);
+        if (entry.row.gap) { attributes["data-fcv-gap"] = "true"; properties.push(`--fcv-item-gap: ${pt(entry.row.gap)}`); }
       }
       if (entry.focus) {
         attributes["data-fcv-focus"] = "true";

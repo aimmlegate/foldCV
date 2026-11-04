@@ -5,7 +5,7 @@ from .models.rich_document import FactFieldSpan
 from .models.template_document import PresentedText, TemplateParagraphBlock, TemplateSectionBlock
 from .rich_fields import field_key, occurrences, working_field
 from .template_panel_values import field_occurrence, period_endpoint, period_field_id
-from .templates.materialize_nodes import literal, locale_text, period_format, reference
+from .templates.materialize_nodes import fallback_style, literal, locale_text, period_format, reference, styled
 from .templates.projection import pointer_tokens
 
 
@@ -37,6 +37,40 @@ def node_labels(project, lines):
                     ref.view_key, ref.template_instance_id, ref.node_index) and line_text(previous) == label:
                 found.add(previous.id)
     return found
+
+
+def row_start(view, index):
+    """The node that opens the table row holding node `index` (D143): the nearest node up to it with a row label; None
+    for a node before the first row, which stays outside the table."""
+    starts = [position for position, node in enumerate(view.view.nodes[:index + 1]) if node.row is not None]
+    return starts[-1] if starts else None
+
+
+def is_row(block):
+    return isinstance(block, TemplateSectionBlock) and block.props.presentation == 'row'
+
+
+def line_container(package, section, index, allocator):
+    """The block a node's line goes into: the item section itself, or the row section of the node's table row, which
+    the item gets back when its rows were removed."""
+    view = next((value for value in package.definition.blocks if section.presentation is not None
+        and value.id == section.presentation.view_key), None)
+    start = row_start(view, index) if view is not None else None
+    if start is None:
+        return section
+    for child in section.children:
+        if is_row(child) and child.presentation is not None and child.presentation.node_index == start:
+            return child
+    row = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-row', section.id, start]), revision=1,
+        props={'recordId': None, 'presentation': 'row'}, content=[], children=[], provenance=[],
+        presentation=reference(package, view.id, fallback_style(view), section.presentation.template_instance_id,
+            section.presentation.item_handle, node_index=start))
+    # After the rows and lines of earlier nodes, as the import orders them.
+    def earlier(child):
+        return child.presentation is not None and child.presentation.node_index is not None and child.presentation.node_index <= start
+    at = next((len(section.children) - position for position, child in enumerate(reversed(section.children)) if earlier(child)), 0)
+    section.children.insert(at, row)
+    return row
 
 
 def block_node(package, block):
@@ -89,6 +123,7 @@ def field_place(project, record, key):
 def _insert_line(package, section, index, node, ref, content, allocator, seed):
     """The node's new line after the blocks of earlier nodes and its own label, which it brings unless one is shown."""
     label = locale_text(node.label, package.definition.template.default_locale)
+    section = line_container(package, section, index, allocator)
     def paragraph(slot, inline):
         return TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', [slot, section.id, index, seed]),
             revision=1, props={'alignment': ref.overrides.alignment or 'left'}, children=[], provenance=[], presentation=ref,
@@ -98,7 +133,7 @@ def _insert_line(package, section, index, node, ref, content, allocator, seed):
     at = next((len(section.children) - position for position, child in enumerate(reversed(section.children)) if earlier(child)), 0)
     labelled = bool(label) and any(earlier(child) and child.presentation.node_index == index and line_text(child) == label
         for child in section.children)
-    section.children[at:at] = [*([paragraph('panel-line-label', [literal(label, ref)])] if label and not labelled else []),
+    section.children[at:at] = [*([paragraph('panel-line-label', [literal(label, styled(ref, node.label_style))])] if label and not labelled else []),
         paragraph('panel-line', content)]
 
 
@@ -128,7 +163,7 @@ def show_fields(project, record, keys, allocator):
             continue
         section, view, index, node, parts = found
         label = locale_text(node.label, package.definition.template.default_locale)
-        line = next((child for child in section.children if child.presentation is not None
+        line = next((child for child in line_container(package, section, index, allocator).children if child.presentation is not None
             and child.presentation.node_index == index and not (label and line_text(child) == label)), None)
         if line is not None:
             ref = line.presentation
@@ -138,7 +173,7 @@ def show_fields(project, record, keys, allocator):
         ref = reference(package, view.id, node.style, section.presentation.template_instance_id,
             section.presentation.item_handle, node_index=index)
         prefix = locale_text(node.prefix, package.definition.template.default_locale)
-        _insert_line(package, section, index, node, ref, [*([literal(prefix, ref)] if prefix else []),
+        _insert_line(package, section, index, node, ref, [*([literal(prefix, styled(ref, node.prefix_style))] if prefix else []),
             field_occurrence(allocator, 'field', record, key, ref, section.id, key)], allocator, key)
 
 
@@ -194,7 +229,7 @@ def _period_content(package, node, ref, content, seed, record, period, identifie
         parts.append([next((span for span in literals if span.text == label), None) or literal(label, ref)])
     if not parts:
         return []
-    lead = next((span for span in literals if prefix and span.text == prefix), None) or (literal(prefix, ref) if prefix else None)
+    lead = next((span for span in literals if prefix and span.text == prefix), None) or (literal(prefix, styled(ref, node.prefix_style)) if prefix else None)
     between = next((span for span in literals if span.text and span.text not in {prefix, label}), None) or literal(separator, ref)
     return [*([lead] if lead else []), *parts[0], *(part for rest in parts[1:] for part in [between, *rest])]
 

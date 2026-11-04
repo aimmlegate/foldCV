@@ -194,11 +194,13 @@ view:
 ```
 
 - `heading`: `none`, `plain` (default) or `band` (the heading on a colored band
-  of `style.section_band`). `title`: the heading per locale.
+  of `style.section_band`). `title`: the heading per locale. `heading_style`:
+  a text style for this view's heading instead of the band's `heading_style`.
 - `inset`: left indent of the block content in points; `item_gap`: space
   between entries in points; both default to 0.
 - `fallback_style`: the style of a line no node covers. A view without nodes
   needs it.
+- `table` and `row`: key-value tables, see [Tables](#tables).
 - `mode` follows the schema (`items` for a list, `object` otherwise); leave it
   out.
 - Field pointers in nodes start at one entry for a list block (`/company`) and
@@ -220,11 +222,52 @@ Node types:
 | `link` | `name_field`, `url_field`, `style` | a name with its URL |
 | `focus_entry` | `name_field`, `experience_field`, `style`, `detail_style` | a technology with an icon and its experience |
 
-Every node also takes `prefix` and `label`, text per locale. The shipped
-templates use `prefix` on a `join_fields` line (`{ru: 'Роль: ', en: 'Role: '}`)
-and `label` on `bullets` (`{ru: 'Задачи:', en: 'Tasks:'}`). `item_field` picks a
-field of each list item (`/display`, `/value`). Any other key not in the row of
-its node type is refused.
+Every node also takes `prefix` and `label`, text per locale, and
+`prefix_style` and `label_style`, a text style for that prefix or label line
+(a bold label before a plain value: `prefix: {ru: 'Роль: '}, prefix_style:
+label`). The shipped templates use `prefix` on a `join_fields` line
+(`{ru: 'Роль: ', en: 'Role: '}`) and `label` on `bullets` (`{ru: 'Задачи:',
+en: 'Tasks:'}`). `item_field` picks a field of each list item (`/display`,
+`/value`). Any other key not in the row of its node type is refused.
+
+### Tables
+
+A view draws its content as rows of a key-value table: a label cell on the
+left, the row's lines on the right. Declare the table style under
+`style.tables` and name it in the view's `table`:
+
+```yaml
+style:
+  tables:
+    card:
+      label_width: 110        # points; 0 means one column of framed or shaded rows
+      label_style: body       # text style of the labels
+      label_align: top        # or center
+      label_background: box   # a color name, or leave it out
+      background: box         # fill of the content cells, or leave it out
+      border_width: 0.75      # points; 0 draws no lines
+      border_color: card_border
+      padding_x: 4.5
+      padding_y: 4
+```
+
+Two kinds of rows:
+
+- A node with `row: {ru: 'Роль в проекте'}` opens a row inside each entry; the
+  nodes after it without `row` continue that row until the next one. Nodes
+  before the first `row` stay above the table (a centered project name). A row
+  whose nodes show nothing is left out.
+- A view with `row: {ru: 'Языки и фреймворки'}` (and `table`) is one row as a
+  whole: its heading stays above, its entries fill the content cell. Views
+  with the same table style that follow each other in one region share one
+  table, so several skill groups become one bordered table. `row: {}` is a row
+  without a label text (a grey box around the languages and the summary).
+
+A view is one row or holds rows, never both; the header region holds no
+table. The label is template text and is never typed into. `item_gap` of a
+whole-block row is the space after its table; inside an entry the entry's gap
+applies. The shipped templates «Таблица навыков», «Анкета» and «Карточки
+проектов» show the three uses.
 
 `header_slot: name` and `header_slot: profession` mark the header lines that
 `style.header.name_top` and `profession_top` place. Each slot is used once, on
@@ -243,9 +286,12 @@ All sections are required, even when no block uses them.
   `.otf` assets are fonts.
 - `colors`: name → `'#RRGGBB'`.
 - `text`: style name → `font` (a token from `fonts`), `size`, `line_height`,
-  `color` (a name from `colors`). Style names are free; the shipped templates
-  use `name`, `profession`, `section`, `project`, `body`, `support`,
-  `emphasis`, `tag`, `footer`.
+  `color` (a name from `colors`) and an optional `alignment` (`left`,
+  `center`, `right`, `justify`) for a centered name or a justified summary.
+  Style names are free; the shipped templates use `name`, `profession`,
+  `section`, `project`, `body`, `support`, `emphasis`, `tag`, `footer`.
+- `tables`: table style name → the key-value table settings of [Tables](#tables);
+  leave it out when no view has rows.
 - `header`: `name_top`, `profession_top`, `overflow:
   grow_header_and_move_body`, `logo` (`asset`, `x`, `top`, `width`, `height`,
   `fit: contain`) or null, `divider` (`x1`, `x2`, `y`, `width`, `color`,
@@ -317,8 +363,8 @@ italics `SourceSansPro-LightIt.ttf`, `-It` (Regular), `-SemiboldIt`,
 
 - Photos: no node shows an image of the person. The header can show one logo
   from a shipped asset, or none.
-- Free tables: content flows in the header and one or two columns; there is no
-  table node and no third column.
+- Free tables: a view draws key-value rows (a label beside the row's lines, see
+  [Tables](#tables)); there is no grid of arbitrary cells and no third column.
 - Contacts or other lines in the header: it holds the name, the title and the
   logo.
 - Own fonts and images: assets resolve only against shipped files; the user

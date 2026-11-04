@@ -84,7 +84,7 @@ export type Alignment1 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Icon = string | null;
 export type Manualorder = boolean;
-export type Presentation = "standard" | "focus";
+export type Presentation = "standard" | "focus" | "row";
 export type Recordid2 = string | null;
 export type Textcolor1 = string;
 export type Sourceid1 = string;
@@ -665,6 +665,7 @@ export type Kind19 = "source" | "fact_type" | "block" | "operation";
 export type Selectors = InputRef[];
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
+export type HeadingStyle = string | null;
 export type Inset = number;
 export type ItemGap = number;
 export type Mode2 = "object" | "items";
@@ -675,12 +676,21 @@ export type Field1 = string | null;
 export type Fields2 = string[];
 export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
+export type LabelStyle = string | null;
 export type NameField = string | null;
+export type PrefixStyle = string | null;
+export type Row = {
+  [k: string]: string;
+} | null;
 export type Separator = string;
 export type Style = string;
 export type Type17 = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
+export type Row1 = {
+  [k: string]: string;
+} | null;
+export type Table = string | null;
 export type Equals = string;
 export type Operation1 = string;
 export type Blocks2 = Block[];
@@ -799,9 +809,19 @@ export type FirstBodyTop = number;
 export type Height2 = number;
 export type Width4 = number;
 export type Background1 = string;
-export type HeadingStyle = string;
+export type HeadingStyle1 = string;
 export type Height3 = number;
 export type TextInset = number;
+export type Background2 = string | null;
+export type BorderColor = string | null;
+export type BorderWidth = number;
+export type LabelAlign = "top" | "center";
+export type LabelBackground = string | null;
+export type LabelStyle1 = string;
+export type LabelWidth = number;
+export type PaddingX = number;
+export type PaddingY = number;
+export type Alignment8 = ("left" | "center" | "right" | "justify") | null;
 export type Color2 = string;
 export type Font1 = string;
 export type LineHeight = number;
@@ -1610,10 +1630,13 @@ export interface InputRef {
 export interface View {
   fallback_style?: FallbackStyle;
   heading: Heading;
+  heading_style?: HeadingStyle;
   inset: Inset;
   item_gap: ItemGap;
   mode: Mode2;
   nodes: Nodes;
+  row?: Row1;
+  table?: Table;
   title: Title;
 }
 export interface ViewNode {
@@ -1625,8 +1648,11 @@ export interface ViewNode {
   header_slot?: HeaderSlot;
   item_field?: ItemField;
   label?: Label1;
+  label_style?: LabelStyle;
   name_field?: NameField;
   prefix?: Prefix;
+  prefix_style?: PrefixStyle;
+  row?: Row;
   separator?: Separator;
   style: Style;
   type: Type17;
@@ -1777,6 +1803,7 @@ export interface Style1 {
   header: Header;
   page: Page1;
   section_band: Band;
+  tables?: Tables;
   text: Text5;
 }
 export interface Bullets {
@@ -1840,14 +1867,33 @@ export interface Page1 {
 }
 export interface Band {
   background: Background1;
-  heading_style: HeadingStyle;
+  heading_style: HeadingStyle1;
   height: Height3;
   text_inset: TextInset;
+}
+export interface Tables {
+  [k: string]: TableStyle;
+}
+/**
+ * A key-value table (D143): a label column of `label_width` points and the row's content beside it. A label width
+ * of 0 is one column of framed or shaded rows; a border width of 0 draws no lines.
+ */
+export interface TableStyle {
+  background?: Background2;
+  border_color?: BorderColor;
+  border_width: BorderWidth;
+  label_align?: LabelAlign;
+  label_background?: LabelBackground;
+  label_style: LabelStyle1;
+  label_width: LabelWidth;
+  padding_x: PaddingX;
+  padding_y: PaddingY;
 }
 export interface Text5 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
+  alignment?: Alignment8;
   color: Color2;
   font: Font1;
   line_height: LineHeight;

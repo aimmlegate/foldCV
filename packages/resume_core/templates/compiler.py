@@ -27,7 +27,8 @@ PROJECTION_VERSION = "closed-json-1"
 ASSET_BYTES = 20 * 1024 * 1024
 PACKAGE_BYTES = 40 * 1024 * 1024
 CAPABILITIES = ["text", "join_fields", "join_items", "bullets", "tags", "period", "link", "focus_entry"]
-ADDED_CAPABILITIES = ['object_items', 'builtin_mapping', 'explicit_item_roots', 'fallback_style', 'header_slots', 'date_text']
+ADDED_CAPABILITIES = ['object_items', 'builtin_mapping', 'explicit_item_roots', 'fallback_style', 'header_slots', 'date_text',
+    'tables', 'style_alignment', 'node_styles', 'heading_styles']
 # Settings and the import form name the template in one URL path segment, and the router decodes %2F before matching.
 TEMPLATE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,199}")
 
@@ -62,6 +63,11 @@ def added_capabilities(definition):
         ('fallback_style', any(block.view.fallback_style is not None for block in definition.blocks)),
         ('header_slots', any(node.header_slot is not None for block in definition.blocks for node in block.view.nodes)),
         ('date_text', date_text(definition)),
+        ('tables', any(block.view.table is not None for block in definition.blocks)),
+        ('style_alignment', any(text.alignment is not None for text in definition.style.text.values())),
+        ('node_styles', any(node.prefix_style is not None or node.label_style is not None
+            for block in definition.blocks for node in block.view.nodes)),
+        ('heading_styles', any(block.view.heading_style is not None for block in definition.blocks)),
     ] if used]
 
 
@@ -245,6 +251,11 @@ def compile_definition(definition: TemplateDefinition, version):
     if style.header.logo: require(style.header.logo.asset, assets, "/style/header/logo")
     if style.header.divider: require(style.header.divider.color, style.colors, "/style/header/divider")
     if style.focus.icon_catalog: require(style.focus.icon_catalog, assets, "/style/focus/icon_catalog")
+    for name, table in style.tables.items():
+        require(table.label_style, style.text, "/style/tables/" + name + "/label_style")
+        if table.border_width > 0: require(table.border_color, style.colors, "/style/tables/" + name + "/border_color")
+        for key in ("label_background", "background"):
+            if getattr(table, key) is not None: require(getattr(table, key), style.colors, "/style/tables/" + name + "/" + key)
     regions = definition.layout.regions
     region_ids = [r.id for r in regions]
     # A one-column layout declares no sidebar; documents keep all three regions and its sidebar stays empty.
@@ -333,6 +344,8 @@ def compile_definition(definition: TemplateDefinition, version):
         base = schema_at(full, "/*") if block.view.mode == "items" else full
         if block.view.fallback_style is not None:
             require(block.view.fallback_style, style.text, '/blocks/' + block.id + '/view/fallback_style')
+        if block.view.heading_style is not None:
+            require(block.view.heading_style, style.text, '/blocks/' + block.id + '/view/heading_style')
         if block.operation is not None: require(block.operation, operations, "/blocks/" + block.id + "/operation")
         if block.mode == "derived" and block.operation is None:
             raise SchemaFailure("/blocks/" + block.id + "/operation", "derived block needs a registered operation")
@@ -346,6 +359,16 @@ def compile_definition(definition: TemplateDefinition, version):
         if block.per_entry and not splits_entries(block):
             raise SchemaFailure("/blocks/" + block.id + "/per_entry",
                 "per_entry needs a model block whose content is a list without item limits")
+        view = block.view
+        row_nodes = [node for node in view.nodes if node.row is not None]
+        if view.table is not None:
+            require(view.table, style.tables, "/blocks/" + block.id + "/view/table")
+            if block.placement.region == "header":
+                raise SchemaFailure("/blocks/" + block.id + "/view/table", "the header holds no table")
+        elif view.row is not None or row_nodes:
+            raise SchemaFailure("/blocks/" + block.id + "/view/table", "rows need the view's table style")
+        if view.row is not None and row_nodes:
+            raise SchemaFailure("/blocks/" + block.id + "/view/row", "a view is one row or holds rows, not both")
         for node in block.view.nodes:
             if node.header_slot is not None:
                 if block.placement.region != 'header' or node.header_slot in header_slots:
@@ -353,6 +376,8 @@ def compile_definition(definition: TemplateDefinition, version):
                 header_slots.add(node.header_slot)
             require(node.style, style.text, "/blocks/" + block.id + "/view/style")
             if node.detail_style: require(node.detail_style, style.text, "/view/detail_style")
+            for key in ("prefix_style", "label_style"):
+                if getattr(node, key) is not None: require(getattr(node, key), style.text, "/blocks/" + block.id + "/view/" + key)
             if node.background: require(node.background, style.colors, "/view/background")
             pointers = [*node.fields, *[p for p in (node.field, node.name_field, node.url_field, node.experience_field) if p is not None]]
             view_schema = {**base, "$defs": full.get("$defs", {})}

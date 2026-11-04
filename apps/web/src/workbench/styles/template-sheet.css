@@ -44,6 +44,19 @@
 .fcv-sheet [data-fcv-focus] > .bn-block::before { content: ""; position: absolute; left: var(--fcv-focus-icon-x); top: 50%;
   width: var(--fcv-focus-icon-width); height: var(--fcv-focus-icon-height); transform: translateY(-50%);
   background: var(--fcv-icon, none) center / contain no-repeat; pointer-events: none; }
+/* A centered or justified style (D143): the text line spans the block, so the alignment shows. */
+.fcv-sheet [data-fcv-align] > .bn-block > .bn-block-content > .bn-inline-content,
+.fcv-sheet [data-fcv-align] > .bn-block > .bn-react-node-view-renderer > .bn-block-content > .bn-inline-content { flex: 1 1 auto; min-width: 0; }
+/* A table row (D143): the label cell is drawn from the plan's label beside the row's own blocks; rows that follow each
+   other share the table's borders, so only the first row draws the top edge. */
+.fcv-sheet [data-fcv-row] > .bn-block { display: grid; grid-template-columns: var(--fcv-row-label-width) minmax(0, 1fr);
+  align-items: stretch; border: var(--fcv-row-border); border-top: 0; background: var(--fcv-row-fill); }
+.fcv-sheet [data-fcv-row-first] > .bn-block { border-top: var(--fcv-row-border); }
+.fcv-sheet [data-fcv-row] > .bn-block::before { content: var(--fcv-row-label); display: var(--fcv-row-label-display);
+  align-items: var(--fcv-row-label-align); grid-column: 1; grid-row: 1; min-width: 0; padding: var(--fcv-row-pad-y) var(--fcv-row-pad-x);
+  border-right: var(--fcv-row-border); background: var(--fcv-row-label-fill); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fcv-sheet [data-fcv-row] > .bn-block > .bn-block-group { grid-column: -2 / -1; grid-row: 1; min-width: 0;
+  padding: var(--fcv-row-pad-y) var(--fcv-row-pad-x); }
 /* A technology chip from the plan; the DOCX draws the same shade with a border of its color, so corners stay small. */
 .fcv-sheet [data-fcv-chip] { background: var(--fcv-chip); border-radius: 2pt; padding: .5pt 1.5pt; margin-inline: 1pt;
   white-space: nowrap; -webkit-box-decoration-break: clone; box-decoration-break: clone; }

@@ -10,7 +10,7 @@ from .template_panel_lines import node_labels
 from .template_panel_records import (VIEW_TARGET, _duplicate, _group_line, _group_nodes, _shown, group_heading, group_lines,
     line_blocks, line_entries, new_technology, put_entry, remove_records, restore_group_line, technology_targets)
 from .template_preparation_panel import _join_technology_line, _split_technology_line, line_is_list, sibling_lists, view_position
-from .templates.materialize_nodes import literal, reference
+from .templates.materialize_nodes import heading_style, literal, reference
 from .technologies import normalize_name
 
 # Longer than any group title a template writes; the panel's field takes no more.
@@ -157,7 +157,7 @@ def add_technology_group(project, command, allocator):
         raise ValueError('PANEL_ACTION_UNSUPPORTED')
     view, index, node, holder = place
     package, key = candidate.template_package, normalize_name(title)
-    heading_ref = reference(package, view.id, package.recipe.style.section_band.heading_style,
+    heading_ref = reference(package, view.id, heading_style(package, view),
         allocator.allocate('template-instance', ['panel-group-heading-instance', key]))
     heading = TemplateHeadingBlock(type='heading', id=allocator.allocate('block', ['panel-group-heading', key]), revision=1,
         props={'level': 1}, content=[literal(title, heading_ref)], children=[], provenance=[], presentation=heading_ref)

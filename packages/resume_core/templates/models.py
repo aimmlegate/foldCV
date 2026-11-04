@@ -55,6 +55,8 @@ class TextStyle(Definition):
     size: Positive
     line_height: Positive
     color: Id
+    # A centered name or title (D143); a block's own alignment and an authored override still win.
+    alignment: Literal["left", "center", "right", "justify"] | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Logo(Definition):
@@ -117,6 +119,20 @@ class Footer(Definition):
     repeat: Literal["every_page"]
 
 
+class TableStyle(Definition):
+    """A key-value table (D143): a label column of `label_width` points and the row's content beside it. A label width
+    of 0 is one column of framed or shaded rows; a border width of 0 draws no lines."""
+    label_width: Points
+    label_style: Id
+    label_align: Literal["top", "center"] = Field(default="top", exclude_if=lambda value: value == "top")
+    label_background: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    background: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    border_width: Points
+    border_color: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    padding_x: Points
+    padding_y: Points
+
+
 class Style(Definition):
     page: Page
     fonts: dict[str, Id]
@@ -127,6 +143,7 @@ class Style(Definition):
     bullets: Bullets
     focus: Focus
     footer: Footer
+    tables: dict[str, TableStyle] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
 
 class Region(Definition):
@@ -295,6 +312,11 @@ class ViewNode(Definition):
     background: Id | None = None
     item_field: str | None = Field(default=None, exclude_if=lambda value: value is None)
     header_slot: Literal['name', 'profession'] | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The node opens a table row with this label (D143); the nodes after it without one continue the row.
+    row: dict[str, str] | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The text styles of the node's prefix and label lines (D143); without them both take the node's style.
+    prefix_style: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    label_style: Id | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def node_shape(self) -> ViewNode:
@@ -302,7 +324,8 @@ class ViewNode(Definition):
                     "focus_entry": ("name_field", "experience_field")}.get(self.type, ("field",))
         if any(not getattr(self, key) for key in required):
             raise ValueError(f"{self.type} requires {', '.join(required)}")
-        allowed = set(required) | {"style", "type", "prefix", "label"}
+        allowed = set(required) | {"style", "type", "prefix", "label", "prefix_style", "label_style"}
+        if self.type != "focus_entry": allowed.add("row")
         if self.type in {'text', 'join_fields'}: allowed.add('header_slot')
         if self.type in {"join_fields", "join_items", "tags"}: allowed.add("separator")
         if self.type in {"join_items", "bullets", "tags"}: allowed.add("item_field")
@@ -322,6 +345,12 @@ class View(Definition):
     item_gap: Points
     nodes: list[ViewNode]
     fallback_style: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The table style of the view's rows (D143): `row` makes the whole block one row labelled so, after its heading;
+    # a node's `row` opens a row inside each entry. Rows of one table style that follow each other share one table.
+    table: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    row: dict[str, str] | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The text style of this view's heading (D143); without it the band's heading style, as for every view before.
+    heading_style: Id | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Rewrite(Definition):

@@ -50,7 +50,11 @@ names, employers, dates or other content into the template.
 
 Call `list_templates`. The closest shipped template is the base:
 `generic-two-column` («Две колонки») for a sidebar layout,
-`generic-one-column` («Одна колонка») for one column. Read the base with
+`generic-one-column` («Одна колонка») for one column,
+`generic-skills-table` («Таблица навыков») for a bordered skills table,
+`generic-questionnaire` («Анкета») for «label: value» lines and one key-value
+table per project, `generic-project-cards` («Карточки проектов») for a grey box
+and project cards with grey label cells. Read the base with
 `read_template` (every page) and the draft with `read_draft` (every page). The
 draft is the text open in the editor when the run started.
 

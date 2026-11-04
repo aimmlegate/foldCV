@@ -33,7 +33,11 @@ def shipped_templates(local_dir: Path = LOCAL_DIR) -> dict[str, Path]:
     local = {} if os.environ.get("FOLDCV_PUBLIC_TEMPLATES") == "1" else {
         path.stem: path for path in sorted(local_dir.glob("*.yaml"))}
     return {**local, "generic-two-column": BUNDLED_DIR / "generic-two-column.yaml",
-        "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml"}
+        "generic-one-column": BUNDLED_DIR / "generic-one-column.yaml",
+        # The three table templates (D143): a skills table, a questionnaire and project cards.
+        "generic-skills-table": BUNDLED_DIR / "generic-skills-table.yaml",
+        "generic-questionnaire": BUNDLED_DIR / "generic-questionnaire.yaml",
+        "generic-project-cards": BUNDLED_DIR / "generic-project-cards.yaml"}
 
 
 BUNDLED_TEMPLATES = shipped_templates()

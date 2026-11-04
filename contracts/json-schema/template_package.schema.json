@@ -1659,6 +1659,13 @@
         "section_band": {
           "$ref": "#/$defs/Band"
         },
+        "tables": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TableStyle"
+          },
+          "title": "Tables",
+          "type": "object"
+        },
         "text": {
           "additionalProperties": {
             "$ref": "#/$defs/TextStyle"
@@ -1679,6 +1686,94 @@
         "footer"
       ],
       "title": "Style",
+      "type": "object"
+    },
+    "TableStyle": {
+      "additionalProperties": false,
+      "description": "A key-value table (D143): a label column of `label_width` points and the row's content beside it. A label width\nof 0 is one column of framed or shaded rows; a border width of 0 draws no lines.",
+      "properties": {
+        "background": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Background"
+        },
+        "border_color": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Border Color"
+        },
+        "border_width": {
+          "minimum": 0,
+          "title": "Border Width",
+          "type": "number"
+        },
+        "label_align": {
+          "default": "top",
+          "enum": [
+            "top",
+            "center"
+          ],
+          "title": "Label Align",
+          "type": "string"
+        },
+        "label_background": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Background"
+        },
+        "label_style": {
+          "minLength": 1,
+          "title": "Label Style",
+          "type": "string"
+        },
+        "label_width": {
+          "minimum": 0,
+          "title": "Label Width",
+          "type": "number"
+        },
+        "padding_x": {
+          "minimum": 0,
+          "title": "Padding X",
+          "type": "number"
+        },
+        "padding_y": {
+          "minimum": 0,
+          "title": "Padding Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label_width",
+        "label_style",
+        "border_width",
+        "padding_x",
+        "padding_y"
+      ],
+      "title": "TableStyle",
       "type": "object"
     },
     "TemplateDefinition": {
@@ -1827,6 +1922,24 @@
     "TextStyle": {
       "additionalProperties": false,
       "properties": {
+        "alignment": {
+          "anyOf": [
+            {
+              "enum": [
+                "left",
+                "center",
+                "right",
+                "justify"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alignment"
+        },
         "color": {
           "minLength": 1,
           "title": "Color",
@@ -1882,6 +1995,19 @@
           "title": "Heading",
           "type": "string"
         },
+        "heading_style": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading Style"
+        },
         "inset": {
           "minimum": 0,
           "title": "Inset",
@@ -1906,6 +2032,34 @@
           },
           "title": "Nodes",
           "type": "array"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table"
         },
         "title": {
           "additionalProperties": {
@@ -2021,6 +2175,19 @@
           "title": "Label",
           "type": "object"
         },
+        "label_style": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Style"
+        },
         "name_field": {
           "anyOf": [
             {
@@ -2039,6 +2206,34 @@
           },
           "title": "Prefix",
           "type": "object"
+        },
+        "prefix_style": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prefix Style"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
         },
         "separator": {
           "default": "",

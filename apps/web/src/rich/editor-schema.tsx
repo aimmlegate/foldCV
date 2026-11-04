@@ -7,7 +7,7 @@ const region = createReactBlockSpec({ type: "region", content: "none", propSchem
   role: { default: "main", values: ["header", "sidebar", "main"] },
 } }, { render: () => <div className="cv-region-marker" contentEditable={false} /> });
 const section = createReactBlockSpec({ type: "section", content: "inline", propSchema: {
-  recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus"] }, manualOrder: { default: false },
+  recordId: { default: "" }, presentation: { default: "standard", values: ["standard", "focus", "row"] }, manualOrder: { default: false },
   textAlignment: { default: "left", values: ["left", "center", "right", "justify"] }, textColor: { default: "default" }, backgroundColor: { default: "default" },
 } }, { render: ({ contentRef }) => <h2 className="cv-section-title" ref={contentRef} /> });
 const factField = createReactInlineContentSpec({ type: "factField", content: "styled", propSchema: {

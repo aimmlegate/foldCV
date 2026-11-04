@@ -8,11 +8,11 @@ from .rich_fields import builtin_cell_values, inline_groups, set_text, working_f
 from .rich_mutations import locate, parent_items, subtree
 from .template_builtin_admission import unknown
 from .template_identity import _bound_root
-from .template_panel_lines import period_fields, period_words
+from .template_panel_lines import line_container, period_fields, period_words, row_start
 from .template_panel_values import written_dates
 from .template_preparation_panel import restore_view
 from .templates.compiler import canonical
-from .templates.materialize_nodes import fallback_style, locale_text, reference
+from .templates.materialize_nodes import fallback_style, locale_text, reference, styled
 from .templates.projection import pointer_tokens
 
 
@@ -174,7 +174,7 @@ def _blank_lines(package, node, ref, record, index, allocator):
     if label:
         blocks.append(TemplateParagraphBlock(type='paragraph',
             id=allocator.allocate('block', ['panel-blank-label', record.id, index]), revision=1, props={}, children=[],
-            provenance=[], presentation=ref, content=[PresentedText(type='text', text=label, styles={}, presentation=ref)]))
+            provenance=[], presentation=ref, content=[PresentedText(type='text', text=label, styles={}, presentation=styled(ref, node.label_style))]))
     kind = TemplateBulletBlock if node.type == 'bullets' else TemplateParagraphBlock
     blocks.append(kind(type='bullet_list' if node.type == 'bullets' else 'paragraph',
         id=allocator.allocate('block', ['panel-blank', record.id, index]), revision=1, props={}, children=[], provenance=[],
@@ -182,7 +182,29 @@ def _blank_lines(package, node, ref, record, index, allocator):
     return blocks
 
 
+def _rowed(package, view, blocks, instance, allocator, seed):
+    """The lines of nodes in table rows (D143) inside their row sections, in node order; other lines stay as they are."""
+    result, rows = [], {}
+    for block in blocks:
+        start = row_start(view, block.presentation.node_index) if block.presentation is not None and block.presentation.node_index is not None else None
+        if start is None:
+            result.append(block)
+            continue
+        if start not in rows:
+            rows[start] = TemplateSectionBlock(type='section', id=allocator.allocate('block', ['panel-row', seed, start]), revision=1,
+                props={'recordId': None, 'presentation': 'row'}, content=[], children=[], provenance=[],
+                presentation=reference(package, view.id, fallback_style(view), instance, node_index=start))
+            result.append(rows[start])
+        rows[start].children.append(block)
+    return result
+
+
 def _blocks(package, view, semantic, record, period, indexes, instance, allocator, context=None, *, scalars=None, blanks=False):
+    return _rowed(package, view, _lines(package, view, semantic, record, period, indexes, instance, allocator, context,
+        scalars=scalars, blanks=blanks), instance, allocator, [record.id, period.id if period is not None else ''])
+
+
+def _lines(package, view, semantic, record, period, indexes, instance, allocator, context=None, *, scalars=None, blanks=False):
     blocks = []
     locale = package.definition.template.default_locale
     separator, ongoing_label = period_words(package)
@@ -207,7 +229,7 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
         content = []
         prefix = locale_text(node.prefix, locale)
         if prefix:
-            content.append(PresentedText(type='text', text=prefix, styles={}, presentation=ref))
+            content.append(PresentedText(type='text', text=prefix, styles={}, presentation=styled(ref, node.prefix_style)))
         for position, key in enumerate(keys):
             if position:
                 content.append(PresentedText(type='text', text=separator if node.type == 'period' else node.separator,
@@ -226,7 +248,7 @@ def _blocks(package, view, semantic, record, period, indexes, instance, allocato
             blocks.append(TemplateParagraphBlock(type='paragraph',
                 id=allocator.allocate('block', ['panel-node-label', record.id, period_id, index]), revision=1,
                 props={}, children=[], provenance=[], presentation=ref,
-                content=[PresentedText(type='text', text=label, styles={}, presentation=ref)]))
+                content=[PresentedText(type='text', text=label, styles={}, presentation=styled(ref, node.label_style))]))
         blocks.append(TemplateParagraphBlock(type='paragraph',
             id=allocator.allocate('block', ['panel-node', record.id, period_id, index]), revision=1,
             props={'alignment': ref.overrides.alignment or 'left'}, children=[], provenance=[], presentation=ref, content=content))
@@ -356,7 +378,7 @@ def create_scalar(workspace, operation, allocator):
 
 def _period_sections(project, record_id, options):
     """The sections of one view of `options` that show only this job: the place a new period can go."""
-    return [block for block in project.document.blocks() if isinstance(block, SectionBlock)
+    return [block for block in project.document.blocks() if isinstance(block, SectionBlock) and block.props.presentation != 'row'
         and block.props.record_id in {None, record_id} and block.presentation.view_key in options
         and section_records(project, block) == {record_id}
         and all(value.record_id == record_id for value in block.provenance if value.kind == 'working_owner')]
@@ -432,8 +454,13 @@ def create_period(workspace, operation, allocator):
             context = block.model_copy(update={'presentation': ref}, deep=True)
     candidate = before.model_copy(deep=True)
     instance = allocator.allocate('template-instance', ['panel-period-instance', original.id, period.id])
-    blocks = _blocks(before.template_package, view, semantic, updated, period, [index], instance, allocator, context)
-    after = (operation.placement_context.placement.after_id if operation.placement_context is not None
-        else section.children[-1].id if section.children else None)
-    _insert(candidate.document, blocks, section.id, after)
+    blocks = _lines(before.template_package, view, semantic, updated, period, [index], instance, allocator, context)
+    if operation.placement_context is not None:
+        parent, after = section.id, operation.placement_context.placement.after_id
+    else:
+        # A period of a table row goes to the end of that row, not after the item's last row.
+        container = line_container(before.template_package, next(block for block in candidate.document.blocks()
+            if block.id == section.id), index, allocator)
+        parent, after = container.id, container.children[-1].id if container.children else None
+    _insert(candidate.document, blocks, parent, after)
     return candidate, [{'kind': 'put_record', 'beforeRevision': original.revision, 'record': updated.model_dump(by_alias=True)}]

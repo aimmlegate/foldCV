@@ -12,10 +12,10 @@ from .template_builtin_admission import unknown
 from .template_facts import delete_subject_in_place
 from .template_panel_creation import _report_cells, period_jobs
 from .template_panel_focus import experience_text, focus_only, focus_rows, focus_view, show_experience
-from .template_panel_lines import field_place, line_text, node_labels, period_text, show_fields
+from .template_panel_lines import field_place, is_row, line_container, line_text, node_labels, period_text, show_fields
 from .template_preparation_panel import (_join_technology_line, _patch_displays, _split_technology_line, drop_empty_titles,
-    field_occurrence, line_is_list, restore_view, sibling_lists, technology_lines, view_position, view_title)
-from .templates.materialize_nodes import literal, locale_text, reference
+    field_occurrence, line_is_list, restore_view, sibling_lists, technology_lines, view_position, view_row, view_title)
+from .templates.materialize_nodes import literal, locale_text, reference, styled
 from .templates.operations import OperationContext, active, display_pointer, select_role_branch
 from .templates.projection import pointer_tokens
 from .technologies import normalize_name
@@ -375,6 +375,7 @@ def add_technology(project, operation, allocator):
         ref = reference(package, block.presentation.view_key, node.style, block.presentation.template_instance_id,
             block.presentation.item_handle, node_index=index)
         label = locale_text(node.label, locale)
+        block = line_container(package, block, index, allocator)
         # A label an earlier removal left behind is used again, not doubled.
         labelled = bool(label) and any(child.presentation is not None and child.presentation.node_index == index
             and line_text(child) == label for child in block.children)
@@ -419,21 +420,27 @@ def line_blocks(package, allocator, record, owner, node, ref, labelled=False):
     """The new line of one node with its prefix and one entry, after the node's label unless one is shown already."""
     locale = package.definition.template.default_locale
     prefix, label = locale_text(node.prefix, locale), locale_text(node.label, locale)
-    blocks = [line_paragraph(allocator, 'panel-technology-line', owner, ref, [*([literal(prefix, ref)] if prefix else []),
+    blocks = [line_paragraph(allocator, 'panel-technology-line', owner, ref, [*([literal(prefix, styled(ref, node.prefix_style))] if prefix else []),
         field_occurrence(allocator, 'technology', record, 'display', ref)])]
-    return [line_paragraph(allocator, 'panel-technology-label', owner, ref, [literal(label, ref)]), *blocks] \
+    return [line_paragraph(allocator, 'panel-technology-label', owner, ref, [literal(label, styled(ref, node.label_style))]), *blocks] \
         if label and not labelled else blocks
 
 
 def restore_group_line(document, package, group, record, allocator):
-    """A group's line that went with its last technology comes back with one entry, after the title or with it."""
+    """A group's line that went with its last technology comes back with one entry, after the title or with it. A view
+    that is one table row (D143) gets the line inside its row, which comes back with the line."""
     view, index, node = group
     ref = reference(package, view.id, node.style, allocator.allocate('template-instance',
         ['panel-technology-instance', view.id]), node_index=index)
     blocks = line_blocks(package, allocator, record, view.id, node, ref)
+    row = next((block for block in document.blocks() if is_row(block) and block.presentation is not None
+        and block.presentation.view_key == view.id and block.presentation.node_index is None), None) if view.view.row is not None else None
+    if row is not None:
+        row.children.extend(blocks)
+        return
     title = next(((items, value) for items in sibling_lists(document) for value in items if view_title(value, view.id)), None)
     if title is not None:
         items, heading = title
-        items[items.index(heading) + 1:items.index(heading) + 1] = blocks
+        items[items.index(heading) + 1:items.index(heading) + 1] = view_row(package, view, blocks, allocator, 'technology')
     elif not restore_view(document, package, view, blocks, allocator, 'technology'):
         raise ValueError('TECHNOLOGY_LINE_MISSING')

@@ -33,6 +33,11 @@ export type Band = true | null;
 export type Blocks2 = [string, ...string[]];
 export type Icon = string | null;
 export type Links = string[];
+export type First = boolean;
+export type Gap = number | null;
+export type Label = string;
+export type Last = boolean;
+export type Table = string;
 export type Style = string;
 export type Full = boolean;
 export type Icons = boolean;
@@ -47,12 +52,13 @@ export type Bold1 = string | null;
 export type Bolditalic = string | null;
 export type Italic1 = string | null;
 export type Regular = string | null;
+export type Upright = string | null;
 export type Lineheight = number;
 export type Size1 = number;
 export type Technologylines = string[][];
 export type Blockid = string;
 export type Jobid = string | null;
-export type Label = string;
+export type Label1 = string;
 export type Afterid = string | null;
 export type Parentid = string;
 export type Records1 = string[];
@@ -113,28 +119,48 @@ export type Background = string;
 export type HeadingStyle = string;
 export type Height2 = number;
 export type TextInset = number;
+export type Background1 = string | null;
+export type BorderColor = string | null;
+export type BorderWidth = number;
+export type LabelAlign = "top" | "center";
+export type LabelBackground = string | null;
+export type LabelStyle = string;
+export type LabelWidth = number;
+export type PaddingX = number;
+export type PaddingY = number;
+export type Alignment2 = ("left" | "center" | "right" | "justify") | null;
 export type Color3 = string;
 export type Font1 = string;
 export type LineHeight = number;
 export type Size2 = number;
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
+export type HeadingStyle1 = string | null;
 export type Inset = number;
 export type ItemGap = number;
 export type Mode = "object" | "items";
-export type Background1 = string | null;
+export type Background2 = string | null;
 export type DetailStyle = string | null;
 export type ExperienceField = string | null;
 export type Field = string | null;
 export type Fields = string[];
 export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
+export type LabelStyle1 = string | null;
 export type NameField = string | null;
+export type PrefixStyle = string | null;
+export type Row = {
+  [k: string]: string;
+} | null;
 export type Separator = string;
 export type Style3 = string;
 export type Type = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
+export type Row1 = {
+  [k: string]: string;
+} | null;
+export type Table1 = string | null;
 export type Schemaversion1 = 1;
 export type Documenthash = string;
 export type Documentrevision1 = number;
@@ -254,7 +280,7 @@ export type Detailtype = "phone" | "email" | "url" | "messenger" | "age" | "birt
 export type Evidence3 = EvidenceSpan[];
 export type Id8 = string;
 export type Kind3 = "detail";
-export type Label2 = string;
+export type Label3 = string;
 export type Origin2 = "source" | "user";
 export type Revision5 = number;
 export type Usercorrected3 = boolean;
@@ -533,7 +559,7 @@ export type Id26 = string;
 export type Column = number | null;
 export type Index = number;
 export type Kind21 = "page" | "paragraph" | "table_cell" | "pasted";
-export type Row = number | null;
+export type Row2 = number | null;
 export type Order1 = number;
 export type Representedfactids = string[];
 export type Revision26 = number;
@@ -1079,11 +1105,11 @@ export type Text11 = string;
 export type Type5 = "manual_scope";
 export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id54 = string;
-export type Alignment2 = "left" | "center" | "right" | "justify";
+export type Alignment3 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Icon1 = string | null;
 export type Manualorder = boolean;
-export type Presentation = "standard" | "focus";
+export type Presentation = "standard" | "focus" | "row";
 export type Recordid6 = string | null;
 export type Textcolor1 = string;
 export type Evidence21 = EvidenceSpan[];
@@ -1123,7 +1149,7 @@ export type Children12 = (
 )[];
 export type Content3 = null;
 export type Id59 = string;
-export type Alignment3 = "left" | "center" | "right";
+export type Alignment4 = "left" | "center" | "right";
 export type Alt = string;
 export type Assetid = string;
 export type Caption = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1152,7 +1178,7 @@ export type Children11 = (
 export type Columnwidths = [number | null, ...(number | null)[]];
 export type Headercols = number;
 export type Headerrows = number;
-export type Alignment4 = "left" | "center" | "right" | "justify";
+export type Alignment5 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
 export type Content4 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1163,7 +1189,7 @@ export type Cells1 = TemplateTableCell[];
 export type Id61 = string;
 export type Rows = TemplateTableRow[];
 export type Id62 = string;
-export type Alignment5 = "left" | "center" | "right" | "justify";
+export type Alignment6 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor3 = string;
 export type Textcolor2 = string;
 export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
@@ -1263,7 +1289,7 @@ export type Children6 = (
 )[];
 export type Content9 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id67 = string;
-export type Alignment6 = "left" | "center" | "right" | "justify";
+export type Alignment7 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor5 = string;
 export type Checked = boolean;
 export type Textcolor3 = string;
@@ -1286,7 +1312,7 @@ export type Children5 = (
 )[];
 export type Content10 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id68 = string;
-export type Alignment7 = "left" | "center" | "right" | "justify";
+export type Alignment8 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor6 = string;
 export type Start2 = number | null;
 export type Textcolor4 = string;
@@ -1328,7 +1354,7 @@ export type Children3 = (
 )[];
 export type Content12 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id70 = string;
-export type Alignment8 = "left" | "center" | "right" | "justify";
+export type Alignment9 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor7 = string;
 export type Level1 = 1 | 2 | 3;
 export type Textcolor5 = string;
@@ -1734,7 +1760,7 @@ export type Children24 = (
 )[];
 export type Content17 = null;
 export type Id80 = string;
-export type Alignment9 = "left" | "center" | "right";
+export type Alignment10 = "left" | "center" | "right";
 export type Alt1 = string;
 export type Assetid1 = string;
 export type Caption1 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -1767,7 +1793,7 @@ export type Headerrows1 = number;
  * @minItems 1
  */
 export type Rows1 = [TableRow, ...TableRow[]];
-export type Alignment10 = "left" | "center" | "right" | "justify";
+export type Alignment11 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor8 = string;
 export type Colspan1 = number;
 export type Content18 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -2101,6 +2127,7 @@ export interface EditorBlock {
   focus?: EditorFocus | null;
   inline?: Inline;
   links?: Links;
+  row?: EditorRow | null;
   style: Style;
 }
 export interface Chips {
@@ -2112,6 +2139,17 @@ export interface EditorFocus {
 }
 export interface Inline {
   [k: string]: string;
+}
+/**
+ * A table row (D143): its table style, its label, and whether it opens or closes the table it shares with its
+ * neighbours.
+ */
+export interface EditorRow {
+  first: First;
+  gap?: Gap;
+  label: Label;
+  last: Last;
+  table: Table;
 }
 /**
  * The facts panel can add, remove and move Focus rows, set their years and choose their icons.
@@ -2149,6 +2187,7 @@ export interface EditorFaces {
   boldItalic: Bolditalic;
   italic: Italic1;
   regular: Regular;
+  upright?: Upright;
 }
 /**
  * Where the facts panel adds a technology: a line of one scope, a job section that has none yet, or a group view
@@ -2157,7 +2196,7 @@ export interface EditorFaces {
 export interface EditorTechnologyTarget {
   blockId: Blockid;
   jobId: Jobid;
-  label: Label;
+  label: Label1;
   placement: EditorPlacement;
   records?: Records1;
 }
@@ -2213,6 +2252,7 @@ export interface Style1 {
   header: Header;
   page: Page;
   section_band: Band1;
+  tables?: Tables;
   text: Text1;
 }
 export interface Bullets {
@@ -2280,10 +2320,29 @@ export interface Band1 {
   height: Height2;
   text_inset: TextInset;
 }
+export interface Tables {
+  [k: string]: TableStyle;
+}
+/**
+ * A key-value table (D143): a label column of `label_width` points and the row's content beside it. A label width
+ * of 0 is one column of framed or shaded rows; a border width of 0 draws no lines.
+ */
+export interface TableStyle {
+  background?: Background1;
+  border_color?: BorderColor;
+  border_width: BorderWidth;
+  label_align?: LabelAlign;
+  label_background?: LabelBackground;
+  label_style: LabelStyle;
+  label_width: LabelWidth;
+  padding_x: PaddingX;
+  padding_y: PaddingY;
+}
 export interface Text1 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
+  alignment?: Alignment2;
   color: Color3;
   font: Font1;
   line_height: LineHeight;
@@ -2295,29 +2354,35 @@ export interface Views {
 export interface View {
   fallback_style?: FallbackStyle;
   heading: Heading;
+  heading_style?: HeadingStyle1;
   inset: Inset;
   item_gap: ItemGap;
   mode: Mode;
   nodes: Nodes;
+  row?: Row1;
+  table?: Table1;
   title: Title1;
 }
 export interface ViewNode {
-  background?: Background1;
+  background?: Background2;
   detail_style?: DetailStyle;
   experience_field?: ExperienceField;
   field?: Field;
   fields?: Fields;
   header_slot?: HeaderSlot;
   item_field?: ItemField;
-  label?: Label1;
+  label?: Label2;
+  label_style?: LabelStyle1;
   name_field?: NameField;
   prefix?: Prefix;
+  prefix_style?: PrefixStyle;
+  row?: Row;
   separator?: Separator;
   style: Style3;
   type: Type;
   url_field?: UrlField;
 }
-export interface Label1 {
+export interface Label2 {
   [k: string]: string;
 }
 export interface Prefix {
@@ -2542,7 +2607,7 @@ export interface DetailRecord {
   evidence: Evidence3;
   id: Id8;
   kind: Kind3;
-  label: Label2;
+  label: Label3;
   origin: Origin2;
   revision: Revision5;
   userCorrected?: Usercorrected3;
@@ -2859,7 +2924,7 @@ export interface SourceLocation {
   column: Column;
   index: Index;
   kind: Kind21;
-  row: Row;
+  row: Row2;
 }
 /**
  * Observed layout cues, never semantic resume fields.
@@ -3803,7 +3868,7 @@ export interface ManualScopeSpan {
   type: Type5;
 }
 export interface SectionProps {
-  alignment?: Alignment2;
+  alignment?: Alignment3;
   backgroundColor?: Backgroundcolor1;
   icon?: Icon1;
   manualOrder?: Manualorder;
@@ -3835,7 +3900,7 @@ export interface SourceWitness {
   kind: Kind44;
 }
 export interface TemplateImageProps {
-  alignment: Alignment3;
+  alignment: Alignment4;
   alt: Alt;
   assetId: Assetid;
   caption: Caption;
@@ -3853,7 +3918,7 @@ export interface TemplateTableRow {
   id: Id61;
 }
 export interface TemplateTableCell {
-  alignment?: Alignment4;
+  alignment?: Alignment5;
   backgroundColor?: Backgroundcolor2;
   colspan?: Colspan;
   content: Content4;
@@ -3862,7 +3927,7 @@ export interface TemplateTableCell {
   rowspan?: Rowspan;
 }
 export interface ParagraphProps {
-  alignment?: Alignment5;
+  alignment?: Alignment6;
   backgroundColor?: Backgroundcolor3;
   textColor?: Textcolor2;
 }
@@ -3872,19 +3937,19 @@ export interface CodeProps {
   language: Language1;
 }
 export interface ChecklistProps {
-  alignment?: Alignment6;
+  alignment?: Alignment7;
   backgroundColor?: Backgroundcolor5;
   checked: Checked;
   textColor?: Textcolor3;
 }
 export interface NumberedProps {
-  alignment?: Alignment7;
+  alignment?: Alignment8;
   backgroundColor?: Backgroundcolor6;
   start?: Start2;
   textColor?: Textcolor4;
 }
 export interface HeadingProps {
-  alignment?: Alignment8;
+  alignment?: Alignment9;
   backgroundColor?: Backgroundcolor7;
   level: Level1;
   textColor?: Textcolor5;
@@ -4344,7 +4409,7 @@ export interface FactFieldSpan {
   type: Type20;
 }
 export interface ImageProps {
-  alignment: Alignment9;
+  alignment: Alignment10;
   alt: Alt1;
   assetId: Assetid1;
   caption: Caption1;
@@ -4362,7 +4427,7 @@ export interface TableRow {
   id: Id82;
 }
 export interface TableCell {
-  alignment?: Alignment10;
+  alignment?: Alignment11;
   backgroundColor?: Backgroundcolor8;
   colspan?: Colspan1;
   content: Content18;

@@ -159,8 +159,9 @@ def test_a_new_id_is_chosen_and_recorded_under_one_store_lock(tmp_path):
         seen.append(set(taken))
         return None
     # The builder sees the taken ids under the lock; refusing stores nothing.
-    assert config.store.create(build) is None and seen == [{GENERIC, 'generic-one-column'}]
-    assert [item['id'] for item in config.catalog()['templates']] == [GENERIC, 'generic-one-column']
+    shipped = [GENERIC, 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
+    assert config.store.create(build) is None and seen == [set(shipped)]
+    assert [item['id'] for item in config.catalog()['templates']] == shipped
     # A package under an id of the taken set is a programming error the store refuses.
     with pytest.raises(SchemaFailure):
         config.store.create(lambda _taken: compile_template(BUNDLED_TEMPLATE))

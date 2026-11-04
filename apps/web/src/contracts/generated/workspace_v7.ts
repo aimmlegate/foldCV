@@ -777,6 +777,7 @@ export type Kind33 = "source" | "fact_type" | "block" | "operation";
 export type Selectors = InputRef[];
 export type FallbackStyle = string | null;
 export type Heading1 = "none" | "plain" | "band";
+export type HeadingStyle = string | null;
 export type Inset = number;
 export type ItemGap = number;
 export type Mode2 = "object" | "items";
@@ -787,12 +788,21 @@ export type Field1 = string | null;
 export type Fields3 = string[];
 export type HeaderSlot = ("name" | "profession") | null;
 export type ItemField = string | null;
+export type LabelStyle = string | null;
 export type NameField = string | null;
+export type PrefixStyle = string | null;
+export type Row1 = {
+  [k: string]: string;
+} | null;
 export type Separator = string;
 export type Style1 = string;
 export type Type = "text" | "join_fields" | "join_items" | "bullets" | "tags" | "period" | "link" | "focus_entry";
 export type UrlField = string | null;
 export type Nodes = ViewNode[];
+export type Row2 = {
+  [k: string]: string;
+} | null;
+export type Table = string | null;
 export type Equals = string;
 export type Operation1 = string;
 export type Blocks2 = Block[];
@@ -913,9 +923,19 @@ export type FirstBodyTop = number;
 export type Height1 = number;
 export type Width3 = number;
 export type Background1 = string;
-export type HeadingStyle = string;
+export type HeadingStyle1 = string;
 export type Height2 = number;
 export type TextInset = number;
+export type Background2 = string | null;
+export type BorderColor = string | null;
+export type BorderWidth = number;
+export type LabelAlign = "top" | "center";
+export type LabelBackground = string | null;
+export type LabelStyle1 = string;
+export type LabelWidth = number;
+export type PaddingX = number;
+export type PaddingY = number;
+export type Alignment = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
 export type Font = string;
 export type LineHeight = number;
@@ -972,7 +992,7 @@ export type Children13 = (
 export type Citations = SourceSpan[];
 export type Itemhandle7 = string | null;
 export type Nodeindex = number | null;
-export type Alignment = ("left" | "center" | "right" | "justify") | null;
+export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Bold1 = boolean | null;
 export type Color2 = string | null;
 export type Font1 = string | null;
@@ -1020,11 +1040,11 @@ export type Text11 = string;
 export type Type5 = "manual_scope";
 export type Content = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id53 = string;
-export type Alignment1 = "left" | "center" | "right" | "justify";
+export type Alignment2 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor1 = string;
 export type Icon = string | null;
 export type Manualorder = boolean;
-export type Presentation = "standard" | "focus";
+export type Presentation = "standard" | "focus" | "row";
 export type Recordid6 = string | null;
 export type Textcolor1 = string;
 export type Evidence21 = EvidenceSpan[];
@@ -1064,7 +1084,7 @@ export type Children12 = (
 )[];
 export type Content3 = null;
 export type Id58 = string;
-export type Alignment2 = "left" | "center" | "right";
+export type Alignment3 = "left" | "center" | "right";
 export type Alt = string;
 export type Assetid = string;
 export type Caption = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1093,7 +1113,7 @@ export type Children11 = (
 export type Columnwidths = [number | null, ...(number | null)[]];
 export type Headercols = number;
 export type Headerrows = number;
-export type Alignment3 = "left" | "center" | "right" | "justify";
+export type Alignment4 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor2 = string;
 export type Colspan = number;
 export type Content4 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
@@ -1104,7 +1124,7 @@ export type Cells1 = TemplateTableCell[];
 export type Id60 = string;
 export type Rows = TemplateTableRow[];
 export type Id61 = string;
-export type Alignment4 = "left" | "center" | "right" | "justify";
+export type Alignment5 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor3 = string;
 export type Textcolor2 = string;
 export type Provenance3 = (NarrativeCitation | FieldBinding | WorkingOwnership | SourceWitness)[];
@@ -1204,7 +1224,7 @@ export type Children6 = (
 )[];
 export type Content9 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id66 = string;
-export type Alignment5 = "left" | "center" | "right" | "justify";
+export type Alignment6 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor5 = string;
 export type Checked = boolean;
 export type Textcolor3 = string;
@@ -1227,7 +1247,7 @@ export type Children5 = (
 )[];
 export type Content10 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id67 = string;
-export type Alignment6 = "left" | "center" | "right" | "justify";
+export type Alignment7 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor6 = string;
 export type Start2 = number | null;
 export type Textcolor4 = string;
@@ -1269,7 +1289,7 @@ export type Children3 = (
 )[];
 export type Content12 = (PresentedText | PresentedHyperlink | FieldOccurrence | BoundLink | ManualScopeSpan)[];
 export type Id69 = string;
-export type Alignment7 = "left" | "center" | "right" | "justify";
+export type Alignment8 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor7 = string;
 export type Level1 = 1 | 2 | 3;
 export type Textcolor5 = string;
@@ -1682,7 +1702,7 @@ export type Children24 = (
 )[];
 export type Content17 = null;
 export type Id79 = string;
-export type Alignment8 = "left" | "center" | "right";
+export type Alignment9 = "left" | "center" | "right";
 export type Alt1 = string;
 export type Assetid1 = string;
 export type Caption1 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -1715,7 +1735,7 @@ export type Headerrows1 = number;
  * @minItems 1
  */
 export type Rows1 = [TableRow, ...TableRow[]];
-export type Alignment9 = "left" | "center" | "right" | "justify";
+export type Alignment10 = "left" | "center" | "right" | "justify";
 export type Backgroundcolor8 = string;
 export type Colspan1 = number;
 export type Content18 = (StyledText | Hyperlink | FactFieldSpan)[];
@@ -3070,10 +3090,13 @@ export interface InputRef {
 export interface View {
   fallback_style?: FallbackStyle;
   heading: Heading1;
+  heading_style?: HeadingStyle;
   inset: Inset;
   item_gap: ItemGap;
   mode: Mode2;
   nodes: Nodes;
+  row?: Row2;
+  table?: Table;
   title: Title4;
 }
 export interface ViewNode {
@@ -3085,8 +3108,11 @@ export interface ViewNode {
   header_slot?: HeaderSlot;
   item_field?: ItemField;
   label?: Label1;
+  label_style?: LabelStyle;
   name_field?: NameField;
   prefix?: Prefix;
+  prefix_style?: PrefixStyle;
+  row?: Row1;
   separator?: Separator;
   style: Style1;
   type: Type;
@@ -3237,6 +3263,7 @@ export interface Style2 {
   header: Header;
   page: Page2;
   section_band: Band;
+  tables?: Tables;
   text: Text8;
 }
 export interface Bullets {
@@ -3300,14 +3327,33 @@ export interface Page2 {
 }
 export interface Band {
   background: Background1;
-  heading_style: HeadingStyle;
+  heading_style: HeadingStyle1;
   height: Height2;
   text_inset: TextInset;
+}
+export interface Tables {
+  [k: string]: TableStyle;
+}
+/**
+ * A key-value table (D143): a label column of `label_width` points and the row's content beside it. A label width
+ * of 0 is one column of framed or shaded rows; a border width of 0 draws no lines.
+ */
+export interface TableStyle {
+  background?: Background2;
+  border_color?: BorderColor;
+  border_width: BorderWidth;
+  label_align?: LabelAlign;
+  label_background?: LabelBackground;
+  label_style: LabelStyle1;
+  label_width: LabelWidth;
+  padding_x: PaddingX;
+  padding_y: PaddingY;
 }
 export interface Text8 {
   [k: string]: TextStyle;
 }
 export interface TextStyle {
+  alignment?: Alignment;
   color: Color1;
   font: Font;
   line_height: LineHeight;
@@ -3521,7 +3567,7 @@ export interface AuthoredPresentation {
   viewKey: Viewkey;
 }
 export interface StyleOverrides {
-  alignment: Alignment;
+  alignment: Alignment1;
   bold: Bold1;
   color: Color2;
   font: Font1;
@@ -3583,7 +3629,7 @@ export interface ManualScopeSpan {
   type: Type5;
 }
 export interface SectionProps {
-  alignment?: Alignment1;
+  alignment?: Alignment2;
   backgroundColor?: Backgroundcolor1;
   icon?: Icon;
   manualOrder?: Manualorder;
@@ -3615,7 +3661,7 @@ export interface SourceWitness {
   kind: Kind43;
 }
 export interface TemplateImageProps {
-  alignment: Alignment2;
+  alignment: Alignment3;
   alt: Alt;
   assetId: Assetid;
   caption: Caption;
@@ -3633,7 +3679,7 @@ export interface TemplateTableRow {
   id: Id60;
 }
 export interface TemplateTableCell {
-  alignment?: Alignment3;
+  alignment?: Alignment4;
   backgroundColor?: Backgroundcolor2;
   colspan?: Colspan;
   content: Content4;
@@ -3642,7 +3688,7 @@ export interface TemplateTableCell {
   rowspan?: Rowspan;
 }
 export interface ParagraphProps {
-  alignment?: Alignment4;
+  alignment?: Alignment5;
   backgroundColor?: Backgroundcolor3;
   textColor?: Textcolor2;
 }
@@ -3652,19 +3698,19 @@ export interface CodeProps {
   language: Language1;
 }
 export interface ChecklistProps {
-  alignment?: Alignment5;
+  alignment?: Alignment6;
   backgroundColor?: Backgroundcolor5;
   checked: Checked;
   textColor?: Textcolor3;
 }
 export interface NumberedProps {
-  alignment?: Alignment6;
+  alignment?: Alignment7;
   backgroundColor?: Backgroundcolor6;
   start?: Start2;
   textColor?: Textcolor4;
 }
 export interface HeadingProps {
-  alignment?: Alignment7;
+  alignment?: Alignment8;
   backgroundColor?: Backgroundcolor7;
   level: Level1;
   textColor?: Textcolor5;
@@ -4133,7 +4179,7 @@ export interface FactFieldSpan {
   type: Type20;
 }
 export interface ImageProps {
-  alignment: Alignment8;
+  alignment: Alignment9;
   alt: Alt1;
   assetId: Assetid1;
   caption: Caption1;
@@ -4151,7 +4197,7 @@ export interface TableRow {
   id: Id81;
 }
 export interface TableCell {
-  alignment?: Alignment9;
+  alignment?: Alignment10;
   backgroundColor?: Backgroundcolor8;
   colspan?: Colspan1;
   content: Content18;

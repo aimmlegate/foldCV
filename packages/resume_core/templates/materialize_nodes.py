@@ -33,6 +33,11 @@ def literal(text, presentation):
     return PresentedText(type='text', text=text, styles={}, presentation=presentation)
 
 
+def styled(ref, token):
+    """The node's reference in another text style (D143): a prefix or label line styled on its own."""
+    return ref if token is None else ref.model_copy(update={'style_token': token}, deep=True)
+
+
 def locale_text(values, locale):
     return values.get(locale, '')
 
@@ -41,6 +46,11 @@ def period_format(package):
     """The template's one declared period format: its separator and localized ongoing label; None without one."""
     return next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
         for value in package.definition.operations if value.kind == 'format_period'), None)
+
+
+def heading_style(package, declaration):
+    """The text style of a view's heading: its own (D143) or the band's."""
+    return declaration.view.heading_style or package.recipe.style.section_band.heading_style
 
 
 def fallback_style(declaration):
@@ -106,9 +116,19 @@ def render_plain_fields(package, declaration, instance, fields, scopes, shown_sc
     return blocks, displayed
 
 
+def row_section(package, declaration, instance, identifier, handle=None, node_index=None):
+    """A table row (D143): a section without text of its own whose children fill the row's content cell. The label and
+    the table style are read from the view, never stored."""
+    return {'type': 'section', 'id': identifier, 'revision': 1, 'props': {'recordId': None, 'presentation': 'row'},
+        'content': [], 'children': [], 'provenance': [],
+        'presentation': reference(package, declaration.id, fallback_style(declaration), instance, handle, node_index)}
+
+
 def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, period_format=None, durations=None):
     blocks, displayed = [], {}
     locale = package.definition.template.default_locale
+    # A node with a row label opens a table row; the nodes after it continue the row until the next label.
+    rows, opened = [], None
     def scalar(path):
         matches = [field for field in fields if field.relative == tuple(pointer_tokens(path))]
         if len(matches) > 1:
@@ -124,8 +144,8 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
         if not content:
             return
         identifier = stable_id(instance, ref.node_index, suffix, [field.cell.id for field in selected])
-        blocks.append({'type': kind, 'id': identifier, 'revision': 1, 'props': {}, 'content': content,
-            'children': [], 'provenance': [], 'presentation': ref})
+        (blocks if opened is None else opened['children']).append({'type': kind, 'id': identifier, 'revision': 1,
+            'props': {}, 'content': content, 'children': [], 'provenance': [], 'presentation': ref})
         for field in selected:
             displayed.setdefault(field.cell.id, []).append(identifier)
     def shown(path):
@@ -139,15 +159,20 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
                 result.append((field, part))
         return result
     for index, node in enumerate(declaration.view.nodes):
+        if node.row is not None:
+            opened = row_section(package, declaration, instance, stable_id(instance, 'row', index), node_index=index)
+            rows.append(opened)
+            blocks.append(opened)
         ref = reference(package, declaration.id, node.style, instance, node_index=index)
         label, prefix = locale_text(node.label, locale), locale_text(node.prefix, locale)
+        prefix_ref, label_ref = styled(ref, node.prefix_style), styled(ref, node.label_style)
         def lead():
-            return [literal(prefix, ref)] if prefix else []
+            return [literal(prefix, prefix_ref)] if prefix else []
         if node.type == 'link':
             name, url = shown(node.name_field), shown(node.url_field)
             if name or url:
                 if label:
-                    block([literal(label, ref)], ref, suffix='label')
+                    block([literal(label, label_ref)], ref, suffix='label')
                 block([*lead(), link_part(ref, instance, name, url, scopes, shown_scopes)], ref, [*name, *url])
             continue
         if node.type == 'focus_entry':
@@ -157,7 +182,7 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
             name, experience = parts(scalar(node.name_field), ref), parts(scalar(node.experience_field), detail)
             if name or experience:
                 if label:
-                    block([literal(label, ref)], ref, suffix='label')
+                    block([literal(label, label_ref)], ref, suffix='label')
                 if name:
                     block([*lead(), *(part for _field, part in name)], ref, [field for field, _part in name])
                 computed = (durations or {}).get(name[0][0].record_id) if name and not experience else None
@@ -185,7 +210,7 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
         if not visible and not ongoing_label:
             continue
         if label:
-            block([literal(label, ref)], ref, suffix='label')
+            block([literal(label, label_ref)], ref, suffix='label')
         if node.type == 'bullets':
             for field, part in visible:
                 block(lead() + [part], ref, [field], kind='bullet_list', suffix=field.cell.id)
@@ -202,4 +227,6 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
         if ongoing_label:
             content += [*([literal(separator, ref)] if visible else []), literal(ongoing_label, ref)]
         block(content, ref, [field for field, _part in visible])
-    return blocks, displayed
+    # A row whose nodes show nothing is left out, as an empty line would be.
+    empty = {id(row) for row in rows if not row['children']}
+    return [item for item in blocks if id(item) not in empty], displayed

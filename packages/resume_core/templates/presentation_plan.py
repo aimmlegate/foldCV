@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from ..rendering.captured_styles import authored_spans
 from .compiler import canonical, sha256
 from .focus import catalog_for, row_icon
+from .materialize_nodes import locale_text
 from .models import remember_asset
 
 
@@ -38,6 +39,42 @@ def chip_background(block, span, recipe):
         return None
     node = node_of(recipe, span.presentation or block.presentation)
     return recipe.style.colors[node.background] if node is not None and node.type == 'tags' and node.background else None
+
+
+def table_of(recipe, block):
+    """(table style id, label per locale) of a table row section (D143); None for any other block. Both come from the
+    captured view: the block's own row label, or the label of the node that opened the row."""
+    ref = getattr(block, 'presentation', None)
+    if block.type != 'section' or block.props.presentation != 'row' or ref is None or ref.view_key not in recipe.views:
+        return None
+    view = recipe.views[ref.view_key]
+    if view.table is None or view.table not in recipe.style.tables:
+        return None
+    label = view.row if ref.node_index is None else view.nodes[ref.node_index].row
+    return view.table, label or {}
+
+
+def table_rows(document, recipe, locale):
+    """Each row section's table, label and place: rows of one table style that follow each other among siblings share
+    one table, so the first and the last of them carry its outer edges. A table of whole blocks ends with the last
+    block's item gap; a table inside an entry leaves the gap to the entry."""
+    found = {}
+    def visit(items):
+        previous = None
+        for index, block in enumerate(items):
+            table = table_of(recipe, block)
+            if table is not None:
+                following = table_of(recipe, items[index + 1]) if index + 1 < len(items) else None
+                last = following is None or following[0] != table[0]
+                ref = block.presentation
+                gap = recipe.views[ref.view_key].item_gap if last and ref.node_index is None else 0
+                found[block.id] = {'table': table[0], 'label': locale_text(table[1], locale),
+                    'first': previous is None or previous[0] != table[0], 'last': last, **({'gap': gap} if gap else {})}
+            previous = table
+            visit(block.children)
+    for region in document.regions:
+        visit(region.blocks)
+    return found
 
 
 def focus_row(block, recipe):
@@ -95,8 +132,16 @@ def style_entry(package, fonts, ref):
                 mark_bold=bold, mark_italic=italic)).font.asset_id
         except RenderFailure:
             faces[name] = None
+    try:
+        # An italic base font names its upright face too: the editor slants it for the letters the italic face lacks, as
+        # the DOCX does.
+        base = fonts.select(FontRequest(overrides.font or style.font, bold=overrides.bold, italic=overrides.italic))
+        if base.italic:
+            faces['upright'] = fonts.select(FontRequest(overrides.font or style.font, bold=overrides.bold, italic=False)).font.asset_id
+    except RenderFailure:
+        pass
     return {'faces': faces, 'size': size, 'lineHeight': scaled_line_height(style.line_height, size, style.size),
-        'color': overrides.color or package.recipe.style.colors[style.color], 'alignment': overrides.alignment}
+        'color': overrides.color or package.recipe.style.colors[style.color], 'alignment': overrides.alignment or style.alignment}
 
 
 def editor_plan(project):
@@ -106,6 +151,7 @@ def editor_plan(project):
     recipe = package.recipe
     fonts, styles = resolver(package)
     blocks, files = {}, {}
+    rows = table_rows(project.document, recipe, package.definition.template.default_locale)
     def keyed(ref):
         key = style_key(ref)
         if key not in styles:
@@ -116,6 +162,11 @@ def editor_plan(project):
         entry = {'style': keyed(ref)}
         if is_band(block, recipe):
             entry['band'] = True
+        row = rows.get(block.id)
+        if row is not None:
+            # The row's own style is its label's: the section shows no text, and the editor draws the label from it.
+            entry['row'] = row
+            entry['style'] = keyed(ref.model_copy(update={'style_token': recipe.style.tables[row['table']].label_style}, deep=True))
         row = focus_row(block, recipe)
         if row:
             icon = row_icon(package, project.facts, row, catalog_for(package), block.props.icon)

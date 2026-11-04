@@ -9,7 +9,8 @@ from ..template_import import digest
 from ..template_source_cleanup import without_contacts
 from .captured_fields import capture_fields, ownership_parents, visible_path
 from .focus import focus_durations
-from .materialize_nodes import DisplayField, fallback_style, literal, locale_text, reference, render_nodes, render_plain_fields, stable_id
+from .materialize_nodes import (DisplayField, fallback_style, heading_style, literal, locale_text, reference, render_nodes,
+    render_plain_fields, row_section, stable_id)
 from .operations import display_pointer, operation_value
 from ..rich_fields import field_key
 from .projection import pointer_tokens
@@ -258,10 +259,16 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         if sections or paragraphs:
             title = locale_text(declaration.view.title, package.definition.template.default_locale)
             if declaration.view.heading != 'none' and title:
-                ref = reference(package, declaration.id, package.recipe.style.section_band.heading_style,
+                ref = reference(package, declaration.id, heading_style(package, declaration),
                     stable_id(operation_id, declaration.id, 'heading'))
                 output.append({'type': 'heading', 'id': stable_id(operation_id, declaration.id, 'heading'), 'revision': 1,
                     'props': {'level': 1}, 'content': [literal(title, ref)], 'children': [], 'provenance': [], 'presentation': ref})
+        if declaration.view.row is not None and (sections or paragraphs):
+            # The whole block is one table row under its label (D143); rows of neighbouring blocks share the table.
+            row = row_section(package, declaration, stable_id(operation_id, declaration.id, 'row'),
+                stable_id(operation_id, declaration.id, 'row'))
+            row['children'] = [*sections, *paragraphs]
+            sections, paragraphs = [row], []
         output.extend(sections)
         output.extend(paragraphs)
     if set(placements) - set(declarations):

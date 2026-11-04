@@ -1,5 +1,6 @@
 """Bundled templates: the two-column package keeps its exact hash in the shared folder; the one-column template
-imports, edits and exports in one column with plain headings and job technology chips, without Focus or a logo."""
+imports, edits and exports in one column with plain headings and job technology chips, without Focus or a logo; the
+three table templates (D143) import the same facts into their key-value tables."""
 
 import asyncio
 from functools import cache
@@ -24,6 +25,7 @@ from tests.templates.test_template_view_adapters import render
 
 TWO_COLUMN_HASH = 'c22f5ab9365ea15ad9bb3d503fbaf6557e9c05393f07bc480c5d4e2e60d2d5c8'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
+PUBLIC = ['generic-two-column', 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
 
 
 @cache
@@ -54,7 +56,7 @@ def test_the_two_column_template_uses_the_foldcv_logo_and_no_footer_text():
 
 def test_a_clean_clone_ships_only_the_public_templates(tmp_path, monkeypatch):
     monkeypatch.delenv('FOLDCV_PUBLIC_TEMPLATES')
-    assert list(shipped_templates(tmp_path / 'missing')) == ['generic-two-column', 'generic-one-column']
+    assert list(shipped_templates(tmp_path / 'missing')) == PUBLIC
 
 
 def test_a_local_template_comes_first_and_compiles_from_its_own_folder(tmp_path, monkeypatch):
@@ -63,11 +65,11 @@ def test_a_local_template_comes_first_and_compiles_from_its_own_folder(tmp_path,
     local = tmp_path / 'private-cv.yaml'
     local.write_bytes(BUNDLED_TEMPLATE.read_bytes().replace(b'id: generic-two-column', b'id: private-cv'))
     shipped = shipped_templates(tmp_path)
-    assert list(shipped) == ['private-cv', 'generic-two-column', 'generic-one-column'] and shipped['private-cv'] == local
+    assert list(shipped) == ['private-cv', *PUBLIC] and shipped['private-cv'] == local
     assert compile_template(local).id == 'private-cv'
     # Tests see what a clean clone ships, whatever the local folder holds.
     monkeypatch.setenv('FOLDCV_PUBLIC_TEMPLATES', '1')
-    assert list(shipped_templates(tmp_path)) == ['generic-two-column', 'generic-one-column']
+    assert list(shipped_templates(tmp_path)) == PUBLIC
 
 
 def test_the_one_column_template_has_no_focus_logo_or_icons():
@@ -146,3 +148,32 @@ def test_the_docx_is_one_column_at_full_width_without_bands_logo_or_footer_text(
     moved_body = xml(render(workspace, tmp_path, document=document))
     assert not moved_body.xpath('//w:tbl', namespaces=NS)
     assert emitted(moved_body).index('ОБРАЗОВАНИЕ') < emitted(moved_body).index('О СЕБЕ')
+
+
+TABLES = {'generic-skills-table': ('skills', 3), 'generic-questionnaire': ('form', 5), 'generic-project-cards': ('card', 5)}
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize('template', list(TABLES))
+def test_the_table_templates_import_and_export_their_rows_as_docx_tables(template, tmp_path):
+    """D143: the same scripted F10 import fills each table template; the editor plan labels the rows and the DOCX writes
+    one table per run of rows, with the label texts of the template."""
+    table = {key: value for key, value in f10(True).items() if key != 'focus'}
+    package = compile_template(BUNDLED_TEMPLATES[template])
+    _fixture, result, workspace, _originals = asyncio.run(generic_import(tmp_path, 'F10', table=table, package=package))
+    assert result.state == 'published'
+    plan = project_presentation(workspace)['editor']
+    rows = [entry['row'] for entry in plan['blocks'].values() if 'row' in entry]
+    style, count = TABLES[template]
+    labelled = [row for row in rows if row['table'] == style]
+    assert len(labelled) == count and sum(row['first'] for row in labelled) == 1 and sum(row['last'] for row in labelled) == 1
+    body = xml(render(workspace, tmp_path))
+    tables = body.xpath('//w:tbl', namespaces=NS)
+    assert tables and not body.xpath('//w:tbl//w:tbl', namespaces=NS)
+    # A table with a label column names each row in its first cell; a one-column box has no labels.
+    labels = [emitted(row.xpath('w:tc', namespaces=NS)[0]) for table_ in tables
+        if len(table_.xpath('w:tblGrid/w:gridCol', namespaces=NS)) == 2 for row in table_.xpath('w:tr', namespaces=NS)]
+    assert labels == [row['label'] for row in rows if row['label']]
+    # The body ends with a paragraph even when a table closes it, and the cells end with paragraphs.
+    assert body.xpath('/w:document/w:body/*', namespaces=NS)[-2].tag.endswith('}p')
+    assert all(cell[-1].tag.endswith('}p') for cell in body.xpath('//w:tc', namespaces=NS))

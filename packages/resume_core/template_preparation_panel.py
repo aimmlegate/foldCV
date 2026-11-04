@@ -6,11 +6,11 @@ from .models.template_document import BoundLink, PresentedText, TemplateHeadingB
 from .rich_fields import field_key, inline_groups, occurrences, set_text, working_field
 from .template_anchors import anchor_steps
 from .template_facts import delete_subject
-from .template_panel_lines import block_node, node_labels, show_fields, sibling_lists, sync_period_lines, template_literal
+from .template_panel_lines import block_node, is_row, node_labels, show_fields, sibling_lists, sync_period_lines, template_literal
 from .template_panel_values import field_occurrence, period_endpoint, period_field_id, written_dates
 from .template_preparation_blocks import changed_block_steps
 from .template_preparation_common import allocator_for, finish_preparation, next_facts, prepared_response, validate_preparation
-from .templates.materialize_nodes import literal, locale_text, reference
+from .templates.materialize_nodes import fallback_style, heading_style, literal, locale_text, reference
 
 # Panel refusals the user can act on; the edit route answers with these codes instead of a generic rejection.
 PANEL_REFUSALS = frozenset({'PANEL_ACTION_UNSUPPORTED', 'PANEL_LINE_SHARED', 'PANEL_OWNER_INVALID', 'TECHNOLOGY_DUPLICATE',
@@ -52,15 +52,27 @@ def view_position(document, package, view):
         if block.presentation is not None and block.presentation.view_key in later), len(items))
 
 
+def view_row(package, view, blocks, allocator, kind):
+    """The blocks of a view that is one table row (D143), inside the row section the import gives it; other views' blocks
+    as they are."""
+    if view.view.row is None or all(is_row(block) for block in blocks):
+        return blocks
+    return [TemplateSectionBlock(type='section', id=allocator.allocate('block', [f'panel-{kind}-row', view.id]), revision=1,
+        props={'recordId': None, 'presentation': 'row'}, content=[], children=blocks, provenance=[],
+        presentation=reference(package, view.id, fallback_style(view),
+            allocator.allocate('template-instance', [f'panel-{kind}-row-instance', view.id])))]
+
+
 def restore_view(document, package, view, blocks, allocator, kind):
     """Insert the blocks of a view the document no longer shows, after its title, where the import puts the view."""
     position = view_position(document, package, view)
     if position is None:
         return False
     region, at = position
+    blocks = view_row(package, view, blocks, allocator, kind)
     title = locale_text(view.view.title, package.definition.template.default_locale)
     if view.view.heading != 'none' and title:
-        ref = reference(package, view.id, package.recipe.style.section_band.heading_style,
+        ref = reference(package, view.id, heading_style(package, view),
             allocator.allocate('template-instance', [f'panel-{kind}-heading-instance', view.id]))
         blocks = [TemplateHeadingBlock(type='heading', id=allocator.allocate('block', [f'panel-{kind}-heading', view.id]),
             revision=1, props={'level': 1}, content=[literal(title, ref)], children=[], provenance=[], presentation=ref), *blocks]

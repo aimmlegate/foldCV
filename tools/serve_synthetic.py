@@ -453,7 +453,8 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=0)
     parser.add_argument('--employment', choices=['issues', 'views', 'generic-f06', 'generic-f10'], default=None)
     # The bundled template of the generic-* imports; with it the default import is generic-f10.
-    parser.add_argument('--template', choices=['generic-two-column', 'generic-one-column'], default=None)
+    parser.add_argument('--template', choices=['generic-two-column', 'generic-one-column', 'generic-skills-table',
+        'generic-questionnaire', 'generic-project-cards'], default=None)
     # Explicit test allowance for template imports; without it the import stays unavailable, as in production.
     parser.add_argument('--template-call-cap', type=int, default=None)
     # Claude starts without a CLI and Settings installs a stub through the managed installer.

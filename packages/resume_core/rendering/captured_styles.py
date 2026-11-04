@@ -109,11 +109,12 @@ class CapturedStyleResolver:
         if not isinstance(block.content,list) or any(span.type not in {'text','fact_field','manual_scope','bound_link','link'}
                 for span in block.content):
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-        self._reference(block.presentation)
+        style=self._reference(block.presentation)
         runs=[self.run(block,span) for span,_link in authored_spans(block) if visible_text(span.text)]
         height=max(run.line_height for run in runs) if runs else self._run(block,block.presentation).line_height
+        # An authored override, then the block's own alignment, then the text style's (D143).
         alignment=(block.presentation.overrides.alignment if block.presentation.overrides.alignment is not None
-            else block.props.alignment)
+            else block.props.alignment if block.props.alignment!='left' else style.alignment or 'left')
         return height,alignment
 
     def font_glyphs(self,font):

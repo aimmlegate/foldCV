@@ -139,6 +139,10 @@ REASONS = {
     'derived block needs the partition_employment operation that names it compact':
         'производному блоку нужна операция partition_employment, которая назначает его компактным',
     'a view without nodes needs fallback_style': 'виду без элементов нужен fallback_style',
+    # Table rows (D143).
+    'the header holds no table': 'в шапке таблицы не бывает',
+    "rows need the view's table style": 'для строк таблицы нужен стиль таблицы в table',
+    'a view is one row or holds rows, not both': 'вид либо сам одна строка таблицы, либо содержит строки, но не то и другое',
     'asset is empty': 'файл пустой',
     'anyOf branches must be schema objects': 'ветки anyOf должны быть схемами-объектами',
     'focus icon catalog is unreadable': 'каталог иконок Focus не читается',

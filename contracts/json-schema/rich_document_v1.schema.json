@@ -2059,7 +2059,8 @@
           "default": "standard",
           "enum": [
             "standard",
-            "focus"
+            "focus",
+            "row"
           ],
           "title": "Presentation",
           "type": "string"
