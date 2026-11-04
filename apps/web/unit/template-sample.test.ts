@@ -27,6 +27,17 @@ test("the sent message names its sample; other messages and the resume transcrip
   assert.ok(!resume.includes("chat-message-attachment"));
 });
 
+test("an empty chat asks its question and offers no ready prompts, in both drawers (D139)", () => {
+  const empty = view({ messages: [], run: null });
+  for (const [scope, title, question] of [[templateScope, "Чат по шаблону", "в шаблоне? Напишите вопрос ниже."],
+    [resumeScope, "Чат по резюме", "в резюме? Напишите вопрос ниже."]] as const) {
+    const html = renderToStaticMarkup(createElement(Transcript, { view: empty, active: false, resource: () => {}, focus: () => false, draft: () => {}, scope }));
+    const part = /<div class="chat-empty">(.*?)<\/div>/u.exec(html)?.[1] ?? "";
+    assert.ok(part.includes(title) && part.includes(question), part);
+    assert.ok(!part.includes("<button"), "no ready prompts");
+  }
+});
+
 test("the templates composer shows its own context and no edits switch; the resume composer keeps both", () => {
   const html = renderToStaticMarkup(createElement(Composer, { ...composer, scope: templateScope,
     context: createElement("span", { className: "chat-attachment" }, "Образец.docx") }));

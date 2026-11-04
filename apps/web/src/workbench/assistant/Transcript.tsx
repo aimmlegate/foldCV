@@ -13,9 +13,7 @@ export function Transcript({ view, active, resource, focus, draft, scope = resum
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
   return <>
     {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>{scope.empty}</h3>
-      <div className="chat-suggestions">
-        {scope.suggestions.map(text => <button key={text} onClick={() => { draft(text); document.getElementById(scope.input)?.focus(); }}><Icon name="spark" />{text}</button>)}
-      </div></div>}
+      <p>{scope.question}</p></div>}
     {view.messages.map(message => <article key={message.id} className={`chat-message${message.role === "user" ? " from-user" : ""}`}>
       <div className="chat-message-heading"><span>{message.role !== "user" && <Icon name="spark" />}{message.role === "user" ? "Вы" : "Помощник"}</span>
         <small><time dateTime={message.timestamp}>{new Date(message.timestamp).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}</time></small></div>
