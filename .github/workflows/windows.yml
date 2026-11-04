@@ -172,6 +172,7 @@ jobs:
           Add-Type -Namespace Win32 -Name User -MemberDefinition @'
           [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
           [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+          [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
           '@
           # The port file stays from the last start, so the page itself must answer.
           function Wait-Page($app) {
@@ -200,9 +201,19 @@ jobs:
             throw "Processes of the app are left running after $after"
           }
           try {
+            $started = Get-Date
             $app = Start-Process -FilePath $exe -PassThru
             Wait-Page $app
-            Start-Sleep -Seconds 15
+            Write-Host "Page served after $([int]((Get-Date) - $started).TotalSeconds) s"
+            # The window shows when the page has loaded, at the latest 10 s after it opened; WebView2's first start on a
+            # fresh runner can take a while.
+            $deadline = (Get-Date).AddMinutes(2)
+            while (-not [Win32.User]::IsWindowVisible([Win32.User]::FindWindow('Tauri Window', 'foldCV Beta'))) {
+              if ($app.HasExited -or (Get-Date) -gt $deadline) { throw 'The app window was not shown' }
+              Start-Sleep -Seconds 1
+            }
+            Write-Host "Window shown after $([int]((Get-Date) - $started).TotalSeconds) s"
+            Start-Sleep -Seconds 10
             try {
               Add-Type -AssemblyName System.Windows.Forms, System.Drawing
               $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
