@@ -161,7 +161,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const printed = useRef<{ doc: unknown; sheet: TemplateSheet | null } | null>(null);
   const printSource = useCallback(() => {
     const paper = paperScroll.current?.querySelector<HTMLElement>(".resume-paper"), page = presented.current?.presentation.recipe.style.page;
-    return paper && page ? { paper, page } : null;
+    return paper && page ? { paper, page: { ...page, footer_bottom: presented.current?.footer?.bottom ?? null } } : null;
   }, []);
   useEffect(() => {
     const title = document.title;
@@ -390,6 +390,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
                 {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
                 <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
                   {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
+                {sheet?.footer && <p className="fcv-footer" style={sheet.footer.style}>{sheet.footer.text}</p>}
               </div>
             </div>
           </div>

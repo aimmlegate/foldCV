@@ -3,7 +3,8 @@
  * shows only its own blocks, so it lays out from its top and a small layout difference in print cuts no line. */
 import { validLink } from "../editor/link";
 
-export type PrintPage = { width: number; height: number; continuation_body_top: number; body_bottom: number };
+/** `footer_bottom`: where the template's footer line ends (D145), below the body; a page copy reaches it. */
+export type PrintPage = { width: number; height: number; continuation_body_top: number; body_bottom: number; footer_bottom?: number | null };
 export type PrintPlatform = "macos" | "windows" | "browser";
 /** A vertical extent in CSS pixels from the top of the sheet; `keep` holds it on the page of the next one (a heading). */
 export type Unit = { top: number; bottom: number; keep: boolean };
@@ -122,7 +123,9 @@ function pageCopy(copy: HTMLElement, index: number, page: PrintPage): HTMLElemen
   const paper = copy.cloneNode(true), shown = String(index);
   if (!(paper instanceof HTMLElement)) throw new Error("Не удалось подготовить резюме к печати.");
   paper.classList.add("print-page");
-  paper.style.width = `${String(page.width)}pt`; paper.style.height = `${String(page.body_bottom)}pt`;
+  // Never taller than the paper: a copy past the page edge would print a blank page after it.
+  const bottom = Math.min(page.height - 1, Math.max(page.body_bottom, page.footer_bottom ?? 0));
+  paper.style.width = `${String(page.width)}pt`; paper.style.height = `${String(bottom)}pt`;
   for (const element of paper.querySelectorAll<HTMLElement>("[data-print-page]")) if (element.dataset["printPage"] !== shown) element.classList.add("print-hidden");
   for (const element of paper.querySelectorAll<HTMLElement>("[data-print-pages]"))
     if (!(element.dataset["printPages"] ?? "").split(" ").includes(shown)) element.classList.add("print-hidden");

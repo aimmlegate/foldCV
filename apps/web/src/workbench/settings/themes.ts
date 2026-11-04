@@ -27,7 +27,8 @@ type NeutralStep = (typeof neutralSteps)[number];
 type AccentStep = (typeof accentSteps)[number];
 type SemanticStep = (typeof semanticSteps)[number];
 export type ColorToken = NeutralStep | AccentStep | SemanticStep | "on-accent";
-export type Palette = Record<ColorToken, string> & Record<"shade" | "paper-rgb" | "accent-rgb", string>;
+/** `plate`: a light backing for artwork drawn for a light page, such as technology logos; the light paper on both sides. */
+export type Palette = Record<ColorToken, string> & Record<"shade" | "paper-rgb" | "accent-rgb" | "plate", string>;
 export const colorTokens: readonly ColorToken[] = [...neutralSteps, ...accentSteps, ...semanticSteps, "on-accent"];
 
 type Oklch = { l: number; c: number; h: number };
@@ -96,6 +97,7 @@ export function palette(id: ThemeId, mode: Mode, contrast = 100): Palette {
   result["on-accent"] = contrastRatio(paperHex, accent) >= contrastRatio(ink, accent) ? paperHex : ink;
   result.shade = mode === "light" ? triplet(toHex({ l: 0.38, c: theme.tint.chroma, h: theme.tint.hue })) : "0 0 0";
   result["paper-rgb"] = triplet(paperHex); result["accent-rgb"] = triplet(accent);
+  result.plate = mode === "light" ? paperHex : palette(id, "light").paper;
   return result as Palette;
 }
 

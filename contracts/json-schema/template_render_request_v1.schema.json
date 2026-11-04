@@ -2461,9 +2461,17 @@
       "additionalProperties": false,
       "properties": {
         "asset": {
-          "minLength": 1,
-          "title": "Asset",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset"
         },
         "fit": {
           "const": "contain",
@@ -2492,7 +2500,6 @@
         }
       },
       "required": [
-        "asset",
         "x",
         "top",
         "width",

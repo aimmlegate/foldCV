@@ -3,6 +3,7 @@
 import base64
 from copy import deepcopy
 from io import BytesIO
+import json
 
 from fontTools.ttLib import TTFont
 from PIL import Image
@@ -10,11 +11,16 @@ import pytest
 
 from packages.resume_core.rendering.captured_assets import font_name,load_captured_assets
 from packages.resume_core.rendering.template import RenderFailure
-from packages.resume_core.templates.compiler import canonical,compile_template,sha256
+from packages.resume_core.templates.compiler import canonical,compile_bytes,sha256
+from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE,package_identity,verify_package
+from tests.templates.storage_fixtures import with_logo
 
 
-def package():return compile_template(BUNDLED_TEMPLATE)
+def package():
+    # The bundled template with its logo place filled (D145).
+    config=with_logo(load_definition(BUNDLED_TEMPLATE.read_bytes()))
+    return compile_bytes(json.dumps(config).encode(),BUNDLED_TEMPLATE.parent,original_format='json')
 
 
 def changed_asset(before,identifier,*,content=None,mime=None,embedding=None):

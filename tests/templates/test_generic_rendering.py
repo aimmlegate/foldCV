@@ -99,18 +99,19 @@ async def test_renamed_headings_and_opaque_block_ids_keep_the_same_presentation(
 
 
 @pytest.mark.asyncio
-async def test_export_carries_logo_captured_fonts_and_exact_links_without_a_footer(tmp_path_factory):
-    # V04: assets are the captured bytes; an empty footer text writes no footer part.
+async def test_export_carries_captured_fonts_and_exact_links_without_a_logo_or_a_footer(tmp_path_factory):
+    # V04: assets are the captured bytes; an empty footer text writes no footer part. The logo place ships empty (D145);
+    # test_template_branding exports an own logo.
     workspace, content = await f10_export(tmp_path_factory)
     package, archive = workspace.project.template_package, parts(content)
     tree = xml(content)
-    # The first-page header carries the logo and the body the Focus icon, both as the captured bytes.
-    assets = {asset.id: asset.sha256 for asset in package.assets}
     def images(part):
-        relations = etree.fromstring(archive['word/_rels/' + part + '.rels'])
+        relations = etree.fromstring(archive['word/_rels/' + part + '.rels']) if 'word/_rels/' + part + '.rels' in archive else []
         return [sha256(archive['word/' + child.get('Target')]) for child in relations if child.get('Type').endswith('/image')]
+    # Only the body's Focus icon is a picture, as the captured bytes.
     python = icon_catalog(package).files['python'].sha256
-    assert images('header1.xml') == [assets['logo']] and images('document.xml') == [python]
+    headers = [name.removeprefix('word/') for name in archive if name.startswith('word/header')]
+    assert not [image for header in headers for image in images(header)] and images('document.xml') == [python]
     assert not tree.xpath('//w:sectPr/w:footerReference', namespaces=NS)
     assert tree.xpath('//w:sectPr/w:titlePg', namespaces=NS)
     assert not [name for name in archive if name.startswith('word/footer')]

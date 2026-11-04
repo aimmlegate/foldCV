@@ -71,3 +71,7 @@
 .fcv-sheet .bn-editor a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 .fcv-sheet .bn-block-content[data-content-type="bulletListItem"]::before { content: var(--fcv-bullet, "•") !important; }
 .fcv-logo { position: absolute; object-fit: contain; pointer-events: none; }
+/* D145: the template's footer line, an optional email. On screen it closes the sheet at its center line; on paper it sits at
+   its baseline on every page (export.css). */
+.fcv-sheet .fcv-footer { margin: 18pt 0 0; text-align: center; white-space: nowrap;
+  transform: translateX(calc(var(--fcv-footer-x) - var(--fcv-page-width) / 2)); }

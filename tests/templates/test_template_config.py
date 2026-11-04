@@ -219,8 +219,8 @@ def operation(config, identifier):
     return next(value for value in config['operations'] if value['id'] == identifier)
 
 
-def logo_as_catalog(config):
-    config['style']['focus']['icon_catalog'] = config['style']['header']['logo']['asset']
+def font_as_catalog(config):
+    config['style']['focus']['icon_catalog'] = 'SourceSansPro-Regular'
 
 
 def unknown_operation(config):
@@ -251,7 +251,7 @@ def anyof_true(config):
 
 
 @pytest.mark.parametrize(('change', 'path', 'fragment'), [
-    (logo_as_catalog, '/style/focus/icon_catalog', 'не читается'),
+    (font_as_catalog, '/style/focus/icon_catalog', 'не читается'),
     (unknown_operation, '/operations/keep', 'не зарегистрирована'),
     (skills_without_their_groups, '/operations/technical-skills', 'входы'),
     (derived_from_another_operation, '/blocks/other_projects/operation', 'partition_employment'),

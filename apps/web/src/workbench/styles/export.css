@@ -21,6 +21,7 @@
 .print-root .print-hidden { display: none !important; }
 .print-root .print-page { contain: strict; overflow: hidden; break-after: page; }
 .print-root .print-page:last-child { break-after: auto; }
+.print-root .fcv-sheet .fcv-footer { position: absolute; top: var(--fcv-footer-top); left: var(--fcv-footer-x); margin: 0; transform: translateX(-50%); }
 @media print {
   /* The app's frame clips the window; the printed pages need the whole copy. */
   html, body { display: block !important; width: auto !important; height: auto !important; min-height: 0 !important;

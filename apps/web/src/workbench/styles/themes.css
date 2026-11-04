@@ -17,7 +17,6 @@
 .modal::backdrop { background: rgb(var(--shade) / .3); }
 /* Native controls, scrollbars and the Monaco editor follow the mode. */
 :root[data-mode="dark"] .app-shell :is(input, select, textarea) { color-scheme: dark; }
-:root[data-mode="dark"] img.focus-icon-image { filter: brightness(1.1); }
 
 /* Settings → Интерфейс → Оформление: three cards with a drawn window each; the system card shows both halves. */
 .scheme-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 24px; }

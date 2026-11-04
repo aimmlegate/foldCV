@@ -25,8 +25,21 @@ PAPER_SCHEMA = {
 }
 
 
+# D145: the bundled two-column template ships an empty logo place. Fixtures that render a logo set one, as «Шаблоны» does.
+LOGO = {'id': 'logo', 'path': 'assets/foldcv.png', 'role': 'logo', 'mime_type': 'image/png', 'embedding': 'not_applicable'}
+
+
+def with_logo(config):
+    """A loaded definition with the logo place filled by the FoldCV picture."""
+    config['style']['header']['logo']['asset'] = LOGO['id']
+    # Where the template listed it before, so fixture packages keep their bytes.
+    at = next(index for index, asset in enumerate(config['assets']) if asset['id'] == 'technology-icons')
+    config['assets'] = [*config['assets'][:at], dict(LOGO), *config['assets'][at:]]
+    return config
+
+
 def package():
-    config = load_definition(BUNDLED_TEMPLATE.read_bytes())
+    config = with_logo(load_definition(BUNDLED_TEMPLATE.read_bytes()))
     config['template'] = {'id': 'synthetic-storage', 'revision': '1', 'name': 'Storage fixture', 'default_locale': 'en'}
     config['content_definitions'] = {}
     config['operations'] = []

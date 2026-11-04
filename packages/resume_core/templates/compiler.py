@@ -248,7 +248,7 @@ def compile_definition(definition: TemplateDefinition, version):
     require(style.section_band.heading_style, style.text, "/style/section_band/heading_style")
     require(style.section_band.background, style.colors, "/style/section_band/background")
     require(style.footer.style, style.text, "/style/footer/style")
-    if style.header.logo: require(style.header.logo.asset, assets, "/style/header/logo")
+    if style.header.logo and style.header.logo.asset: require(style.header.logo.asset, assets, "/style/header/logo")
     if style.header.divider: require(style.header.divider.color, style.colors, "/style/header/divider")
     if style.focus.icon_catalog: require(style.focus.icon_catalog, assets, "/style/focus/icon_catalog")
     for name, table in style.tables.items():

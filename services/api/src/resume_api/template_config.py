@@ -17,6 +17,8 @@ from packages.resume_core.templates.loading import CONFIG_BYTES, load_definition
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import TemplateStore, bundled_folder
 
+from .template_branding import (LOGO_ID, LOGO_PATH, NOT_EDITABLE, BrandingRefused, branding, changes, edited_json,
+    edited_yaml, footer_text, logo_png)
 from .template_reasons import reason_text
 
 REVISION_TAKEN = "эта версия уже сохранена с другим содержимым; измените template.revision"
@@ -268,3 +270,39 @@ class TemplateConfig:
     def set_default(self, template_id):
         self.store.set_default(template_id)
         return {'schemaVersion': 1, **self.catalog()}
+
+    def branding(self, template_id):
+        return {'schemaVersion': 1, **branding(self.store.current(template_id))}
+
+    def save_branding(self, template_id, request):
+        """A new revision with the request's logo and footer email (D145): (config state with its branding, None) or
+        (None, check reply). New imports take it; projects keep the package they captured."""
+        current, bundled = self.store.versions(template_id)
+        try:
+            footer = footer_text(request.footer)
+            png = logo_png(request.logo) if request.logo is not None else None
+            edits = changes(current, png, request.remove_logo, footer)
+        except BrandingRefused as error:
+            return None, refused({'path': error.path, 'message': error.message})
+        (_format, raw), _flags = self.flags(current, bundled)
+        # By content, not the recorded format: a saved JSON text is recorded as YAML, which it also is.
+        text = edited_yaml(raw.decode('utf-8'), edits) or edited_json(raw.decode('utf-8'), edits)
+        known = {current.revision, *self.store.revisions(template_id), *([bundled.revision] if bundled is not None else [])}
+        text = with_header(text, revision=next_revision(known)) if text is not None else None
+        if text is None:
+            return None, refused({'path': '/', 'message': NOT_EDITABLE})
+        assets = decoded_assets(current)
+        if png is not None:
+            assets[LOGO_PATH] = png
+        package, error = self.compile_saved(text, current, bundled, assets)
+        if error is not None:
+            return None, refused(error)
+        place = package.recipe.style.header.logo
+        logo = next((asset for asset in package.assets if place is not None and asset.id == place.asset), None)
+        # An odd text form (anchors, duplicate keys) can compile to something else; such a save is refused.
+        intended = (logo is not None and logo.id == LOGO_ID and base64.b64decode(logo.bytes_base64) == png if png is not None
+            else logo is None if request.remove_logo else place == current.recipe.style.header.logo)
+        if package.recipe.style.footer.text != footer or not intended:
+            return None, refused({'path': '/', 'message': NOT_EDITABLE})
+        self.store.save(package, keep_text=True)
+        return {**self.read(template_id), 'branding': branding(package)}, None

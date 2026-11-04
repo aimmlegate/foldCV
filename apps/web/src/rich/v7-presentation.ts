@@ -11,6 +11,8 @@ export const presentationMeta = "foldcv-v7-presentation";
 
 /** What the mounted editor draws: Python's plan, the captured recipe and blob URLs of verified captured bytes. */
 export type TemplateSheet = { css: string; variables: CSSProperties; logo: { url: string; style: CSSProperties } | null;
+  /** The footer line (D145: an optional email): its text, look and place, and where it ends on the page, in points. */
+  footer: { text: string; style: CSSProperties; bottom: number } | null;
   presentation: Presentation; styles: ReadonlyMap<string, string>; icons: ReadonlyMap<string, string>; tables: ReadonlyMap<string, string> };
 
 /** Captured fonts and icons load once by hash and stay cached; replies carry only their names (D104). */
@@ -98,10 +100,18 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
     // The template's bullet glyph, as the DOCX numbering uses it (CT08: a second template draws "–").
     "--fcv-bullet": JSON.stringify(style.bullets.marker),
   } as CSSProperties;
-  const logoAsset = logoValue ? assets.get(logoValue.asset) : undefined;
+  // A logo place without an asset stays empty (D145).
+  const logoAsset = logoValue?.asset ? assets.get(logoValue.asset) : undefined;
   const logo = logoValue && logoAsset ? { url: assetUrl(logoAsset), style: { left: pt(logoValue.x), top: pt(logoValue.top),
     width: pt(logoValue.width), height: pt(logoValue.height) } } : null;
-  return { css: rules.join("\n"), variables, logo, presentation, styles, icons, tables };
+  // The baseline sits about 0.8 of the size below the top of the text, inside the line's own half-leading.
+  const line = style.footer.text.trim(), lettering = line ? style.text[style.footer.style] : undefined;
+  const top = lettering ? style.footer.baseline_y - 0.8 * lettering.size - (lettering.line_height - lettering.size) / 2 : 0;
+  const footer = lettering ? { text: line, bottom: top + lettering.line_height, style: {
+    fontFamily: `${family(style.fonts[lettering.font] ?? null) ?? "inherit"}, sans-serif`, fontSize: pt(lettering.size),
+    lineHeight: pt(lettering.line_height), color: style.colors[lettering.color] ?? "inherit",
+    "--fcv-footer-top": pt(top), "--fcv-footer-x": pt(style.footer.center_x) } as CSSProperties } : null;
+  return { css: rules.join("\n"), variables, logo, footer, presentation, styles, icons, tables };
 }
 
 /** Literal spans have no binding id. The plan stores them as `literal@start@end` in UTF-16 units. */

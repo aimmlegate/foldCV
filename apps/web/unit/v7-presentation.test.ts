@@ -42,7 +42,7 @@ test("italic faces are declared italic, so only an upright stand-in gets the bro
   const regions = [{ id: "header", x: 20, width: 556 }, { id: "main", x: 20, width: 556 }];
   const response = { workspace: { project: { templatePackage: { assets: Object.values(faces).map(asset) } } }, presentation: { editor: {
     fonts: Object.values(faces), icons: [], blocks: {}, styles: { body: { faces, size: 10, lineHeight: 12, color: "#000", alignment: null } } },
-    recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {}, focus: {}, bullets: {}, colors: {} } } } } as unknown as TemplateProjectResponseV1;
+    recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {}, focus: {}, bullets: {}, colors: {}, footer: { text: "" } } } } } as unknown as TemplateProjectResponseV1;
   const css = templateSheet(response)?.css ?? "";
   for (const id of ["italic", "bold-italic"]) assert.match(css, new RegExp(`fcv-${id.padEnd(24, "0")}"; font-style: italic;`));
   for (const id of ["regular", "bold"]) assert.match(css, new RegExp(`fcv-${id.padEnd(24, "0")}"; src:`));
@@ -56,13 +56,30 @@ test("table styles become sheet rules and an italic base font falls back to its 
     border_color: "line", padding_x: 4.5, padding_y: 4 }, box: { label_width: 0, label_style: "body", background: "box", border_width: 0, padding_x: 6, padding_y: 4 } };
   const response = { workspace: { project: { templatePackage: { assets: ["bold-italic", "bold"].map(asset) } } }, presentation: { editor: {
     fonts: ["bold-italic", "bold"], icons: [], blocks: {}, styles: { section: { faces, size: 14, lineHeight: 18, color: "#000", alignment: null } } },
-    recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {}, focus: {}, bullets: {}, colors: { box: "#F3F3F3", line: "#CCCCCC" }, tables } } } } as unknown as TemplateProjectResponseV1;
+    recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {}, focus: {}, bullets: {}, colors: { box: "#F3F3F3", line: "#CCCCCC" }, tables, footer: { text: "" } } } } } as unknown as TemplateProjectResponseV1;
   const sheet = templateSheet(response);
   assert.ok(sheet);
   assert.deepEqual([...sheet.tables], [["card", "t0"], ["box", "t1"]]);
   assert.match(sheet.css, /\[data-fcv-table="t0"\] \{ --fcv-row-label-width: 110pt; --fcv-row-label-display: flex; --fcv-row-border: 0\.75pt solid #CCCCCC; --fcv-row-label-fill: #F3F3F3; --fcv-row-fill: transparent; --fcv-row-pad-x: 4\.5pt; --fcv-row-pad-y: 4pt; --fcv-row-label-align: center; \}/);
   assert.match(sheet.css, /\[data-fcv-table="t1"\] \{ --fcv-row-label-width: 0pt; --fcv-row-label-display: none; --fcv-row-border: 0; --fcv-row-label-fill: transparent; --fcv-row-fill: #F3F3F3;/);
   assert.match(sheet.css, /font-family: var\(--fcv-regular\), "fcv-bold00000000000000000000", sans-serif; font-style: italic; font-size: 14pt;/);
+});
+
+test("a footer email shows with the template's footer look, and print reaches its bottom (D145)", () => {
+  const regions = [{ id: "header", x: 20, width: 556 }, { id: "main", x: 20, width: 556 }];
+  const sheet = (text: string) => templateSheet({ workspace: { project: { templatePackage: { assets: [{ id: "regular", sha256: "r".padEnd(64, "0") }] } } },
+    presentation: { editor: { fonts: ["regular"], icons: [], blocks: {}, styles: {} }, recipe: { layout: { regions }, style: { page: {}, header: {}, section_band: {},
+      focus: {}, bullets: {}, colors: { ink: "#111111" }, fonts: { body: "regular" },
+      text: { footer: { font: "body", size: 12, line_height: 15, color: "ink" } },
+      footer: { text, center_x: 275.65, baseline_y: 803, style: "footer", repeat: "every_page" } } } } } as unknown as TemplateProjectResponseV1);
+  assert.equal(sheet("   ")?.footer, null, "an empty footer text shows nothing");
+  const footer = sheet(" hr@example.com ")?.footer;
+  assert.ok(footer);
+  assert.equal(footer.text, "hr@example.com");
+  // The text's top: the baseline less 0.8 of the size and half the leading; the line ends one line height below.
+  assert.deepEqual(footer.style, { fontFamily: `"fcv-${"r".padEnd(24, "0")}", sans-serif`, fontSize: "12pt", lineHeight: "15pt", color: "#111111",
+    "--fcv-footer-top": "791.9pt", "--fcv-footer-x": "275.65pt" });
+  assert.ok(Math.abs(footer.bottom - 806.9) < 1e-9);
 });
 
 test("a row section is decorated with its table, label and edges, and an item inside it keeps no gap", () => {

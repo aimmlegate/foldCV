@@ -56,18 +56,28 @@ test("a remark marks its fields inside the blocks Python names when they show th
 
 test("a remark without a shown field marks its blocks; a named heading stands for its whole section", () => {
   const marks = remarkMarks(document, [
-    issue([cell("gone", "display"), "scope-task"], ["fallback", "tools-line"], "Показан исходный текст."),
+    issue([cell("gone", "display"), "scope-task"], ["fallback"], "Показан исходный текст."),
     issue(["scope-outline"], ["projects", "labs", "labs-title", "labs-claim", "fallback"], "Разметка записей под вопросом."),
     issue(["scope-other"], ["school", "deleted-block"], "Образование под вопросом."),
   ]);
   assert.deepEqual(sorted(marks.blocks), [
     ["projects", ["Разметка записей под вопросом."]],
     ["school-name", ["Образование под вопросом."]],
-    ["tools-line", ["Показан исходный текст."]],
     ["fallback", ["Показан исходный текст."]],
   ].sort(([left], [right]) => String(left).localeCompare(String(right))),
   "a section's other blocks keep only remarks that do not name its heading; an item frame marks its lines");
   assert.equal(marks.cells.size, 0);
+});
+
+test("a remark on a value the text no longer shows marks no blocks across sections: they are lines its value was cited from", () => {
+  const marks = remarkMarks(document, [
+    // A tester's Kafka version remark: the rejected technology cited the summary, a job and the tools line (D145).
+    issue([cell("gone", "display"), "scope-task"], ["about", "labs-title", "tools-line"], "Версия указана как Kafka 4.0."),
+    // A remark without a fact target names its own block's lines, wherever they are.
+    issue(["scope-other"], ["about", "tools-line"], "Блок под вопросом."),
+  ]);
+  assert.deepEqual(sorted(marks.blocks), [["about", ["Блок под вопросом."]], ["tools-line", ["Блок под вопросом."]]]);
+  assert.equal(marks.cells.size + marks.scoped.size, 0);
 });
 
 test("retired, blank and target-less remarks mark nothing; one place keeps each distinct message once", () => {

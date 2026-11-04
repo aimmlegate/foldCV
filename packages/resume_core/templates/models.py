@@ -60,7 +60,8 @@ class TextStyle(Definition):
 
 
 class Logo(Definition):
-    asset: Id
+    # The place a logo takes; without an asset it stays empty until the user sets one in «Шаблоны» (D145).
+    asset: Id | None = None
     x: Points
     top: Points
     width: Positive

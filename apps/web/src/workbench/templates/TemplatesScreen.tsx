@@ -12,6 +12,7 @@ import { deleteControl, downloadName, draftLabel, shownId, templateKind, unsaved
 import type { TemplateProposal } from "../../assistant/template";
 import { applyProposal, type ApplyOutcome } from "./apply";
 import { TemplateAssistant, type TemplateContext } from "./TemplateAssistant";
+import { TemplateBranding } from "./TemplateBranding";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
 type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | "applying" | null;
@@ -156,6 +157,8 @@ export default function TemplatesScreen({ open, close, settings }: { open: boole
             title={state.package.id === catalog.defaultId ? "Основной шаблон удалить нельзя: сначала сделайте основным другой" : undefined}
             onClick={() => setConfirmDelete(true)}>Удалить</Button>}
         </div>}
+        {state && <TemplateBranding templateId={state.package.id} packageHash={state.package.packageHash} blocked={dirty} disabled={busy}
+          saved={next => { adopt(next); setCatalog(value => value && withState(value, next)); }} />}
         {draft && <div className="template-active"><h3>{draftLabel(draft.name)}</h3>
           <span className="small muted">Сохраните, чтобы новые резюме могли его выбрать.</span></div>}
         {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}

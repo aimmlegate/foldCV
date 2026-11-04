@@ -1,5 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument } from "yaml";
-import { field, text } from "../../api/fields";
+import { field, optionalText, text } from "../../api/fields";
 import { parseTemplateCatalog, type TemplateCatalog, type TemplateEntry } from "../../projects/api";
 import { ProjectApiFailure } from "../../rich/v7-connection";
 
@@ -93,6 +93,27 @@ export async function resetTemplateConfig(templateId: string): Promise<TemplateC
 /** Makes the template the default for new imports; its saved YAML stays as it is. */
 export async function setDefaultTemplate(templateId: string): Promise<TemplateCatalog> {
   return parseTemplateCatalog((await call("/v1/rich/template-default", "PUT", { templateId })).value);
+}
+
+/** D145: whether the template has a logo place, its own logo as a PNG data URL, and the footer email. */
+export type TemplateBranding = { logoPlace: boolean; logo: string | null; footer: string };
+export type BrandingChange = { logo?: string; removeLogo?: boolean; footer: string };
+export type BrandingSave = { saved: true; state: TemplateConfigState; branding: TemplateBranding } | { saved: false; error: TemplateProblem };
+export function parseBranding(value: unknown): TemplateBranding {
+  const place = field(value, "logoPlace"), logo = optionalText(value, "logo");
+  if (typeof place !== "boolean") throw new ProjectApiFailure("INVALID_RESULT");
+  return { logoPlace: place, logo: logo?.startsWith("data:image/png;base64,") ? logo : null, footer: text(value, "footer") };
+}
+export async function readTemplateBranding(templateId: string): Promise<TemplateBranding> {
+  const { value } = await call(`${one(templateId)}/branding`, "GET");
+  if (field(value, "schemaVersion") !== 1) throw new ProjectApiFailure("INVALID_RESULT");
+  return parseBranding(value);
+}
+/** Saves the logo and email as the template's next version; `logo` is the picture's base64, without a data URL prefix. */
+export async function saveTemplateBranding(templateId: string, change: BrandingChange): Promise<BrandingSave> {
+  const { status, value } = await call(`${one(templateId)}/branding`, "PUT", change);
+  const result = parseSave(status, value);
+  return result.saved ? { ...result, branding: parseBranding(field(value, "branding")) } : result;
 }
 
 function tokens(pointer: string): string[] {

@@ -23,7 +23,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = 'c22f5ab9365ea15ad9bb3d503fbaf6557e9c05393f07bc480c5d4e2e60d2d5c8'
+TWO_COLUMN_HASH = 'ae3975834bfd496c07f5ad35ded5f7243af041d1b79a6cee037aa6fc0632fba4'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 PUBLIC = ['generic-two-column', 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
 
@@ -47,10 +47,11 @@ def test_a_long_technology_list_stays_a_valid_reply(template, block):
     validate_payload(schema, {'items': [f'Tool {index}' for index in range(120)]})
 
 
-def test_the_two_column_template_uses_the_foldcv_logo_and_no_footer_text():
+def test_the_two_column_template_keeps_an_empty_logo_place_and_no_footer_text():
+    # D145: no FoldCV logo; «Шаблоны» sets an own logo for the place and a footer email.
     package = compile_template(BUNDLED_TEMPLATE)
-    logo = next(asset for asset in package.assets if asset.role == 'logo')
-    assert (logo.id, logo.path) == ('logo', 'assets/foldcv.png') and package.recipe.style.header.logo.asset == 'logo'
+    assert not any(asset.role == 'logo' for asset in package.assets)
+    assert package.recipe.style.header.logo is not None and package.recipe.style.header.logo.asset is None
     assert package.recipe.style.footer.text == '' and package.definition.template.name == 'Две колонки'
 
 

@@ -36,7 +36,9 @@ def test_equivalent_yaml_json_keeps_originals_and_compiled_assets(config):
     assert yaml_package.recipe.style.text["body"].size == 10
     assert yaml_package.recipe.layout.regions[1].width == 118.5
     assert yaml_package.recipe.style.footer.text == ""
-    assert {asset.role for asset in yaml_package.assets} == {"font", "logo", "catalog"}
+    # D145: the logo place ships empty; «Шаблоны» adds a logo asset for it.
+    assert {asset.role for asset in yaml_package.assets} == {"font", "catalog"}
+    assert yaml_package.recipe.style.header.logo is not None and yaml_package.recipe.style.header.logo.asset is None
     assert verify_package(yaml_package) == yaml_package
 
 

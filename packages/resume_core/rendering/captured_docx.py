@@ -762,7 +762,8 @@ class CapturedWriter:
             body = self.document.element.body
             if len(body) > 1 and body[-2].tag == qn('w:tbl'):
                 self.spacer(self.document, 1)
-        logo = self.recipe.style.header.logo
+        # A logo place without an asset stays empty (D145).
+        logo = self.recipe.style.header.logo if self.recipe.style.header.logo and self.recipe.style.header.logo.asset else None
         if logo is not None:
             asset = next(asset for asset in self.request.package.assets if asset.id == logo.asset)
             self.logo = decode_logo(asset)

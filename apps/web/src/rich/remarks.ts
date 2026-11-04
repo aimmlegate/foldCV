@@ -69,7 +69,9 @@ function doubtfulCells(facts: FactsInput | undefined): [string, string][] {
 /** What the text marks. A remark marks the fields it names where the document shows them: only inside the blocks Python
  * placed it on when those show them (a skill group remark names its group, not the jobs listing the technology), else
  * everywhere. Without a shown field it marks those blocks, where a named heading stands for its whole section. A remark
- * without targets names no place of its own (Python then lists every imported block) and is not marked. */
+ * without targets names no place of its own (Python then lists every imported block) and is not marked. Nor is a remark
+ * on a value the document no longer shows whose blocks span several sections: they are the lines its value was cited
+ * from, and a rejected technology cites the whole CV (a Kafka version remark marked the summary and every project). */
 export function remarkMarks(document: OutlineDocument, issues: readonly IssueInput[], facts?: FactsInput): RemarkMarks {
   // `shown`: the blocks showing each field.
   const blocks = new Map<string, OutlineBlock>(), sections = new Map<string, string>(), shown = new Map<string, Set<string>>();
@@ -106,6 +108,8 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
       continue;
     }
     const named = issue.blockIds.flatMap(id => { const block = blocks.get(id); return block ? [block] : []; });
+    const valued = issue.targetIds.some(id => remarkRecord(id) !== null);
+    if (valued && new Set(named.map(block => sections.get(block.id) ?? block.id)).size > 1) continue;
     const headings = new Set(named.filter(block => block.type === "heading").map(block => block.id));
     for (const block of named) {
       const heading = sections.get(block.id);

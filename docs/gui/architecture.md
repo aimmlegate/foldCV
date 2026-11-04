@@ -261,7 +261,9 @@ Kept `/v1` routes: `POST /v1/session/exchange`; `/v1/settings/*` (rules, connect
 preferences, limits, import model, fallback model, rewrite reasoning, assistant);
 `POST /v1/host/*` (CLI discovery, status, models, login, model choice, detach,
 install); `GET /v1/rich/template-config` (templates and the default one),
-`/v1/rich/template-config/{templateId}` (GET, PUT) with `/check` and `/reset`, and
+`/v1/rich/template-config/{templateId}` (GET, PUT) with `/check` and `/reset`,
+`/v1/rich/template-config/{templateId}/branding` (GET, PUT: the template's own logo in its logo place and an optional
+footer email, saved as its next revision with the text edited in place; `template_branding.py`, D145), and
 `PUT /v1/rich/template-default` (Settings template editor); `GET /v1/rich/template-assets/{sha}`;
 `GET /v1/rich/template-import` (import availability, templates, default);
 `POST /v1/rich/projects/template-input` and `/template-input/{templateId}` (the upload that
@@ -294,11 +296,11 @@ stall check). Nothing there is durable.
   call (180 s) plus cleanup and 60 s, or when it outlives its captured time limits.
 - The import start may carry `effort`; the capture checks it against the import model's
   catalog efforts (`IMPORT_EFFORT_UNSUPPORTED`) and records it.
-
-- Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
 - Without a chosen effort, imports, rewrites and assistant turns run at the model's default
   from `default_effort` in `packages/resume_core/reasoning.py` (D144): high when the model
   offers levels above high, medium when high is its top, else the CLI's own default.
+
+- Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a
   task that holds one shared inference permit. The start answers 202 at once; an import
   queued behind a sign-in or connection check shows stage `waiting`, and the

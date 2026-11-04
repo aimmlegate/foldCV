@@ -32,8 +32,11 @@ export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | nu
       const remark = remarkOf(target), mark = target?.closest(".fcv-remark");
       if (!remark || !mark) { hideSoon(); return; }
       cancelHide();
-      const rect = mark.getBoundingClientRect();
-      setShown({ ...remark, left: rect.left, top: rect.top, bottom: rect.bottom });
+      // The line under the pointer, not the mark's box: a paragraph's box put the tip under its last line, far from the
+      // words the pointer was on.
+      const rect = [...mark.getClientRects()].find(line => event.clientY >= line.top && event.clientY <= line.bottom)
+        ?? mark.getBoundingClientRect();
+      setShown({ ...remark, left: Math.max(rect.left, event.clientX - 24), top: rect.top, bottom: rect.bottom });
     };
     const leave = () => hideSoon();
     // A press or a selection means the user is at work in the text: the tip gets out of the way at once. A press on the tip

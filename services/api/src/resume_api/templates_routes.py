@@ -14,6 +14,7 @@ from packages.resume_core.templates.store import TemplateRefused, UnknownTemplat
 
 from .extracting import UploadFailure, parse_one_part
 from .host_models import EmptyRequest
+from .template_branding import TemplateBrandingRequest
 from .template_config import (TemplateConfig, TemplateConfigRequest, TemplateCopyRequest, TemplateDefaultRequest,
     TemplateDraftRequest, TemplateSaveRequest)
 from .template_responses import wire_response
@@ -85,6 +86,18 @@ def mount_template_routes(app, *, root, intake, projects, problem):
     async def template_config_save(template_id: str, payload: TemplateSaveRequest):
         def save():
             saved, refused = TemplateConfig(root).save(template_id, payload.text, payload.revision)
+            return config_reply(refused, 422) if refused is not None else saved
+        return await config_call(save, write=True)
+
+    # D145: the template's own logo and footer email, saved as its next revision.
+    @app.get('/v1/rich/template-config/{template_id}/branding')
+    async def template_branding_read(template_id: str):
+        return await config_call(TemplateConfig(root).branding, template_id)
+
+    @app.put('/v1/rich/template-config/{template_id}/branding')
+    async def template_branding_save(template_id: str, payload: TemplateBrandingRequest):
+        def save():
+            saved, refused = TemplateConfig(root).save_branding(template_id, payload)
             return config_reply(refused, 422) if refused is not None else saved
         return await config_call(save, write=True)
 

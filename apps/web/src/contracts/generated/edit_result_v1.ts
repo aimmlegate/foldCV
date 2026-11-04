@@ -101,7 +101,7 @@ export type Width1 = number;
 export type X1 = number;
 export type X2 = number;
 export type Y = number;
-export type Asset = string;
+export type Asset = string | null;
 export type Fit = "contain";
 export type Height = number;
 export type Top = number;
@@ -2300,7 +2300,7 @@ export interface Divider {
   y: Y;
 }
 export interface Logo {
-  asset: Asset;
+  asset?: Asset;
   fit: Fit;
   height: Height;
   top: Top;
