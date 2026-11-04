@@ -32,6 +32,7 @@ export function TaskProgress({ entry, source, busy, stop, retry, close, open }: 
   const finishedAt = running || view.kind === "stalled" ? undefined : Date.parse(entry.task.startedAt) + entry.task.elapsed * 1000;
   const jobs = found?.jobs.filter(job => job.employer || job.role) ?? [];
   const saved = !!found && found.facts > 0;
+  const events = progress?.events ?? [];
   return <section className="progress-screen" aria-label="Импорт резюме"><div className="progress-content">
     <div className="import-progress-heading"><h2>Импорт резюме</h2>
       <Elapsed startedAt={entry.task.startedAt} finishedAt={finishedAt} active={running || view.kind === "stalled"} /></div>
@@ -40,12 +41,12 @@ export function TaskProgress({ entry, source, busy, stop, retry, close, open }: 
       <div className="import-process">
         <ol className="progress-list" aria-label="Этапы импорта">{stages.map((label, position) => {
           const state = position < index ? "done" : position === index ? "current" : "";
+          const note = position !== index ? "" : position === 1 && step ? (current ? `${step} · ${current}` : step)
+            : position === 0 && phase === "queued" ? "В очереди" : "";
           return <li key={label} className={state} aria-current={position === index ? "step" : undefined}>
             <span className="step-indicator" aria-hidden="true">{position < index ? <Icon name="check" />
               : position === index && running ? <Spinner /> : position + 1}</span>
-            <span className="import-stage-copy">{label}
-              {position === 1 && position === index && step && <small>{step}{current && ` · ${current}`}</small>}
-              {position === 0 && position === index && phase === "queued" && <small>В очереди</small>}</span>
+            <span className="import-stage-copy">{label}{note && <small title={note}>{note}</small>}</span>
           </li>;
         })}</ol>
         {running && <>
@@ -71,35 +72,41 @@ export function TaskProgress({ entry, source, busy, stop, retry, close, open }: 
         {view.kind === "succeeded" && <div className="import-problem neutral" role="status"><strong>Импорт завершён</strong>
           <div className="import-problem-actions"><button type="button" className="button primary" disabled={busy} onClick={open}>
             {busy ? "Открываем…" : "Открыть резюме"}</button></div></div>}
-        {progress && progress.events.length > 0 && <section className="import-activity" aria-label="События импорта">
+        {/* Shown from the start of a run: its box appearing with the first event would move the screen. */}
+        {(running || events.length > 0) && <section className="import-activity" aria-label="События импорта">
           <h4>События</h4>
-          <ol>{progress.events.map(event => <li key={`${event.at}:${event.text}`}>
-            <time dateTime={event.at}>{new Date(event.at).toLocaleTimeString("ru-RU")}</time><span>{event.text}</span></li>)}</ol>
+          <ol>{events.length > 0 ? events.map(event => <li key={`${event.at}:${event.text}`}>
+            <time dateTime={event.at}>{new Date(event.at).toLocaleTimeString("ru-RU")}</time><span>{event.text}</span></li>)
+            : <li className="import-activity-empty">Событий пока нет.</li>}</ol>
         </section>}
+        {/* In this column, not under both: the findings beside it grow and would push it down. */}
+        {running && <div className="import-progress-footer"><button type="button" className="text-button" disabled={entry.stopping} onClick={stop}>
+          {entry.stopping && <Spinner />}{entry.stopping ? "Останавливаем…" : "Остановить импорт"}</button>
+          <span>Можно перейти к другому резюме: импорт продолжится.</span></div>}
       </div>
       <section className="import-discoveries" aria-label="Найдено">
         <div className="import-discoveries-heading"><span>{saved ? "Найдено" : "Текст исходника"}</span>
           <Icon name={saved ? "check" : "file"} /></div>
         {saved && found ? <>
-          {(found.name || found.title) && <div className="import-found-candidate">{found.name && <h3>{found.name}</h3>}{found.title && <p>{found.title}</p>}</div>}
+          {/* Kept while the name is not found yet, so a later name moves nothing below it. */}
+          <div className="import-found-candidate">{found.name && <h3>{found.name}</h3>}{found.title && <p>{found.title}</p>}</div>
           <dl className="import-found-counts" aria-live="polite" aria-atomic="true">
             <div><dt>Фактов</dt><dd>{found.facts}</dd></div><div><dt>Мест работы</dt><dd>{found.jobCount}</dd></div>
             <div><dt>Технологий</dt><dd>{found.technologyCount}</dd></div>
           </dl>
-          {jobs.length > 0 && <div className="import-found-group"><h4>Опыт работы</h4><ul className="import-found-jobs">
-            {jobs.map(job => <li key={job.id}><strong>{job.employer || job.role}</strong>{job.employer && job.role && <span>{job.role}</span>}</li>)}
-          </ul>{found.jobCount > jobs.length && <p className="import-found-more">Ещё {found.jobCount - jobs.length}</p>}</div>}
-          {found.technologies.length > 0 && <div className="import-found-group"><h4>Технологии</h4><ul className="import-found-technologies">
-            {found.technologies.map(name => <li key={name}>{name}</li>)}
-          </ul>{found.technologyCount > found.technologies.length && <p className="import-found-more">Ещё {found.technologyCount - found.technologies.length}</p>}</div>}
+          <div className="import-found-groups">
+            {jobs.length > 0 && <div className="import-found-group import-found-jobs-group"><h4>Опыт работы</h4><ul className="import-found-jobs">
+              {jobs.map(job => <li key={job.id}><strong>{job.employer || job.role}</strong>{job.employer && job.role && <span>{job.role}</span>}</li>)}
+            </ul>{found.jobCount > jobs.length && <p className="import-found-more">Ещё {found.jobCount - jobs.length}</p>}</div>}
+            {found.technologies.length > 0 && <div className="import-found-group import-found-technologies-group"><h4>Технологии</h4><ul className="import-found-technologies">
+              {found.technologies.map(name => <li key={name}>{name}</li>)}
+            </ul>{found.technologyCount > found.technologies.length && <p className="import-found-more">Ещё {found.technologyCount - found.technologies.length}</p>}</div>}
+          </div>
         </> : <>
           {source.pages > 0 && <p className="import-source-pages">Страниц с текстом: {source.pages}</p>}
           {source.excerpt && <blockquote className="import-source-excerpt">{source.excerpt}</blockquote>}
         </>}
       </section>
     </div>
-    {running && <div className="import-progress-footer"><button type="button" className="text-button" disabled={entry.stopping} onClick={stop}>
-      {entry.stopping && <Spinner />}{entry.stopping ? "Останавливаем…" : "Остановить импорт"}</button>
-      <span>Можно перейти к другому резюме: импорт продолжится.</span></div>}
   </div></section>;
 }

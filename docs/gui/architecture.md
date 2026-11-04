@@ -296,6 +296,9 @@ stall check). Nothing there is durable.
   catalog efforts (`IMPORT_EFFORT_UNSUPPORTED`) and records it.
 
 - Import (`projects/intake.py`, `projects/imports.py`, `importer/template_pipeline.py`):
+- Without a chosen effort, imports, rewrites and assistant turns run at the model's default
+  from `default_effort` in `packages/resume_core/reasoning.py` (D144): high when the model
+  offers levels above high, medium when high is its top, else the CLI's own default.
   the upload becomes a V7 pre-draft through `repository.create`; the import runs as a
   task that holds one shared inference permit. The start answers 202 at once; an import
   queued behind a sign-in or connection check shows stage `waiting`, and the

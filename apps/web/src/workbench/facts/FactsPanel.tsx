@@ -56,7 +56,8 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       for (let parent = row?.parentElement; parent && parent !== panel.current; parent = parent.parentElement)
         if (parent instanceof HTMLDetailsElement) parent.open = true;
       row?.scrollIntoView({ block: "center", behavior: "smooth" });
-      row?.querySelector<HTMLElement>("button:not(:disabled), input:not(:disabled)")?.focus();
+      // A focus that scrolls stops the smooth scroll in WebKit halfway and leaves the panel unpainted until the next scroll.
+      row?.querySelector<HTMLElement>("button:not(:disabled), input:not(:disabled)")?.focus({ preventScroll: true });
       onFocused?.();
     });
     return () => cancelAnimationFrame(frame);

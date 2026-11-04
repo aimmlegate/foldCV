@@ -1,5 +1,6 @@
-.progress-screen { box-sizing: border-box; align-items: safe center; padding: 36px 40px; }
-.progress-screen .progress-content { max-width: 900px; min-width: 0; margin-block: auto; }
+.progress-screen { box-sizing: border-box; align-items: flex-start; padding: 36px 40px; scrollbar-gutter: stable; }
+/* Top-aligned, not centered: a centered screen moves as a whole whenever a running import adds a line. */
+.progress-screen .progress-content { max-width: 900px; min-width: 0; }
 .import-progress-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
 .import-elapsed { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .progress-screen .progress-content h2 { margin: 18px 0 9px; font-size: 34px; }
@@ -7,7 +8,7 @@
 .import-source-name { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .import-progress-grid { display: grid; grid-template-columns: minmax(200px, .85fr) minmax(0, 1.15fr); gap: 40px; margin-top: 30px; align-items: start; }
 .import-process .progress-list { margin: 0; }
-.import-process .progress-list li { min-height: 24px; padding: 15px 0; color: var(--muted); gap: 12px; font-size: 12px; }
+.import-process .progress-list li { min-height: 24px; padding: 15px 0 19px; color: var(--muted); gap: 12px; font-size: 12px; }
 .import-process .progress-list li.done { color: var(--muted); }
 .import-process .progress-list li.current { color: var(--ink); font-weight: 600; }
 .import-process .step-indicator { box-sizing: border-box; width: 23px; height: 23px; flex: 0 0 23px; border-color: var(--line); }
@@ -20,13 +21,17 @@
 .import-discoveries { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .import-discoveries-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
 .import-discoveries-heading svg { width: 15px; height: 15px; flex-shrink: 0; }
-.import-found-candidate { margin-top: 20px; }
+.import-found-candidate { min-height: 48px; margin-top: 20px; }
 .import-found-candidate h3 { font-size: 18px; font-weight: 600; line-height: 1.4; margin: 0 0 5px; overflow-wrap: anywhere; }
 .import-found-candidate p { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
 .import-found-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 21px 0 0; padding-block: 16px; border-block: 1px solid var(--line); }
 .import-found-counts > div { display: flex; flex-direction: column-reverse; gap: 5px; }
 .import-found-counts dt { color: var(--muted); font-size: 10px; line-height: 1.4; }
 .import-found-counts dd { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1; margin: 0; }
+/* Jobs and technologies keep their own columns: whichever the import saves later moves nothing. */
+.import-found-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; align-items: start; }
+.import-found-jobs-group { grid-column: 1; }
+.import-found-technologies-group { grid-column: 2; }
 .import-found-group { margin-top: 20px; }
 .import-found-group h4 { font-size: 10px; color: var(--muted); font-weight: 500; margin: 0 0 10px; }
 .import-found-jobs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -39,18 +44,20 @@
 .import-discovery-note { font-size: 10px; line-height: 1.7; color: var(--muted); margin: 20px 0 0; }
 .import-source-pages { font-size: 12px; margin: 20px 0 14px; color: var(--muted); }
 .import-source-excerpt { margin: 20px 0 0; padding-left: 14px; border-left: 2px solid var(--line); max-height: 190px; overflow: hidden; white-space: pre-line; color: var(--muted); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
-.import-progress-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 26px; }
+.import-progress-footer { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 20px; }
 .import-progress-footer .text-button { padding: 4px 0; font-size: 12px; }
 .import-progress-footer > span { color: var(--muted); font-size: 10px; line-height: 1.6; }
 @keyframes import-wait { 50% { opacity: .3; } }
 @media (max-width: 1000px) { .progress-screen { padding: 26px; } .import-progress-grid { gap: 24px; grid-template-columns: minmax(170px, .8fr) minmax(0, 1.2fr); } }
-@media (max-width: 700px) { .progress-screen { align-items: flex-start; padding: 24px; } .import-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 22px; } .import-live-message { min-height: 0; margin-top: 14px; } .progress-screen .progress-content h2 { font-size: 29px; } .import-discoveries { padding: 18px; } .import-progress-footer { align-items: flex-start; flex-direction: column; gap: 10px; margin-top: 20px; } }
+@media (max-width: 700px) { .progress-screen { padding: 24px; } .import-progress-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 22px; } .import-live-message { min-height: 0; margin-top: 14px; } .progress-screen .progress-content h2 { font-size: 29px; } .import-discoveries { padding: 18px; } .import-found-groups { grid-template-columns: minmax(0, 1fr); } .import-found-group:is(.import-found-jobs-group, .import-found-technologies-group) { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { .import-activity-dot { animation: none; } }
 .import-progress-heading .operation-elapsed { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-.import-stage-copy { display: grid; gap: 3px; min-width: 0; }
-.import-stage-copy small { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
+/* The stage note hangs in the row's bottom padding on one line: a new step or block keeps every row in place. */
+.import-stage-copy { position: relative; flex: 1; min-width: 0; }
+.import-stage-copy small { position: absolute; top: calc(100% + 3px); left: 0; right: 0; overflow: hidden; color: var(--muted); font-size: 11px;
+  font-weight: 400; line-height: 1.5; white-space: nowrap; text-overflow: ellipsis; }
 .import-rotating { color: var(--accent); font-style: italic; white-space: nowrap; }
-.import-signs { margin: 4px 0 0 15px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.import-signs { min-height: 3.2em; margin: 4px 0 0 15px; color: var(--muted); font-size: 11px; line-height: 1.6; }
 .import-problem { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--danger-line); border-radius: 8px; background: var(--danger-bg); color: var(--danger); }
 .import-problem.neutral { border-color: var(--line); background: var(--wash); color: var(--ink); }
 .import-problem strong { display: block; font-size: 13px; font-weight: 600; }
@@ -63,6 +70,7 @@
 .import-activity ol { display: grid; align-content: start; gap: 6px; height: 140px; margin: 0; padding: 0 6px 0 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; list-style: none; }
 .import-activity li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .import-activity time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.import-activity li.import-activity-empty { display: block; color: var(--muted); }
 .task-notice p { display: grid; gap: 2px; }
 .task-notice-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 /* Feedback item 14: a smaller form; item 12: model, effort and rewrite sit next to «Обработать».

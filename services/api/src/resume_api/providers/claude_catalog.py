@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from packages.resume_core.reasoning import ModelReasoning
+from packages.resume_core.reasoning import ModelReasoning, default_effort
 from resume_api.cli.qualification import Version
 
 
@@ -21,7 +21,7 @@ class CatalogModel:
     def reasoning(self) -> ModelReasoning:
         if self.default_effort is None:
             return ModelReasoning(supported=[], default=None)
-        return ModelReasoning(supported=list(EFFORTS), default=self.default_effort)
+        return ModelReasoning(supported=list(EFFORTS), default=default_effort(EFFORTS, self.default_effort))
 
 
 # Taken from T3's model manifest of 2026-10-21; `ultracode` and `ultrathink` are excluded.

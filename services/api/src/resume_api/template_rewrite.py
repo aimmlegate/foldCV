@@ -42,10 +42,13 @@ class TemplateRewrite:
                 effort = self.preferences.load().rewrite_reasoning_effort if self.preferences else None
             except PreferencesFailure as error:
                 raise ProjectFailure(error.code, 409) from None
-            # A level saved for another model runs at this model's default instead of failing the rewrite.
+            # A level saved for another model runs at this model's default instead of failing the rewrite. The default is
+            # sent, not left to the CLI, whose own default is lower (D144).
             metadata = self.reasoning(selected[1])
             if effort is not None and metadata is not None and effort not in metadata.supported:
                 effort = None
+            if effort is None and metadata is not None:
+                effort = metadata.default
             request = ContentInput(plain_prompt(instruction, source), PlainTextReply, GenerationPolicy(model=selected[1],
                 timeout_seconds=180, allow_repair=False, reasoning_effort=effort))
             def run():

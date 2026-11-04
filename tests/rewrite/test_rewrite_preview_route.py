@@ -82,7 +82,8 @@ def test_a_rewrite_runs_on_the_chosen_rewrite_model_at_a_level_that_model_report
         assert client.put('/v1/settings/rewrite-reasoning', json={'model': 'model-a', 'effort': 'low'}).status_code == 200
         editor = Editor(client, PROJECT)
         preview(editor, request_id='rewrite-a')
-        # A processing model changed elsewhere keeps the saved level; this model lacks it and runs at its default.
+        # A processing model changed elsewhere keeps the saved level; this model lacks it and runs at its default, which is
+        # sent (D144).
         client.post('/v1/host/select', json={'model': 'model-b'})
         preview(editor, request_id='rewrite-b')
         client.post('/v1/host/select', json={'model': 'model-a'})
@@ -90,7 +91,7 @@ def test_a_rewrite_runs_on_the_chosen_rewrite_model_at_a_level_that_model_report
         assert client.put('/v1/settings/rewrite-reasoning', json={'model': 'model-b', 'effort': 'high'}).status_code == 200
         preview(editor, request_id='rewrite-c')
     assert [(request.policy.model, request.policy.reasoning_effort) for request in provider.requests] == [
-        ('model-a', 'low'), ('model-b', None), ('model-b', 'high')]
+        ('model-a', 'low'), ('model-b', 'high'), ('model-b', 'high')]
 
 
 def test_an_unchanged_reply_is_a_preview_without_any_edit(tmp_path):
