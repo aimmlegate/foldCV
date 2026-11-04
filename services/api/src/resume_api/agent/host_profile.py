@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -22,7 +21,7 @@ APP_SERVER_PREFIX = ("app-server", "--strict-config", "--listen", "stdio://")
 
 
 def check_host(package: Path | None = None, *, managed: bool = False) -> None:
-    """The managed runtime keeps its release pins; a user-installed package needs the publisher's
+    """The managed runtime matches its release record (D146); a user-installed package needs the publisher's
     signed host and a manifest that names a qualifying version."""
     host = CODE_MODE_HOST if package is None else package / distribution.HOST
     manifest = PACKAGE_MANIFEST if package is None else package / "codex-package.json"
@@ -31,10 +30,9 @@ def check_host(package: Path | None = None, *, managed: bool = False) -> None:
             if any(part.is_symlink() for part in (path, *path.parents)) or not stat.S_ISREG(path.stat().st_mode):
                 raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
         if managed:
-            for path, digest in ((host, distribution.HOST_SHA256), (manifest, distribution.MANIFEST_SHA256)):
-                with path.open("rb") as stream:
-                    if hashlib.file_digest(stream, "sha256").hexdigest() != digest:
-                        raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
+            runtime = distribution.runtime(package.parent)
+            if not runtime.intact(package, (distribution.HOST, distribution.PACKAGE_MANIFEST)):
+                raise ExperimentalProfileError("AGENT_CODE_MODE_HOST_UNSUPPORTED")
         else:
             require_publisher(host, codex.TEAM_ID, codex.HOST_IDENTIFIER)
             raw = manifest.read_bytes()

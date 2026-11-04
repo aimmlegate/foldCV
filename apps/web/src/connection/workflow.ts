@@ -69,6 +69,19 @@ export function modelProvider(snapshot: ConnectionSnapshot, name: string): Provi
   return snapshot.providers.find(entry => entry.enabled && entry.models.includes(name));
 }
 
+/** Install for a missing or refused CLI, or the update to the newer release the service found (D146). */
+export function installable(entry: ProviderEntry): boolean {
+  const installation = entry.installation;
+  if (!installation?.available || installingStates.includes(installation.state) || entry.state === "login_pending") return false;
+  return ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(entry.state) || installation.update;
+}
+
+/** The sidebar's offer: the providers that are on and have a newer managed release. */
+export function updateNotice(snapshot: ConnectionSnapshot | null): string | null {
+  const names = snapshot?.providers.filter(entry => entry.enabled && entry.installation?.update).map(entry => entry.display) ?? [];
+  return names.length ? `Обновление ${names.join(" и ")}` : null;
+}
+
 /** The sidebar line: the providers connected now, else whether a check is still due. */
 export function connectionSummary(snapshot: ConnectionSnapshot | null): string {
   const on = snapshot?.providers.filter(entry => entry.enabled) ?? [];
@@ -83,14 +96,18 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const release = (value: unknown): boolean => value === null || typeof value === "string" && /^[0-9a-zA-Z.-]{1,60}$/.test(value);
+
 function validInstallation(value: unknown): value is CliInstallation {
   const errors: readonly string[] = ["unsafe_directory", "busy", "cancelled", "unsupported_platform", "download_failed",
-    "invalid_package", "checksum_failed", "install_failed"];
+    "invalid_package", "checksum_failed", "install_failed", "incompatible_release"];
+  // totalBytes stays 0 until the install has found the release it downloads.
   return record(value) && typeof value.state === "string" && ["idle", "downloading", "verifying", "extracting", "ready", "failed", "cancelled"].includes(value.state) &&
     typeof value.downloadedBytes === "number" && Number.isSafeInteger(value.downloadedBytes) && value.downloadedBytes >= 0 &&
-    typeof value.totalBytes === "number" && Number.isSafeInteger(value.totalBytes) && value.totalBytes > 0 &&
-    value.downloadedBytes <= value.totalBytes && typeof value.available === "boolean" &&
-    typeof value.version === "string" && /^[0-9a-zA-Z.-]{1,60}$/.test(value.version) &&
+    typeof value.totalBytes === "number" && Number.isSafeInteger(value.totalBytes) && value.totalBytes >= 0 &&
+    (value.totalBytes === 0 || value.downloadedBytes <= value.totalBytes) && typeof value.available === "boolean" &&
+    release(value.installed) && release(value.latest) && typeof value.update === "boolean" &&
+    (!value.update || value.installed !== null && value.latest !== null) &&
     (value.error === null || typeof value.error === "string" && errors.includes(value.error));
 }
 
@@ -318,10 +335,28 @@ export class ConnectionWorkflow {
     await this.run(kind, "enable", { enabled }, "Could not change the provider. Try again.");
     if (enabled && this.epochs.get(kind) === epoch && !this.activityOf(kind).error && this.entry(kind)?.state === "unchecked") await this.refresh(kind);
   }
+  /** Asks the service for newer releases of the managed CLIs that are on. Quiet: only the offers change, and no
+   * answer means no offer. */
+  async checkReleases(): Promise<void> {
+    for (const item of this.view.snapshot.providers) {
+      if (this.closed) return;
+      if (!item.enabled || !item.installation?.available) continue;
+      try {
+        const snapshot = await this.post("release-check", {}, item.kind);
+        if (this.closed) return;
+        // A check, sign-in or install of this provider may be running: only the release fields are taken.
+        const providers = this.view.snapshot.providers.map(value => {
+          const fresh = snapshot.providers.find(entry => entry.kind === value.kind)?.installation;
+          return fresh && value.installation
+            ? { ...value, installation: { ...value.installation, installed: fresh.installed, latest: fresh.latest, update: fresh.update } } : value;
+        });
+        this.publish({ ...this.view.snapshot, providers }, this.view.activity);
+      } catch { /* No offer without an answer. */ }
+    }
+  }
   async install(kind: ProviderKind): Promise<void> {
     const item = this.entry(kind), installation = item?.installation;
-    if (!item || this.activityOf(kind).pending || !installation?.available || installingStates.includes(installation.state)
-        || !["cli_missing", "launcher_unsupported", "unsupported_version"].includes(item.state)) return;
+    if (!item || this.activityOf(kind).pending || !installation || !installable(item)) return;
     const providers = this.view.snapshot.providers.map(value => value.kind === kind
       ? { ...value, installation: { ...installation, state: "downloading" as const, downloadedBytes: 0, error: null } } : value);
     this.publish({ ...this.view.snapshot, providers }, this.view.activity);

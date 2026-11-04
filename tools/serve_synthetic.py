@@ -31,7 +31,8 @@ from packages.resume_core.storage import atomic_write
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
 from resume_api.app import ProviderSlot, create_app
-from resume_api.cli.installation import ClaudeInstallation
+from resume_api.cli.installation import ClaudeInstallation, MARKER
+from resume_api.cli.releases import RECORD, Record, Release
 from resume_api.connection import Metadata, Quota
 from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
@@ -82,10 +83,11 @@ class ScriptedClaude(ScriptedConnection):
         from resume_api.connection import ConnectionFailure
         if self.installation is not None and not self.installation.executable.is_file():
             raise ConnectionFailure('CLI_MISSING')
+        version = ((self.installation.installed() if self.installation else None) or '2.1.308') + ' (Claude Code)'
         if full and not self.signed_in:
-            raise ConnectionFailure('LOGIN_REQUIRED', '2.1.308 (Claude Code)')
+            raise ConnectionFailure('LOGIN_REQUIRED', version)
         models = ('claude-sonnet-5-5', 'claude-opus-5-5')
-        return Metadata('2.1.308 (Claude Code)', models, 'max', Quota('not_provided'),
+        return Metadata(version, models, 'max', Quota('not_provided'),
             reasoning={name: ModelReasoning(supported=['low', 'medium', 'high'], default='medium') for name in models})
 
 
@@ -100,18 +102,19 @@ class ScriptedProfile:
 
 
 class ScriptedInstallation(ClaudeInstallation):
-    """The managed Claude install with its real staging and checks; the download is a local stub paced for the screen."""
+    """The managed Claude install with its real staging, record and update offer; the release listing and the download
+    are local stubs, the download paced for the screen."""
     STUB = b'#!/bin/sh\nexit 1\n' * 65536
+    NEWEST = '2.1.318'
 
-    @property
-    def size(self):
-        return len(self.STUB)
+    def lookup(self, _fetch):
+        return Release(self.NEWEST, 'https://downloads.claude.ai/claude-code-releases/' + self.NEWEST + '/stub',
+                       len(self.STUB), hashlib.sha256(self.STUB).hexdigest())
 
-    @property
-    def sha256(self):
-        return hashlib.sha256(self.STUB).hexdigest()
+    def publisher(self, _binary):
+        pass
 
-    def download(self, _files, target):
+    def download(self, _files, target, release):
         step = len(self.STUB) // 20
         with target.open('wb') as output:
             for start in range(0, len(self.STUB), step):
@@ -121,12 +124,25 @@ class ScriptedInstallation(ClaudeInstallation):
                 output.flush()
                 self.update(downloadedBytes=target.stat().st_size)
 
+    def place(self, version):
+        """An older stub release in place, as an earlier install leaves it, so Settings offers the update."""
+        package = self.root / version
+        binary = package / 'bin' / 'claude'
+        binary.parent.mkdir(parents=True, mode=0o700)
+        self.root.chmod(0o700)
+        (self.root / MARKER).write_text('foldcv-cli-runtime-v1\n')
+        binary.write_bytes(self.STUB)
+        binary.chmod(0o700)
+        (package / RECORD).write_bytes(Record(version, {'bin/claude': hashlib.sha256(self.STUB).hexdigest()}).encode())
 
-def scripted_claude_slot(root, missing, runtime):
+
+def scripted_claude_slot(root, missing, runtime, outdated=False):
     """The assistant runs the same scripted runtime with Claude active."""
-    if not missing:
+    if not missing and not outdated:
         return ProviderSlot(ScriptedClaude(), profile=ScriptedProfile(root / 'claude-profile'), runtime=runtime)
     installation = ScriptedInstallation(root / 'claude-runtime')
+    if outdated:
+        installation.place('2.1.310')
 
     def rebind(slot, executable):
         return ProviderSlot(slot.connection, None, ScriptedProfile(slot.profile.root, executable), installation,
@@ -394,7 +410,7 @@ async def main(args):
                 experimental_profile=None, connection_adapter=connection, content_provider=content,
                 clock=lambda: datetime.fromisoformat(NOW), agent_runtime=runtime,
                 template_import_call_cap=args.template_call_cap,
-                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime)})
+                provider_slots={'claude_cli': scripted_claude_slot(root, args.claude_missing, runtime, args.claude_update)})
         app.app.state.assistant._fetcher = app.app.state.template_assistant._fetcher = web
     repository = app.app.state.projects.repository
     if args.template_call_cap is not None and not args.reopen:
@@ -459,6 +475,8 @@ if __name__ == '__main__':
     parser.add_argument('--template-call-cap', type=int, default=None)
     # Claude starts without a CLI and Settings installs a stub through the managed installer.
     parser.add_argument('--claude-missing', action='store_true')
+    # Claude starts with an older stub release installed, so Settings offers the update to the stub's newest one.
+    parser.add_argument('--claude-update', action='store_true')
     # Seconds each scripted template call waits before its reply, to watch a running import in the preview.
     parser.add_argument('--template-delay', type=float, default=0.0)
     # Native assistant runs on the user's Codex sign-in, charged to the SR08 ledger (at most LIVE_LIMIT starts).

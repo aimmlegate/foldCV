@@ -102,14 +102,15 @@ test("save status and installation render descriptions without error codes in vi
     expand: () => {}, status: "PROJECT_SAVE_FAILED", ready: true, busy: false, save: () => {}, exportFile: () => {}, retrySave: () => {} }));
   assert.ok(!header.includes("PROJECT_SAVE_FAILED")); assert.match(header, /Не сохранено/u); assert.match(header, /сохранить/u);
   const installation = renderToStaticMarkup(createElement(Installation, { value: { available: true, state: "failed",
-    version: "0.0.0", downloadedBytes: 0, totalBytes: 0, error: "download_failed" }, display: "Codex" }));
+    installed: null, latest: null, update: false, downloadedBytes: 0, totalBytes: 0, error: "download_failed" }, display: "Codex" }));
   assert.ok(!installation.includes("download_failed")); assert.match(installation, /скачать/u);
 });
 
 test("installation failures of any provider never name another one", () => {
-  for (const error of ["busy", "unsafe_directory", "unsupported_platform", "download_failed", "checksum_failed", "invalid_package", "install_failed"] as const) {
+  for (const error of ["busy", "unsafe_directory", "unsupported_platform", "download_failed", "checksum_failed", "invalid_package", "install_failed",
+    "incompatible_release"] as const) {
     const card = renderToStaticMarkup(createElement(Installation, { value: { available: true, state: "failed",
-      version: "0.0.0", downloadedBytes: 0, totalBytes: 1, error }, display: "Claude" }));
+      installed: null, latest: null, update: false, downloadedBytes: 0, totalBytes: 1, error }, display: "Claude" }));
     assert.ok(!card.includes("Codex"), error);
   }
   for (const code of ["INSTALL_NOT_AVAILABLE", "LOGIN_NOT_AVAILABLE"]) assert.ok(!knownErrorMessage(code)?.includes("Codex"), code);

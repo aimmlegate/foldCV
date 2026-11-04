@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,10 +12,11 @@ from packages.resume_core import host
 from resume_api.cli import profile as codex
 from resume_api.cli.profile import overrides
 from resume_api.cli.qualification import QualificationError, require_publisher
+from resume_api.cli.releases import Runtime
 from . import distribution
 
 
-# Only the runtime FoldCV downloaded keeps hash pins; a user-installed CLI is qualified by its
+# The runtime FoldCV downloaded is checked against its release record; a user-installed CLI is qualified by its
 # publisher signature and the version table (multi-provider plan section 5).
 BINARY = Path("/Users/fostral/.codex/plugins/.plugin-appserver/codex-cli/CodexCLI.app/Contents/MacOS/codex")
 SYSTEM_SKILLS = ("imagegen", "openai-docs", "skill-creator", "skill-installer")
@@ -73,8 +73,14 @@ class ExperimentalCliProfile:
     executable: Path = BINARY
 
     @property
+    def runtime(self) -> Runtime:
+        """FoldCV's managed runtime beside this profile (`cli-runtime`)."""
+        return distribution.runtime(Path(os.path.abspath(self.root)).parent / "cli-runtime")
+
+    @property
     def managed(self) -> bool:
-        return self.executable == distribution.managed_executable(self.root.parent / "cli-runtime")
+        """A release FoldCV installed: its directory under the runtime holds a record (D146)."""
+        return self.executable != BINARY and self.runtime.package_of(Path(os.path.abspath(self.executable))) is not None
 
     @property
     def package_root(self) -> Path:
@@ -133,9 +139,8 @@ class ExperimentalCliProfile:
             except QualificationError:
                 raise ExperimentalProfileError("CLI_UNSUPPORTED") from None
             return
-        with self.executable.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        if digest != distribution.CLI_SHA256:
+        package = self.runtime.package_of(Path(os.path.abspath(self.executable)))
+        if package is None or not self.runtime.intact(package, (distribution.CLI,)):
             raise ExperimentalProfileError("CLI_UNSUPPORTED")
 
     def config(self, operation: Path) -> list[str]:

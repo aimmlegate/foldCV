@@ -1,6 +1,6 @@
 import { errorMessage } from "../errors/messages";
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
-import { ConnectionWorkflow, connectionSummary, type ConnectionView } from "../connection/workflow";
+import { ConnectionWorkflow, connectionSummary, updateNotice, type ConnectionView } from "../connection/workflow";
 import { TemplateEditor } from "../rich/TemplateEditor";
 import { AssistantDrawer } from "../assistant/Drawer";
 import { useResumeWorkspace } from "./useResumeWorkspace";
@@ -46,7 +46,11 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
   const [connection, setConnection] = useState<ConnectionView | null>(null);
   const [visited, setVisited] = useState<ReadonlySet<Screen>>(() => new Set()), [fileMode, setFileMode] = useState<FileMode | null>(null);
   const onResume = screen === "resume";
-  useEffect(() => { const workflow = new ConnectionWorkflow(setConnection); void workflow.peek(); return () => workflow.close(); }, []);
+  useEffect(() => {
+    const workflow = new ConnectionWorkflow(setConnection);
+    void workflow.peek().then(() => workflow.checkReleases());
+    return () => workflow.close();
+  }, []);
   // The import screen shows only inside the importing resume; other resumes open and edit meanwhile.
   const shownImport = shown ? imports.get(shown.workspace.projectId) : undefined;
   const view = !template ? "source" : template.response.workspace.project ? "editor" : shownImport ? "template_progress" : "pre_draft";
@@ -86,7 +90,7 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       handle={<PanelHandle className="history-handle" label="Ширина списка резюме" axis="x" sign={1} value={historyWidth ?? (innerWidth <= 1280 ? 187 : 208)}
         minimum={historyWidths.minimum} maximum={historyWidths.maximum} change={changeHistoryWidth} reset={() => changeHistoryWidth(null)} />}
       fresh={() => { void fresh(); if (innerWidth <= 600) setCollapsed(true); }} open={navigate} remove={remove} archive={archive} openFile={() => openFile("open")} settings={openSettings} templates={() => openScreen("templates")}
-      connection={connectionSummary(connection?.snapshot ?? null)} error={error} />
+      connection={connectionSummary(connection?.snapshot ?? null)} update={updateNotice(connection?.snapshot ?? null)} error={error} />
     <section className="main-area">
       <Header title={screenTitle(screen, shown?.identity?.title ?? shown?.workspace.title ?? (workspace.loading ? "Открываем резюме…" : "Новое резюме"))}
         subtitle={!onResume ? APP_NAME : shown?.identity?.subtitle || "Рабочий документ"} collapsed={collapsed} expand={() => setCollapsed(false)} status={status}

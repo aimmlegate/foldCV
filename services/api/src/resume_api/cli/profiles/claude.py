@@ -12,7 +12,9 @@ from pathlib import Path
 import shutil
 
 from packages.resume_core import host
-from resume_api.cli.qualification import Compatibility
+from resume_api.cli import claude_distribution, qualification
+from resume_api.cli.qualification import Compatibility, QualificationError
+from resume_api.cli.releases import Runtime
 
 
 KIND = "claude_cli"
@@ -104,6 +106,25 @@ class ClaudeCliProfile:
     def windows_home(self) -> Path:
         """Home and app data of the CLI on Windows, so it does not read or write the user's own."""
         return self.root / "home"
+
+    @property
+    def runtime(self) -> Runtime:
+        """FoldCV's managed runtime beside this profile (`cli-runtime-claude_cli`)."""
+        return claude_distribution.runtime(Path(os.path.abspath(self.root)).parent / ("cli-runtime-" + KIND))
+
+    @property
+    def managed(self) -> bool:
+        return self.runtime.package_of(Path(os.path.abspath(self.executable))) is not None
+
+    def check_binary(self) -> None:
+        """macOS: the binary Anthropic signed, of any version. Windows has no codesign check, so only FoldCV's managed
+        copy runs there, and only while it is the file its signed manifest named (D146)."""
+        if not host.WINDOWS:
+            qualification.require_publisher(self.executable, TEAM_ID, IDENTIFIER)
+            return
+        package = self.runtime.package_of(Path(os.path.abspath(self.executable)))
+        if package is None or not self.runtime.intact(package):
+            raise QualificationError("CLI_UNSUPPORTED")
 
     def prepare(self) -> None:
         if self.root.exists() and not (self.root / MARKER).is_file():

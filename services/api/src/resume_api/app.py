@@ -29,6 +29,7 @@ from .lifecycle import OperationFiles, SpikeError, has_blocked_owned, reap_owned
 from .connection import ConnectionAdapter, ConnectionFailure, Metadata
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import CliInstallation
+from . import release_checks
 from .cli.profiles.claude import ClaudeProfileError
 from .providers.codex_cli import CodexCliProvider
 from .providers.registry import DESCRIPTORS, ProviderRegistry, discovered
@@ -59,7 +60,7 @@ MODEL_STOP_SECONDS = 65
 USABLE_QUOTA = frozenset({"available", "not_provided"})
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
                             "host/select", "host/cancel-login", "host/install", "host/cancel-install",
-                            "host/enable", "host/login-code"})
+                            "host/release-check", "host/enable", "host/login-code"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 TEMPLATE_ASSISTANT_PATH = "/v2/templates/assistant/"
@@ -305,7 +306,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                                                           experimental_profile=experimental_profile)
     provider = (CodexCliProvider(experimental_profile.executable, experimental_profile=experimental_profile)
                 if experimental_profile else None)
-    installation = CliInstallation(experimental_profile.root.parent / "cli-runtime") if experimental_profile else None
+    installation = (CliInstallation(experimental_profile.root.parent / "cli-runtime",
+                                    qualify=release_checks.codex(experimental_profile.root))
+                    if experimental_profile else None)
     connection_epoch = 0
     connection_namespace = secrets.token_hex(12)
 
@@ -882,8 +885,10 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 return connection_response(kind)
             if job == "login" and states[kind].state != "login_required":
                 return problem("LOGIN_NOT_AVAILABLE", 409, "host")
-            if job == "install" and (installation is None or states[kind].state not in {
-                    "cli_missing", "unsupported_version", "launcher_unsupported"}):
+            # An install puts the newest release in place: for a missing or refused CLI, or as the update Settings
+            # offers once a newer release is found (D146).
+            if job == "install" and (installation is None or kind in login_tasks or (states[kind].state not in {
+                    "cli_missing", "unsupported_version", "launcher_unsupported"} and not installation.snapshot()["update"])):
                 return problem("INSTALL_NOT_AVAILABLE", 409, "host")
             # Beside the provider's own sign-in or install a check starts nothing: the reply is that job's state.
             if job not in {"login", "install"} and (kind in login_tasks or kind in install_tasks):
@@ -1099,6 +1104,48 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             return problem("INSTALL_NOT_AVAILABLE", 409, "host")
         return await connection_job("install", kind, lambda files, _cancel: installation.install(files))
 
+    release_lookups: dict[str, asyncio.Task] = {}
+
+    async def release_check(payload: HostRequest):
+        """Looks for a newer release of the managed CLI through the publisher's release listing; no CLI runs, no model
+        work stops. One look serves every request while it runs."""
+        kind, refused = target(payload)
+        if refused:
+            return refused
+        installation = slots[kind].installation
+        async with gate:
+            if installation is None or not installation.snapshot()["available"] or kind in install_tasks:
+                return connection_response(kind)
+            task = release_lookups.get(kind)
+            if task is None:
+                files, cancel = OperationFiles(temp_root), threading.Event()
+
+                def look():
+                    with files.open():
+                        installation.check(files, cancel)
+
+                task = asyncio.create_task(asyncio.to_thread(look))
+                release_lookups[kind] = task
+                operations[task] = files
+                connection_work[task] = (files, cancel)
+
+                def finished(done: asyncio.Task, kind=kind) -> None:
+                    if not done.cancelled() and isinstance(done.exception(), SpikeError):
+                        lifecycle_code(done.exception())
+                    operations.pop(done, None)
+                    connection_work.pop(done, None)
+                    if release_lookups.get(kind) is done:
+                        del release_lookups[kind]
+                task.add_done_callback(finished)
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        async with gate:
+            return connection_response(kind)
+
     async def cancel_install(payload: HostRequest):
         nonlocal connection_epoch
         kind, refused = target(payload)
@@ -1220,6 +1267,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     for path, handler in (("discover", discover), ("status", status), ("models", models),
                           ("login", login), ("select", select), ("detach", detach),
                           ("cancel-login", cancel_login), ("install", install_cli), ("cancel-install", cancel_install),
+                          ("release-check", release_check),
                           ("enable", enable), ("login-code", send_login_code)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ConnectionWorkflow, connectionSummary, modelGroups, validConnection, type ConnectionSnapshot } from "../src/connection/workflow";
+import { ConnectionWorkflow, connectionSummary, installable, modelGroups, updateNotice, validConnection, type ConnectionSnapshot,
+  type ProviderEntry } from "../src/connection/workflow";
 import { errorMessage } from "../src/errors/messages";
 
 type Entry = Record<string, unknown> & { kind: string; enabled: boolean; metadataReady: boolean; models: string[] };
@@ -289,7 +290,7 @@ test("cleanup block from detach survives a late stale status response", async ()
   assert.equal(workflow.view.error, null);
 });
 
-const installation = { state: "idle", available: true, version: "0.162.0-alpha.17.2", downloadedBytes: 0,
+const installation = { state: "idle", available: true, installed: null, latest: null, update: false, downloadedBytes: 0,
   totalBytes: 132097637, error: null };
 const missingCodex: Entry = { ...codex, ...off, state: "cli_missing", installation };
 const missing = reply([missingCodex], "codex_cli", { experimentalMode: true });
@@ -298,9 +299,14 @@ const withCodex = (change: Record<string, unknown>) => reply([{ ...missingCodex,
 test("installation validates bounded progress and rejects unsafe server values", () => {
   assert.equal(validConnection(missing), true);
   for (const broken of [{ downloadedBytes: -1 }, { downloadedBytes: installation.totalBytes + 1 },
-    { totalBytes: 0 }, { downloadedBytes: Infinity }, { available: "yes" }, { version: "../../cli" }, { error: "<html>" }, { error: "unknown_error" }]) {
-    assert.equal(validConnection(withCodex({ installation: { ...installation, ...broken } })), false);
+    { totalBytes: -1 }, { downloadedBytes: Infinity }, { available: "yes" }, { installed: "../../cli" }, { latest: 7 }, { update: "yes" },
+    { update: true, latest: "0.166.0" }, { error: "<html>" }, { error: "unknown_error" }]) {
+    assert.equal(validConnection(withCodex({ installation: { ...installation, ...broken } })), false, JSON.stringify(broken));
   }
+  // Before the install has found its release the size is 0.
+  assert.equal(validConnection(withCodex({ installation: { ...installation, state: "downloading", totalBytes: 0 } })), true);
+  assert.equal(validConnection(withCodex({ installation: { ...installation, installed: "0.162.0-alpha.17.2", latest: "0.166.0",
+    update: true, error: "incompatible_release" } })), true);
 });
 
 test("successful installation refreshes native login without restarting", async () => {
@@ -400,4 +406,55 @@ test("returning to settings resumes installation progress and refreshes complete
     assert.equal(workflow.entry("codex_cli")?.state, "login_required");
     assert.deepEqual(calls, ["/v1/settings/connection", "/v1/settings/connection", "/v1/host/status"]);
   } finally { workflow.close(); }
+});
+
+const outdated = { ...installation, installed: "2.1.308", latest: "2.1.318", update: true };
+const connectedClaude: Entry = { ...claude, installation: outdated };
+
+test("a newer release is offered as an update of a connected provider and named in the sidebar", () => {
+  assert.equal(installable(connectedClaude as ProviderEntry), true);
+  assert.equal(installable({ ...connectedClaude, installation: { ...outdated, update: false } } as ProviderEntry), false);
+  assert.equal(installable({ ...connectedClaude, state: "login_pending" } as ProviderEntry), false);
+  assert.equal(installable({ ...connectedClaude, installation: { ...outdated, state: "downloading" } } as ProviderEntry), false);
+  assert.equal(installable({ ...connectedClaude, installation: { ...outdated, available: false } } as ProviderEntry), false);
+  assert.equal(updateNotice(reply([codex, connectedClaude]) as ConnectionSnapshot), "Обновление Claude");
+  assert.equal(updateNotice(reply([codex, { ...connectedClaude, enabled: false }]) as ConnectionSnapshot), null);
+  assert.equal(updateNotice(null), null);
+});
+
+test("release checks ask only for providers that are on with a managed install and take only the release fields", async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  const managed = { ...claude, installation: { ...installation, installed: "2.1.308" } };
+  const request: typeof fetch = (input, init) => {
+    const path = String(input);
+    calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null });
+    if (path.endsWith("/connection")) return Promise.resolve(response(reply([codex, managed])));
+    // The reply also names a state the screen did not ask about; only the offer may change.
+    return Promise.resolve(response(reply([codex, { ...managed, state: "metadata_failed", installation: outdated }], "claude_cli")));
+  };
+  const workflow = new ConnectionWorkflow(() => {}, request);
+  await workflow.peek(false);
+  await workflow.checkReleases();
+  assert.deepEqual(calls.map(call => [call.path, call.body]), [["/v1/settings/connection", null],
+    ["/v1/host/release-check", { provider: "claude_cli" }]]);
+  assert.equal(workflow.entry("claude_cli")?.state, "connected");
+  assert.deepEqual(workflow.entry("claude_cli")?.installation, { ...managed.installation, latest: "2.1.318", update: true });
+});
+
+test("an update installs over a connected provider and checks it again", async () => {
+  const calls: string[] = [];
+  const workflow = new ConnectionWorkflow(() => {}, input => {
+    const path = String(input);
+    calls.push(path);
+    if (path.endsWith("/install")) return Promise.resolve(response(reply([codex, { ...claude, state: "unchecked",
+      installation: { ...outdated, state: "ready", installed: "2.1.318", update: false } }], "claude_cli")));
+    if (path.endsWith("/status")) return Promise.resolve(response(reply([codex, { ...claude,
+      installation: { ...outdated, state: "ready", installed: "2.1.318", update: false } }], "claude_cli")));
+    return Promise.resolve(response(reply([codex, connectedClaude])));
+  });
+  await workflow.peek(false);
+  await workflow.install("claude_cli");
+  assert.deepEqual(calls, ["/v1/settings/connection", "/v1/host/install", "/v1/host/status"]);
+  assert.equal(workflow.entry("claude_cli")?.state, "connected");
+  assert.equal(workflow.entry("claude_cli")?.installation?.installed, "2.1.318");
 });

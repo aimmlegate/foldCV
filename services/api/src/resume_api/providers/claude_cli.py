@@ -288,27 +288,41 @@ class ClaudeCliProvider:
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
         end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
+        version = self._version(files, cancel, end)
+        try:
+            return self._qualified(files, cancel, end, version, self._capable(files, cancel, end, version))
+        except ContentFailure as error:
+            error.version = str(version) if len(str(version)) <= 80 else None
+            raise
+
+    def capabilities(self, files: OperationFiles, cancel: threading.Event,
+                     end: float) -> tuple[qualification.Version, str]:
+        """What the probe checks before any account read; a new release passes it before it replaces the installed
+        one (D146)."""
+        version = self._version(files, cancel, end)
+        try:
+            return version, self._capable(files, cancel, end, version)
+        except ContentFailure as error:
+            error.version = str(version) if len(str(version)) <= 80 else None
+            raise
+
+    def _version(self, files: OperationFiles, cancel: threading.Event, end: float) -> qualification.Version:
         fixture = self.fixture_transport is not None and self.fixture_transport.executable.absolute() == self.executable
         if not fixture:
             if self.profile is None:
                 raise ContentFailure("CLI_PROFILE_UNSAFE")
             try:
-                qualification.require_publisher(self.executable, profile_rules.TEAM_ID, profile_rules.IDENTIFIER)
+                self.profile.check_binary()
             except qualification.QualificationError as error:
                 raise ContentFailure(error.code) from None
         try:
             raw, _ = self._run(files, ("--version",), end, cancel)
-            version = qualification.Version.parse(raw.decode("utf-8", "strict"))
+            return qualification.Version.parse(raw.decode("utf-8", "strict"))
         except (ProcessExit, UnicodeError, qualification.QualificationError):
             raise ContentFailure("CLI_UNSUPPORTED") from None
-        try:
-            return self._qualified(files, cancel, end, version)
-        except ContentFailure as error:
-            error.version = str(version) if len(str(version)) <= 80 else None
-            raise
 
-    def _qualified(self, files: OperationFiles, cancel: threading.Event, end: float,
-                   version: qualification.Version) -> Probe:
+    def _capable(self, files: OperationFiles, cancel: threading.Event, end: float,
+                 version: qualification.Version) -> str:
         try:
             raw_help, _ = self._run(files, ("--help",), end, cancel)
         except ProcessExit:
@@ -318,6 +332,10 @@ class ClaudeCliProvider:
         missing = qualification.missing_flags(raw_help.decode("utf-8", "replace"), profile_rules.REQUIRED_FLAGS)
         if status == "broken" or missing:
             raise ContentFailure("CLI_UNSUPPORTED")
+        return status
+
+    def _qualified(self, files: OperationFiles, cancel: threading.Event, end: float,
+                   version: qualification.Version, status: str) -> Probe:
         try:
             stdout, _ = self._run(files, ("auth", "status", "--json"), end, cancel)
         except ProcessExit as error:

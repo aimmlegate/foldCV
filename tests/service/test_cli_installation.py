@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import hashlib
 import gzip
 import io
+import json
 from pathlib import Path
 import shutil
 import sys
@@ -16,10 +17,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
+from resume_api import release_checks
 from resume_api.app import create_app
 from resume_api.cli import distribution as release
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, installed_profile
 from resume_api.cli.installation import CliInstallation, InstallationFailure, MARKER
+from resume_api.cli.releases import Release
 from resume_api.connection import ConnectionAdapter, Metadata, Quota
 from resume_api.lifecycle import OperationFiles
 from tests.settings.test_providers import running_rewrite
@@ -28,25 +31,50 @@ ORIGIN = "http://127.0.0.1:39281"
 SECRET = "synthetic-cli-installation-0123456789"
 
 
-@pytest.fixture
-def package(tmp_path, monkeypatch):
-    payloads = {"bin/codex": b"synthetic-codex", "bin/codex-code-mode-host": b"synthetic-host",
-                "codex-package.json": b"synthetic-manifest"}
-    archive = tmp_path / "source.tar.gz"
+VERSION = "0.166.0"
+
+
+def manifest(version=VERSION, **changes):
+    return (json.dumps({"layoutVersion": 1, "version": version, "target": release.TARGET, "variant": "codex",
+                        "entrypoint": release.CLI, **changes}) + "\n").encode()
+
+
+def write_package(archive, payloads):
     with tarfile.open(archive, "w:gz") as target:
         for name, value in payloads.items():
             member = tarfile.TarInfo(name)
             member.size = len(value)
             member.mode = 0o755 if name.startswith("bin/") else 0o644
             target.addfile(member, io.BytesIO(value))
-    for name, value in (("ARCHIVE_BYTES", archive.stat().st_size),
-                        ("ARCHIVE_SHA256", hashlib.sha256(archive.read_bytes()).hexdigest()),
-                        ("CLI_SHA256", hashlib.sha256(payloads["bin/codex"]).hexdigest()),
-                        ("HOST_SHA256", hashlib.sha256(payloads["bin/codex-code-mode-host"]).hexdigest()),
-                        ("MANIFEST_SHA256", hashlib.sha256(payloads["codex-package.json"]).hexdigest())):
-        monkeypatch.setattr(release, name, value)
-    monkeypatch.setattr(CliInstallation, "download", lambda _self, _files, destination: shutil.copyfile(archive, destination))
-    return archive, payloads
+
+
+class Listing:
+    """GitHub's latest release, served from a local archive; `publish` replaces it."""
+
+    def __init__(self, archive):
+        self.archive = archive
+        self.current = None
+
+    def publish(self, payloads, version=VERSION):
+        write_package(self.archive, payloads)
+        self.current = Release(version, release.DOWNLOAD_URL + "rust-v" + version + "/" + release.package_name(),
+                               self.archive.stat().st_size, hashlib.sha256(self.archive.read_bytes()).hexdigest())
+
+
+@pytest.fixture
+def package(tmp_path, monkeypatch):
+    """A synthetic package published as the newest release; its signature and capability checks are tested on their
+    own."""
+    payloads = {release.CLI: b"synthetic-codex", release.HOST: b"synthetic-host",
+                release.PACKAGE_MANIFEST: manifest()}
+    listing = Listing(tmp_path / "source.tar.gz")
+    listing.publish(payloads)
+    monkeypatch.setattr(CliInstallation, "lookup", lambda _self, _fetch: listing.current)
+    monkeypatch.setattr(CliInstallation, "download",
+                        lambda _self, _files, destination, _release: shutil.copyfile(listing.archive, destination))
+    monkeypatch.setattr(CliInstallation, "publisher", lambda _self, _package: None)
+    monkeypatch.setattr(release_checks, "codex", lambda _root: None)
+    return listing.archive, payloads, listing
 
 
 def install(installer, tmp_path):
@@ -77,7 +105,8 @@ def test_failed_download_keeps_previous_runtime(package, tmp_path, monkeypatch, 
     assert install(installer, tmp_path)
     original = installer.executable.read_bytes()
     if damage == "checksum":
-        monkeypatch.setattr(release, "ARCHIVE_SHA256", "0" * 64)
+        listing = package[2]
+        listing.current = Release(VERSION, listing.current.url, listing.current.size, "0" * 64)
     elif damage == "truncated":
         package[0].write_bytes(b"truncated")
     elif damage == "network":
@@ -161,14 +190,26 @@ def test_cancel_during_verification_or_extraction_keeps_previous(package, tmp_pa
     assert installer.executable.read_bytes() == original
 
 
-def test_package_failure_and_publish_failure_preserve_previous(package, tmp_path, monkeypatch):
+@pytest.mark.parametrize("change", [{"version": "0.165.0"}, {"variant": "codex-provisioned"}, {"target": "x86_64-unknown-linux-musl"},
+                                    {"entrypoint": "bin/other"}, {"host": None}, {"record": True}])
+def test_package_failure_and_publish_failure_preserve_previous(package, tmp_path, monkeypatch, change):
     installer = CliInstallation(tmp_path / "runtime")
     assert install(installer, tmp_path)
     original = installer.executable.read_bytes()
-    monkeypatch.setattr(release, "HOST_SHA256", "0" * 64)
+    _archive, payloads, listing = package
+    broken = dict(payloads)
+    if "host" in change:
+        del broken[release.HOST]
+    elif "record" in change:
+        # A package may not bring FoldCV's record of itself.
+        broken["foldcv-release.json"] = b"{}"
+    else:
+        broken[release.PACKAGE_MANIFEST] = manifest(**change)
+    listing.publish(broken)
     assert install(installer, tmp_path) is None
+    assert installer.snapshot()["error"] == "invalid_package"
     assert installer.executable.read_bytes() == original
-    monkeypatch.setattr(release, "HOST_SHA256", hashlib.sha256(b"synthetic-host").hexdigest())
+    listing.publish(payloads)
     rename = Path.rename
     def fail_staging(path, target):
         if path.name.startswith(".staging-"):
@@ -205,7 +246,7 @@ class InstalledMetadata(ConnectionAdapter):
         if not self.executable.is_file():
             from resume_api.connection import ConnectionFailure
             raise ConnectionFailure("CLI_MISSING")
-        return Metadata("codex-cli " + release.RELEASE, ("gpt-6-luna",), "plus", Quota("available", 25, 1800000000))
+        return Metadata("codex-cli " + VERSION, ("gpt-6-luna",), "plus", Quota("available", 25, 1800000000))
 
 
 def make_app(tmp_path):
@@ -243,7 +284,7 @@ async def test_install_routes_require_session_and_connect_without_restart(packag
 @pytest.mark.parametrize("action", ["cancel-install", "detach"])
 async def test_cancellation_stops_download_and_discards_late_completion(package, tmp_path, monkeypatch, action):
     started = threading.Event()
-    def wait_for_cancel(installer, files, archive):
+    def wait_for_cancel(installer, files, archive, _release):
         started.set()
         assert installer.cancel.wait(3)
         installer.check_cancel()
@@ -318,3 +359,82 @@ def test_discovery_rechecks_path_after_external_install(tmp_path, monkeypatch):
     cli.write_bytes(b"native binary fixture")
     selected[0] = str(cli)
     assert adapter._launcher() == (cli, ())
+
+
+def test_a_newer_codex_release_replaces_the_installed_package(package, tmp_path):
+    _archive, payloads, listing = package
+    listing.publish({**payloads, release.PACKAGE_MANIFEST: manifest("0.165.0")}, "0.165.0")
+    installer = CliInstallation(tmp_path / "cli-runtime")
+    assert install(installer, tmp_path) == installer.root / "0.165.0" / release.CLI
+    newer = {**payloads, release.CLI: b"synthetic-codex 0.166.0"}
+    listing.publish(newer)
+    installer.found_at = None
+    with OperationFiles(tmp_path / "operations").open() as files:
+        installer.check(files, threading.Event())
+    assert (installer.snapshot()["installed"], installer.snapshot()["latest"], installer.snapshot()["update"]) == (
+        "0.165.0", VERSION, True)
+    assert install(installer, tmp_path) == installer.root / VERSION / release.CLI
+    assert installer.executable.read_bytes() == newer[release.CLI]
+    assert not (installer.root / "0.165.0").exists()
+    profile = ExperimentalCliProfile(tmp_path / "cli-profile", installer.executable)
+    assert profile.managed
+    profile.check_binary()
+
+
+def test_the_package_pinned_before_updates_still_counts(tmp_path, monkeypatch):
+    runtime = tmp_path / "cli-runtime"
+    payloads = {release.CLI: b"pinned codex", release.HOST: b"pinned host", release.PACKAGE_MANIFEST: b"{}"}
+    for name, value in payloads.items():
+        path = runtime / release.RELEASE / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(value)
+    (runtime / release.RELEASE / release.CLI).chmod(0o700)
+    for attribute, name in (("CLI_SHA256", release.CLI), ("HOST_SHA256", release.HOST),
+                            ("MANIFEST_SHA256", release.PACKAGE_MANIFEST)):
+        monkeypatch.setattr(release, attribute, hashlib.sha256(payloads[name]).hexdigest())
+    installer = CliInstallation(runtime)
+    assert installer.installed() == release.RELEASE and installer.executable == runtime / release.RELEASE / release.CLI
+    assert installed_profile(tmp_path / "cli-profile", managed_only=True).managed
+
+
+def test_on_macos_the_package_must_carry_openais_signature(tmp_path, monkeypatch):
+    from resume_api.cli import qualification
+    from resume_api.cli.profile import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
+    signed = []
+
+    def publisher(path, team, identifier):
+        signed.append((path.name, team, identifier))
+        if path.name.startswith("codex-code-mode-host"):
+            raise qualification.QualificationError("CLI_UNSUPPORTED")
+    monkeypatch.setattr("resume_api.cli.installation.require_publisher", publisher)
+    monkeypatch.setattr("resume_api.cli.installation.host.WINDOWS", False)
+    with pytest.raises(InstallationFailure, match="invalid_package"):
+        CliInstallation(tmp_path / "runtime").publisher(tmp_path / "package")
+    assert signed == [(Path(release.CLI).name, TEAM_ID, IDENTIFIER), (Path(release.HOST).name, TEAM_ID, HOST_IDENTIFIER)]
+
+
+@pytest.mark.parametrize(("failure", "code"), [
+    (None, None), ("banner", "incompatible_release"), ("UNSUPPORTED_VERSION", "incompatible_release"),
+    ("CLI_FAILED", "incompatible_release"), ("CANCELLED", "cancelled"), ("DEADLINE_EXCEEDED", "install_failed"),
+    ("CLI_PROFILE_UNSAFE", "install_failed"),
+])
+def test_the_codex_capability_check_refuses_only_what_the_cli_cannot_do(tmp_path, monkeypatch, failure, code):
+    from resume_api.connection import ConnectionFailure
+    checked = []
+
+    def version(_adapter, _files, _cancel, _deadline):
+        if failure not in {None, "banner"}:
+            raise ConnectionFailure(failure)
+        return "codex-cli 0.165.0" if failure == "banner" else "codex-cli " + VERSION
+    monkeypatch.setattr(ConnectionAdapter, "version", version)
+    monkeypatch.setattr(ConnectionAdapter, "check_profile", lambda *_args: checked.append("profile"))
+    monkeypatch.setattr(release_checks, "check_host", lambda package, managed: checked.append(("host", managed)))
+    qualify = release_checks.codex(tmp_path / "cli-profile")
+    executable = tmp_path / "cli-runtime" / VERSION / release.CLI
+    if code is None:
+        qualify(None, executable, VERSION, threading.Event())
+        assert checked == ["profile", ("host", True)]
+        return
+    with pytest.raises(InstallationFailure) as raised:
+        qualify(None, executable, VERSION, threading.Event())
+    assert raised.value.code == code

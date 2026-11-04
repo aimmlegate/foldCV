@@ -33,7 +33,7 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
   useEffect(() => { void controller.load(); return () => { controller.close(); workflow.close(); }; }, [controller, workflow]);
   // Settings stays mounted behind the editor, whose rewrite popover and assistant panel save the same choices, and a
   // connection check can end while it is away.
-  useEffect(() => { if (open) { void controller.refreshPreferences(); void controller.refreshAssistant(); void workflow.peek(); } }, [open, controller, workflow]);
+  useEffect(() => { if (open) { void controller.refreshPreferences(); void controller.refreshAssistant(); void workflow.peek().then(() => workflow.checkReleases()); } }, [open, controller, workflow]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
   const groups = modelGroups(view.snapshot);
   const draftActions = <>{!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}

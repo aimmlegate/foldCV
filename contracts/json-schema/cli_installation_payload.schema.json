@@ -21,7 +21,8 @@
             "download_failed",
             "invalid_package",
             "checksum_failed",
-            "install_failed"
+            "install_failed",
+            "incompatible_release"
           ],
           "type": "string"
         },
@@ -30,6 +31,30 @@
         }
       ],
       "title": "Error"
+    },
+    "installed": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-zA-Z.-]{1,60}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Installed"
+    },
+    "latest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-zA-Z.-]{1,60}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Latest"
     },
     "state": {
       "enum": [
@@ -45,23 +70,24 @@
       "type": "string"
     },
     "totalBytes": {
-      "exclusiveMinimum": 0,
+      "minimum": 0,
       "title": "Totalbytes",
       "type": "integer"
     },
-    "version": {
-      "pattern": "^[0-9a-zA-Z.-]{1,60}$",
-      "title": "Version",
-      "type": "string"
+    "update": {
+      "title": "Update",
+      "type": "boolean"
     }
   },
   "required": [
     "state",
     "downloadedBytes",
     "totalBytes",
-    "version",
     "error",
-    "available"
+    "available",
+    "installed",
+    "latest",
+    "update"
   ],
   "title": "CliInstallationPayload",
   "type": "object"

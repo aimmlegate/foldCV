@@ -1,7 +1,12 @@
-"""Explicit, cancellable installation into an app-owned directory."""
+"""Explicit, cancellable installation of the newest official release into an app-owned directory (D146).
+
+An install or update looks up the newest release first, checks the download against its publisher's record, writes
+FoldCV's record next to the files and, when the slot gives a capability check, runs the new CLI through it before the
+older release goes. A release that fails that check is not offered again in this run."""
 
 from contextlib import contextmanager
 import hashlib
+import json
 import os
 from pathlib import Path, PurePosixPath
 import platform
@@ -14,11 +19,18 @@ import uuid
 from packages.resume_core import host
 from . import claude_distribution, distribution as release
 from .process_runner import ProcessExit, ProcessRunner
+from .qualification import QualificationError, require_publisher
+from .releases import RECORD, VERSION, Record, Release, ReleaseFailure, newer
 from ..lifecycle import SpikeError
 
 MARKER = ".foldcv-cli-runtime-v1"
-# The Windows package unpacks to 458 MB (0.162.0-alpha.17.2).
-MAX_UNPACKED = 600_000_000 if host.WINDOWS else 400_000_000
+# Codex 0.166.0 unpacks to 427 MB on macOS and 587 MB on Windows; the bound only stops a runaway archive.
+MAX_UNPACKED = 2_000_000_000
+MAX_MEMBERS = 1000
+INSTALLING = frozenset({"downloading", "verifying", "extracting"})
+# A found release counts as the newest for this long; Settings looks again when it opens after that.
+FRESH_SECONDS = 6 * 3600
+CHECK_SECONDS = 45
 
 
 class InstallationFailure(Exception):
@@ -54,44 +66,50 @@ def curl() -> Path:
 
 
 class CliInstallation:
-    """The Codex package: one pinned archive with the CLI, its code-mode host and the package manifest."""
+    """The Codex package: the release archive with the CLI, its code-mode host and the package manifest.
+
+    `qualify(files, executable, version, cancel)` checks what a new release can do before it replaces the old one; it
+    raises InstallationFailure("incompatible_release") when the profile cannot use it."""
 
     download_name = "codex.tar.gz"
     seconds = 300
 
-    def __init__(self, root):
+    def __init__(self, root, *, qualify=None):
         self.root = Path(os.path.abspath(root))
+        self.qualify = qualify
         self.cancel = threading.Event()
         self.lock = threading.Lock()
-        self.value = {"state": "idle", "downloadedBytes": 0, "totalBytes": self.size,
-                      "version": self.release, "error": None,
+        self.checking = threading.Lock()
+        self.found: Release | None = None
+        self.found_at: float | None = None
+        self.refused: set[str] = set()
+        self.value = {"state": "idle", "downloadedBytes": 0, "totalBytes": 0, "error": None,
                       "available": (platform.system(), platform.machine()) in {("Darwin", "arm64"),
                                                                                 ("Windows", "AMD64")}}
 
-    # Read on each use, so a test can patch the pinned module values.
     @property
-    def release(self):
-        return release.RELEASE
+    def runtime(self):
+        return release.runtime(self.root)
 
-    @property
-    def url(self):
-        return release.ARCHIVE_URL
-
-    @property
-    def size(self):
-        return release.ARCHIVE_BYTES
-
-    @property
-    def sha256(self):
-        return release.ARCHIVE_SHA256
+    def lookup(self, fetch):
+        return release.latest(fetch)
 
     @property
     def executable(self):
-        return release.managed_executable(self.root)
+        return self.runtime.executable()
+
+    def installed(self):
+        found = self.runtime.current()
+        return found[0] if found else None
 
     def snapshot(self):
         with self.lock:
-            return dict(self.value)
+            value = dict(self.value)
+            latest = self.found.version if self.found else None
+        installed = self.installed()
+        value.update(installed=installed, latest=latest,
+                     update=value["state"] not in INSTALLING and latest not in self.refused and newer(latest, installed))
+        return value
 
     def update(self, **values):
         with self.lock:
@@ -127,13 +145,51 @@ class CliInstallation:
         if self.cancel.is_set():
             raise InstallationFailure("cancelled")
 
-    def download(self, files, archive):
+    def fetch(self, files, url, limit, cancel, deadline):
+        """One small HTTPS read: a version, a manifest, a signature or a release listing."""
+        headers = (("--header", "Accept: application/vnd.github+json", "--header", "X-GitHub-Api-Version: 2022-11-28")
+                   if url.startswith("https://api.github.com/") else ())
+        try:
+            stdout, _ = ProcessRunner(curl()).run(files, (
+                "-q", "--fail", "--silent", "--show-error", "--location", "--proto", "=https",
+                "--proto-redir", "=https", "--connect-timeout", "15", "--max-time", "30",
+                "--max-filesize", str(limit), *headers, url,
+            ), cancel=cancel, deadline=deadline, max_output=limit + 16384, max_stdout=limit)
+        except ProcessExit:
+            raise ReleaseFailure("download_failed") from None
+        except SpikeError as error:
+            if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
+                raise
+            raise ReleaseFailure("cancelled" if error.code == "CANCELLED" else "download_failed") from None
+        return stdout
+
+    def resolve(self, files, cancel, deadline):
+        found = self.lookup(lambda url, limit: self.fetch(files, url, limit, cancel, deadline))
+        with self.lock:
+            self.found, self.found_at = found, time.monotonic()
+        return found
+
+    def check(self, files, cancel):
+        """Look for a newer release; a failed look keeps the last answer, and one is enough for FRESH_SECONDS."""
+        with self.lock:
+            if self.found_at is not None and time.monotonic() - self.found_at < FRESH_SECONDS:
+                return
+        if not self.checking.acquire(blocking=False):
+            return
+        try:
+            self.resolve(files, cancel, time.monotonic() + CHECK_SECONDS)
+        except ReleaseFailure:
+            pass
+        finally:
+            self.checking.release()
+
+    def download(self, files, archive, target):
         deadline = time.monotonic() + self.seconds
 
         def progress():
             self.check_cancel()
             size = archive.stat().st_size if archive.exists() else 0
-            if size > self.size:
+            if size > target.size:
                 raise InstallationFailure("download_failed")
             self.update(downloadedBytes=size)
 
@@ -141,7 +197,7 @@ class CliInstallation:
             ProcessRunner(curl()).run(files, (
                 "-q", "--fail", "--silent", "--show-error", "--location", "--proto", "=https",
                 "--proto-redir", "=https", "--connect-timeout", "15", "--max-time", str(self.seconds),
-                "--max-filesize", str(self.size), "--output", str(archive), self.url,
+                "--max-filesize", str(target.size), "--output", str(archive), target.url,
             ), cancel=self.cancel, deadline=deadline, poll_input=progress, max_output=16384)
         except ProcessExit:
             raise InstallationFailure("download_failed") from None
@@ -154,7 +210,8 @@ class CliInstallation:
                 self.check_cancel()
                 name = PurePosixPath(member.name)
                 if (name.is_absolute() or ".." in name.parts or not name.parts or "\\" in member.name
-                        or not (member.isfile() or member.isdir()) or name in names or len(names) >= 200):
+                        or not (member.isfile() or member.isdir()) or name in names or len(names) >= MAX_MEMBERS
+                        or name.parts[0] == RECORD):
                     raise InstallationFailure("invalid_package")
                 names.add(name)
                 total += member.size
@@ -174,41 +231,86 @@ class CliInstallation:
                         output.write(chunk)
                 target.chmod(0o700 if member.mode & 0o111 else 0o600)
 
-    def verify(self, package):
-        for name, expected in ((release.CLI, release.CLI_SHA256),
-                               (release.HOST, release.HOST_SHA256),
-                               ("codex-package.json", release.MANIFEST_SHA256)):
-            path = package / name
-            if (any(part.is_symlink() for part in (path, *path.parents))
-                    or not path.is_file() or digest(path, self.check_cancel) != expected):
-                raise InstallationFailure("invalid_package")
+    def publisher(self, package):
+        """macOS: OpenAI signed the CLI and its host. Windows has no such check; GitHub's digest stands alone."""
+        from .profile import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
+        if host.WINDOWS:
+            return
+        for name, identifier in ((release.CLI, IDENTIFIER), (release.HOST, HOST_IDENTIFIER)):
+            try:
+                require_publisher(package / name, TEAM_ID, identifier)
+            except QualificationError:
+                raise InstallationFailure("invalid_package") from None
 
-    def stage(self, download, staging):
+    def verify(self, package, target):
+        """The package manifest names this release and target; returns the record of the files every check reads."""
+        manifest = package / release.PACKAGE_MANIFEST
+        try:
+            raw = manifest.read_bytes() if manifest.is_file() and not manifest.is_symlink() else b""
+            value = json.loads(raw) if 0 < len(raw) <= 65_536 else None
+        except (OSError, ValueError):
+            value = None
+        if (not isinstance(value, dict) or value.get("version") != target.version or value.get("variant") != "codex"
+                or value.get("target") != release.TARGET or value.get("entrypoint") != release.CLI):
+            raise InstallationFailure("invalid_package")
+        files = {}
+        for name in self.runtime.names:
+            path = package.joinpath(*PurePosixPath(name).parts)
+            if any(part.is_symlink() for part in (path, *path.parents)) or not path.is_file():
+                raise InstallationFailure("invalid_package")
+            files[name] = digest(path, self.check_cancel)
+        self.publisher(package)
+        return Record(target.version, files)
+
+    def stage(self, download, staging, target):
         self.unpack(download, staging)
-        self.verify(staging)
+        return self.verify(staging, target)
+
+    def prune(self, keep):
+        """Older releases and leftovers go once a new release is in place; a file still open stays until next time."""
+        for item in self.root.iterdir():
+            name = item.name
+            if name == keep or not (VERSION.fullmatch(name) or name.startswith((".staging-", ".previous-"))):
+                continue
+            try:
+                if item.is_dir() and not item.is_symlink():
+                    host.remove_tree(item)
+            except OSError:
+                pass
 
     def install(self, files):
         staging = None
         previous = None
         committed = False
+        target = None
         try:
             if not self.snapshot()["available"]:
                 raise InstallationFailure("unsupported_platform")
             with self.owned():
                 self.check_cancel()
-                archive = files.path / self.download_name
-                self.update(state="downloading", downloadedBytes=0, error=None)
-                self.download(files, archive)
+                self.update(state="downloading", downloadedBytes=0, totalBytes=0, error=None)
+                try:
+                    target = self.resolve(files, self.cancel, time.monotonic() + CHECK_SECONDS)
+                except ReleaseFailure as error:
+                    raise InstallationFailure(error.code) from None
                 self.check_cancel()
-                self.update(state="verifying", downloadedBytes=min(archive.stat().st_size, self.size))
-                if archive.stat().st_size != self.size or digest(archive, self.check_cancel) != self.sha256:
+                self.update(totalBytes=target.size)
+                archive = files.path / self.download_name
+                self.download(files, archive, target)
+                self.check_cancel()
+                self.update(state="verifying", downloadedBytes=min(archive.stat().st_size, target.size))
+                if archive.stat().st_size != target.size or digest(archive, self.check_cancel) != target.sha256:
                     raise InstallationFailure("checksum_failed")
                 staging = self.root / (".staging-" + uuid.uuid4().hex)
                 staging.mkdir(mode=0o700)
                 self.update(state="extracting")
-                self.stage(archive, staging)
+                record = self.stage(archive, staging, target)
+                descriptor = os.open(staging / RECORD, os.O_WRONLY | os.O_CREAT | os.O_EXCL | host.O_NOFOLLOW
+                                     | host.O_BINARY, 0o600)
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(record.encode())
                 self.check_cancel()
-                destination = self.executable.parent.parent
+                destination = self.root / target.version
                 if destination.exists() or destination.is_symlink():
                     private_directory(destination)
                     previous = self.root / (".previous-" + uuid.uuid4().hex)
@@ -220,10 +322,25 @@ class CliInstallation:
                         previous.rename(destination)
                         previous = None
                     raise
+                staging = None
+                executable = destination.joinpath(*PurePosixPath(self.runtime.entry).parts)
+                try:
+                    if self.qualify is not None:
+                        self.qualify(files, executable, target.version, self.cancel)
+                    self.check_cancel()
+                except BaseException:
+                    host.remove_tree(destination)
+                    if previous is not None:
+                        previous.rename(destination)
+                        previous = None
+                    raise
                 committed = True
+                self.prune(target.version)
                 self.update(state="ready")
-                return self.executable
+                return executable
         except InstallationFailure as error:
+            if error.code == "incompatible_release" and target is not None:
+                self.refused.add(target.version)
             self.update(state="cancelled" if error.code == "cancelled" else "failed", error=error.code)
         except SpikeError as error:
             if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
@@ -240,37 +357,38 @@ class CliInstallation:
 
 
 class ClaudeInstallation(CliInstallation):
-    """One notarized Claude Code binary, pinned from the signed release manifest (MP02b)."""
+    """One Claude Code binary of the newest release, named by Anthropic's signed manifest (MP02b, D146)."""
 
     download_name = "claude"
     # The binary is about twice the Codex archive.
     seconds = 600
 
     @property
-    def release(self):
-        return claude_distribution.RELEASE
+    def runtime(self):
+        return claude_distribution.runtime(self.root)
 
-    @property
-    def url(self):
-        return claude_distribution.BINARY_URL
+    def lookup(self, fetch):
+        return claude_distribution.latest(fetch)
 
-    @property
-    def size(self):
-        return claude_distribution.BINARY_BYTES
+    def publisher(self, binary):
+        """macOS: the notarized binary Anthropic signed. On Windows the signed manifest's checksum stands alone."""
+        from .profiles.claude import IDENTIFIER, TEAM_ID
+        if host.WINDOWS:
+            return
+        try:
+            require_publisher(binary, TEAM_ID, IDENTIFIER)
+        except QualificationError:
+            raise InstallationFailure("invalid_package") from None
 
-    @property
-    def sha256(self):
-        return claude_distribution.BINARY_SHA256
-
-    @property
-    def executable(self):
-        return claude_distribution.managed_executable(self.root)
-
-    def stage(self, download, staging):
-        target = staging / "bin" / claude_distribution.BINARY
-        target.parent.mkdir(mode=0o700)
-        with download.open("rb") as source, target.open("xb") as output:
+    def stage(self, download, staging, target):
+        entry = claude_distribution.entry()
+        binary = staging.joinpath(*PurePosixPath(entry).parts)
+        binary.parent.mkdir(mode=0o700)
+        with download.open("rb") as source, binary.open("xb") as output:
             while chunk := source.read(1024 * 1024):
                 self.check_cancel()
                 output.write(chunk)
-        target.chmod(0o700)
+        binary.chmod(0o700)
+        self.publisher(binary)
+        # The download matched the manifest's checksum, so the copy carries it.
+        return Record(target.version, {entry: target.sha256})

@@ -2,8 +2,9 @@
 service from the page to a DOCX export through the render worker.
 
 Usage: `<build python> tools/desktop/check_helper.py <FoldCV Helper.app | Windows helper directory> [--cli]`. The
-Windows check runs on Windows. --cli also installs the pinned Codex and Claude runtimes into the temporary root and
-runs each through its profile (network, about 450 MB). Everything runs in a temporary root.
+Windows check runs on Windows. --cli also installs the newest Codex and Claude releases into the temporary root, runs
+each through its profile and checks that its connection stops at sign-in (network, about 550 MB). Everything runs in a
+temporary root.
 """
 
 from __future__ import annotations
@@ -128,7 +129,7 @@ def check_cli(helper: Path, root: Path) -> dict:
     probe = ROOT / "tools/desktop/cli_probe.py"
     result = subprocess.run([*command(helper)[:-1], str(probe), str(root)], capture_output=True, timeout=1500,
                             env=environment(root.parent))
-    assert result.returncode == 0, result.stderr.decode()[-4000:]
+    assert result.returncode == 0, (result.stdout + result.stderr).decode()[-4000:]
     return json.loads(result.stdout)
 
 

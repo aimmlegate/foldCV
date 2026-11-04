@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { errorMessage } from "../../errors/messages";
-import { loginCodePattern, type ConnectionView, type ConnectionWorkflow, type ProviderActivity, type ProviderEntry } from "../../connection/workflow";
+import { installable, loginCodePattern, type ConnectionView, type ConnectionWorkflow, type ProviderActivity, type ProviderEntry } from "../../connection/workflow";
 import { connectionMessage } from "../../connection/messages";
 import { APP_NAME } from "../app-name";
 import { Button } from "../ui/Button";
@@ -28,7 +28,11 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
   const [code, setCode] = useState(""), [codeSent, setCodeSent] = useState(false);
   const installation = entry.installation;
   const installing = installation && ["downloading", "verifying", "extracting"].includes(installation.state);
-  const canInstall = installation?.available && ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(entry.state);
+  const canInstall = installable(entry), update = Boolean(installation?.update) && !installing;
+  // An update keeps the profile, so a sign-in stays.
+  const signedIn = ["connected", "unknown_limits", "quota_exhausted"].includes(entry.state);
+  const installNote = update ? `${display} ${installation?.latest ?? ""} будет скачан с сайта ${publisher}.${signedIn ? " Вход сохранится." : ""}`
+    : `${display} будет установлен с сайта ${publisher}.`;
   const quota = entry.quota.state === "not_provided" ? "Использование не предоставляется провайдером"
     : `${entry.quota.usedPercent !== null ? `Использовано ${entry.quota.usedPercent}%` : "Использование неизвестно"}`
       + ` · Лимит ${entry.quota.state === "available" ? "доступен" : entry.quota.state === "exhausted" ? "исчерпан" : "неизвестен"}`
@@ -37,19 +41,24 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
   return <div className="provider-card" data-provider={kind}>
     <div className="switch-line"><label htmlFor={id}><strong>{display}</strong> <small>по подписке {subscription}</small></label>
       <input className="switch" id={id} aria-label={`Включить ${display}`} role="switch" type="checkbox" checked={entry.enabled}
-        disabled={disabled || pending || detaching || Boolean(installing)} onChange={event => void workflow.enable(kind, event.currentTarget.checked)} /></div>
+        disabled={disabled || pending || detaching || Boolean(installing)} onChange={event => { const on = event.currentTarget.checked; void workflow.enable(kind, on).then(() => { if (on) void workflow.checkReleases(); }); }} /></div>
     {!entry.enabled ? <p className="small muted">{entry.installed ? "Выключен." : "Выключен, не установлен."} Включите, чтобы подключить {display}.</p> : <>
       <div className="connection-status"><span className="connection-check">{pending || detaching || entry.state === "login_pending" ? <Spinner /> : <Icon name={entry.state === "connected" ? "check" : "info"} />}</span>
-        <div><strong role="status">{detaching ? "Останавливаем подключение…" : installing ? `Устанавливаем ${display}…` : entry.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : pending ? "Проверяем подключение…" : connectionMessage(entry.state, { display, subscription })}</strong>
+        <div><strong role="status">{detaching ? "Останавливаем подключение…" : installing ? `${installation?.installed ? "Обновляем" : "Устанавливаем"} ${display}…` : entry.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : pending ? "Проверяем подключение…" : connectionMessage(entry.state, { display, subscription })}</strong>
           <small>{[entry.plan, entry.version].filter(Boolean).join(" · ") || "Нет сведений о подписке"}</small></div></div>
       {entry.versionStatus === "graceful" && <p className="small muted">Версия новее проверенной в {APP_NAME}; её возможности проверены при подключении.</p>}
+      {update ? <p className="small" role="status">Доступна новая версия {display}: {installation?.latest}. Установлена {installation?.installed}.</p>
+        : installation?.latest && installation.latest === installation.installed && !installing
+          && <p className="small muted">Установлена последняя версия {display}.</p>}
       <div className="quota-line">{entry.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${entry.quota.usedPercent}%` }} /></span>}
         {quota}
       </div>
       {installation && <Installation value={installation} display={display} />}
-      {canInstall && <p className="small muted">{display} будет установлен с сайта {publisher}.</p>}
-      <div className="settings-actions"><Button className="small" busy={pending && !installing && entry.state !== "login_pending"} busyLabel="Проверяем…" disabled={disabled || pending || Boolean(installing)} onClick={() => void workflow.refresh(kind)}>Проверить подключение</Button>
-        {canInstall && <Button variant="primary" className="small" busy={Boolean(installing)} busyLabel="Устанавливаем…" disabled={disabled || pending} onClick={() => void workflow.install(kind)}>Установить {display}</Button>}
+      {canInstall && <p className="small muted">{installNote}</p>}
+      <div className="settings-actions"><Button className="small" busy={pending && !installing && entry.state !== "login_pending"} busyLabel="Проверяем…" disabled={disabled || pending || Boolean(installing)}
+          onClick={() => void workflow.refresh(kind).then(() => workflow.checkReleases())}>Проверить подключение</Button>
+        {(canInstall || installing) && <Button variant="primary" className="small" busy={Boolean(installing)} busyLabel={installation?.installed ? "Обновляем…" : "Устанавливаем…"}
+          disabled={disabled || pending} onClick={() => void workflow.install(kind)}>{update ? `Обновить ${display}` : `Установить ${display}`}</Button>}
         {installing && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelInstall(kind)}>Отменить установку</button>}
         {experimental && entry.state === "login_required" && <button className="text-button" disabled={disabled || pending} onClick={() => void workflow.login(kind)}>Войти через {subscription}</button>}
         {entry.state === "login_pending" && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelLogin(kind)}>Отменить вход</button>}

@@ -11,6 +11,8 @@ import re
 import subprocess
 from typing import Literal
 
+from packages.resume_core import host
+
 
 Status = Literal["supported", "graceful", "broken"]
 _VERSION = re.compile(r"(?:^|\s)v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\s|$)")
@@ -89,7 +91,10 @@ def publisher_requirement(team_id: str, identifier: str) -> str:
 def signature(executable: Path, *, codesign: Path = Path("/usr/bin/codesign"),
               requirement: str | None = None) -> Signature:
     """Strictly verify the code signature of the resolved binary and read its publisher. The text `codesign -d` prints
-    is what the binary claims; only `requirement` proves that an Apple-issued chain signed it."""
+    is what the binary claims; only `requirement` proves that an Apple-issued chain signed it.
+    Windows has no codesign, so nothing passes there: only FoldCV's managed copies run, checked by their record."""
+    if host.WINDOWS:
+        raise QualificationError("CLI_UNSUPPORTED")
     resolved = resolve(executable)
     info = resolved.stat()
     key = (str(resolved), info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns, requirement)

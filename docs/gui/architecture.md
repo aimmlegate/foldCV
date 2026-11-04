@@ -260,7 +260,7 @@ Assistant routes, under `/v2/projects/{id}/assistant` (`assistant/routes.py`):
 Kept `/v1` routes: `POST /v1/session/exchange`; `/v1/settings/*` (rules, connection,
 preferences, limits, import model, fallback model, rewrite reasoning, assistant);
 `POST /v1/host/*` (CLI discovery, status, models, login, model choice, detach,
-install); `GET /v1/rich/template-config` (templates and the default one),
+install of the newest release, release check, D146); `GET /v1/rich/template-config` (templates and the default one),
 `/v1/rich/template-config/{templateId}` (GET, PUT) with `/check` and `/reset`,
 `/v1/rich/template-config/{templateId}/branding` (GET, PUT: the template's own logo in its logo place and an optional
 footer email, saved as its next revision with the text edited in place; `template_branding.py`, D145), and
