@@ -4,7 +4,7 @@ name: Windows
 # same zip on a Mac) and the Tauri one, whose shell needs the Windows toolchain.
 on:
   push:
-    branches: [desktop/windows-build, desktop/tauri-windows]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
