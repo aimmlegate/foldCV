@@ -115,6 +115,7 @@ export type Recordid = string;
 export type Beforerecordid = string | null;
 export type Documentrevision = number;
 export type Factsrevision = number;
+export type Groupid = string | null;
 export type Jobid = string | null;
 export type Operation =
   | "add"
@@ -127,7 +128,8 @@ export type Operation =
   | "remove_from_focus"
   | "move_technology"
   | "move_focus"
-  | "set_focus_icon";
+  | "set_focus_icon"
+  | "add_technology_group";
 export type Periodid = string | null;
 export type Recordid1 = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;
@@ -337,6 +339,7 @@ export interface RichPanelRequest {
   capture: ActionCapture;
   documentRevision: Documentrevision;
   factsRevision: Factsrevision;
+  groupId?: Groupid;
   jobId?: Jobid;
   operation: Operation;
   periodId?: Periodid;

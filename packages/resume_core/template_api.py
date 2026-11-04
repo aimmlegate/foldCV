@@ -59,6 +59,8 @@ class EditorTechnologyTarget(Wire):
     label: str
     # The block's place, or where the view's line goes; the panel sends it back and Python refuses an older one.
     placement: EditorPlacement
+    # A skill group's technologies in the order its line shows them (D136); a job's target lists none.
+    records: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class EditorFocusPanel(Wire):
@@ -99,6 +101,8 @@ class EditorPlanV1(Wire):
     # The record kinds this template's document has a place for; the panel offers adding only these.
     add_kinds: list[Literal['employment', 'education', 'language']] = Field(default_factory=list,
         exclude_if=lambda value: not value)
+    # A skill group of the user's own can follow the last one, under a title of its own (D136).
+    add_technology_group: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

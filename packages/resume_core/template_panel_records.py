@@ -99,33 +99,65 @@ def _group_line(project, view_id, index):
         and block.presentation.node_index == index), None)
 
 
+def group_lines(project):
+    """(target id, line, view id) of each skill group line the document shows, in document order. A view's first line is
+    named by its view, so its target stays when the line goes and comes back; a later one, a group of the user's own
+    (D136), by its own block."""
+    groups, seen, found = _group_nodes(project.template_package), set(), []
+    for block, container, _content, owner in technology_lines(project):
+        ref = block.presentation
+        # The scope is the view and item section that show the line, not the current owners of its entries.
+        if owner is not None or container != 'content' or ref is None or ref.view_key not in groups \
+                or ref.node_index != groups[ref.view_key][1]:
+            continue
+        found.append((block.id if ref.view_key in seen else VIEW_TARGET + ref.view_key, block, ref.view_key))
+        seen.add(ref.view_key)
+    return found
+
+
+def group_heading(document, line, view, where=None):
+    """The view title right before a group's line, or before the section around it; None without one."""
+    where = placements(document) if where is None else where
+    blocks = {value.id: value for value in document.blocks()}
+    for identifier in (line.id, where[line.id][0]):
+        previous = where[identifier][1] if identifier in where else None
+        if previous is not None and view_title(blocks[previous], view):
+            return blocks[previous]
+    return None
+
+
+def line_entries(line):
+    """The records a technology line lists, in its order."""
+    return [entry[0] for entry in _split_technology_line(line.content)[1]]
+
+
 def technology_targets(project):
     """Where the facts panel adds a technology, with the placement Python checks: a job's line, else its section; each
-    group the import shows for this project, by template order, at its line or where the line goes."""
+    group the import shows for this project, by template order, at its line or where the line goes, then the groups of the
+    user's own (D136) in document order. A group's target lists the technologies its line shows."""
     package, document = project.template_package, project.document
     jobs = {record.id for record in project.facts.records if record.kind == 'employment'}
     where, order = placements(document), {value.id: index for index, value in enumerate(package.definition.blocks)}
     groups, nodes = _group_nodes(package), {}
+    locale = package.definition.template.default_locale
     general, owned, lined = [], [], set()
+    for position, (identifier, block, view) in enumerate(group_lines(project)):
+        heading = group_heading(document, block, view, where)
+        label = (''.join(getattr(part, 'text', '') for part in heading.content) if heading is not None
+            else locale_text(groups[view][0].view.title, locale))
+        own = identifier.startswith(VIEW_TARGET)
+        if own:
+            lined.add(view)
+        general.append(((0, order[view]) if own else (1, position), EditorTechnologyTarget(blockId=identifier, jobId=None,
+            label=label, placement=_placement(where, block.id), records=line_entries(block))))
     for block, container, _content, owner in technology_lines(project):
         ref = block.presentation
-        if container != 'content' or ref is None:
+        if container != 'content' or ref is None or owner not in jobs:
             continue
-        # The scope is the view and item section that show the line, not the current owners of its entries.
-        if owner is None and ref.view_key in groups and ref.node_index == groups[ref.view_key][1]:
-            if ref.view_key in lined:
-                continue
-            lined.add(ref.view_key)
-            title = next((''.join(getattr(part, 'text', '') for part in value.content) for value in document.blocks()
-                if view_title(value, ref.view_key)), '')
-            general.append((order[ref.view_key], EditorTechnologyTarget(blockId=VIEW_TARGET + ref.view_key, jobId=None,
-                label=title, placement=_placement(where, block.id))))
-        elif owner in jobs:
-            if ref.view_key not in nodes:
-                nodes[ref.view_key] = _line_node(package, ref.view_key)
-            if nodes[ref.view_key] is not None and ref.node_index == nodes[ref.view_key][0]:
-                owned.append(EditorTechnologyTarget(blockId=block.id, jobId=owner, label='',
-                    placement=_placement(where, block.id)))
+        if ref.view_key not in nodes:
+            nodes[ref.view_key] = _line_node(package, ref.view_key)
+        if nodes[ref.view_key] is not None and ref.node_index == nodes[ref.view_key][0]:
+            owned.append(EditorTechnologyTarget(blockId=block.id, jobId=owner, label='', placement=_placement(where, block.id)))
     shown = {value.job_id for value in owned}
     for block in document.blocks():
         job = block.props.record_id if isinstance(block, TemplateSectionBlock) else None
@@ -137,7 +169,6 @@ def technology_targets(project):
         if nodes[view] is not None:
             shown.add(job)
             owned.append(EditorTechnologyTarget(blockId=block.id, jobId=job, label='', placement=_placement(where, block.id)))
-    locale = package.definition.template.default_locale
     for view, _index, _node in groups.values():
         if view.id in lined or not _shown(project, view):
             continue
@@ -148,7 +179,7 @@ def technology_targets(project):
             placement = position
         else:
             continue
-        general.append((order[view.id], EditorTechnologyTarget(blockId=VIEW_TARGET + view.id, jobId=None,
+        general.append(((0, order[view.id]), EditorTechnologyTarget(blockId=VIEW_TARGET + view.id, jobId=None,
             label=locale_text(view.view.title, locale), placement=placement)))
     return [target for _order, target in sorted(general, key=lambda value: value[0])] + owned
 
@@ -172,8 +203,9 @@ def panel_plan(project):
         if len(identifiers := [entry[0] for entry in _split_technology_line(content)[1]]) > 1
         and len(identifiers) == len(set(identifiers))]
     from .template_panel_creation import addable_kinds
+    from .template_panel_groups import new_group_place
     return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('technologyLines', lines),
-        ('addKinds', addable_kinds(project))) if value}
+        ('addKinds', addable_kinds(project)), ('addTechnologyGroup', new_group_place(project) is not None)) if value}
 
 
 def _view_position(project, view):
@@ -195,6 +227,9 @@ def _duplicate(project, job_id, name, record_id=None):
     else:
         listed = {record.id for record in project.facts.records if record.kind == 'technology' and record.job_id == job_id}
         listed -= only
+        if job_id is None:
+            # The skill groups list a job's technology the import put there too (D136).
+            listed |= {entry for _identifier, line, _view in group_lines(project) for entry in line_entries(line)}
     key = normalize_name(name)
     return any(record.id in listed and record.id != record_id and normalize_name(record.display.raw_text) == key
         for record in project.facts.records)
@@ -325,40 +360,15 @@ def add_technology(project, operation, allocator):
         if target is None or (target.placement.parent_id, target.placement.after_id) != (context.placement.parent_id,
                 context.placement.after_id):
             raise ValueError('TECHNOLOGY_LINE_MISSING')
-    record_id = allocator.allocate('technology', ['panel-technology', command.job_id or '', normalize_name(name)])
-    record = TechnologyRecord(id=record_id, kind='technology', revision=1, origin='user', userCorrected=True, evidence=[],
-        jobId=command.job_id, subprojectId=None, display=unknown(), canonicalId=unknown())
-    set_text(record, 'display', name)
-    _report_cells(project, record, allocator)
+    record = new_technology(project, command.job_id, name, allocator)
     candidate = project.model_copy(deep=True)
     package = candidate.template_package
     locale = package.definition.template.default_locale
-    def paragraph(slot, owner, ref, content):
-        return TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', [slot, owner]), revision=1,
-            props={'alignment': ref.overrides.alignment or 'left'}, children=[], provenance=[], presentation=ref,
-            content=content)
-    def line(owner, node, ref, labelled):
-        """The new line of one node with its prefix, after the node's label unless one is shown already."""
-        prefix, label = locale_text(node.prefix, locale), locale_text(node.label, locale)
-        blocks = [paragraph('panel-technology-line', owner, ref, [*([literal(prefix, ref)] if prefix else []),
-            field_occurrence(allocator, 'technology', record, 'display', ref)])]
-        return [paragraph('panel-technology-label', owner, ref, [literal(label, ref)]), *blocks] if label and not labelled else blocks
     group = _group_nodes(package).get(target.block_id.removeprefix(VIEW_TARGET)) if target.block_id.startswith(VIEW_TARGET) else None
     block = _group_line(candidate, group[0].id, group[1]) if group is not None else next(value for value
         in candidate.document.blocks() if value.id == target.block_id)
     if group is not None and block is None:
-        # The group's line went with its last technology: it comes back after the title, or with it.
-        view, index, node = group
-        ref = reference(package, view.id, node.style, allocator.allocate('template-instance',
-            ['panel-technology-instance', view.id]), node_index=index)
-        blocks = line(view.id, node, ref, False)
-        title = next(((items, value) for items in sibling_lists(candidate.document) for value in items
-            if view_title(value, view.id)), None)
-        if title is not None:
-            items, heading = title
-            items[items.index(heading) + 1:items.index(heading) + 1] = blocks
-        elif not restore_view(candidate.document, package, view, blocks, allocator, 'technology'):
-            raise ValueError('TECHNOLOGY_LINE_MISSING')
+        restore_group_line(candidate.document, package, group, record, allocator)
         return candidate, [{'kind': 'put_record', 'beforeRevision': None, 'record': record.model_dump(by_alias=True)}]
     if isinstance(block, TemplateSectionBlock):
         index, node = _line_node(package, block.presentation.view_key)
@@ -371,15 +381,59 @@ def add_technology(project, operation, allocator):
         # After the item's blocks of earlier nodes and the node's own label, where the import puts the line.
         at = sum(1 for child in block.children if child.presentation is not None and child.presentation.node_index is not None
             and child.presentation.node_index <= index)
-        block.children[at:at] = line(block.id, node, ref, labelled)
+        block.children[at:at] = line_blocks(package, allocator, record, block.id, node, ref, labelled)
     else:
-        content = block.content
-        prefix, entries, trailing = _split_technology_line(content)
-        sample = entries[-1][2][-1]
-        ref = (sample.presentation or block.presentation).model_copy(deep=True)
-        node = package.recipe.views[ref.view_key].nodes[ref.node_index] if ref.node_index is not None else None
-        # A line of one entry has no separator to copy; the node's own one is the import's.
-        separator = literal((_separator(node) if node is not None else '') or ', ', ref)
-        entries.append((record.id, [], [field_occurrence(allocator, 'technology', record, 'display', ref)]))
-        content[:] = _join_technology_line(prefix, entries, trailing, separator)
+        put_entry(package, block, record, allocator)
     return candidate, [{'kind': 'put_record', 'beforeRevision': None, 'record': record.model_dump(by_alias=True)}]
+
+
+def new_technology(project, job_id, name, allocator):
+    """A technology the user adds, with its cells reported."""
+    record_id = allocator.allocate('technology', ['panel-technology', job_id or '', normalize_name(name)])
+    record = TechnologyRecord(id=record_id, kind='technology', revision=1, origin='user', userCorrected=True, evidence=[],
+        jobId=job_id, subprojectId=None, display=unknown(), canonicalId=unknown())
+    set_text(record, 'display', name)
+    _report_cells(project, record, allocator)
+    return record
+
+
+def put_entry(package, line, record, allocator, before_id=None):
+    """Add a record's entry to a technology line, before another's or at its end, styled as the line's entries."""
+    prefix, entries, trailing = _split_technology_line(line.content)
+    sample = entries[-1][2][-1]
+    ref = (sample.presentation or line.presentation).model_copy(deep=True)
+    node = package.recipe.views[ref.view_key].nodes[ref.node_index] if ref.node_index is not None else None
+    # A line of one entry has no separator to copy; the node's own one is the import's.
+    separator = literal((_separator(node) if node is not None else '') or ', ', ref)
+    at = len(entries) if before_id is None else [entry[0] for entry in entries].index(before_id)
+    entries.insert(at, (record.id, [], [field_occurrence(allocator, 'technology', record, 'display', ref)]))
+    line.content[:] = _join_technology_line(prefix, entries, trailing, separator)
+
+
+def line_paragraph(allocator, slot, owner, ref, content):
+    return TemplateParagraphBlock(type='paragraph', id=allocator.allocate('block', [slot, owner]), revision=1,
+        props={'alignment': ref.overrides.alignment or 'left'}, children=[], provenance=[], presentation=ref, content=content)
+
+
+def line_blocks(package, allocator, record, owner, node, ref, labelled=False):
+    """The new line of one node with its prefix and one entry, after the node's label unless one is shown already."""
+    locale = package.definition.template.default_locale
+    prefix, label = locale_text(node.prefix, locale), locale_text(node.label, locale)
+    blocks = [line_paragraph(allocator, 'panel-technology-line', owner, ref, [*([literal(prefix, ref)] if prefix else []),
+        field_occurrence(allocator, 'technology', record, 'display', ref)])]
+    return [line_paragraph(allocator, 'panel-technology-label', owner, ref, [literal(label, ref)]), *blocks] \
+        if label and not labelled else blocks
+
+
+def restore_group_line(document, package, group, record, allocator):
+    """A group's line that went with its last technology comes back with one entry, after the title or with it."""
+    view, index, node = group
+    ref = reference(package, view.id, node.style, allocator.allocate('template-instance',
+        ['panel-technology-instance', view.id]), node_index=index)
+    blocks = line_blocks(package, allocator, record, view.id, node, ref)
+    title = next(((items, value) for items in sibling_lists(document) for value in items if view_title(value, view.id)), None)
+    if title is not None:
+        items, heading = title
+        items[items.index(heading) + 1:items.index(heading) + 1] = blocks
+    elif not restore_view(document, package, view, blocks, allocator, 'technology'):
+        raise ValueError('TECHNOLOGY_LINE_MISSING')

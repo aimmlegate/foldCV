@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { monaco } from "./monaco";
+import { monaco, monacoTheme } from "./monaco";
 
 /** A read-only inline diff of the editor text against a proposed text; loaded only when a card opens it. */
 export default function ProposalDiff({ original, modified }: { original: string; modified: string }) {
@@ -8,7 +8,7 @@ export default function ProposalDiff({ original, modified }: { original: string;
   useEffect(() => {
     if (!host.current) return;
     const pair = { original: monaco.editor.createModel(original, "yaml"), modified: monaco.editor.createModel(modified, "yaml") };
-    const diff = monaco.editor.createDiffEditor(host.current, { readOnly: true, originalEditable: false, renderSideBySide: false,
+    const diff = monaco.editor.createDiffEditor(host.current, { theme: monacoTheme(), readOnly: true, originalEditable: false, renderSideBySide: false,
       automaticLayout: true, minimap: { enabled: false }, fontSize: 12, scrollBeyondLastLine: false, hideUnchangedRegions: { enabled: true } });
     diff.setModel(pair);
     models.current = pair;

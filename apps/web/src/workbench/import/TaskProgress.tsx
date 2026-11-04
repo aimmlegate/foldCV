@@ -33,9 +33,9 @@ export function TaskProgress({ entry, source, busy, stop, retry, close, open }: 
   const jobs = found?.jobs.filter(job => job.employer || job.role) ?? [];
   const saved = !!found && found.facts > 0;
   return <section className="progress-screen" aria-label="Импорт резюме"><div className="progress-content">
-    <div className="import-progress-heading"><div className="progress-icon"><Icon name="fold" />{running && <Spinner />}</div>
+    <div className="import-progress-heading"><h2>Импорт резюме</h2>
       <Elapsed startedAt={entry.task.startedAt} finishedAt={finishedAt} active={running || view.kind === "stalled"} /></div>
-    <h2>Импорт резюме</h2>{source.name && <p className="import-source-name">{source.name}</p>}
+    {source.name && <p className="import-source-name">{source.name}</p>}
     <div className="import-progress-grid">
       <div className="import-process">
         <ol className="progress-list" aria-label="Этапы импорта">{stages.map((label, position) => {

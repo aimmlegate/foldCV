@@ -9,7 +9,8 @@ import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
 import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
-import { textSizes, type Appearance, type PaneOrder } from "./interface";
+import { type Appearance, type PaneOrder } from "./interface";
+import { AppearanceSettings } from "./Appearance";
 
 const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
 export function Settings({ open, close, connectionChanged, paneOrder, changePaneOrder, appearance, changeAppearance }: { open: boolean; close: () => void;
@@ -107,29 +108,13 @@ export function Settings({ open, close, connectionChanged, paneOrder, changePane
           disabled={!current.preferences || current.saving} value={current.draft.projectMegabytes} onChange={event => controller.change("projectMegabytes", event.currentTarget.value)} />
         <p className="small muted">От {limitRanges.projectMegabytes.minimum} до {limitRanges.projectMegabytes.maximum} МБ.</p>
       </>}
-      {section === "interface" && <><h3>Расположение резюме</h3>
+      {section === "interface" && <><AppearanceSettings value={appearance} change={changeAppearance} />
+        <h3>Расположение резюме</h3>
         <label htmlFor="workspace-pane-order">Порядок панелей при сравнении</label>
         <select id="workspace-pane-order" value={paneOrder} onChange={event => changePaneOrder(event.currentTarget.value === "original-first" ? "original-first" : "layout-first")}>
           <option value="layout-first">Макет слева, оригинал справа</option>
           <option value="original-first">Оригинал слева, макет справа</option>
         </select><p>Сохраняется сразу.</p>
-        <h3>Читаемость</h3>
-        <label htmlFor="interface-text-size">Размер текста интерфейса</label>
-        <select id="interface-text-size" value={appearance.textSize} onChange={event => {
-          const value = textSizes.find(size => size === event.currentTarget.value);
-          if (value) changeAppearance({ ...appearance, textSize: value });
-        }}>
-          <option value="normal">Обычный</option>
-          <option value="large">Крупный</option>
-          <option value="x-large">Очень крупный</option>
-        </select>
-        <label htmlFor="interface-contrast">Контраст</label>
-        <select id="interface-contrast" value={appearance.contrast} onChange={event => changeAppearance({ ...appearance, contrast: event.currentTarget.value === "high" ? "high" : "normal" })}>
-          <option value="normal">Обычный</option>
-          <option value="high">Высокий: чёрный текст</option>
-        </select>
-        <p>Сохраняется сразу и действует на меню, панели и подсказки. Масштаб самого резюме задаёт список в панели редактора;
-          всё окно целиком увеличивают ⌘ + и ⌘ − (Ctrl на Windows).</p>
       </>}
       {(section === "model" || section === "limits") && draftActions}
     </div></div>

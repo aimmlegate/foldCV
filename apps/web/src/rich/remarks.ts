@@ -9,8 +9,10 @@ import { allSpans, field, isFrame, ownSpans, subtree, type OutlineBlock, type Ou
 type IssueInput = { state: string; message: string; targetIds: readonly string[]; blockIds: readonly string[] };
 type FactsInput = { records: readonly unknown[] };
 
-/** The marked places with the remarks on each: shown fields by cell ID, and blocks whose own text is marked. */
-export type RemarkMarks = { cells: ReadonlyMap<string, readonly string[]>; blocks: ReadonlyMap<string, readonly string[]> };
+/** The marked places with the remarks on each: shown fields by cell ID, fields marked only inside one block (by block ID,
+ * then cell ID), and blocks whose own text is marked. */
+export type RemarkMarks = { cells: ReadonlyMap<string, readonly string[]>;
+  scoped: ReadonlyMap<string, ReadonlyMap<string, readonly string[]>>; blocks: ReadonlyMap<string, readonly string[]> };
 
 /** What a doubtful value's mark says: it names the value, so the tip speaks of the place it is on (D130). */
 export function doubtfulValue(rawText: unknown, what: "value" | "date" | "present" | "datedEnd" = "value"): string {
@@ -64,11 +66,13 @@ function doubtfulCells(facts: FactsInput | undefined): [string, string][] {
   return result;
 }
 
-/** What the text marks. A remark marks the fields it names where the document shows them; otherwise the blocks Python
- * placed it on, where a named heading stands for its whole section. A remark without targets names no place of its own
- * (Python then lists every imported block) and is not marked. */
+/** What the text marks. A remark marks the fields it names where the document shows them: only inside the blocks Python
+ * placed it on when those show them (a skill group remark names its group, not the jobs listing the technology), else
+ * everywhere. Without a shown field it marks those blocks, where a named heading stands for its whole section. A remark
+ * without targets names no place of its own (Python then lists every imported block) and is not marked. */
 export function remarkMarks(document: OutlineDocument, issues: readonly IssueInput[], facts?: FactsInput): RemarkMarks {
-  const blocks = new Map<string, OutlineBlock>(), sections = new Map<string, string>(), shown = new Set<string>();
+  // `shown`: the blocks showing each field.
+  const blocks = new Map<string, OutlineBlock>(), sections = new Map<string, string>(), shown = new Map<string, Set<string>>();
   for (const region of document.regions) {
     let heading: string | null = null;
     for (const top of region.blocks) {
@@ -76,22 +80,31 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
       for (const block of subtree(top)) {
         blocks.set(block.id, block);
         if (heading !== null) sections.set(block.id, heading);
-        shownCells(block).forEach(id => shown.add(id));
+        shownCells(block).forEach(id => shown.set(id, (shown.get(id) ?? new Set<string>()).add(block.id)));
       }
     }
   }
-  const cells = new Map<string, string[]>(), marked = new Map<string, string[]>();
+  const cells = new Map<string, string[]>(), scoped = new Map<string, Map<string, string[]>>(), marked = new Map<string, string[]>();
   const add = (into: Map<string, string[]>, id: string, message: string) => {
     const messages = into.get(id) ?? [];
     if (!messages.includes(message)) into.set(id, [...messages, message]);
   };
+  const inside = (block: string) => { const value = scoped.get(block) ?? new Map<string, string[]>(); scoped.set(block, value); return value; };
   // A frame's own line is hidden, so its lines carry its mark.
   const lines = (block: OutlineBlock): string[] => isFrame(block) ? block.children.flatMap(lines) : [block.id];
   for (const issue of issues) {
     const message = issue.message.trim();
     if (issue.state !== "active" || !message || !issue.targetIds.length) continue;
     const fields = issue.targetIds.filter(id => shown.has(id));
-    if (fields.length) { fields.forEach(id => add(cells, id, message)); continue; }
+    if (fields.length) {
+      const named = new Set(issue.blockIds.flatMap(id => { const block = blocks.get(id); return block ? subtree(block).map(value => value.id) : []; }));
+      for (const id of fields) {
+        const places = [...shown.get(id) ?? []].filter(block => named.has(block));
+        if (!places.length) add(cells, id, message);
+        places.forEach(block => add(inside(block), id, message));
+      }
+      continue;
+    }
     const named = issue.blockIds.flatMap(id => { const block = blocks.get(id); return block ? [block] : []; });
     const headings = new Set(named.filter(block => block.type === "heading").map(block => block.id));
     for (const block of named) {
@@ -101,7 +114,7 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
     }
   }
   for (const [id, message] of doubtfulCells(facts)) if (shown.has(id)) add(cells, id, message);
-  return { cells, blocks: marked };
+  return { cells, scoped, blocks: marked };
 }
 
 /** The fact a cell ID names, for the tip's way into Facts; a block mark names none. */
@@ -116,23 +129,29 @@ export function remarkRecord(cellId: string): string | null {
 export const remarkMessagesAttribute = "data-fcv-remark", remarkRecordAttribute = "data-fcv-record";
 const markAttributes = (messages: readonly string[], recordId: string | null) => ({ class: "fcv-remark",
   [remarkMessagesAttribute]: JSON.stringify(messages), ...(recordId ? { [remarkRecordAttribute]: recordId } : {}) });
+/** A field's remarks: the ones on it anywhere, then the ones on it inside its block. */
+const fieldMessages = (marks: RemarkMarks, block: unknown, cell: string): string[] => [...new Set([...marks.cells.get(cell) ?? [],
+  ...typeof block === "string" ? marks.scoped.get(block)?.get(cell) ?? [] : []])];
 
 /** Decorations for the marks `current` returns; null shows none. */
 export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
   return new Plugin({ key: new PluginKey(remarkMarksMeta), props: { decorations: state => {
     const marks = current();
-    if (!marks || (!marks.cells.size && !marks.blocks.size)) return DecorationSet.empty;
+    if (!marks || (!marks.cells.size && !marks.scoped.size && !marks.blocks.size)) return DecorationSet.empty;
     const decorations: Decoration[] = [];
+    // A block's own fields come before its nested blocks, so the last container passed holds the field.
+    let container: unknown = null;
     state.doc.descendants((node, position) => {
       const name = node.type.name;
       if (name === "templateField" || name === "boundLink") {
-        const cell: unknown = node.attrs["cellId"], messages = typeof cell === "string" ? marks.cells.get(cell) : undefined;
-        if (messages && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize,
+        const cell: unknown = node.attrs["cellId"], messages = typeof cell === "string" ? fieldMessages(marks, container, cell) : [];
+        if (messages.length && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize,
           markAttributes(messages, typeof cell === "string" ? remarkRecord(cell) : null)));
         return false;
       }
       if (name !== "blockContainer") return true;
       const id: unknown = node.attrs["id"], messages = typeof id === "string" ? marks.blocks.get(id) : undefined;
+      container = id;
       const size = node.firstChild?.content.size ?? 0;
       // The block's own content starts inside its content node, one step past the container's start.
       if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages, null)));

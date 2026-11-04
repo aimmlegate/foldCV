@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Schema, type Node } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
-import { DecorationSet } from "@tiptap/pm/view";
-import { doubtfulValue, remarkMarks, remarkMarksPlugin, type RemarkMarks } from "../src/rich/remarks";
+import { DecorationSet, type Decoration } from "@tiptap/pm/view";
+import { doubtfulValue, remarkMarks, remarkMarksPlugin, remarkMessagesAttribute, type RemarkMarks } from "../src/rich/remarks";
 import { groupAnchors, type OutlineDocument } from "../src/rich/outline";
 
 type Block = OutlineDocument["regions"][number]["blocks"][number];
@@ -36,11 +36,21 @@ const issue = (targetIds: string[], blockIds: string[], message = "Замеча�
 const known = (rawText: string) => ({ rawText, value: rawText, status: "known" });
 const unresolved = (rawText: string) => ({ rawText, value: null, status: "unresolved" });
 const sorted = (map: ReadonlyMap<string, readonly string[]>) => [...map].sort(([left], [right]) => left.localeCompare(right));
+const inside = (marks: RemarkMarks) => [...marks.scoped].flatMap(([block, fields]) =>
+  [...fields].map(([id, messages]) => [block, id, messages] as const)).sort(([left], [right]) => left.localeCompare(right));
 
-test("a remark marks the fields it names wherever the text shows them, not the blocks Python placed it on", () => {
-  // As the skill group remark: technology cells as targets, and blocks found by shared source lines.
-  const marks = remarkMarks(document, [issue([cell("nginx", "display")], ["about", "focus-python", "labs-chips"], "Группа не определена.")]);
-  assert.deepEqual(sorted(marks.cells), [[cell("nginx", "display"), ["Группа не определена."]]], "the chip and the tools line share one cell");
+test("a remark marks its fields inside the blocks Python names when they show them, else wherever the text shows them", () => {
+  const marks = remarkMarks(document, [
+    // The skill group remark names its group: the tools line, not the job chip that shares its cell.
+    issue([cell("nginx", "display")], ["tools", "tools-line"], "Группа не определена."),
+    // A named item stands for its lines.
+    issue([cell("python", "display")], ["labs"], "Python под вопросом."),
+    // Blocks found by shared source lines, none of them showing the field.
+    issue([cell("nginx", "display")], ["about", "labs-title"], "Найдено по строкам исходника."),
+  ]);
+  assert.deepEqual(inside(marks), [["labs-chips", cell("python", "display"), ["Python под вопросом."]],
+    ["tools-line", cell("nginx", "display"), ["Группа не определена."]]], "neither the Focus row nor the job chip");
+  assert.deepEqual(sorted(marks.cells), [[cell("nginx", "display"), ["Найдено по строкам исходника."]]], "the chip and the tools line");
   assert.equal(marks.blocks.size, 0);
 });
 
@@ -125,12 +135,36 @@ test("the plugin marks a field node and a block's own text, and nothing while th
       schema.node("blockGroup", null, nested)]),
   ]));
   const at = (name: string) => { let found = -1; doc.descendants((node, pos) => { if (found < 0 && node.isText && node.text === name) found = pos; }); return found; };
-  const marks: RemarkMarks = { cells: new Map([["cell-1", ["Группа не определена."]]]), blocks: new Map([["parent", ["Под вопросом."]]]) };
+  const marks: RemarkMarks = { cells: new Map([["cell-1", ["Группа не определена."]]]), scoped: new Map(),
+    blocks: new Map([["parent", ["Под вопросом."]]]) };
   const found = decorations(doc, marks).map(value => [value.from, value.to]).sort((left, right) => (left[0] ?? 0) - (right[0] ?? 0));
   // The field node starts one step before its text; the parent's own text, not its nested child, is marked.
   assert.deepEqual(found, [[at("Nginx") - 1, at("Nginx") + "Nginx".length + 1], [at("Parent"), at("Parent") + "Parent".length]]);
   assert.deepEqual(decorations(doc, null), []);
-  assert.deepEqual(decorations(doc, { cells: new Map(), blocks: new Map() }), []);
+  assert.deepEqual(decorations(doc, { cells: new Map(), scoped: new Map(), blocks: new Map() }), []);
+});
+
+const tip = (value: Decoration): unknown => {
+  const attrs = (value as unknown as { type: { attrs: Record<string, string | undefined> } }).type.attrs;
+  return JSON.parse(attrs[remarkMessagesAttribute] ?? "[]");
+};
+
+test("a field marked inside one block is marked only there, with the field's marks anywhere", () => {
+  const field = (value: string) => schema.node("templateField", { cellId: "cell-1" }, schema.text(value));
+  // A job chip with a nested line showing the same field, then the group line.
+  const doc = schema.node("doc", null, schema.node("blockGroup", null, [
+    schema.node("blockContainer", { id: "chips" }, [schema.node("paragraph", null, field("Chip")),
+      schema.node("blockGroup", null, schema.node("blockContainer", { id: "nested" }, schema.node("paragraph", null, field("Nested"))))]),
+    schema.node("blockContainer", { id: "group" }, schema.node("paragraph", null, [schema.text("Tools: "), field("Group")])),
+  ]));
+  const tips = (marks: Omit<RemarkMarks, "blocks">) => decorations(doc, { ...marks, blocks: new Map() })
+    .map(value => [doc.textBetween(value.from, value.to), tip(value)]).sort(([left], [right]) => String(left).localeCompare(String(right)));
+  const group = new Map([["group", new Map([["cell-1", ["Группа не определена."]]])]]);
+  assert.deepEqual(tips({ cells: new Map(), scoped: group }), [["Group", ["Группа не определена."]]]);
+  assert.deepEqual(tips({ cells: new Map([["cell-1", ["Найдено."]]]), scoped: group }),
+    [["Chip", ["Найдено."]], ["Group", ["Найдено.", "Группа не определена."]], ["Nested", ["Найдено."]]]);
+  assert.deepEqual(tips({ cells: new Map(), scoped: new Map([["chips", new Map([["cell-1", ["Только чип."]]])]]) }),
+    [["Chip", ["Только чип."]]], "a nested block's field is not its parent's");
 });
 
 test("a value the user typed gets no doubtful mark", () => {

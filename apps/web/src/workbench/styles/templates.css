@@ -5,7 +5,7 @@
 .templates-list .template-row { border: 1px solid transparent; background: none; border-radius: 6px; text-align: left; padding: 10px 12px;
   display: flex; flex-direction: column; gap: 4px; color: var(--ink); }
 .templates-list .template-row:hover:not(:disabled) { background: var(--wash); }
-.templates-list .template-row[aria-current="page"] { background: #e5ecda; border-color: #dce4cf; }
+.templates-list .template-row[aria-current="page"] { background: var(--wash); border-color: var(--wash-strong); }
 .templates-list .template-row strong { font-weight: 550; overflow-wrap: anywhere; }
 .templates-list .template-row small { color: var(--muted); }
 .templates-editor { min-width: 0; padding-left: 24px; border-left: 1px solid var(--line); }
@@ -18,7 +18,7 @@
 .template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }
 .templates-assistant:empty { display: none; }
 /* The resume drawer's prototype rules are keyed to its own ids; this drawer is a column beside the editor. */
-#template-chat-host { background: #fafbf5; border: 1px solid #d5deca; border-radius: 8px; overflow: hidden; }
+#template-chat-host { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 #template-chat-host.chat-open { width: 380px; height: max(420px, calc(100vh - 300px)); }
 #template-chat-host.chat-expanded { width: 560px; }
 #template-chat-host .chat-handle { display: none; }
@@ -27,7 +27,7 @@
 #template-chat-input { width: 100%; min-height: 36px; max-height: 115px; border: 0; padding: 0 3px; border-radius: 0; outline: none; background: transparent;
   resize: vertical; line-height: 1.6; box-shadow: none; font-size: var(--ui-body); color: var(--ink); }
 #template-chat-input::placeholder { color: var(--muted); }
-#template-chat-model { border: 0; width: auto; max-width: 135px; font-size: 10px; padding: 5px 20px 5px 4px; color: #758966; background: transparent; }
+#template-chat-model { border: 0; width: auto; max-width: 135px; font-size: 10px; padding: 5px 20px 5px 4px; color: var(--muted-soft); background: transparent; }
 .template-proposal-target { font-size: var(--ui-small); color: var(--muted); }
 .template-proposal-diff { height: 260px; border: 1px solid var(--line); border-radius: 5px; margin-top: 8px; overflow: hidden; }
 @media (max-width: 1080px) {

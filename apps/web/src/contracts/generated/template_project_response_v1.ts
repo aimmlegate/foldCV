@@ -19,6 +19,7 @@ export type Styletoken = string;
 export type Templateinstanceid = string | null;
 export type Viewkey = string;
 export type Addkinds = ("employment" | "education" | "language")[];
+export type Addtechnologygroup = boolean;
 export type Band = true | null;
 /**
  * @minItems 1
@@ -48,6 +49,7 @@ export type Jobid = string | null;
 export type Label = string;
 export type Afterid = string | null;
 export type Parentid = string;
+export type Records1 = string[];
 export type Technologytargets = EditorTechnologyTarget[];
 export type Capabilities = string[];
 export type AllowMorePages = true;
@@ -360,7 +362,7 @@ export type Origin12 = "source" | "user";
 export type Revision20 = number;
 export type Status7 = "unresolved" | "pending" | "conflict";
 export type Usercorrected17 = boolean;
-export type Records1 = (
+export type Records2 = (
   | CandidateRecord
   | DetailRecord
   | EmploymentRecord
@@ -2042,6 +2044,7 @@ export interface StyleOverrides {
  */
 export interface EditorPlanV1 {
   addKinds?: Addkinds;
+  addTechnologyGroup?: Addtechnologygroup;
   blocks: Blocks1;
   focusPanel?: EditorFocusPanel | null;
   fonts: Fonts;
@@ -2120,6 +2123,7 @@ export interface EditorTechnologyTarget {
   jobId: Jobid;
   label: Label;
   placement: EditorPlacement;
+  records?: Records1;
 }
 /**
  * A block's parent block or region and the sibling before it, as a panel placement context names them.
@@ -2354,7 +2358,7 @@ export interface WorkingFactsV2 {
   manualScopes: Manualscopes;
   mode?: Mode1;
   observations: Observations;
-  records: Records1;
+  records: Records2;
   relations: Relations1;
   revision: Revision21;
   schemaVersion: Schemaversion4;

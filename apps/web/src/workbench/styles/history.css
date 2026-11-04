@@ -3,14 +3,14 @@
 .app-shell .history .brand { gap: 8px; min-width: 0; color: var(--ink); font-size: 25px; font-weight: 650; line-height: 1; letter-spacing: -1.2px; }
 .app-shell .history .brand > svg { width: 28px; height: 28px; margin: 0; }
 .app-shell .history .brand > .brand-name { color: inherit; white-space: nowrap; }
-.app-shell .history .brand-name > span { color: #7d8a6e; }
+.app-shell .history .brand-name > span { color: var(--muted-soft); }
 .app-shell .history .new-button { margin: 0 0 24px; padding: 9px 11px; }
 .app-shell .history .history-heading { margin-bottom: 6px; padding: 0 12px; }
 
 .app-shell .history .project-list { gap: 2px; min-height: 0; }
 .app-shell .history .project-row { border-radius: 6px; }
 /* Lighter than the active row, so hover never reads as the open resume. */
-.app-shell .history .project-row:not(.active):is(:hover, :focus-within) { background: #edf0e6; }
+.app-shell .history .project-row:not(.active):is(:hover, :focus-within) { background: var(--desk); }
 .app-shell .history .project-select { gap: 1px; padding: 7px 10px 7px 11px; }
 .app-shell .history .project-select :is(strong, small, em) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-shell .history .project-select strong { font-size: 13px; font-weight: 550; line-height: 1.4; }
@@ -21,8 +21,8 @@
 .app-shell .history .project-actions { position: absolute; top: 50%; right: 4px; display: flex; gap: 1px; padding-left: 4px; border-radius: 5px; background: inherit; opacity: 0; transform: translateY(-50%); }
 .app-shell .history .project-row:is(:hover, :focus-within) .project-actions { opacity: 1; }
 .app-shell .history .project-actions > button { position: static; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 5px; border: 0; border-radius: 4px; background: none; color: var(--muted); opacity: 1; }
-.app-shell .history .project-actions > button:hover:not(:disabled) { background: #dbe3ce; color: var(--ink); }
-.app-shell .history .project-actions > .project-delete:hover:not(:disabled) { color: #925e48; }
+.app-shell .history .project-actions > button:hover:not(:disabled) { background: var(--wash-strong); color: var(--ink); }
+.app-shell .history .project-actions > .project-delete:hover:not(:disabled) { color: var(--danger); }
 .app-shell .history .project-actions svg { width: 13px; height: 13px; }
 
 .app-shell .history .history-archive { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
@@ -30,7 +30,7 @@
 .app-shell .history .archive-toggle:hover { background: var(--wash); }
 .app-shell .history .archive-toggle > svg { width: 12px; height: 12px; transition: transform .15s; }
 .app-shell .history .archive-toggle[aria-expanded="true"] > svg { transform: rotate(90deg); }
-.app-shell .history .archive-count { margin-left: auto; color: #929b85; font-size: 10px; }
+.app-shell .history .archive-count { margin-left: auto; color: var(--muted-soft); font-size: 10px; }
 .app-shell .history .archive-list { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
 
 .app-shell .history .history-footer { padding: 14px 8px 0; }

@@ -4,7 +4,7 @@
 /* The sprite's check path; the Icon component's SVG import cannot load in the Node render tests. */
 .chat-proposal[data-state="applied"] h3::before { content: ""; flex-shrink: 0; width: 14px; height: 14px; background: var(--accent);
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4L19 6'/%3E%3C/svg%3E") center / contain no-repeat; }
-.chat-proposal[data-state="applied"] { border-color: #acbf96; }
+.chat-proposal[data-state="applied"] { border-color: var(--ok); }
 .chat-proposal p { margin-block: 8px; overflow-wrap: anywhere; }
 .chat-proposal-coverage { color: var(--muted); }
 .chat-proposal-change { margin-block: 10px; }
@@ -19,4 +19,4 @@
 .chat-proposal button:focus-visible, .chat-proposal summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 @container (max-width: 480px) { .chat-proposal-comparison { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) { .chat-proposal-comparison { grid-template-columns: minmax(0, 1fr); } }
-@keyframes assistant-change { from, 60% { background-color: #f0f5e6; box-shadow: 0 0 0 4px #f0f5e6, 0 0 0 6px #acbf96; } to { background-color: transparent; box-shadow: 0 0 0 4px transparent, 0 0 0 6px transparent; } }
+@keyframes assistant-change { from, 60% { background-color: var(--nav); box-shadow: 0 0 0 4px var(--nav), 0 0 0 6px var(--ok); } to { background-color: transparent; box-shadow: 0 0 0 4px transparent, 0 0 0 6px transparent; } }
