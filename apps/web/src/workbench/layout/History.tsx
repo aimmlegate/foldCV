@@ -7,7 +7,7 @@ import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { historyGroups } from "./history-groups";
 import type { Screen } from "../templates/screen";
-import type { SettingsSection } from "../settings/Rows";
+import type { SettingsSection } from "../settings/sections";
 
 /** The refusal shows here: behind this modal dialog the notification badge cannot be reached. */
 export function DeleteDialog({ open, busy, error, close, confirm }: { open: boolean; busy: boolean; error: string; close: () => void; confirm: () => void }) {

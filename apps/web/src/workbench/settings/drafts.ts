@@ -25,11 +25,20 @@ export type SettingsApi = {
   saveLimits: (value: SaveLimitsPreference) => Promise<Preferences>;
   saveRules: (value: SaveRulesRequest) => Promise<RulesSettings>; saveAssistant: (value: AgentSettingsRequest) => Promise<AgentSettings>;
 };
+/** `pending`: parts queued or in the save that runs; `focus`: the value whose row shows a part's progress and error;
+ * `marks`: when a value's row last saved, for its short «Сохранено». */
 export type SettingsState = {
   preferences: Preferences | null; rules: RulesSettings | null; assistant: AgentSettings | null; draft: SettingsValues;
   loading: boolean; saving: boolean; staleRules: boolean; comparison: boolean; saved: SettingsPart[];
   errors: Partial<Record<SettingsPart, string>>; message: string;
+  pending: SettingsPart[]; focus: Partial<Record<SettingsPart, keyof SettingsValues>>; marks: Partial<Record<keyof SettingsValues, number>>;
 };
+
+/** The parts a changed value saves at once (D147). The processing model also saves a chosen level, which belongs to
+ * the model rewriting runs on; the rewrite model leaves the level to Python, which drops one the new model lacks. */
+export const commitParts: Readonly<Record<keyof SettingsValues, readonly SettingsPart[]>> = { model: ["model", "reasoning"], rewriteModel: ["rewrite"],
+  reasoning: ["reasoning"], importModel: ["import"], fallbackModel: ["fallback"], agentEnabled: ["assistant"], agentModel: ["assistant"],
+  agentEffort: ["assistant"], markdown: ["rules"], importMinutes: ["limits"], projectMegabytes: ["limits"] };
 function message(error: unknown, part: SettingsPart): string {
   const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "";
   if (part === "limits" && code === "INVALID_REQUEST") return "Не удалось сохранить лимиты. Укажите целые числа в допустимых пределах.";
@@ -44,9 +53,14 @@ export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
     draft: { reasoning: null, model: null, rewriteModel: null, importModel: null, fallbackModel: null, agentEnabled: true, agentModel: null, agentEffort: null, markdown: "",
       importMinutes: String(limitRanges.importMinutes.default), projectMegabytes: String(limitRanges.projectMegabytes.default) },
-    loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "" };
+    loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "", pending: [], focus: {}, marks: {} };
   private closed = false;
   private epoch = 0;
+  // One save at a time: commits queue their parts, and each queued part goes once with the latest draft.
+  private readonly queue = new Set<SettingsPart>();
+  private readonly inFlight = new Set<SettingsPart>();
+  private running: Promise<void> | null = null;
+  private draining: Promise<void> | null = null;
   constructor(private readonly api: SettingsApi, private readonly changed: (state: SettingsState) => void) {}
   private publish(patch: Partial<SettingsState>): void {
     if (!this.closed) { this.state = { ...this.state, ...patch }; this.changed(this.state); }
@@ -69,8 +83,39 @@ export class SettingsDrafts {
     return result;
   }
   change<K extends keyof SettingsValues>(key: K, value: SettingsValues[K]): void {
-    this.publish({ draft: { ...this.state.draft, [key]: value }, message: "" });
+    const marks = { ...this.state.marks }; delete marks[key];
+    this.publish({ draft: { ...this.state.draft, [key]: value }, message: "", marks });
   }
+  /** Changes a value and saves its parts at once, behind a save that runs. */
+  commit<K extends keyof SettingsValues>(key: K, value: SettingsValues[K]): Promise<void> {
+    this.change(key, value);
+    const parts = commitParts[key], focus = { ...this.state.focus };
+    for (const part of parts) { this.queue.add(part); focus[part] = key; }
+    this.publish({ focus });
+    return this.drain();
+  }
+  /** Sends a part's draft again after a refused save. The assistant panel saves the same settings, so a refusal can
+   * come from an older revision: that base is read again first, keeping the choice. */
+  async retry(part: SettingsPart): Promise<void> {
+    if (part === "assistant") await this.refreshAssistant();
+    this.queue.add(part);
+    return this.drain();
+  }
+  private publishPending(): void { this.publish({ pending: [...new Set([...this.inFlight, ...this.queue])] }); }
+  private drain(): Promise<void> {
+    this.publishPending();
+    this.draining ??= (async () => {
+      while (this.queue.size && !this.closed) {
+        if (this.running) { await this.running; continue; }
+        // Loading takes the bases first; its end drains the queue again.
+        if (this.state.loading) break;
+        const parts = [...this.queue]; this.queue.clear();
+        await this.save(parts);
+      }
+    })().finally(() => { this.draining = null; this.publishPending(); });
+    return this.draining;
+  }
+  private settled(): void { if (this.queue.size) void this.drain(); }
   async load(): Promise<void> {
     if (this.state.saving || this.state.loading || this.closed) return;
     const epoch = ++this.epoch; this.publish({ loading: true });
@@ -95,6 +140,7 @@ export class SettingsDrafts {
         this.publish({ assistant: assistant.value }); delete errors.assistant; }
     } else errors.assistant = "Не удалось загрузить настройки помощника. Повторите загрузку.";
     this.publish({ draft, errors, loading: false });
+    this.settled();
   }
   cancel(): void {
     if (this.state.saving) return;
@@ -144,7 +190,7 @@ export class SettingsDrafts {
       this.publish({ rules, errors, staleRules: false, comparison: true,
         message: "Сохранённая версия загружена ниже. Ваш текст остался в форме." });
     } catch { this.publish({ errors: { ...this.state.errors, rules: "Не удалось загрузить команды. Ваш текст остался в форме." } }); }
-    finally { if (epoch === this.epoch) this.publish({ loading: false }); }
+    finally { if (epoch === this.epoch) { this.publish({ loading: false }); this.settled(); } }
   }
   async reloadAssistant(): Promise<void> {
     if (this.state.saving || this.state.loading || this.closed) return;
@@ -154,13 +200,21 @@ export class SettingsDrafts {
       const errors = { ...this.state.errors }; delete errors.assistant;
       this.publish({ assistant, errors, message: "Настройки помощника загружены. Ваш выбор остался в форме." });
     } catch { this.publish({ errors: { ...this.state.errors, assistant: "Не удалось загрузить настройки помощника." } }); }
-    finally { if (epoch === this.epoch) this.publish({ loading: false }); }
+    finally { if (epoch === this.epoch) { this.publish({ loading: false }); this.settled(); } }
   }
-  async save(): Promise<void> {
-    if (this.state.saving || this.state.loading || this.closed) return;
-    const parts = this.dirty, submitted = { ...this.state.draft }, bases = this.state;
+  /** Saves the dirty parts, or only those of `only` that are dirty; a part already saved has nothing to send. */
+  save(only?: readonly SettingsPart[]): Promise<void> {
+    if (this.state.saving || this.state.loading || this.closed) return Promise.resolve();
+    const run = this.run(only ? this.dirty.filter(part => only.includes(part)) : this.dirty)
+      .finally(() => { this.running = null; this.inFlight.clear(); this.publishPending(); this.settled(); });
+    this.running = run;
+    return run;
+  }
+  private async run(parts: SettingsPart[]): Promise<void> {
+    const submitted = { ...this.state.draft }, bases = this.state;
     const errors = { ...this.state.errors }; for (const part of parts) delete errors[part];
-    this.publish({ saving: true, errors, saved: [], message: "" });
+    for (const part of parts) this.inFlight.add(part);
+    this.publish({ saving: true, errors, saved: [], message: "" }); this.publishPending();
     for (const part of parts) {
       if (this.closed) break;
       try {
@@ -211,11 +265,13 @@ export class SettingsDrafts {
           this.publish({ rules, comparison: false, draft: { ...this.state.draft,
             markdown: this.state.draft.markdown === submitted.markdown ? rules.markdown : this.state.draft.markdown } });
         }
-        this.publish({ saved: [...this.state.saved, part] });
+        const key = this.state.focus[part];
+        this.publish({ saved: [...this.state.saved, part], ...(key ? { marks: { ...this.state.marks, [key]: Date.now() } } : {}) });
       } catch (error) {
         this.publish({ errors: { ...this.state.errors, [part]: message(error, part) }, staleRules: this.state.staleRules ||
           part === "rules" && error instanceof Error && "code" in error && error.code === "RULES_STALE" });
       }
+      this.inFlight.delete(part); this.publishPending();
     }
     this.publish({ saving: false });
   }

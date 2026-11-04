@@ -13,7 +13,7 @@ import { TaskProgress } from "./import/TaskProgress";
 import { TaskNotices } from "./import/TaskNotices";
 import { sourceSummary } from "./import/progress";
 import { Settings } from "./settings/Settings";
-import type { SettingsSection } from "./settings/Rows";
+import type { SettingsSection } from "./settings/sections";
 import { readPaneOrder, savePaneOrder, type PaneOrder, readAppearance, saveAppearance, type Appearance } from "./settings/interface";
 import { FileDialog, type FileMode } from "./files/FileDialog";
 import { projectFilename, projectStem } from "./files/filename";

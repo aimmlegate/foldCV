@@ -1,9 +1,6 @@
-import type { ReactNode } from "react";
-
-/** The sections of Settings in nav order (D147). Limits have no item: their saved or default values still apply. */
-export type SettingsSection = "connection" | "models" | "assistant" | "rules" | "appearance";
-export const settingsSections: readonly { id: SettingsSection; label: string }[] = [{ id: "connection", label: "Подключение" },
-  { id: "models", label: "Модели" }, { id: "assistant", label: "Помощник" }, { id: "rules", label: "Команды" }, { id: "appearance", label: "Оформление" }];
+import { useEffect, useState, type ReactNode } from "react";
+import { Icon } from "../ui/Icon";
+import { Spinner } from "../ui/Spinner";
 
 /** A bordered group of setting rows; the title is an eyebrow inside the border. */
 export function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
@@ -23,4 +20,17 @@ export function SettingsRow({ label, hint, htmlFor, children, note }: {
     <div className="settings-row-control">{children}</div>
     {note && <div className="settings-row-note">{note}</div>}
   </div>;
+}
+
+/** A row's save state at the left of its control: a spinner while it saves, then «Сохранено» for two seconds. */
+export function RowState({ pending, at }: { pending: boolean; at: number | undefined }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const left = at === undefined ? 0 : at + 2000 - Date.now();
+    setShown(left > 0);
+    if (left <= 0) return;
+    const timer = setTimeout(() => setShown(false), left);
+    return () => clearTimeout(timer);
+  }, [at]);
+  return <span className="settings-row-state" role="status">{pending ? <Spinner /> : shown && <><Icon name="check" />Сохранено</>}</span>;
 }

@@ -5,7 +5,7 @@ import type { Preferences } from "../src/contracts/generated/preferences";
 import type { RulesSettings } from "../src/contracts/generated/rules_settings";
 import type { AgentSettings } from "../src/contracts/generated/agent_settings";
 import { projectFilename } from "../src/workbench/files/filename";
-import { settingsSections } from "../src/workbench/settings/Rows";
+import { settingsSections } from "../src/workbench/settings/sections";
 
 function gate() { let release = () => {}; const wait = new Promise<void>(resolve => { release = resolve; }); return { wait, release }; }
 function setup() {
@@ -262,4 +262,66 @@ test("reopened Settings shows rewrite choices saved in the popover and keeps its
 test("Settings lists five sections in nav order; limits have no item (D147)", () => {
   assert.deepEqual(settingsSections.map(item => `${item.id}:${item.label}`),
     ["connection:Подключение", "models:Модели", "assistant:Помощник", "rules:Команды", "appearance:Оформление"]);
+});
+
+test("a committed choice saves its own part at once and marks its row; nothing else is sent (D147)", async () => {
+  const h = setup(); await h.controller.load();
+  h.controller.change("markdown", `${h.server.rules.markdown}\nDraft.`);
+  await h.controller.commit("importModel", "model-c");
+  assert.deepEqual(h.calls, [{ part: "import", value: "model-c" }]);
+  assert.equal(h.server.preferences.selectedImportModel, "model-c");
+  assert.deepEqual(h.controller.dirty, ["rules"]);
+  assert.equal(typeof h.controller.state.marks.importModel, "number"); assert.deepEqual(h.controller.state.pending, []);
+  // The next change of that value clears its mark.
+  h.controller.change("importModel", "model-a");
+  assert.equal(h.controller.state.marks.importModel, undefined);
+});
+
+test("a refused commit keeps the choice with the error on its row, and Повторить sends it again", async () => {
+  const h = setup(); await h.controller.load();
+  h.fail.add("fallback"); await h.controller.commit("fallbackModel", "model-b");
+  assert.equal(h.controller.state.draft.fallbackModel, "model-b"); assert.ok(h.controller.state.errors.fallback);
+  assert.equal(h.controller.state.focus.fallback, "fallbackModel"); assert.equal(h.controller.state.marks.fallbackModel, undefined);
+  h.fail.clear(); await h.controller.retry("fallback");
+  assert.equal(h.server.preferences.selectedFallbackModel, "model-b"); assert.equal(h.controller.state.errors.fallback, undefined);
+  assert.deepEqual(h.calls.map(call => call.part), ["fallback", "fallback"]);
+});
+
+test("changes during a save wait for it; the queued part goes once, with the latest choice, in order", async () => {
+  const h = setup(); await h.controller.load();
+  const hold = gate(), original = h.api.selectRewrite;
+  h.api.selectRewrite = async model => { if (model === "model-b") await hold.wait; return original(model); };
+  const first = h.controller.commit("rewriteModel", "model-b");
+  await Promise.resolve();
+  void h.controller.commit("rewriteModel", "model-c"); void h.controller.commit("rewriteModel", "model-a");
+  assert.deepEqual(h.controller.state.pending, ["rewrite"]);
+  hold.release(); await first;
+  assert.deepEqual(h.calls.map(call => call.value), ["model-b", "model-a"]);
+  assert.equal(h.server.preferences.selectedRewriteModel, "model-a"); assert.deepEqual(h.controller.dirty, []); assert.deepEqual(h.controller.state.pending, []);
+});
+
+test("a new rewrite model leaves the level to Python; a new processing model saves the chosen level for itself", async () => {
+  const h = setup(); h.server.preferences.rewriteReasoningEffort = "low"; await h.controller.load();
+  // model-c has no «low»: Python drops it and the level row follows, without a refused level save.
+  await h.controller.commit("rewriteModel", "model-c");
+  assert.deepEqual(h.calls.map(call => call.part), ["rewrite"]);
+  assert.equal(h.controller.state.draft.reasoning, null); assert.deepEqual(h.controller.dirty, []); assert.equal(h.controller.state.errors.reasoning, undefined);
+  await h.controller.commit("rewriteModel", null); await h.controller.commit("reasoning", "medium");
+  // Rewriting runs on the processing model, so its change sends the level for the new model too.
+  await h.controller.commit("model", "model-b");
+  assert.deepEqual(h.calls.slice(-2), [{ part: "model", value: "model-b" }, { part: "reasoning", value: { model: "model-b", effort: "medium" } }]);
+  // model-b lacks «medium»: the refusal lands on the processing model's row and the level stays chosen.
+  assert.ok(h.controller.state.errors.reasoning); assert.equal(h.controller.state.focus.reasoning, "model");
+  assert.equal(h.controller.state.draft.reasoning, "medium"); assert.equal(h.server.preferences.selectedModel, "model-b");
+});
+
+test("a commit during a reload waits for it and then saves", async () => {
+  const h = setup(); await h.controller.load();
+  const hold = gate(), original = h.api.rules;
+  h.api.rules = async () => { await hold.wait; return original(); };
+  const reloading = h.controller.reloadRules();
+  const committed = h.controller.commit("agentEnabled", true);
+  assert.deepEqual(h.controller.state.pending, ["assistant"]); assert.equal(h.server.assistant.enabled, false);
+  hold.release(); await reloading; await committed; await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(h.server.assistant.enabled, true); assert.deepEqual(h.controller.state.pending, []);
 });

@@ -18,6 +18,13 @@
 .settings-row-control { display: flex; flex: 0 1 auto; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; margin-left: auto; }
 .settings-row-control > select { width: 280px; max-width: 100%; margin: 0; padding: 8px 10px; }
 .settings-row-note { flex-basis: 100%; }
+/* Saving at once (D147): a spinner, then «Сохранено» by the control; a refusal under the row with «Повторить». An empty
+   state stays in the tree for the announcement; at the left of a right-aligned control its gap shows as nothing. */
+.settings-row-state { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: var(--ui-small); white-space: nowrap; }
+.settings-row-state > svg, .settings-row-state > .operation-spinner { width: 14px; height: 14px; }
+.app-shell .settings-content .settings-row-error { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 2px 0 0; color: var(--danger);
+  font-size: var(--ui-small); line-height: 1.5; }
+.app-shell .settings-content .settings-row-error .text-button { padding: 0; color: var(--accent); font-size: var(--ui-small); }
 
 /* The text size as three segments; native radios keep the arrow keys. */
 .segmented { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }

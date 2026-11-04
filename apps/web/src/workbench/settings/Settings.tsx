@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ConnectionWorkflow, modelGroups, type ConnectionView } from "../../connection/workflow";
 import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
 import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
-import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState } from "./drafts";
+import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState, type SettingsValues } from "./drafts";
 import { Connections } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
 import { ReasoningSelect } from "./ReasoningSelect";
@@ -11,11 +11,16 @@ import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import { type Appearance, type PaneOrder } from "./interface";
 import { AppearanceSettings } from "./Appearance";
-import { SettingsGroup, SettingsRow, settingsSections, type SettingsSection } from "./Rows";
+import { RowState, SettingsGroup, SettingsRow } from "./Rows";
+import { settingsSections, type SettingsSection } from "./sections";
 
 const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
+// The parts that save at once from a row; their state shows on the row of the value that sent them.
+const rowBound: readonly SettingsPart[] = ["model", "rewrite", "reasoning", "import", "fallback", "assistant"];
+const firstKeys: Partial<Record<SettingsPart, keyof SettingsValues>> = { model: "model", rewrite: "rewriteModel", reasoning: "reasoning",
+  import: "importModel", fallback: "fallbackModel", assistant: "agentEnabled" };
 const leads: Record<SettingsSection, string> = { connection: "Модели включённых провайдеров доступны во всех списках моделей.",
-  models: "Какая модель импортирует резюме и правит текст.", assistant: "Чат по резюме и по шаблонам.",
+  models: "Каждый выбор сохраняется сразу.", assistant: "Чат по резюме и по шаблонам. Каждый выбор сохраняется сразу.",
   rules: "Тексты команд «Сократить» и «Сделать яснее» в правке текста.", appearance: "Сохраняется сразу. Страница резюме остаётся светлой при любой теме." };
 
 /** Settings (D147): five sections in a column of at most 720 px; each section is groups of rows. `request` opens a
@@ -46,8 +51,20 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
   useEffect(() => { if (open) { void controller.refreshPreferences(); void controller.refreshAssistant(); void workflow.peek().then(() => workflow.checkReleases()); } }, [open, controller, workflow]);
   const current = state ?? controller.state, dirty = controller.dirty.length > 0, busy = current.loading || current.saving;
   const groups = modelGroups(view.snapshot);
-  const modelsOff = busy || !current.preferences || view.pending || !view.snapshot.metadataReady;
-  const assistantOff = busy || !current.assistant || view.pending || !view.snapshot.metadataReady;
+  // Choices stay open during a save: a change then waits for it and goes next.
+  const modelsOff = current.loading || !current.preferences || view.pending || !view.snapshot.metadataReady;
+  const assistantOff = current.loading || !current.assistant || view.pending || !view.snapshot.metadataReady;
+  // A part without its base failed to load: that goes to the top; a refused save goes under the row that sent it.
+  const loadFailed = (part: SettingsPart) => part === "assistant" ? !current.assistant : part === "rules" ? !current.rules : !current.preferences;
+  const at = (part: SettingsPart) => current.focus[part] ?? firstKeys[part];
+  const rowParts = (key: keyof SettingsValues) => rowBound.filter(part => at(part) === key);
+  const rowState = (key: keyof SettingsValues) => <RowState pending={rowParts(key).some(part => current.pending.includes(part))} at={current.marks[key]} />;
+  const rowNote = (key: keyof SettingsValues) => {
+    const failed = rowParts(key).filter(part => current.errors[part] && !loadFailed(part));
+    return failed.length > 0 && failed.map(part => <p className="settings-row-error" role="alert" key={part}>{errorMessage(current.errors[part])}
+      <button type="button" className="text-button" disabled={current.pending.includes(part)} onClick={() => void controller.retry(part)}>Повторить</button></p>);
+  };
+  const topErrors = Object.entries(current.errors).filter(([part]) => !rowBound.includes(part as SettingsPart) || loadFailed(part as SettingsPart));
   const draftActions = <>{!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
     <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить</Button>
       <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
@@ -61,46 +78,46 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
     </nav><div className="settings-content">
       <div className="settings-feedback">
         {current.loading && <OperationStatus label="Загружаем настройки" timed />}
-        {current.saved.length > 0 && <OperationStatus state="success" label={`Сохранено: ${current.saved.map(part => partNames[part]).join(", ")}.`} />}
+        {current.saved.some(part => !rowBound.includes(part)) && <OperationStatus state="success"
+          label={`Сохранено: ${current.saved.filter(part => !rowBound.includes(part)).map(part => partNames[part]).join(", ")}.`} />}
         {current.message && <p className="notice" role="status">{current.message}</p>}
-        {Object.entries(current.errors).map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
+        {topErrors.map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
+        {!controller.ready && !current.loading && topErrors.length > 0 && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
       </div>
       <h2 className="settings-section-title">{shownLabel}</h2>
       {section !== "limits" && <p className="settings-lead">{leads[section]}</p>}
       {section === "connection" && <Connections view={view} workflow={workflow} disabled={current.saving} />}
       {section === "models" && <><SettingsGroup title="Обработка и правка">
-        <SettingsRow label="Модель обработки" hint="Импорт и правки, если ниже не выбрано другое." htmlFor="model-select">
-          <ModelSelect id="model-select" label="Модель обработки" labelled={false} value={current.draft.model} groups={groups} disabled={modelsOff}
-            change={value => { if (value) controller.change("model", value); }} /></SettingsRow>
-        <SettingsRow label="Модель правки текста" htmlFor="rewrite-model-select">
-          <ModelSelect id="rewrite-model-select" label="Модель правки текста" labelled={false} value={current.draft.rewriteModel} groups={groups}
-            defaultLabel="Как модель обработки" disabled={modelsOff} change={value => controller.change("rewriteModel", value)} /></SettingsRow>
-        <SettingsRow label="Рассуждения при правке" htmlFor="rewrite-reasoning">
-          <ReasoningSelect labelled={false} value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.rewriteModel ?? current.draft.model ?? ""]}
-            disabled={modelsOff || !(current.draft.rewriteModel ?? current.draft.model)} change={value => controller.change("reasoning", value)} /></SettingsRow>
+        <SettingsRow label="Модель обработки" hint="Импорт и правки, если ниже не выбрано другое." htmlFor="model-select" note={rowNote("model")}>
+          {rowState("model")}<ModelSelect id="model-select" label="Модель обработки" labelled={false} value={current.draft.model} groups={groups} disabled={modelsOff}
+            change={value => { if (value) void controller.commit("model", value); }} /></SettingsRow>
+        <SettingsRow label="Модель правки текста" htmlFor="rewrite-model-select" note={rowNote("rewriteModel")}>
+          {rowState("rewriteModel")}<ModelSelect id="rewrite-model-select" label="Модель правки текста" labelled={false} value={current.draft.rewriteModel} groups={groups}
+            defaultLabel="Как модель обработки" disabled={modelsOff} change={value => void controller.commit("rewriteModel", value)} /></SettingsRow>
+        <SettingsRow label="Рассуждения при правке" htmlFor="rewrite-reasoning" note={rowNote("reasoning")}>
+          {rowState("reasoning")}<ReasoningSelect labelled={false} value={current.draft.reasoning} metadata={view.snapshot.modelReasoning?.[current.draft.rewriteModel ?? current.draft.model ?? ""]}
+            disabled={modelsOff || !(current.draft.rewriteModel ?? current.draft.model)} change={value => void controller.commit("reasoning", value)} /></SettingsRow>
       </SettingsGroup>
       <SettingsGroup title="Импорт резюме">
-        <SettingsRow label="Модель импорта" htmlFor="import-model-select">
-          <ModelSelect id="import-model-select" label="Модель импорта" labelled={false} value={current.draft.importModel} groups={groups}
-            defaultLabel="Как модель обработки" disabled={modelsOff} change={value => controller.change("importModel", value)} /></SettingsRow>
-        <SettingsRow label="Резервная модель" hint="Повторит блок, если основная модель не справится." htmlFor="fallback-model-select">
-          <ModelSelect id="fallback-model-select" label="Резервная модель" labelled={false} value={current.draft.fallbackModel} groups={groups}
-            defaultLabel="Нет" disabled={modelsOff} change={value => controller.change("fallbackModel", value)} /></SettingsRow>
-      </SettingsGroup>{draftActions}</>}
-      {section === "assistant" && <><SettingsGroup>
-        <SettingsRow label="Включить помощника" htmlFor="assistant-enabled">
-          <input className="switch" id="assistant-enabled" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant}
-            onChange={event => controller.change("agentEnabled", event.currentTarget.checked)} /></SettingsRow>
-        <SettingsRow label="Модель помощника" htmlFor="assistant-model-select">
-          <ModelSelect id="assistant-model-select" label="Модель помощника" labelled={false} value={current.draft.agentModel} groups={groups}
-            defaultLabel="Выберите модель" disabled={assistantOff} change={value => controller.change("agentModel", value)} /></SettingsRow>
-        <SettingsRow label="Рассуждения помощника" htmlFor="assistant-reasoning">
-          <ReasoningSelect id="assistant-reasoning" label="Рассуждения помощника" labelled={false} value={current.draft.agentEffort}
+        <SettingsRow label="Модель импорта" htmlFor="import-model-select" note={rowNote("importModel")}>
+          {rowState("importModel")}<ModelSelect id="import-model-select" label="Модель импорта" labelled={false} value={current.draft.importModel} groups={groups}
+            defaultLabel="Как модель обработки" disabled={modelsOff} change={value => void controller.commit("importModel", value)} /></SettingsRow>
+        <SettingsRow label="Резервная модель" hint="Повторит блок, если основная модель не справится." htmlFor="fallback-model-select" note={rowNote("fallbackModel")}>
+          {rowState("fallbackModel")}<ModelSelect id="fallback-model-select" label="Резервная модель" labelled={false} value={current.draft.fallbackModel} groups={groups}
+            defaultLabel="Нет" disabled={modelsOff} change={value => void controller.commit("fallbackModel", value)} /></SettingsRow>
+      </SettingsGroup></>}
+      {section === "assistant" && <SettingsGroup>
+        <SettingsRow label="Включить помощника" htmlFor="assistant-enabled" note={rowNote("agentEnabled")}>
+          {rowState("agentEnabled")}<input className="switch" id="assistant-enabled" role="switch" type="checkbox" checked={current.draft.agentEnabled} disabled={!current.assistant || current.loading}
+            onChange={event => void controller.commit("agentEnabled", event.currentTarget.checked)} /></SettingsRow>
+        <SettingsRow label="Модель помощника" htmlFor="assistant-model-select" note={rowNote("agentModel")}>
+          {rowState("agentModel")}<ModelSelect id="assistant-model-select" label="Модель помощника" labelled={false} value={current.draft.agentModel} groups={groups}
+            defaultLabel="Выберите модель" disabled={assistantOff} change={value => void controller.commit("agentModel", value)} /></SettingsRow>
+        <SettingsRow label="Рассуждения помощника" htmlFor="assistant-reasoning" note={rowNote("agentEffort")}>
+          {rowState("agentEffort")}<ReasoningSelect id="assistant-reasoning" label="Рассуждения помощника" labelled={false} value={current.draft.agentEffort}
             metadata={view.snapshot.modelReasoning?.[current.draft.agentModel ?? ""]} disabled={assistantOff || !current.draft.agentModel}
-            change={value => controller.change("agentEffort", value)} /></SettingsRow>
-      </SettingsGroup>
-        {current.errors.assistant && current.assistant && <button className="text-button" disabled={busy} onClick={() => void controller.reloadAssistant()}>Загрузить снова</button>}
-        {draftActions}</>}
+            change={value => void controller.commit("agentEffort", value)} /></SettingsRow>
+      </SettingsGroup>}
       {section === "rules" && <>
         <p className="small muted">Пишите инструкции под заголовками <code>## Preset: shorten</code> и <code>## Preset: clarify</code>; остальной текст не используется.</p>
         <label htmlFor="rules-text">Инструкции (Markdown)</label><textarea className="rules-text" id="rules-text" aria-label="Инструкции команд" spellCheck={false}
