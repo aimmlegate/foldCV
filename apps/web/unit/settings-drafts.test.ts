@@ -325,3 +325,13 @@ test("a commit during a reload waits for it and then saves", async () => {
   hold.release(); await reloading; await committed; await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(h.server.assistant.enabled, true); assert.deepEqual(h.controller.state.pending, []);
 });
+
+test("the commands save and revert on their own; other drafts stay", async () => {
+  const h = setup(); await h.controller.load();
+  h.controller.change("importModel", "model-c"); h.controller.change("markdown", `${h.server.rules.markdown}\nDraft.`);
+  await h.controller.saveRules();
+  assert.deepEqual(h.calls.map(call => call.part), ["rules"]); assert.deepEqual(h.controller.dirty, ["import"]);
+  assert.equal(typeof h.controller.state.marks.markdown, "number");
+  h.controller.change("markdown", "## Preset: shorten\nA\n## Preset: clarify\nB\n"); h.controller.revertRules();
+  assert.equal(h.controller.state.draft.markdown, h.server.rules.markdown); assert.deepEqual(h.controller.dirty, ["import"]);
+});

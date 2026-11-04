@@ -101,6 +101,19 @@ export class SettingsDrafts {
     this.queue.add(part);
     return this.drain();
   }
+  /** Saves the commands text on its own, behind a save that runs; its mark goes to the text. */
+  saveRules(): Promise<void> {
+    this.publish({ focus: { ...this.state.focus, rules: "markdown" } });
+    this.queue.add("rules");
+    return this.drain();
+  }
+  /** Puts the commands text back to the saved one; the other parts keep their drafts. */
+  revertRules(): void {
+    if (this.state.saving || !this.state.rules) return;
+    const errors = { ...this.state.errors }; delete errors.rules;
+    if (this.state.staleRules) errors.rules = knownErrorMessage("RULES_STALE") ?? "Обновите правила.";
+    this.publish({ draft: { ...this.state.draft, markdown: this.state.rules.markdown }, errors, message: "" });
+  }
   private publishPending(): void { this.publish({ pending: [...new Set([...this.inFlight, ...this.queue])] }); }
   private drain(): Promise<void> {
     this.publishPending();
@@ -181,14 +194,18 @@ export class SettingsDrafts {
       draft.agentEffort = assistant.reasoningEffort ?? null; }
     this.publish({ assistant, draft });
   }
-  async reloadRules(): Promise<void> {
+  /** Loads the saved commands after a refusal for an older revision. `merge` (base, old base, draft) puts the edits on
+   * the new text; without it the form keeps its whole text. */
+  async reloadRules(merge?: (base: string, old: string, draft: string) => string): Promise<void> {
     if (this.state.saving || this.state.loading || this.closed) return;
     const epoch = ++this.epoch; this.publish({ loading: true });
     try {
       const rules = await this.api.rules(); if (this.closed || epoch !== this.epoch) return;
       const errors = { ...this.state.errors }; delete errors.rules;
-      this.publish({ rules, errors, staleRules: false, comparison: true,
-        message: "Сохранённая версия загружена ниже. Ваш текст остался в форме." });
+      const old = this.state.rules?.markdown, draft = merge && old !== undefined
+        ? { ...this.state.draft, markdown: merge(rules.markdown, old, this.state.draft.markdown) } : this.state.draft;
+      this.publish({ rules, draft, errors, staleRules: false, comparison: true,
+        message: merge ? "Сохранённая версия загружена. Ваши правки команд остались в полях." : "Сохранённая версия загружена ниже. Ваш текст остался в форме." });
     } catch { this.publish({ errors: { ...this.state.errors, rules: "Не удалось загрузить команды. Ваш текст остался в форме." } }); }
     finally { if (epoch === this.epoch) { this.publish({ loading: false }); this.settled(); } }
   }

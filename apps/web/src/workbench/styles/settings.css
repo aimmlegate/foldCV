@@ -52,6 +52,22 @@
 .provider-card .login-code input { max-width: 320px; }
 .app-shell .settings-content .provider-note { margin-top: 4px; }
 
+/* Команды: two fields in one group, in the Monaco font stack; the save bar sticks to the bottom while the text differs. */
+.settings-field { padding: 14px 18px; }
+.settings-field + .settings-field { border-top: 1px solid var(--line); }
+.app-shell .settings-content .settings-field > label { display: block; margin: 0; color: var(--ink); font-size: var(--ui-body); font-weight: 550; }
+.app-shell .settings-content .settings-field > p { margin: 3px 0 8px; color: var(--muted); font-size: var(--ui-small); line-height: 1.5; }
+.app-shell .settings-content .settings-field > .rules-text { display: block; min-height: 112px; margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: var(--ui-small); line-height: 1.6; }
+.commands-saved { display: flex; justify-content: flex-end; min-height: 18px; margin: -10px 2px 6px; }
+.commands-saved-version { margin: 4px 0 16px; }
+.commands-saved-version summary { color: var(--accent); font-size: var(--ui-small); cursor: pointer; }
+.app-shell .settings-content .commands-saved-version .rules-text { min-height: 160px; margin-top: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--ui-small); }
+.settings-savebar { position: sticky; bottom: 0; z-index: 4; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 10px;
+  margin-top: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 -6px 18px rgb(var(--shade) / .08); }
+.settings-savebar > [role="status"] { margin-right: auto; color: var(--muted); font-size: var(--ui-small); }
+.settings-savebar > .settings-savebar-error { color: var(--danger); }
+
 /* The text size as three segments; native radios keep the arrow keys. */
 .segmented { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
 .app-shell .settings-content .segmented label { position: relative; margin: 0; color: var(--muted); font-size: var(--ui-small); font-weight: 500; cursor: pointer; }

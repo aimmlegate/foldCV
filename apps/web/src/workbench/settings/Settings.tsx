@@ -11,6 +11,7 @@ import { Button } from "../ui/Button";
 import { OperationStatus } from "../ui/OperationStatus";
 import { type Appearance, type PaneOrder } from "./interface";
 import { AppearanceSettings } from "./Appearance";
+import { CommandsSettings } from "./Commands";
 import { RowState, SettingsGroup, SettingsRow } from "./Rows";
 import { settingsSections, type SettingsSection } from "./sections";
 
@@ -64,7 +65,8 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
     return failed.length > 0 && failed.map(part => <p className="settings-row-error" role="alert" key={part}>{errorMessage(current.errors[part])}
       <button type="button" className="text-button" disabled={current.pending.includes(part)} onClick={() => void controller.retry(part)}>Повторить</button></p>);
   };
-  const topErrors = Object.entries(current.errors).filter(([part]) => !rowBound.includes(part as SettingsPart) || loadFailed(part as SettingsPart));
+  const inline = (part: SettingsPart) => (rowBound.includes(part) || part === "rules") && !loadFailed(part);
+  const topErrors = Object.entries(current.errors).filter(([part]) => !inline(part as SettingsPart));
   const draftActions = <>{!controller.ready && !current.loading && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
     <div className="settings-actions"><Button variant="primary" busy={current.saving} busyLabel="Сохраняем…" disabled={!dirty || current.loading || view.pending} onClick={() => void controller.save()}>Сохранить</Button>
       <Button variant="quiet" disabled={!dirty || busy} onClick={() => controller.cancel()}>Отмена</Button>
@@ -78,8 +80,8 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
     </nav><div className="settings-content">
       <div className="settings-feedback">
         {current.loading && <OperationStatus label="Загружаем настройки" timed />}
-        {current.saved.some(part => !rowBound.includes(part)) && <OperationStatus state="success"
-          label={`Сохранено: ${current.saved.filter(part => !rowBound.includes(part)).map(part => partNames[part]).join(", ")}.`} />}
+        {current.saved.some(part => !inline(part)) && <OperationStatus state="success"
+          label={`Сохранено: ${current.saved.filter(part => !inline(part)).map(part => partNames[part]).join(", ")}.`} />}
         {current.message && <p className="notice" role="status">{current.message}</p>}
         {topErrors.map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
         {!controller.ready && !current.loading && topErrors.length > 0 && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
@@ -118,15 +120,7 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
             metadata={view.snapshot.modelReasoning?.[current.draft.agentModel ?? ""]} disabled={assistantOff || !current.draft.agentModel}
             change={value => void controller.commit("agentEffort", value)} /></SettingsRow>
       </SettingsGroup>}
-      {section === "rules" && <>
-        <p className="small muted">Пишите инструкции под заголовками <code>## Preset: shorten</code> и <code>## Preset: clarify</code>; остальной текст не используется.</p>
-        <label htmlFor="rules-text">Инструкции (Markdown)</label><textarea className="rules-text" id="rules-text" aria-label="Инструкции команд" spellCheck={false}
-          disabled={!current.rules} value={current.draft.markdown} onChange={event => controller.change("markdown", event.currentTarget.value)} />
-        {current.rules && <><p className="small muted">Версия {current.rules.revision}</p><button className="text-button" disabled={busy} onClick={() => void controller.reloadRules()}>Загрузить сохранённую версию</button></>}
-        {current.comparison && current.rules && <><label htmlFor="rules-comparison">Сохранённая версия</label>
-          <textarea className="rules-text" id="rules-comparison" aria-label="Сохранённая версия команд" readOnly value={current.rules.markdown} /></>}
-        {draftActions}
-      </>}
+      {section === "rules" && <CommandsSettings state={current} controller={controller} />}
       {section === "limits" && <><p>Время действует со следующего импорта.</p>
         <label htmlFor="limit-import-minutes">Время на импорт резюме, минут</label>
         <input className="limit-input" id="limit-import-minutes" type="number" inputMode="numeric" step={1} min={limitRanges.importMinutes.minimum} max={limitRanges.importMinutes.maximum}
