@@ -19,7 +19,7 @@
   min-height: var(--fcv-header-height); margin: 0 0 var(--fcv-body-gap) var(--fcv-header-left); }
 .fcv-sheet .fcv-region-header::after { content: ""; position: absolute; left: var(--fcv-divider-left); bottom: 0;
   width: var(--fcv-divider-width); border-bottom: var(--fcv-divider); }
-.fcv-sheet .fcv-region-sidebar { grid-column: 1; grid-row: 2; min-width: 0; }
+.fcv-sheet .fcv-region-sidebar { grid-column: var(--fcv-sidebar-column, 1); grid-row: 2; min-width: 0; }
 .fcv-sheet .fcv-region-main { grid-column: var(--fcv-main-column); grid-row: var(--fcv-main-row); min-width: 0; }
 .fcv-sheet .node-region { display: none; }
 .fcv-sheet .node-region:has(.uir-empty-region) { display: block; }

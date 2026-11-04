@@ -282,7 +282,9 @@ layout:
   `reading_order` repeats the list. The header takes `first_page_header`, the
   others `independent_column`.
 - `x + width` of a region stays within the page width; sidebar and main must
-  not overlap. The exported DOCX puts the sidebar left of main.
+  not overlap. The sidebar stands left or right of main as its `x` says: a
+  sidebar right of main has `x` at or past the end of main (`main.x +
+  main.width`); the page, the DOCX and the PDF follow it.
 - One column: drop the sidebar region and move its blocks to `main` with free
   orders.
 - `pagination`: only `keep_heading_with_next` is a choice; the other three
@@ -317,7 +319,6 @@ italics `SourceSansPro-LightIt.ttf`, `-It` (Regular), `-SemiboldIt`,
   from a shipped asset, or none.
 - Free tables: content flows in the header and one or two columns; there is no
   table node and no third column.
-- A sidebar on the right: the sidebar is always the left column.
 - Contacts or other lines in the header: it holds the name, the title and the
   logo.
 - Own fonts and images: assets resolve only against shipped files; the user

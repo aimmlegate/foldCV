@@ -556,17 +556,20 @@ class CapturedWriter:
             table.columns[index].width = Twips(width)
 
     def columns(self):
-        """The sidebar and main columns as one borderless table row."""
-        widths = [self.geometry.sidebar_width, self.geometry.main_width]
-        if self.geometry.gap:
-            widths.insert(1, self.geometry.gap)
+        """The sidebar and main columns as one borderless table row, in page order: the sidebar left or right of main."""
+        geometry, roles = self.geometry, {region.role: region for region in self.request.document.regions}
+        cells = [(geometry.sidebar_width, roles.get('sidebar')), (geometry.main_width, roles.get('main'))]
+        if geometry.sidebar_right:
+            cells.reverse()
+        if geometry.gap:
+            cells.insert(1, (geometry.gap, None))
+        widths = [width for width, _region in cells]
         table = self.document.add_table(rows=1, cols=len(widths))
         self.borderless(table, widths)
-        for index, width in enumerate(widths):
+        for index, (width, region) in enumerate(cells):
             cell = table.cell(0, index)
             cell.width = Twips(width)
             self.clear_cell(cell)
-            region = self.request.document.regions[1] if index == 0 else self.request.document.regions[2] if index == len(widths) - 1 else None
             if region is not None:
                 self.blocks(cell, region.blocks)
                 # A column's first paragraph opens the body; keeping it with the next one adds nothing there,

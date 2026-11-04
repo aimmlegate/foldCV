@@ -16,11 +16,21 @@ test("a layout without a sidebar is one column that stacks the regions and hides
   const sidebar = { id: "sidebar", x: 20, width: 130, flow: "independent_column" } as const;
   const main = { id: "main", x: 160, width: 420, flow: "independent_column" } as const;
   assert.deepEqual(sheetColumns([header, sidebar, main]), { "--fcv-left": "20pt", "--fcv-header-left": "0pt", "--fcv-header-width": "556pt",
-    "--fcv-columns": "130pt 420pt", "--fcv-gap": "10pt", "--fcv-main-column": "2", "--fcv-main-row": "2", "--fcv-sidebar-empty": "block" });
+    "--fcv-columns": "130pt 420pt", "--fcv-gap": "10pt", "--fcv-main-column": "2", "--fcv-sidebar-column": "1", "--fcv-main-row": "2",
+    "--fcv-sidebar-empty": "block" });
   assert.deepEqual(sheetColumns([{ ...header, x: 40 }, { ...main, x: 34, width: 528 }]), { "--fcv-left": "34pt", "--fcv-header-left": "6pt",
-    "--fcv-header-width": "556pt", "--fcv-columns": "528pt", "--fcv-gap": "0pt", "--fcv-main-column": "1", "--fcv-main-row": "3",
-    "--fcv-sidebar-empty": "none" });
+    "--fcv-header-width": "556pt", "--fcv-columns": "528pt", "--fcv-gap": "0pt", "--fcv-main-column": "1", "--fcv-sidebar-column": "1",
+    "--fcv-main-row": "3", "--fcv-sidebar-empty": "none" });
   assert.equal(sheetColumns([header, sidebar]), null, "a layout needs its main column");
+});
+
+test("a sidebar right of main is the second column and the sheet starts at main", () => {
+  const header = { id: "header", x: 20, width: 556, flow: "first_page_header" } as const;
+  const main = { id: "main", x: 20, width: 440, flow: "independent_column" } as const;
+  const sidebar = { id: "sidebar", x: 470, width: 110, flow: "independent_column" } as const;
+  assert.deepEqual(sheetColumns([header, sidebar, main]), { "--fcv-left": "20pt", "--fcv-header-left": "0pt", "--fcv-header-width": "556pt",
+    "--fcv-columns": "440pt 110pt", "--fcv-gap": "10pt", "--fcv-main-column": "1", "--fcv-sidebar-column": "2", "--fcv-main-row": "2",
+    "--fcv-sidebar-empty": "block" });
 });
 
 test("italic faces are declared italic, so only an upright stand-in gets the browser's slant", () => {

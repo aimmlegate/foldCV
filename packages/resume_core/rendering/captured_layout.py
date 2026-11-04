@@ -41,6 +41,8 @@ class BodyGeometry:
     gap: int
     main_width: int
     right: int
+    # The sidebar stands right of the main column; the body then starts at the main column.
+    sidebar_right: bool = False
 
     @classmethod
     def from_recipe(cls, recipe):
@@ -48,7 +50,8 @@ class BodyGeometry:
         regions = {region.id: region for region in recipe.layout.regions}
         # A one-column layout has no sidebar: its body starts at the main column, with no sidebar or gap width.
         sidebar, main = regions.get('sidebar'), regions['main']
-        if (sidebar is not None and sidebar.x + sidebar.width > main.x) or page.first_body_top < page.continuation_body_top:
+        on_right = sidebar is not None and sidebar.x >= main.x + main.width
+        if (sidebar is not None and not on_right and sidebar.x + sidebar.width > main.x) or page.first_body_top < page.continuation_body_top:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         # Page-size native properties use unsigned short values.
         width = native_units(page.width, positive=True, maximum=65535)
@@ -56,14 +59,18 @@ class BodyGeometry:
         first = native_units(page.first_body_top)
         continuation = native_units(page.continuation_body_top)
         bottom = native_units(page.body_bottom, positive=True)
-        left = native_units(sidebar.x if sidebar is not None else main.x)
         sidebar_width = native_units(sidebar.width, positive=True) if sidebar is not None else 0
         main_x = native_units(main.x)
         main_width = native_units(main.width, positive=True)
-        gap, right = main_x - left - sidebar_width, width - main_x - main_width
+        if on_right:
+            sidebar_x = native_units(sidebar.x)
+            left, gap, right = main_x, sidebar_x - main_x - main_width, width - sidebar_x - sidebar_width
+        else:
+            left = native_units(sidebar.x) if sidebar is not None else main_x
+            gap, right = main_x - left - sidebar_width, width - main_x - main_width
         if not 0 <= continuation <= first < bottom < height or gap < 0 or right < 0:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
-        return cls(width, height, first, continuation, bottom, left, sidebar_width, gap, main_width, right)
+        return cls(width, height, first, continuation, bottom, left, sidebar_width, gap, main_width, right, on_right)
 
 
 class CapturedMetrics:

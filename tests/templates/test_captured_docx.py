@@ -160,13 +160,28 @@ def test_changed_recipe_optional_logo_divider_footer_and_geometry(captured_reque
     assert not any(name.startswith('word/media/') for name in parts(content))
 
 
-@pytest.mark.parametrize('damage', ['right_sidebar', 'negative_first_offset', 'collapsed_column', 'huge_page'])
+def test_a_sidebar_right_of_main_is_the_last_column_and_the_body_starts_at_main(captured_request, tmp_path):
+    def edit(config):
+        config['layout']['regions'][1].update(x=470, width=110)
+        config['layout']['regions'][2].update(x=20, width=440)
+    request = configured(captured_request, edit)
+    # The fixture's sidebar holds no text, so one line is placed there.
+    document = request.document.model_copy(deep=True)
+    line = deepcopy(next(block for block in document.blocks() if block.type == 'paragraph' and block.content))
+    line.id, line.content = 'sidebar-line', [PresentedText(type='text', text='Sidebar line', styles={}, presentation=None)]
+    next(region for region in document.regions if region.role == 'sidebar').blocks.append(line)
+    tree = xml(render_captured_docx(recapture(request, document=document), tmp_path))
+    assert tree.xpath('//w:tblGrid/w:gridCol/@w:w', namespaces=NS)[:3] == ['8800', '200', '2200']
+    assert (tree.xpath('string(//w:pgMar/@w:left)', namespaces=NS), tree.xpath('string(//w:pgMar/@w:right)', namespaces=NS)) == ('400', '320')
+    first, _gap, last = tree.xpath('//w:body/w:tbl/w:tr/w:tc', namespaces=NS)
+    assert 'Example Labs' in emitted(first) and 'Example Labs' not in emitted(last)
+    assert 'Sidebar line' in emitted(last) and 'Sidebar line' not in emitted(first)
+
+
+@pytest.mark.parametrize('damage', ['negative_first_offset', 'collapsed_column', 'huge_page'])
 def test_valid_but_unsupported_geometry_fails_explicitly(captured_request, tmp_path, damage):
     def edit(config):
-        if damage == 'right_sidebar':
-            config['layout']['regions'][1].update(x=500, width=90)
-            config['layout']['regions'][2].update(x=20, width=450)
-        elif damage == 'negative_first_offset':
+        if damage == 'negative_first_offset':
             config['style']['page']['first_body_top'] = 10
         elif damage == 'collapsed_column':
             config['layout']['regions'][1]['width'] = 0.001

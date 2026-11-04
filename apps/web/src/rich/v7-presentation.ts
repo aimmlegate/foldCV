@@ -21,16 +21,18 @@ export function assetUrl(asset: Pick<Asset, "sha256">): string {
 const pt = (value: number): string => `${value}pt`;
 
 /** The sheet's column geometry. A layout without a sidebar is one column: the regions stack in reading order and the
- * empty sidebar offers no "add text" button. */
+ * empty sidebar offers no "add text" button. A sidebar stands left or right of main, as its `x` says. */
 export function sheetColumns(regions: readonly Presentation["recipe"]["layout"]["regions"][number][]): Readonly<Record<string, string>> | null {
   const byId = new Map(regions.map(region => [region.id, region]));
   const header = byId.get("header"), sidebar = byId.get("sidebar"), main = byId.get("main");
   if (!header || !main) return null;
-  const left = sidebar?.x ?? main.x;
+  const right = sidebar !== undefined && sidebar.x >= main.x + main.width;
+  const left = sidebar && !right ? sidebar.x : main.x;
+  const columns = !sidebar ? pt(main.width) : right ? `${pt(main.width)} ${pt(sidebar.width)}` : `${pt(sidebar.width)} ${pt(main.width)}`;
+  const gap = !sidebar ? 0 : right ? sidebar.x - main.x - main.width : main.x - sidebar.x - sidebar.width;
   return { "--fcv-left": pt(left), "--fcv-header-left": pt(header.x - left), "--fcv-header-width": pt(header.width),
-    "--fcv-columns": sidebar ? `${pt(sidebar.width)} ${pt(main.width)}` : pt(main.width),
-    "--fcv-gap": pt(sidebar ? main.x - sidebar.x - sidebar.width : 0),
-    "--fcv-main-column": sidebar ? "2" : "1", "--fcv-main-row": sidebar ? "2" : "3", "--fcv-sidebar-empty": sidebar ? "block" : "none" };
+    "--fcv-columns": columns, "--fcv-gap": pt(gap), "--fcv-main-column": sidebar && !right ? "2" : "1",
+    "--fcv-sidebar-column": right ? "2" : "1", "--fcv-main-row": sidebar ? "2" : "3", "--fcv-sidebar-empty": sidebar ? "block" : "none" };
 }
 
 /** Faces, sizes and colors come from the plan; geometry from the compiled recipe. Nothing is read from wording or IDs. */
