@@ -4,14 +4,16 @@ import { claimApplicationTab, type TabLease } from "./tab";
 import { APP_NAME } from "./app-name";
 import { App } from "./App";
 import { BlockedTab } from "./BlockedTab";
-import { applyAppearance, readAppearance } from "./settings/interface";
+import { applyAppearance, readAppearance, watchSystemScheme } from "./settings/interface";
 import "./styles/index.css";
 
 const element = document.getElementById("root");
 if (!element) throw new Error("Root is missing");
 const root = createRoot(element);
-// The saved text size and contrast apply before anything is drawn, so no screen flashes the defaults.
+// The saved theme, contrast and text size apply before anything is drawn, so no screen flashes the defaults; a system
+// scheme change follows the same way.
 applyAppearance(readAppearance());
+watchSystemScheme(readAppearance);
 
 async function mountApplication(lease: TabLease, host: HTMLElement): Promise<void> {
   const portalHost = document.createElement("div");

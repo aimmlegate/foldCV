@@ -6,8 +6,7 @@
 :root[data-ui-text] :is(.app-shell, .modal, .notice-panel, .uir-rewrite) svg { width: calc(var(--ui-body) * 1.25); height: calc(var(--ui-body) * 1.25); }
 :root[data-ui-text] .app-shell :is(.chat-launcher, .eyebrow, .history-heading, .settings-saved, .source-note, .technology-note, .chat-activity, .chat-context) { font-size: var(--ui-small); }
 :root[data-ui-text] .uir-rewrite { width: min(420px, calc(100vw - 24px)); }
-/* High contrast: black text, dark captions and firmer lines; dimmed controls stay readable. */
-:root[data-ui-contrast="high"] { --ink: #000; --muted: #1f241c; --line: #9ea697; --accent: #3a4731; --accent-hover: #2b351f; --warn: #4f3710; }
+/* Strong contrast (the slider at 120 % and above, D140): dimmed controls stay readable, captions take the dark caption color. */
 :root[data-ui-contrast="high"] button:disabled, :root[data-ui-contrast="high"] [data-uir-engine-ui] button:disabled { opacity: .6; }
 :root[data-ui-contrast="high"] .app-shell :is(.project-select small, .project-select em, .history-open, .connection-mini, .project-heading > span, .session-status) { color: var(--muted); }
 :root[data-ui-contrast="high"] .app-shell :is(.tool, .toolbar-select, .text-button) { color: var(--ink); }

@@ -21,4 +21,6 @@
 @import "./remarks.css";
 @import "./accessibility.css";
 @import "./export.css";
+@import "./sheet-light.css";
+@import "./themes.css";
 @import "./desktop.css";
