@@ -1,7 +1,8 @@
 use std::ffi::OsString;
-use std::fs::{self, DirBuilder, File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
@@ -9,6 +10,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::policy::HelperCommand;
+use crate::system;
 
 const LOG_BYTES: u64 = 5 * 1024 * 1024;
 const READY_BYTES: usize = 4096;
@@ -47,14 +49,14 @@ fn loopback(origin: &str) -> bool {
 
 fn open_log(path: &Path) -> io::Result<File> {
     if let Some(folder) = path.parent() {
-        DirBuilder::new().recursive(true).mode(0o700).create(folder)?;
+        system::private_folder(folder)?;
     }
     if fs::metadata(path).is_ok_and(|metadata| metadata.len() > LOG_BYTES) {
         let mut rotated = path.as_os_str().to_owned();
         rotated.push(".1");
         let _ = fs::rename(path, rotated);
     }
-    OpenOptions::new().create(true).append(true).mode(0o600).open(path)
+    system::private_file(OpenOptions::new().create(true).append(true)).open(path)
 }
 
 /// Reports the first stdout line, then drains the rest so the service never blocks on a full pipe.
@@ -97,15 +99,17 @@ impl Helper {
     pub fn start(command: &HelperCommand, environment: &[(OsString, OsString)], log: &Path, timeout: Duration)
         -> Result<Arc<Helper>, Failure> {
         let output = open_log(log).map_err(|_| Failure::Unavailable)?;
-        let mut child = Command::new(&command.executable)
-            .args(&command.args)
+        let mut process = Command::new(&command.executable);
+        process.args(&command.args)
             .env_clear()
             .envs(environment.iter().map(|(name, value)| (name, value)))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::from(output))
-            .spawn()
-            .map_err(|_| Failure::Unavailable)?;
+            .stderr(Stdio::from(output));
+        // No console window on Windows; the service starts its own workers without one too.
+        #[cfg(windows)]
+        process.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+        let mut child = process.spawn().map_err(|_| Failure::Unavailable)?;
         let stdout = child.stdout.take().expect("stdout is piped");
         let (report, ready) = mpsc::channel();
         thread::spawn(move || read_ready(stdout, report));
@@ -145,6 +149,7 @@ impl Helper {
         status.expect("the helper has ended")
     }
 
+    #[cfg(unix)]
     fn signal(&self, signal: libc::c_int) {
         let mut child = self.child.lock().unwrap();
         if let Ok(None) = child.try_wait() {
@@ -154,23 +159,37 @@ impl Helper {
     }
 
     pub fn stop(&self) {
-        // EOF on stdin asks for a graceful shutdown; signals only follow when it does not come.
+        // EOF on stdin asks for a graceful shutdown; the helper is ended only when it does not come.
         drop(self.stdin.lock().unwrap().take());
         if self.wait_for(Duration::from_secs(20)) {
             return;
         }
-        self.signal(libc::SIGTERM);
-        if self.wait_for(Duration::from_secs(5)) {
-            return;
-        }
-        self.signal(libc::SIGKILL);
+        self.end();
         self.wait();
+    }
+
+    #[cfg(unix)]
+    fn end(&self) {
+        self.signal(libc::SIGTERM);
+        if !self.wait_for(Duration::from_secs(5)) {
+            self.signal(libc::SIGKILL);
+        }
+    }
+
+    /// Windows has no SIGTERM: the process ends at once, as with Electron's kill() there.
+    #[cfg(windows)]
+    fn end(&self) {
+        let mut child = self.child.lock().unwrap();
+        if let Ok(None) = child.try_wait() {
+            let _ = child.kill();
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::time::Instant;
 
     const READY: &str = r#"{"origin": "http://127.0.0.1:4321", "secret": "0123456789abcdef0123456789abcdef"}"#;
@@ -183,12 +202,14 @@ mod tests {
     }
 
     /// A shell script stands in for the helper.
+    #[cfg(unix)]
     fn fake(script: &str) -> HelperCommand {
         HelperCommand { executable: "/bin/sh".into(), args: vec!["-c".into(), script.into(), "helper".into(), "serve".into(), "/data/root".into()] }
     }
 
+    #[cfg(unix)]
     fn environment() -> Vec<(OsString, OsString)> {
-        crate::policy::helper_environment(None, Path::new("/nonexistent"))
+        crate::policy::helper_environment(|_| None, Path::new("/nonexistent"))
     }
 
     #[test]
@@ -203,6 +224,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_helper_serves_until_its_stdin_closes_and_logs_its_stderr() {
         let folder = temporary("serve");
@@ -217,6 +239,7 @@ mod tests {
         assert_eq!(fs::read_to_string(&log).unwrap(), "starting serve /data/root\nstopped\n");
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_helper_that_ignores_stdin_still_ends_on_sigterm() {
         let folder = temporary("term");
@@ -226,6 +249,7 @@ mod tests {
         assert!(helper.wait_for(Duration::from_secs(5)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_helper_that_exits_answers_garbage_or_is_missing_fails_the_start() {
         let folder = temporary("fail");

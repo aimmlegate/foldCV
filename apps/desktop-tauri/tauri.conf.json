@@ -9,6 +9,9 @@
   },
   "bundle": {
     "active": false,
-    "icon": ["../../assets/branding/foldcv/liquid-glass-v2/macos/FoldCV-native-olive.iconset/icon_512x512.png"]
+    "publisher": "foldCV",
+    "copyright": "foldCV",
+    "icon": ["../../assets/branding/foldcv/liquid-glass-v2/macos/FoldCV-native-olive.iconset/icon_512x512.png",
+      "../../assets/branding/foldcv/liquid-glass-v2/windows/FoldCV.ico"]
   }
 }

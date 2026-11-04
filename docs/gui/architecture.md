@@ -54,7 +54,8 @@ Build: `tools/build-macos-dmg.sh` (README). The Windows app (`apps/desktop`) is 
 Electron window; its zip runs the service on the python.org embeddable Python instead
 (`tools/desktop/build_windows_helper.py`);
 its workers run as scripts, each process in its own Job Object (`packages/resume_core/winjob.py`,
-`host.py`). Build: `tools/build-windows-zip.sh` or the `Windows` workflow.
+`host.py`). Build: `tools/build-windows-zip.sh` or the `Windows` workflow, which also
+builds a test zip with the Tauri window around the same helper.
 A remote deployment keeps the data contracts but needs an explicit execution
 decision: a protected local companion for the user's CLI, or a different approved
 provider adapter. A shared server cannot use a CLI installed on the user's laptop

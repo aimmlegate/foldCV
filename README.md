@@ -45,12 +45,17 @@ app start). Unpack the zip anywhere and run `foldCV Beta.exe`; there is no insta
 Windows SmartScreen asks once (More info → Run anyway). Codex and Claude run in a Job Object that lets them start no
 other program and ends them with the app; unlike the macOS sandbox it does not limit which files they read or write.
 
+The same workflow also builds a test zip with the Tauri window instead (job `tauri`, artifact `foldcv-windows-tauri`,
+`foldCV-Beta-<version>-win-x64-tauri.zip`): the same helper and data folder, the page in the system WebView2, which
+Windows 11 has. Its shell needs the Windows toolchain, so it is built on the runner only. Do not run both apps at once:
+they share the data folder.
+
 ## Repository
 
 | Path | Contents |
 | --- | --- |
 | `apps/web` | React and TypeScript frontend |
-| `apps/desktop-tauri` | Tauri window of the macOS app |
+| `apps/desktop-tauri` | Tauri window of the macOS app and of the Windows test zip |
 | `apps/desktop` | Electron window of the Windows app |
 | `services/api` | FastAPI local service, CLI providers, import and assistant |
 | `packages/resume_core` | Project storage, templates and DOCX rendering |

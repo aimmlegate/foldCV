@@ -1,30 +1,26 @@
-// The macOS app: a Tauri window that starts the frozen service and shows its page, as apps/desktop does with Electron
-// on Windows. The page uses no Tauri API; preload.js gives it what the Electron preload gives.
+// The desktop app: a Tauri window that starts the frozen service and shows its page, as apps/desktop does with
+// Electron. The page uses no Tauri API; preload.js gives it what the Electron preload gives.
+#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 mod helper;
 mod policy;
+// What differs between macOS and Windows: the window frame, the menu, alerts, links and file access.
+#[cfg_attr(target_os = "macos", path = "macos.rs")]
+#[cfg_attr(windows, path = "windows.rs")]
+mod system;
 
 use std::collections::HashMap;
-use std::fs::{self, DirBuilder, File, TryLockError};
+use std::fs::{self, File, TryLockError};
 use std::io;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::SeqCst};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
-use dispatch2::DispatchQueue;
-use objc2::{MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSAlert, NSAlertStyle, NSBackingStoreType, NSWindow, NSWindowButton, NSWindowStyleMask,
-    NSWindowTitleVisibility};
-use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
-use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, PageLoadPayload};
+use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, PageLoadPayload, PermissionKind, PermissionResponse};
 use tauri::window::Color;
-use tauri::{AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, Url, Webview, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Manager, RunEvent, Url, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
 use helper::{Endpoint, Helper};
@@ -50,15 +46,13 @@ struct Shell {
     left: Mutex<Option<mpsc::Sender<()>>>,
     downloads: Mutex<HashMap<String, Download>>,
     next_download: AtomicU64,
-    // In half zoom levels of Chromium, as the Electron menu steps.
-    zoom: Mutex<i32>,
 }
 
 /// One app per data root: a second service on the same root would reap the operations of the first.
 fn claim(root: &Path) -> io::Result<Option<File>> {
     let folder = root.join("tauri");
-    DirBuilder::new().recursive(true).mode(0o700).create(&folder)?;
-    let file = File::options().create(true).truncate(false).write(true).mode(0o600).open(folder.join("shell.lock"))?;
+    system::private_folder(&folder)?;
+    let file = system::private_file(File::options().create(true).truncate(false).write(true)).open(folder.join("shell.lock"))?;
     match file.try_lock() {
         Ok(()) => Ok(Some(file)),
         Err(TryLockError::WouldBlock) => Ok(None),
@@ -68,7 +62,7 @@ fn claim(root: &Path) -> io::Result<Option<File>> {
 
 fn open_external(raw: &str) {
     if let Some(url) = policy::external_url(raw) {
-        thread::spawn(move || { let _ = Command::new("/usr/bin/open").arg(url).status(); });
+        system::open_url(url);
     }
 }
 
@@ -76,7 +70,7 @@ fn notify(webview: &Webview, state: &str, name: &str) {
     let _ = webview.eval(format!("window.__foldcvDownloadDone?.({}, {})", serde_json::json!(state), serde_json::json!(name)));
 }
 
-/// WebKit writes the file into the data root first; the save dialog follows, as Electron's did before the page heard.
+/// The engine writes the file into the data root first; the save dialog follows, as Electron's did before the page heard.
 fn download(shell: &Shell, webview: Webview, event: DownloadEvent<'_>) -> bool {
     match event {
         DownloadEvent::Requested { url, destination } => {
@@ -84,7 +78,7 @@ fn download(shell: &Shell, webview: Webview, event: DownloadEvent<'_>) -> bool {
             let folder = target.parent().unwrap_or(Path::new("/"));
             let name = policy::requested_name(&target, |name| folder.join(name).exists()).unwrap_or_else(|| "file".into());
             let file = shell.root.join("tauri/downloads").join(shell.next_download.fetch_add(1, SeqCst).to_string());
-            if DirBuilder::new().recursive(true).mode(0o700).create(&file).is_err() {
+            if system::private_folder(&file).is_err() {
                 return false;
             }
             let file = file.join(&name);
@@ -144,32 +138,6 @@ fn page_loaded(shell: &Shell, window: &WebviewWindow, payload: PageLoadPayload<'
     }
 }
 
-/// How high the close button sits above the bottom of the title bar in a window of this style (9 pt on macOS 26).
-/// tao keeps that height when it moves the buttons and makes the bar their height plus its inset, so the Electron
-/// inset from the top, which centres the buttons in their height plus twice the inset, needs it added.
-fn button_offset() -> f64 {
-    let mut offset = 9.0;
-    DispatchQueue::main().exec_sync(|| {
-        let style = NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Miniaturizable
-            | NSWindowStyleMask::Resizable | NSWindowStyleMask::FullSizeContentView;
-        let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(800.0, 600.0));
-        let window = NSWindow::alloc(MainThreadMarker::new().expect("the main queue runs on the main thread"));
-        // SAFETY: a deferred window that is never shown; the Retained value releases it.
-        let window = unsafe {
-            let window = NSWindow::initWithContentRect_styleMask_backing_defer(window, frame, style,
-                NSBackingStoreType::Buffered, true);
-            window.setReleasedWhenClosed(false);
-            window
-        };
-        window.setTitlebarAppearsTransparent(true);
-        window.setTitleVisibility(NSWindowTitleVisibility::Hidden);
-        if let Some(button) = window.standardWindowButton(NSWindowButton::CloseButton) {
-            offset = button.frame().origin.y;
-        }
-    });
-    offset
-}
-
 fn window_size(app: &AppHandle) -> (f64, f64) {
     let area = app.primary_monitor().ok().flatten()
         .map(|monitor| monitor.work_area().size.to_logical::<f64>(monitor.scale_factor()));
@@ -179,24 +147,18 @@ fn window_size(app: &AppHandle) -> (f64, f64) {
 fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> tauri::Result<WebviewWindow> {
     let url = Url::parse(&format!("{}/#secret={}", endpoint.origin, endpoint.secret)).expect("the helper names a valid origin");
     let (width, height) = window_size(app);
-    let buttons = LogicalPosition::new(16.0, 12.0 + button_offset());
     let (origin, downloads, loads) = (endpoint.origin.clone(), shell.clone(), shell.clone());
-    let window = WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::External(url))
+    let builder = WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::External(url))
         .title(&app.package_info().name)
         .inner_size(width, height)
         .min_inner_size(800.0, 600.0)
         .center()
         .visible(false)
-        // No title bar, the window buttons over the page corner, where the Electron window had them.
-        .title_bar_style(TitleBarStyle::Overlay)
-        .hidden_title(true)
-        .traffic_light_position(buttons)
         .background_color(Color(0xea, 0xe9, 0xe2, 0xff))
         // Files dropped on the page go to the page, not to Tauri.
         .disable_drag_drop_handler()
-        .allow_link_preview(false)
         .devtools(false)
-        .initialization_script(PRELOAD)
+        .initialization_script(format!("{PRELOAD}({:?});", system::DESKTOP))
         // It also sees the loads of frames: the DOCX original is an about:srcdoc frame.
         .on_navigation(move |url| {
             if url.scheme() == "about" || policy::app_url(url.as_str(), &origin) {
@@ -209,9 +171,15 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
             open_external(url.as_str());
             NewWindowResponse::Deny
         })
+        // The page needs no permission, so the shell refuses them, as the Electron one does. Files go through the
+        // shell's save dialog, so a second download in a row is not held back.
+        .on_permission_request(|_, kind| match kind {
+            PermissionKind::AutomaticDownloads => PermissionResponse::Allow,
+            _ => PermissionResponse::Deny,
+        })
         .on_download(move |webview, event| download(&downloads, webview, event))
-        .on_page_load(move |window, payload| page_loaded(&loads, &window, payload))
-        .build()?;
+        .on_page_load(move |window, payload| page_loaded(&loads, &window, payload));
+    let window = system::window(builder, &shell.root).build()?;
     let (handle, closing) = (app.clone(), shell.clone());
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event && !closing.finished.load(SeqCst) {
@@ -232,8 +200,15 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
 
 fn start(app: AppHandle, shell: Arc<Shell>) {
     let name = app.package_info().name.clone();
+    // Windows 11 has the WebView2 runtime; an old Windows 10 may not.
+    #[cfg(windows)]
+    if tauri::webview_version().is_err() {
+        system::alert(&name, format!("Для {name} нужен Microsoft Edge WebView2 Runtime."),
+            "Установите его с сайта Microsoft и запустите приложение снова.".into());
+        return shutdown(&app, &shell);
+    }
     let command = policy::helper_command(&app.path().resource_dir().unwrap_or_default(), &shell.root);
-    let environment = policy::helper_environment(std::env::var_os("TMPDIR"), &app.path().home_dir().unwrap_or_default());
+    let environment = policy::helper_environment(|key| std::env::var_os(key), &app.path().home_dir().unwrap_or_default());
     let helper = match Helper::start(&command, &environment, &shell.log, Duration::from_secs(120)) {
         Ok(helper) => helper,
         Err(_) => return fatal(&app, &shell, format!("Не удалось запустить {name}.")),
@@ -251,20 +226,9 @@ fn start(app: AppHandle, shell: Arc<Shell>) {
     }
 }
 
-/// An app-modal alert, as Electron shows without a window; waits for it on a thread other than the main one.
-fn alert(message: String, detail: String) {
-    DispatchQueue::main().exec_sync(move || {
-        let alert = NSAlert::new(MainThreadMarker::new().expect("the main queue runs on the main thread"));
-        alert.setAlertStyle(NSAlertStyle::Critical);
-        alert.setMessageText(&NSString::from_str(&message));
-        alert.setInformativeText(&NSString::from_str(&detail));
-        alert.runModal();
-    });
-}
-
 /// Shows the error, then quits.
 fn fatal(app: &AppHandle, shell: &Arc<Shell>, message: String) {
-    alert(message, format!("Подробности в журнале: {}", shell.log.display()));
+    system::alert(&app.package_info().name, message, format!("Подробности в журнале: {}", shell.log.display()));
     shutdown(app, shell);
 }
 
@@ -291,83 +255,22 @@ fn shutdown(app: &AppHandle, shell: &Arc<Shell>) {
     });
 }
 
-fn menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
-    let info = app.package_info();
-    let about = AboutMetadata { name: Some(info.name.clone()), version: Some(info.version.to_string()), ..Default::default() };
-    let application = Submenu::with_items(app, &info.name, true, &[
-        &PredefinedMenuItem::about(app, None, Some(about))?,
-        &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::services(app, None)?,
-        &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::hide(app, None)?,
-        &PredefinedMenuItem::hide_others(app, None)?,
-        &PredefinedMenuItem::show_all(app, None)?,
-        &PredefinedMenuItem::separator(app)?,
-        // Not the system's quit item: that one ends the app before the page can leave.
-        &MenuItem::with_id(app, "quit", format!("Quit {}", info.name), true, Some("CmdOrCtrl+Q"))?,
-    ])?;
-    let file = Submenu::with_items(app, "File", true, &[&PredefinedMenuItem::close_window(app, None)?])?;
-    let edit = Submenu::with_items(app, "Edit", true, &[
-        &PredefinedMenuItem::undo(app, None)?,
-        &PredefinedMenuItem::redo(app, None)?,
-        &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::cut(app, None)?,
-        &PredefinedMenuItem::copy(app, None)?,
-        &PredefinedMenuItem::paste(app, None)?,
-        &PredefinedMenuItem::select_all(app, None)?,
-    ])?;
-    let view = Submenu::with_items(app, "View", true, &[
-        &MenuItem::with_id(app, "reload", "Reload", true, Some("CmdOrCtrl+R"))?,
-        &PredefinedMenuItem::separator(app)?,
-        &MenuItem::with_id(app, "zoom-reset", "Actual Size", true, Some("CmdOrCtrl+0"))?,
-        &MenuItem::with_id(app, "zoom-in", "Zoom In", true, Some("CmdOrCtrl+="))?,
-        &MenuItem::with_id(app, "zoom-out", "Zoom Out", true, Some("CmdOrCtrl+-"))?,
-        &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::fullscreen(app, None)?,
-    ])?;
-    let window = Submenu::with_items(app, "Window", true, &[
-        &PredefinedMenuItem::minimize(app, None)?,
-        &PredefinedMenuItem::maximize(app, None)?,
-        &PredefinedMenuItem::separator(app)?,
-        &PredefinedMenuItem::bring_all_to_front(app, None)?,
-    ])?;
-    window.set_as_windows_menu_for_nsapp()?;
-    Menu::with_items(app, &[&application, &file, &edit, &view, &window])
-}
-
-fn menu_event(app: &AppHandle, event: MenuEvent) {
-    let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
-    if event.id() == "quit" {
-        return shutdown(app, &shell);
-    }
-    let Some(window) = app.get_webview_window(WINDOW).filter(|_| !shell.stopping.load(SeqCst)) else { return };
-    match event.id().as_ref() {
-        "reload" => { let _ = window.reload(); }
-        id @ ("zoom-reset" | "zoom-in" | "zoom-out") => {
-            let mut zoom = shell.zoom.lock().unwrap();
-            *zoom = match id { "zoom-in" => (*zoom + 1).min(9), "zoom-out" => (*zoom - 1).max(-6), _ => 0 };
-            let _ = window.set_zoom(1.2f64.powf(f64::from(*zoom) / 2.0));
-        }
-        _ => {}
-    }
-}
-
 fn main() {
-    let app = tauri::Builder::default()
+    let app = system::app(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
-        .menu(menu)
-        .on_menu_event(menu_event)
         .setup(|app| {
-            let root = policy::data_root(std::env::var_os("FOLDCV_DESKTOP_ROOT").as_deref(), &app.path().data_dir()?);
+            // Local, not roaming, on Windows; the same Application Support folder on macOS.
+            let root = policy::data_root(std::env::var_os("FOLDCV_DESKTOP_ROOT").as_deref(), &app.path().local_data_dir()?);
             let lock = claim(&root);
             let another = matches!(lock, Ok(None));
             let shell = Arc::new(Shell { log: root.join("logs/helper.log"), root, _lock: lock.ok().flatten(),
                 helper: OnceLock::new(), shown: AtomicBool::new(false), stopping: AtomicBool::new(another),
                 finished: AtomicBool::new(another), left: Mutex::new(None), downloads: Mutex::new(HashMap::new()),
-                next_download: AtomicU64::new(0), zoom: Mutex::new(0) });
+                next_download: AtomicU64::new(0) });
             app.manage(shell.clone());
             if another {
-                // macOS opens the running app instead; only a direct second start gets here.
+                // macOS opens the running app instead, and on Windows the single instance plugin hands a second start
+                // to it; only a direct second start on macOS gets here.
                 app.handle().exit(0);
                 return Ok(());
             }
