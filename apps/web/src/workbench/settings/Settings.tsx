@@ -78,11 +78,12 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
       {settingsSections.map(item => <button key={item.id} data-settings={item.id} className={section === item.id ? "active" : ""}
         aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)}>{item.label}</button>)}
     </nav><div className="settings-content">
+      {/* Floating notices are for what keeps a section from working (D147): a failed load. Saves report on their row. */}
       <div className="settings-feedback">
         {current.loading && <OperationStatus label="Загружаем настройки" timed />}
         {current.saved.some(part => !inline(part)) && <OperationStatus state="success"
           label={`Сохранено: ${current.saved.filter(part => !inline(part)).map(part => partNames[part]).join(", ")}.`} />}
-        {current.message && <p className="notice" role="status">{current.message}</p>}
+        {current.message && section === "limits" && <p className="notice" role="status">{current.message}</p>}
         {topErrors.map(([part, error]) => <p className="notice error" role="alert" key={part}>{partNames[part as SettingsPart]}: {errorMessage(error)}</p>)}
         {!controller.ready && !current.loading && topErrors.length > 0 && <Button className="small" onClick={() => void controller.load()}>Загрузить снова</Button>}
       </div>

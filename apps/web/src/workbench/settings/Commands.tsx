@@ -39,6 +39,7 @@ export function CommandsSettings({ state, controller }: { state: SettingsState; 
     {state.staleRules && <p className="notice warning" role="status">Команды изменились в другом окне. Загрузите сохранённую версию: ваши правки
       останутся в полях. <button type="button" className="text-button" disabled={state.loading || state.saving} onClick={() => void controller.reloadRules(mergeCommands)}>
         Загрузить сохранённую версию</button></p>}
+    {state.comparison && state.message && <p className="settings-lead" role="status">{state.message}</p>}
     {state.comparison && state.rules && <details className="commands-saved-version"><summary>Сохранённая версия</summary>
       <textarea className="rules-text" aria-label="Сохранённая версия команд" readOnly value={state.rules.markdown} /></details>}
     {(dirty || saving) && <div className="settings-savebar" role="region" aria-label="Несохранённые команды">
