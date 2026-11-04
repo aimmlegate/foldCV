@@ -2412,6 +2412,11 @@
           "title": "Addkinds",
           "type": "array"
         },
+        "addTechnologyGroup": {
+          "default": false,
+          "title": "Addtechnologygroup",
+          "type": "boolean"
+        },
         "blocks": {
           "additionalProperties": {
             "$ref": "#/$defs/EditorBlock"
@@ -2588,6 +2593,14 @@
         },
         "placement": {
           "$ref": "#/$defs/EditorPlacement"
+        },
+        "records": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Records",
+          "type": "array"
         }
       },
       "required": [

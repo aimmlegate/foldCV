@@ -363,7 +363,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
             blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)} bold={heavier}
             active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,
               list: listed("bullet_list"), numbered: listed("numbered_list") }}
-            remarks={marks && (marks.cells.size > 0 || marks.blocks.size > 0) ? marking : null}
+            remarks={marks && (marks.cells.size > 0 || marks.scoped.size > 0 || marks.blocks.size > 0) ? marking : null}
             layoutControls={<div className="layout-controls"><select className="toolbar-select" aria-label="Масштаб листа" value={String(zoomChoice)}
               onChange={event => { const next = parseZoom(event.currentTarget.value); setZoomChoice(next); saveZoom(next); }}>
               <option value="fit">По ширине</option>{zoomLevels.map(level => <option key={level} value={String(level)}>{level * 100}%</option>)}

@@ -168,7 +168,10 @@ async def test_each_known_technology_appears_once_among_the_active_groups(tmp_pa
     grouped = [text for text in texts if text[:3] in {prefix for _equals, prefix in GROUPS.values()}]
     assert sorted(grouped) == sorted(shown) and sorted(text[3:] for text in grouped) == EXPECTED['F04']['allSkills']
     project = fixture.current().project
-    assert [issue.code for issue in project.import_issues] == ['IMPORT_SKILL_GROUP_UNCERTAIN'] and project.import_issues[0].block_ids
+    assert [issue.code for issue in project.import_issues] == ['IMPORT_SKILL_GROUP_UNCERTAIN']
+    # The remark points at the group the technology joined, not at the job naming it, though their lines share its source text.
+    named = [block for block in project.document.blocks() if block.id in project.import_issues[0].block_ids]
+    assert named and {block.presentation.view_key for block in named} == {'tech-b' if family == 'other' else 'role-tools'}
     # Replaying every deterministic task from the durable import gives its stored result.
     stored = project.template_operations[-1]
     for task in stored.tasks:

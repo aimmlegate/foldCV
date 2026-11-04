@@ -116,6 +116,9 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     fallback, *uncertain = sorted(workspace.project.import_issues, key=lambda issue: issue.code != 'IMPORT_SOURCE_FALLBACK')
     assert (fallback.code, fallback.category, fallback.rule_id) == ('IMPORT_SOURCE_FALLBACK', 'content_violation', 'projects-support')
     assert [issue.code for issue in uncertain] == ([] if rewrite else ['IMPORT_SKILL_GROUP_UNCERTAIN'])
+    # The old job's Perl remark points at the group Perl joined, its heading and line, not at the job listing it.
+    blocks = {block.id: block for block in workspace.project.document.blocks()}
+    assert all({blocks[identifier].presentation.view_key for identifier in issue.block_ids} == {'data_and_tools'} for issue in uncertain)
     # With rewriting off, rewrite fields show their exact source wording.
     if rewrite:
         assert shown['summary'][1] == 'Backend engineer focused on reliable queue systems.'

@@ -1155,6 +1155,19 @@
           "title": "Factsrevision",
           "type": "integer"
         },
+        "groupId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Groupid"
+        },
         "jobId": {
           "anyOf": [
             {
@@ -1180,7 +1193,8 @@
             "remove_from_focus",
             "move_technology",
             "move_focus",
-            "set_focus_icon"
+            "set_focus_icon",
+            "add_technology_group"
           ],
           "title": "Operation",
           "type": "string"
