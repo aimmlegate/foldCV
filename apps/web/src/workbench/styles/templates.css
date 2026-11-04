@@ -1,24 +1,49 @@
-.templates-screen { overflow: auto; flex: 1; padding: 30px 32px; display: flex; flex-direction: column; min-height: 0; }
-.templates-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 24px; align-items: start; min-height: 0; }
-.templates-list { display: flex; flex-direction: column; gap: 4px; }
+/* D147: the screen keeps the window's height; the list, the editor and the assistant scroll inside it. */
+.templates-screen { overflow: hidden; flex: 1; padding: 22px 28px 16px; display: flex; flex-direction: column; min-height: 0; }
+.templates-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 24px; flex: 1; min-height: 0; }
+.templates-list { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: auto; }
 .templates-list .template-row { border: 1px solid transparent; background: none; border-radius: 6px; text-align: left; padding: 10px 12px;
   display: flex; flex-direction: column; gap: 4px; color: var(--ink); }
 .templates-list .template-row:hover:not(:disabled) { background: var(--wash); }
 .templates-list .template-row[aria-current="page"] { background: var(--wash); border-color: var(--wash-strong); }
 .templates-list .template-row strong { font-weight: 550; overflow-wrap: anywhere; }
 .templates-list .template-row small { color: var(--muted); }
-.templates-editor { min-width: 0; padding-left: 24px; border-left: 1px solid var(--line); }
+.templates-editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding-left: 24px; border-left: 1px solid var(--line); }
 .templates-editor h3 { margin: 0; font-size: var(--ui-title); font-weight: 550; color: var(--ink); }
-.template-yaml-editor { height: max(420px, calc(100vh - 380px)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
-.template-yaml-loading { height: max(420px, calc(100vh - 380px)); display: flex; align-items: center; justify-content: center; margin-top: 8px; border: 1px dashed var(--line); border-radius: 5px; }
-.template-active { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 8px; }
-.template-problem { overflow-wrap: anywhere; }
-.template-problem code { font-size: inherit; }
+.template-yaml-editor { flex: 1; min-height: 240px; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-top: 8px; }
+.template-yaml-loading { flex: 1; min-height: 240px; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; margin-top: 8px;
+  border: 1px dashed var(--line); border-radius: 5px; }
+/* The toolbar: name and marks at the left, Save and Check always in view, the rest in the «⋯» menu. */
+.template-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding-bottom: 6px; }
+.template-heading { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.template-heading h3 { min-width: 0; margin-right: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.template-chip { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted);
+  font-size: var(--ui-small); line-height: 20px; white-space: nowrap; }
+.template-chip.main { border-color: var(--wash-strong); background: var(--wash); color: var(--accent-text); }
+.template-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+.template-more { width: 36px; padding: 0; }
+.template-menu { z-index: 170; box-sizing: border-box; min-width: 220px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+  color: var(--ink); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 8%, transparent); font-size: var(--ui-body); line-height: 1.4; }
+.template-menu [role="menuitem"] { padding: 7px 10px; border-radius: 5px; outline: none; cursor: default; user-select: none; }
+.template-menu [role="menuitem"][data-highlighted] { background: var(--wash); }
+.template-menu [role="menuitem"][data-disabled] { color: var(--muted); opacity: .65; }
+.template-menu .danger:not([data-disabled]) { color: var(--danger); }
+/* The status line: the check problem, which moves the cursor to its line, or the last outcome; «Не сохранено» at the right. */
+.template-status { display: flex; align-items: center; gap: 12px; min-height: 30px; padding-top: 6px; color: var(--muted); font-size: var(--ui-small); }
+.template-status-message { flex: 1; min-width: 0; }
+.template-status-message .operation-status { font-size: var(--ui-small); }
+.template-status-error { margin: 0; color: var(--danger); overflow-wrap: anywhere; }
+.template-problem { display: inline-flex; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.template-problem:hover > span { text-decoration: underline; }
+.template-problem > svg { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 2px; }
+.template-status > .settings-saved { flex: 0 0 auto; margin-left: auto; }
+.template-status > .text-button { flex: 0 0 auto; padding: 0; color: var(--accent); font-size: var(--ui-small); }
 .template-technical { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; cursor: pointer; }
 .templates-assistant:empty { display: none; }
 /* The resume drawer's prototype rules are keyed to its own ids; this drawer is a column beside the editor. */
 #template-chat-host { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-#template-chat-host.chat-open { width: 380px; height: max(420px, calc(100vh - 300px)); }
+.templates-assistant { min-height: 0; }
+#template-chat-host.chat-open { width: 380px; height: 100%; }
 #template-chat-host.chat-expanded { width: 560px; }
 #template-chat-host .chat-handle { display: none; }
 #template-chat-host .chat-launcher { padding: 8px 14px; }
@@ -30,14 +55,18 @@
 .template-proposal-target { font-size: var(--ui-small); color: var(--muted); }
 .template-proposal-diff { height: 260px; border: 1px solid var(--line); border-radius: 5px; margin-top: 8px; overflow: hidden; }
 @media (max-width: 1080px) {
-  .templates-layout { grid-template-columns: 180px minmax(0, 1fr); }
-  .templates-assistant { grid-column: 1 / -1; }
-  #template-chat-host.chat-open, #template-chat-host.chat-expanded { width: auto; height: min(70dvh, 620px); }
+  .templates-layout { grid-template-columns: 180px minmax(0, 1fr) auto; gap: 18px; }
+  .templates-editor { padding-left: 18px; }
+  #template-chat-host.chat-open, #template-chat-host.chat-expanded { width: 320px; }
 }
+/* A phone-wide window scrolls as a whole again: the list above, the editor at a fixed height. */
 @media (max-width: 600px) {
-  .templates-screen { padding: 20px 14px; }
-  .templates-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .templates-screen { overflow: auto; padding: 20px 14px; }
+  .templates-layout { display: flex; flex: none; flex-direction: column; gap: 16px; }
+  .templates-list { overflow: visible; }
   .templates-editor { padding-left: 0; border-left: 0; }
+  .template-yaml-editor { flex: none; height: 70dvh; }
+  #template-chat-host.chat-open, #template-chat-host.chat-expanded { width: auto; height: min(70dvh, 620px); }
 }
 .templates-list .templates-add { align-self: flex-start; margin-bottom: 8px; }
 .template-name-form { display: flex; flex-direction: column; gap: 6px; }

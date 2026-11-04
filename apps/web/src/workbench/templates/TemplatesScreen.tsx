@@ -6,9 +6,11 @@ import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
 import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
-import { checkTemplateConfig, createTemplate, deleteTemplate, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig,
+import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, readTemplateCatalog, readTemplateConfig, resetTemplateConfig, saveTemplateConfig,
   setDefaultTemplate, withState, type TemplateConfigState, type TemplateProblem, type TemplateSave } from "./config";
-import { deleteControl, downloadName, draftLabel, shownId, templateKind, unsaved, type ShownTemplate } from "./studio";
+import { downloadName, draftLabel, menuActions, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
+import { TemplateToolbar } from "./TemplateToolbar";
+import type { YamlEditorHandle } from "./YamlEditor";
 import type { TemplateProposal } from "../../assistant/template";
 import { applyProposal, type ApplyOutcome } from "./apply";
 import { TemplateAssistant, type TemplateContext } from "./TemplateAssistant";
@@ -17,6 +19,9 @@ import { TemplateBranding } from "./TemplateBranding";
 const YamlEditor = lazy(() => import("./YamlEditor"));
 type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | "applying" | null;
 type Outcome = "checked" | "saved" | "reset" | "default" | "added" | "deleted" | null;
+// Work the toolbar buttons do not show themselves goes to the status line.
+const progress: Partial<Record<Exclude<Work, null>, string>> = { loading: "Загружаем шаблон", resetting: "Возвращаем встроенный шаблон",
+  defaulting: "Делаем шаблон основным", adding: "Добавляем копию", deleting: "Удаляем шаблон", applying: "Применяем предложение" };
 
 /** The templates screen: the list, the YAML of the shown template and the template assistant. New imports use these
  * templates; existing resumes keep their own captured version. */
@@ -40,6 +45,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   const [asking, setAsking] = useState(false);
   const answer = useRef<((open: boolean) => void) | null>(null);
   const [technical, setTechnical] = useState(false);
+  const yaml = useRef<YamlEditorHandle>(null), more = useRef<HTMLButtonElement>(null);
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
   const draft = shown?.kind === "draft" ? shown : null;
   // The assistant reads and applies after renders: these hold what the editor shows now.
@@ -132,7 +138,24 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     setDelivery(await deliverFile(new Blob([text], { type: "application/yaml" }), downloadName(shown)));
   };
 
+  function pick(action: MenuAction) {
+    if (action === "copy") setCopyName(state ? `${state.package.name} — копия` : "");
+    else if (action === "default") void makeDefault();
+    else if (action === "download") void download();
+    else if (action === "reset") setConfirmReset(true);
+    else setConfirmDelete(true);
+  }
+
   const busy = work !== null;
+  const chips = state && catalog ? [{ label: state.package.revision }, { label: templateKind(state) },
+    ...(state.package.id === catalog.defaultId ? [{ label: "основной", main: true }] : [])] : [{ label: "новый" }];
+  const done = outcome === "checked" ? nextRevision ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."
+    : outcome === "saved" ? "Сохранено. Изменения применятся к новым резюме."
+    : outcome === "reset" ? "Встроенный шаблон восстановлен."
+    : outcome === "default" && state ? `Основной шаблон: ${state.package.name}.`
+    : outcome === "added" && state ? `Добавлен шаблон «${state.package.name}».`
+    : outcome === "deleted" ? "Шаблон удалён. Готовые резюме сохранили свой вид." : deliveryMessage(delivery);
+  const running = work && progress[work];
   return <section className="templates-screen" aria-label="Шаблоны">
     <div className="templates-layout">
       <nav className="templates-list" aria-label="Список шаблонов">
@@ -146,61 +169,45 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
         {draft && <button className="template-row" aria-current="page" disabled={busy}><strong>{draftLabel(draft.name)}</strong><small>новый</small></button>}
       </nav>
       <div className="templates-editor">
-        {state && catalog && <div className="template-active">
-          <h3>{state.package.name}</h3>
-          <span className="small">Версия {state.package.revision}</span><span className="small muted">{templateKind(state)}</span>
-          {state.package.id === catalog.defaultId ? <span className="small muted">основной</span>
-            : <Button className="small" busy={work === "defaulting"} busyLabel="Сохраняем…" disabled={busy} onClick={() => void makeDefault()}>Сделать основным</Button>}
-          {deleteControl({ id: state.package.id, bundled: state.bundled }, catalog.defaultId) !== "hidden" && <Button className="small" variant="danger"
-            busy={work === "deleting"} busyLabel="Удаляем…" disabled={busy || deleteControl({ id: state.package.id, bundled: state.bundled }, catalog.defaultId) === "disabled"}
-            title={state.package.id === catalog.defaultId ? "Основной шаблон удалить нельзя: сначала сделайте основным другой" : undefined}
-            onClick={() => setConfirmDelete(true)}>Удалить</Button>}
-        </div>}
+        {shown && <TemplateToolbar name={state ? state.package.name : draft ? draftLabel(draft.name) : ""} chips={chips}
+          actions={menuActions(shown, catalog?.defaultId ?? null)} dirty={dirty} busy={busy} saving={work === "saving"} checking={work === "checking"}
+          save={() => void save()} check={state ? () => void check() : undefined} more={more} choose={pick} />}
         {state && <TemplateBranding templateId={state.package.id} packageHash={state.package.packageHash} blocked={dirty} disabled={busy}
           saved={next => { adopt(next); setCatalog(value => value && withState(value, next)); }} />}
-        {draft && <div className="template-active"><h3>{draftLabel(draft.name)}</h3>
-          <span className="small muted">Сохраните, чтобы новые резюме могли его выбрать.</span></div>}
-        {work === "loading" && <OperationStatus label="Загружаем шаблон" timed />}
-        {failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
-        {problem && <p className="notice error template-problem" role="alert">Ошибка в <code>{problem.path}</code>: {problem.message}</p>}
-        {outcome === "checked" && <OperationStatus state="success" label={nextRevision
-          ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."} />}
-        {outcome === "saved" && <OperationStatus state="success" label="Сохранено. Изменения применятся к новым резюме." />}
-        {outcome === "reset" && <OperationStatus state="success" label="Встроенный шаблон восстановлен." />}
-        {outcome === "default" && state && <OperationStatus state="success" label={`Основной шаблон: ${state.package.name}.`} />}
-        {outcome === "added" && state && <OperationStatus state="success" label={`Добавлен шаблон «${state.package.name}».`} />}
-        {outcome === "deleted" && <OperationStatus state="success" label="Шаблон удалён. Готовые резюме сохранили свой вид." />}
-        {deliveryMessage(delivery) && <OperationStatus state="success" label={deliveryMessage(delivery)} />}
+        {!shown && <div className="template-yaml-loading">
+          {work === "loading" ? <OperationStatus label="Загружаем шаблон" timed />
+            : <>{failure !== null && <p className="notice error" role="alert">{errorMessage(failure)}</p>}
+              <Button className="small" onClick={() => void load()}>Загрузить снова</Button></>}
+        </div>}
         {shown && <label className="template-technical small"><input type="checkbox" checked={technical} onChange={event => setTechnical(event.target.checked)} />
           Показать служебные разделы</label>}
         {shown && <Suspense fallback={<div className="template-yaml-loading"><OperationStatus label="Загружаем редактор" /></div>}>
-          <YamlEditor value={text} problem={problem} readOnly={busy} technical={technical}
+          <YamlEditor ref={yaml} value={text} problem={problem} readOnly={busy} technical={technical}
             change={value => { setText(value); setProblem(null); setOutcome(null); }} />
         </Suspense>}
-        <div className="settings-actions">
-          {!shown && !busy && <Button className="small" onClick={() => void load()}>Загрузить снова</Button>}
-          {draft && <Button variant="primary" busy={work === "saving"} busyLabel="Сохраняем…" disabled={busy} onClick={() => void save()}>Сохранить</Button>}
-          {state && <>
-            <Button variant="primary" busy={work === "saving"} busyLabel="Сохраняем…" disabled={!dirty || busy} onClick={() => void save()}>Сохранить</Button>
-            <Button busy={work === "checking"} busyLabel="Проверяем…" disabled={busy} onClick={() => void check()}>Проверить</Button>
-            <Button variant="quiet" disabled={!dirty || busy} onClick={() => { setText(state.text); setProblem(null); setOutcome(null); }}>Отменить правки</Button>
-            {state.bundled && <Button variant="quiet" busy={work === "resetting"} busyLabel="Возвращаем…" disabled={busy || !state.edited}
-              onClick={() => setConfirmReset(true)}>Вернуть встроенный</Button>}
-          </>}
-          {shown && <Button variant="quiet" disabled={busy} onClick={() => void download()}><Icon name="download" />Скачать YAML</Button>}
+        {shown && <div className="template-status">
+          <div className="template-status-message">
+            {running ? <OperationStatus label={running} />
+              : failure !== null ? <p className="template-status-error" role="alert">{errorMessage(failure)}</p>
+              : problem ? <p className="template-status-error" role="alert"><button type="button" className="template-problem" title={`Показать в тексте: ${problem.path}`}
+                onClick={() => yaml.current?.reveal()}><Icon name="warning" /><span>Строка {problemLine(text, problem.path)}: {problem.message}</span></button></p>
+              : done ? <OperationStatus state="success" label={done} /> : null}
+          </div>
           {dirty && <span className="settings-saved" role="status">Не сохранено</span>}
-        </div>
+          {dirty && state && <button type="button" className="text-button" disabled={busy}
+            onClick={() => { setText(state.text); setProblem(null); setOutcome(null); }}>Отменить правки</button>}
+        </div>}
       </div>
       <aside className="templates-assistant" aria-label="Помощник по шаблонам">
         <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} />
       </aside>
     </div>
-    <Dialog open={confirmReset} close={() => setConfirmReset(false)} title="Вернуть встроенный шаблон?">
+    <Dialog open={confirmReset} close={() => setConfirmReset(false)} title="Вернуть встроенный шаблон?" returnFocus={more.current}>
       <p className="dialog-copy">Ваши правки этого шаблона пропадут. Готовые резюме не изменятся.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmReset(false)}>Отмена</Button>
         <Button variant="primary" onClick={() => { setConfirmReset(false); void reset(); }}>Вернуть</Button></div>
     </Dialog>
-    <Dialog open={copyName !== null} close={() => setCopyName(null)} title="Новый шаблон">
+    <Dialog open={copyName !== null} close={() => setCopyName(null)} title="Новый шаблон" returnFocus={more.current}>
       <form className="template-name-form" onSubmit={event => { event.preventDefault(); void add(); }}>
         <p className="dialog-copy">Копия шаблона «{state?.package.name}». Она сохранится сразу, её можно будет изменить и удалить.</p>
         <label htmlFor="template-copy-name">Название</label>
@@ -209,7 +216,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
           <Button type="submit" variant="primary" disabled={!copyName?.trim()}>Добавить</Button></div>
       </form>
     </Dialog>
-    <Dialog open={confirmDelete} close={() => setConfirmDelete(false)} title={`Удалить шаблон «${state?.package.name ?? ""}»?`}>
+    <Dialog open={confirmDelete} close={() => setConfirmDelete(false)} title={`Удалить шаблон «${state?.package.name ?? ""}»?`} returnFocus={more.current}>
       <p className="dialog-copy">Новые резюме не смогут его выбрать. Готовые резюме сохранят свой вид.</p>
       <div className="dialog-actions"><Button variant="quiet" onClick={() => setConfirmDelete(false)}>Отмена</Button>
         <Button variant="danger" onClick={() => { setConfirmDelete(false); void remove(); }}>Удалить</Button></div>

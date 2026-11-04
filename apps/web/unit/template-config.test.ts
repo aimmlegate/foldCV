@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCheck, parseConfigState, parseSave, pointerRange, technicalLines, withState } from "../src/workbench/templates/config";
+import { parseCheck, parseConfigState, parseSave, pointerRange, problemLine, technicalLines, withState } from "../src/workbench/templates/config";
 
 const source = [
   "# yaml-language-server: $schema=schema.json",
@@ -72,6 +72,15 @@ test("a save or reset updates only its own template in the list and keeps the de
   assert.deepEqual(created.templates.map(entry => entry.id), [...catalog.templates.map(entry => entry.id), "custom-moy"]);
   const earlier = withState(created, { ...own, package: { ...own.package, id: "custom-a" } });
   assert.deepEqual(earlier.templates.map(entry => entry.id), [...catalog.templates.map(entry => entry.id), "custom-a", "custom-moy"]);
+});
+
+test("the status line names the line where the editor marks a problem", () => {
+  const text = ["# comment", "schema_version: 4", "blocks:", "- id: identity", "  view:", "    style: nmae", ""].join("\n");
+  assert.equal(problemLine(text, "/blocks/0/view/style"), 6);
+  assert.equal(problemLine(text, "/blocks/0"), 4);
+  // A pointer that finds nothing lands on the first line that is not a comment, as the marker does.
+  assert.equal(problemLine(text, "/missing/key"), 2);
+  assert.equal(problemLine("", "/blocks"), 1);
 });
 
 test("technical sections are found by their top-level keys only", () => {

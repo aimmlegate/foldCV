@@ -9,7 +9,7 @@
   :root:not([data-mode]) body { background: #1f221a; color: #e9ece5; }
 }
 /* Floating panels: the paper at the chosen opacity over a blur; solid at 100 %. */
-.modal, .rewrite-panel, .uir-rewrite, .toast, .notice-panel, .block-panel, .technology-menu, .chat-thread-menu, .remark-tip, .workspace-operation,
+.modal, .rewrite-panel, .uir-rewrite, .toast, .notice-panel, .block-panel, .technology-menu, .chat-thread-menu, .template-menu, .remark-tip, .workspace-operation,
 .editor-notifications .rewrite-activity, .settings-feedback > *, .facts-feedback > *,
 [data-uir-engine-ui] :is([role="menu"], [role="listbox"], [role="dialog"], .bn-toolbar, .bn-suggestion-menu) {
   background-color: rgb(var(--paper-rgb) / var(--glass)); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);

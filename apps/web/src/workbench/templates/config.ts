@@ -149,6 +149,14 @@ export function pointerRange(source: string, pointer: string): { start: number; 
   return { start, end: Math.max(start + 1, lineEnd(source, start)) };
 }
 
+/** The 1-based editor line where `pointerRange` places a server problem. */
+export function problemLine(source: string, pointer: string): number {
+  const { start } = pointerRange(source, pointer);
+  let line = 1;
+  for (let index = source.indexOf("\n"); index >= 0 && index < start; index = source.indexOf("\n", index + 1)) line += 1;
+  return line;
+}
+
 // Top-level sections people rarely edit: fonts and files, fact storage, operations, provenance.
 const TECHNICAL = new Set(["style", "layout", "source", "content_definitions", "fact_types", "operations", "assets", "provenance"]);
 

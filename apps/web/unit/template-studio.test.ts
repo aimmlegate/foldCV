@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { screenTitle, visit, type Screen } from "../src/workbench/templates/screen";
-import { deleteControl, downloadName, draftLabel, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
+import { deleteControl, downloadName, draftLabel, menuActions, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
 
 const state = { package: { id: "generic", name: "Две колонки", revision: "1.3.0", packageHash: "a".repeat(64) }, format: "yaml" as const,
   text: "template: {}\n", bundled: true, edited: false };
@@ -42,4 +42,21 @@ test("delete is hidden on shipped templates and disabled on the default; downloa
   assert.equal(deleteControl({ id: "custom-moy", bundled: false }, "generic"), "enabled");
   assert.equal(downloadName({ kind: "saved", state }), "generic.yaml");
   assert.equal(downloadName({ kind: "draft", name: "Мой", assetsFrom: null }), "template.yaml");
+});
+
+test("the «⋯» menu offers only what applies to the shown template", () => {
+  const saved = (bundled: boolean, edited: boolean, id = bundled ? "generic" : "custom-moy"): ShownTemplate =>
+    ({ kind: "saved", state: { ...state, package: { ...state.package, id }, bundled, edited } });
+  const offered = (shown: ShownTemplate | null, defaultId: string | null) =>
+    Object.entries(menuActions(shown, defaultId)).filter(([, choice]) => choice !== "hidden").map(([action, choice]) => `${action}:${choice}`);
+  // A shipped default: no reset until edited, never a delete.
+  assert.deepEqual(offered(saved(true, false), "generic"), ["copy:enabled", "download:enabled"]);
+  assert.deepEqual(offered(saved(true, true), "generic"), ["copy:enabled", "download:enabled", "reset:enabled"]);
+  assert.deepEqual(offered(saved(true, false), "custom-moy"), ["copy:enabled", "default:enabled", "download:enabled"]);
+  // An own template is deleted, except while it is the default.
+  assert.deepEqual(offered(saved(false, true), "generic"), ["copy:enabled", "default:enabled", "download:enabled", "delete:enabled"]);
+  assert.deepEqual(offered(saved(false, true), "custom-moy"), ["copy:enabled", "download:enabled", "delete:disabled"]);
+  // A new template exists only in the editor until saved.
+  assert.deepEqual(offered({ kind: "draft", name: "Мой", assetsFrom: "generic" }, "generic"), ["download:enabled"]);
+  assert.deepEqual(offered(null, "generic"), []);
 });

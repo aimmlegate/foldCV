@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import { pointerRange, technicalLines, type TemplateProblem } from "./config";
 import { MODEL_URI, monaco, monacoTheme } from "./monaco";
 
 const SERVER_OWNER = "foldcv-template-check";
 
+/** `reveal` puts the cursor on the problem again, for the status line after the reader moved away. */
+export type YamlEditorHandle = { reveal: () => void };
 export type YamlEditorProps = { value: string; change: (value: string) => void; problem: TemplateProblem | null; readOnly: boolean;
-  technical: boolean };
+  technical: boolean; ref?: Ref<YamlEditorHandle> };
 
 function foldTechnical(instance: monaco.editor.IStandaloneCodeEditor, show: boolean) {
   const model = instance.getModel(), selectionLines = model ? technicalLines(model.getValue()) : [];
@@ -15,8 +17,14 @@ function foldTechnical(instance: monaco.editor.IStandaloneCodeEditor, show: bool
 
 /** Monaco with live schema checks; `problem` is the server compiler's finding, placed at its JSON pointer. Technical
  * sections stay folded unless `technical` is set. */
-export default function YamlEditor({ value, change, problem, readOnly, technical }: YamlEditorProps) {
+export default function YamlEditor({ value, change, problem, readOnly, technical, ref }: YamlEditorProps) {
   const host = useRef<HTMLDivElement>(null), editor = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const problemAt = useRef<monaco.IPosition | null>(null);
+  useImperativeHandle(ref, () => ({ reveal: () => {
+    const instance = editor.current, at = problemAt.current;
+    if (!instance || !at) return;
+    instance.setPosition(at); instance.revealLineInCenter(at.lineNumber); instance.focus();
+  } }), []);
   const changeRef = useRef(change), external = useRef(false), technicalRef = useRef(technical);
   changeRef.current = change; technicalRef.current = technical;
   useEffect(() => {
@@ -42,9 +50,10 @@ export default function YamlEditor({ value, change, problem, readOnly, technical
   useEffect(() => {
     const model = editor.current?.getModel();
     if (!model) return;
-    if (!problem) { monaco.editor.setModelMarkers(model, SERVER_OWNER, []); return; }
+    if (!problem) { monaco.editor.setModelMarkers(model, SERVER_OWNER, []); problemAt.current = null; return; }
     const range = pointerRange(model.getValue(), problem.path);
     const start = model.getPositionAt(range.start), end = model.getPositionAt(range.end);
+    problemAt.current = start;
     monaco.editor.setModelMarkers(model, SERVER_OWNER, [{ severity: monaco.MarkerSeverity.Error, message: `${problem.path}: ${problem.message}`,
       startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column }]);
     // The cursor unfolds a folded section that hides the problem.
