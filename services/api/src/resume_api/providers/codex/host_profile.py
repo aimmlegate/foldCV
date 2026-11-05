@@ -7,10 +7,10 @@ import os
 from pathlib import Path
 import stat
 
-from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
-from resume_api.cli import distribution, profile as codex
+from resume_api.providers.codex.profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex import distribution, pins as codex
 from resume_api.cli.qualification import QualificationError, require_publisher
-from .base import TOKEN_ENV
+from ...agent.base import TOKEN_ENV
 
 
 TOOLS = ("get_resume_context", "check_resume", "read_public_page")

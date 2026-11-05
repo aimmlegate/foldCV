@@ -15,18 +15,18 @@ from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.host import WINDOWS
 from packages.resume_core.models.agent import AgentUsage
 from packages.resume_core.storage import StorageFailure
-from resume_api.cli.experimental_profile import ExperimentalProfileError
+from resume_api.providers.codex.profile import ExperimentalProfileError
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked, INFERENCE
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import ACTION_METHODS
+from resume_api.providers.codex.content import ACTION_METHODS
 from resume_api.providers.shared import strict_json
 from resume_api.profile_ownership import native_profile
-from resume_api.agent.host_profile import CODE_MODE_HOST
+from resume_api.providers.codex.host_profile import CODE_MODE_HOST
 from resume_api.agent.base import TOKEN_ENV
 
-from .profile import AgentProfile
-from .base import RuntimeResult, SessionFinished, terminal_cleanup
+from .agent_profile import AgentProfile
+from ...agent.base import RuntimeResult, SessionFinished, terminal_cleanup
 
 
 SERVER_REQUESTS = frozenset({"account/chatgptAuthTokens/refresh", "applyPatchApproval", "attestation/generate",

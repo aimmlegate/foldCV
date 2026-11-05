@@ -15,10 +15,10 @@ import threading
 import pytest
 
 from resume_api import desktop, launcher, lifecycle
-from resume_api.cli import distribution, experimental_profile
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex import distribution, profile as experimental_profile
+from resume_api.providers.codex.profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.cli.installation import ClaudeInstallation, curl as system_curl
-from resume_api.cli.profiles import claude
+from resume_api.providers.claude import profile as claude
 from tools.desktop import build_helper
 
 ROOT = Path(__file__).resolve().parents[2]

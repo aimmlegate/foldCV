@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from tools import local_readiness as readiness
 from packages.resume_core.templates import store
 from packages.resume_core.templates.projection import SchemaFailure
-from resume_api.connection import ConnectionAdapter
+from resume_api.providers.codex.connection import ConnectionAdapter
 from resume_api.providers.base import ConnectionFailure
 from tests.support.foundation import LOCAL_MANIFEST as MANIFEST, run_local
 

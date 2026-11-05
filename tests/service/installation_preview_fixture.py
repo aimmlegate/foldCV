@@ -13,8 +13,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "services/api/src"))
 
 from resume_api.app import create_app
-from resume_api.cli.distribution import managed_executable
-from resume_api.cli.experimental_profile import ExperimentalCliProfile
+from resume_api.providers.codex.distribution import managed_executable
+from resume_api.providers.codex.profile import ExperimentalCliProfile
 
 
 async def main():

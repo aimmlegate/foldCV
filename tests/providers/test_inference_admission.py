@@ -125,7 +125,8 @@ async def test_a_call_cancelled_before_its_owned_permit_is_recorded_as_never_dis
     from types import SimpleNamespace
     from resume_api.importer.template_transport import JOB_PERMIT, ProviderTemplateTransport
     from resume_api.inference_admission import InferenceAdmission
-    from resume_api.providers import claude_cli, codex_cli
+    from resume_api.providers.claude import content as claude_cli
+    from resume_api.providers.codex import content as codex_cli
     from resume_api.providers.content import ContentFailure, outcome_state
     module = codex_cli if kind == "codex" else claude_cli
     cli = Path("/bin/echo")

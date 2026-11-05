@@ -9,9 +9,11 @@ import subprocess
 import pytest
 
 from packages.resume_core import host
-from resume_api.cli import claude_distribution, distribution, openpgp, qualification
-from resume_api.cli.profiles import claude
-from resume_api.cli.profiles.claude import ClaudeCliProfile
+from resume_api.providers.claude import distribution as claude_distribution
+from resume_api.providers.codex import distribution
+from resume_api.cli import openpgp, qualification
+from resume_api.providers.claude import profile as claude
+from resume_api.providers.claude.profile import ClaudeCliProfile
 from resume_api.cli.qualification import QualificationError
 from resume_api.cli.releases import RECORD, Record, Release, ReleaseFailure, newer
 from resume_api.providers.registry import CLAUDE, discovered

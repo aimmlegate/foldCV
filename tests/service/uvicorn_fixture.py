@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "services/api/src"))
 
 from resume_api.app import create_app
-from resume_api.connection import ConnectionAdapter
+from resume_api.providers.codex.connection import ConnectionAdapter
 from resume_api.providers.base import ConnectionFailure
 
 SECRET = "synthetic-startup-secret-0123456789"

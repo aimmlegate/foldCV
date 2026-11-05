@@ -19,12 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessRunner
-from resume_api.cli.profiles import claude as rules
+from resume_api.providers.claude import profile as rules
 from resume_api.providers.base import ConnectionFailure
-from resume_api.connection_claude import ClaudeConnectionAdapter
+from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.lifecycle import OperationFiles
-from resume_api.providers import claude_catalog
-from resume_api.providers.claude_cli import ClaudeCliProvider, FixtureTransport
+from resume_api.providers.claude import catalog as claude_catalog
+from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 
 
@@ -492,7 +492,7 @@ def test_a_profile_failure_does_not_read_as_a_version(fake, tmp_path, monkeypatc
 
 
 def test_envelopes_of_the_live_mp00_run_are_accepted():
-    from resume_api.providers.claude_cli import ClaudeEvents
+    from resume_api.providers.claude.content import ClaudeEvents
     from resume_api.providers.structured_schema import StructuredSchema
 
     class Check(BaseModel):

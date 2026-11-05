@@ -9,8 +9,9 @@ checksum the manifest names; on macOS it is also the notarized binary with Team 
 from pathlib import Path
 
 from packages.resume_core.host import WINDOWS
-from . import openpgp
-from .releases import Fetch, Record, Release, ReleaseFailure, Runtime, SHA256, checked_size, checked_version, strict_json
+from ...cli import openpgp
+from ...cli.releases import (Fetch, Record, Release, ReleaseFailure, Runtime, SHA256, checked_size, checked_version,
+                             strict_json)
 
 BASE_URL = "https://downloads.claude.ai/claude-code-releases/"
 # The primary key packet of https://downloads.claude.ai/keys/claude-code.asc,

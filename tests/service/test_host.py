@@ -179,8 +179,8 @@ def test_listeners_and_working_set_are_read(tmp_path):
 
 def test_windows_sign_ins_start_outside_the_operation_folder(tmp_path, monkeypatch):
     """A browser a sign-in starts inherits its folder and temp folder; the operation's own are removed after the run."""
-    from resume_api.cli.experimental_profile import ExperimentalCliProfile
-    from resume_api.cli.profiles.claude import ClaudeCliProfile
+    from resume_api.providers.codex.profile import ExperimentalCliProfile
+    from resume_api.providers.claude.profile import ClaudeCliProfile
 
     monkeypatch.setattr(host, "WINDOWS", True)
     operation = tmp_path / "operation"

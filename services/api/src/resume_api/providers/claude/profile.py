@@ -12,7 +12,8 @@ from pathlib import Path
 import shutil
 
 from packages.resume_core import host
-from resume_api.cli import claude_distribution, qualification
+from resume_api.providers.claude import distribution as claude_distribution
+from resume_api.cli import qualification
 from resume_api.cli.qualification import Compatibility, QualificationError
 from resume_api.cli.releases import Runtime
 

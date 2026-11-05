@@ -7,7 +7,7 @@ import threading
 import pytest
 
 from resume_api.agent.base import RuntimeInput, RuntimeResult
-from resume_api.cli.experimental_profile import ExperimentalCliProfile
+from resume_api.providers.codex.profile import ExperimentalCliProfile
 from resume_api.providers.base import Metadata, Quota
 from resume_api.projects.errors import ProjectFailure
 from tests.service.app_fixtures import make_app

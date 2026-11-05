@@ -10,7 +10,7 @@ import pytest
 
 from tests.providers.fixtures import PROMPT, fake
 from resume_api.lifecycle import OperationFiles
-from resume_api.providers.codex_cli import CodexCliProvider, Events, FixtureTransport
+from resume_api.providers.codex.content import CodexCliProvider, Events, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 from resume_api.providers.structured_schema import StructuredSchema
 

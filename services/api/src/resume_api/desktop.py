@@ -20,7 +20,7 @@ import uvicorn
 from packages.resume_core import host
 from packages.resume_core.storage import atomic_write, private_directory
 from .app import create_app
-from .cli.experimental_profile import installed_profile, use_system_certificates
+from .providers.codex.profile import installed_profile, use_system_certificates
 from .launcher import TEMPLATE_IMPORT_CALL_CAP, claude_slot
 from .lifecycle import require_supported_host, tune_garbage_collector
 

@@ -17,11 +17,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api import app as app_module
 from resume_api.app import create_app
-from resume_api.cli import distribution
-from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex import distribution
+from resume_api.providers.codex.profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.providers.base import Metadata, Quota
 from resume_api.inference_admission import INFERENCE
-from resume_api.providers.codex_cli import CodexCliProvider
+from resume_api.providers.codex.content import CodexCliProvider
 from resume_api.providers.content import ContentResult, ReportedUsage
 from tests.service.app_fixtures import add_project
 from tests.support.foundation import run_local

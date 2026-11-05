@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Literal
 
 from packages.resume_core.models.settings import DEFAULT_PROVIDER, ProviderKind
-from resume_api.cli import profile as codex
-from resume_api.cli.profiles import claude
+from resume_api.providers.codex import pins as codex
+from resume_api.providers.claude import profile as claude
 from resume_api.cli.qualification import Compatibility, QualificationError, require_publisher
 
 

@@ -397,7 +397,7 @@ async def main(args):
     runtime = ScriptedAgentRuntime(assistant_script)
     if args.live_assistant:
         # The user's existing Codex sign-in is used in place (allowed 2026-10-27); projects stay in this temp root.
-        from resume_api.cli.experimental_profile import installed_profile
+        from resume_api.providers.codex.profile import installed_profile
         profile = installed_profile(LIVE_PROFILE)
         app = create_app(origin=origin, secret=secret, temp_root=operations, data_root=data, dist=dist,
             experimental_profile=profile)

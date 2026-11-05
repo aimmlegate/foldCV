@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 
 from packages.resume_core.host import WINDOWS
-from .releases import Fetch, Record, Release, ReleaseFailure, Runtime, checked_size, checked_version, strict_json
+from ...cli.releases import Fetch, Record, Release, ReleaseFailure, Runtime, checked_size, checked_version, strict_json
 
 LATEST_URL = "https://api.github.com/repos/openai/codex/releases/latest"
 DOWNLOAD_URL = "https://github.com/openai/codex/releases/download/"

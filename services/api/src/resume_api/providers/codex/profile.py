@@ -9,8 +9,8 @@ from pathlib import Path
 import stat
 
 from packages.resume_core import host
-from resume_api.cli import profile as codex
-from resume_api.cli.profile import overrides
+from resume_api.providers.codex import pins as codex
+from resume_api.providers.codex.pins import overrides
 from resume_api.cli.qualification import QualificationError, require_publisher
 from resume_api.cli.releases import Runtime
 from . import distribution
@@ -219,7 +219,7 @@ class ExperimentalCliProfile:
 def installed_profile(root: Path, *, managed_only: bool = False) -> ExperimentalCliProfile:
     """The macOS app passes managed_only: it uses only the runtime it installs, on every Mac the same way."""
     import shutil
-    from resume_api.agent.host_profile import check_host
+    from resume_api.providers.codex.host_profile import check_host
 
     managed = distribution.managed_executable(root.parent / "cli-runtime")
     if managed_only:

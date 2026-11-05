@@ -10,7 +10,7 @@ import pytest
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.templates.store import TemplateStore
 from resume_api.app import ProviderSlot, create_app
-from resume_api.cli.profiles.claude import ClaudeCliProfile
+from resume_api.providers.claude.profile import ClaudeCliProfile
 from resume_api.providers.base import Metadata, Quota
 from tests.templates.employment_fixtures import employment_package
 from tests.templates.test_template_fallback_model import ModelRecorder, run_import

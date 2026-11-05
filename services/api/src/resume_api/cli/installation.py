@@ -17,7 +17,8 @@ import time
 import uuid
 
 from packages.resume_core import host
-from . import claude_distribution, distribution as release
+from ..providers.claude import distribution as claude_distribution
+from ..providers.codex import distribution as release
 from .process_runner import ProcessExit, ProcessRunner
 from .qualification import QualificationError, require_publisher
 from .releases import RECORD, VERSION, Record, Release, ReleaseFailure, newer
@@ -233,7 +234,7 @@ class CliInstallation:
 
     def publisher(self, package):
         """macOS: OpenAI signed the CLI and its host. Windows has no such check; GitHub's digest stands alone."""
-        from .profile import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
+        from ..providers.codex.pins import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
         if host.WINDOWS:
             return
         for name, identifier in ((release.CLI, IDENTIFIER), (release.HOST, HOST_IDENTIFIER)):
@@ -372,7 +373,7 @@ class ClaudeInstallation(CliInstallation):
 
     def publisher(self, binary):
         """macOS: the notarized binary Anthropic signed. On Windows the signed manifest's checksum stands alone."""
-        from .profiles.claude import IDENTIFIER, TEAM_ID
+        from ..providers.claude.profile import IDENTIFIER, TEAM_ID
         if host.WINDOWS:
             return
         try:

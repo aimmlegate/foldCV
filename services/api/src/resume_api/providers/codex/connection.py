@@ -12,13 +12,13 @@ import time
 
 from packages.resume_core.reasoning import model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex.profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import ACTION_METHODS
+from resume_api.providers.codex.content import ACTION_METHODS
 from resume_api.providers.shared import MODEL, PLAN, strict_json
-from resume_api.cli.profile import REQUIRED_FLAGS, check_features, overrides, qualify
+from resume_api.providers.codex.pins import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
-from .providers.base import ConnectionFailure, Metadata, Quota
+from ..base import ConnectionFailure, Metadata, Quota
 
 
 MAX_MODELS = 100

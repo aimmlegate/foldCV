@@ -8,7 +8,7 @@ import sys
 import time
 from types import SimpleNamespace
 
-from resume_api.agent.runtime import CodexAgentRuntime
+from resume_api.providers.codex.runtime import CodexAgentRuntime
 from resume_api.agent.base import RuntimeInput
 from resume_api.cli.process_runner import ProcessRunner
 

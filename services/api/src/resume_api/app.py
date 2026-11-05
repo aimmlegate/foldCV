@@ -21,12 +21,14 @@ from pydantic import ValidationError
 
 from .host_models import ErrorEnvelope, ErrorPayload, ProviderState
 from .lifecycle import has_blocked_owned, reap_owned
-from .connection import ConnectionAdapter
-from .cli.experimental_profile import ExperimentalCliProfile
+from .providers.codex.connection import ConnectionAdapter
+from .providers.codex.profile import ExperimentalCliProfile
 from .cli.installation import CliInstallation
 from . import release_checks
-from .providers.codex_cli import CodexCliProvider
+from .providers.codex.content import CodexCliProvider
 from .providers.registry import DESCRIPTORS, ProviderRegistry
+from .providers.base import ConnectionPort, ContentPort, ProfilePort
+from .agent.base import AgentRuntime
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
 from packages.resume_core.rules import RulesStore
 from .projects.errors import ProjectFailure
@@ -38,7 +40,7 @@ from .host.connections import HostConnections
 from .host.routes import mount_host_routes
 from .settings_routes import SettingsContext, mount_settings_routes
 from packages.resume_core.assistant_store import AgentFailure
-from .agent.runtime import CodexAgentRuntime
+from .providers.codex.runtime import CodexAgentRuntime
 
 
 MAX_BODY = 1_048_576
@@ -61,11 +63,11 @@ TEMPLATE_SAMPLES_PATH = TEMPLATE_ASSISTANT_PATH + "samples"
 class ProviderSlot:
     """One provider's connection adapter, content provider, native profile, installer and assistant runtime; a slot
     runs processes only while its provider is on (D119)."""
-    connection: object
-    provider: object | None = None
-    profile: object | None = None
+    connection: ConnectionPort
+    provider: ContentPort | None = None
+    profile: ProfilePort | None = None
     installation: CliInstallation | None = None
-    runtime: object | None = None
+    runtime: AgentRuntime | None = None
     # How a finished managed install rebinds the slot to the new executable.
     rebind: Callable[[ProviderSlot, Path], ProviderSlot] | None = None
 

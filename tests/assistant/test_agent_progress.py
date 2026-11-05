@@ -48,7 +48,7 @@ def test_malformed_optional_progress_cannot_abort_the_answer(payload):
 
 @pytest.mark.asyncio
 async def test_scripted_foreground_protocol_streams_summary_and_keeps_raw_reasoning_private(tmp_path, monkeypatch):
-    from resume_api.agent.runtime import NativeSession
+    from resume_api.providers.codex.runtime import NativeSession
     requests, events = [], []
     original = NativeSession.request
     def observed(session, method, params):

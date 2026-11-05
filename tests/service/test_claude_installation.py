@@ -12,16 +12,16 @@ import pytest
 
 from resume_api import release_checks
 from resume_api.app import ProviderSlot
-from resume_api.cli import claude_distribution as release
+from resume_api.providers.claude import distribution as release
 from resume_api.cli.installation import ClaudeInstallation, CliInstallation, InstallationFailure
-from resume_api.cli.profiles import claude
-from resume_api.cli.profiles.claude import ClaudeCliProfile
+from resume_api.providers.claude import profile as claude
+from resume_api.providers.claude.profile import ClaudeCliProfile
 from resume_api.cli.qualification import Version
 from resume_api.cli.releases import RECORD, Release, ReleaseFailure
-from resume_api.connection_claude import ClaudeConnectionAdapter
+from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.launcher import bind_claude, claude_slot
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.claude_cli import ClaudeCliProvider, FixtureTransport
+from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure
 from resume_api.providers.registry import CLAUDE, ProviderRegistry
 from tests.settings.support import MetadataAdapter, application, client_session

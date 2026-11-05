@@ -155,7 +155,7 @@ def test_owned_codex_calls_under_one_permit_generate_at_once(tmp_path):
     from contextlib import contextmanager
     from pathlib import Path
     from packages.resume_core.storage import private_directory
-    from resume_api.providers.codex_cli import CodexCliProvider
+    from resume_api.providers.codex.content import CodexCliProvider
     root = tmp_path / 'profile'
     private_directory(root)
     provider = CodexCliProvider(Path('/nonexistent/synthetic'),

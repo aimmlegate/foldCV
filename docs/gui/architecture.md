@@ -337,7 +337,7 @@ stall check). Nothing there is durable.
 
 ### Assistant
 
-Runtime: the pinned Codex app-server subprocess (`agent/runtime.py`), the in-process
+Runtime: the pinned Codex app-server subprocess (`providers/codex/runtime.py`), the in-process
 MCP listener with a bearer token (`agent/mcp.py`), the public page fetcher
 (`agent/web.py`) and the bundled skills (`assistant/skills/`).
 

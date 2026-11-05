@@ -14,13 +14,13 @@ import threading
 import time
 
 from resume_api import release_checks
-from resume_api.cli.experimental_profile import ExperimentalCliProfile
+from resume_api.providers.codex.profile import ExperimentalCliProfile
 from resume_api.cli.installation import ClaudeInstallation, CliInstallation
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.profiles import claude
-from resume_api.connection import ConnectionAdapter
+from resume_api.providers.claude import profile as claude
+from resume_api.providers.codex.connection import ConnectionAdapter
 from resume_api.providers.base import ConnectionFailure
-from resume_api.connection_claude import ClaudeConnectionAdapter
+from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.lifecycle import OperationFiles, SpikeError
 
 # Signed out, a CLI that passes every check stops here (D146: a codesign-only check had refused every Windows binary).

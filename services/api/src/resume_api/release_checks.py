@@ -6,14 +6,14 @@ from __future__ import annotations
 from pathlib import Path
 import time
 
-from .agent.host_profile import check_host
-from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
+from .providers.codex.host_profile import check_host
+from .providers.codex.profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import InstallationFailure
-from .cli.profiles.claude import ClaudeCliProfile
-from .connection import ConnectionAdapter
+from .providers.claude.profile import ClaudeCliProfile
+from .providers.codex.connection import ConnectionAdapter
 from .providers.base import ConnectionFailure
 from .lifecycle import SpikeError
-from .providers.claude_cli import ClaudeCliProvider
+from .providers.claude.content import ClaudeCliProvider
 from .providers.content import ContentFailure
 
 # A first start of a new binary may wait for the antivirus scan on Windows.

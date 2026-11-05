@@ -15,16 +15,16 @@ import webbrowser
 from pydantic import Field
 import uvicorn
 
-from .agent.claude_runtime import ClaudeAgentRuntime
+from .providers.claude.runtime import ClaudeAgentRuntime
 from .app import ProviderSlot, create_app
 from .host_models import Transport
 from .lifecycle import require_supported_host, tune_garbage_collector
-from .cli.experimental_profile import installed_profile
+from .providers.codex.profile import installed_profile
 from .cli.installation import ClaudeInstallation
-from .cli.profiles import claude
-from .cli.profiles.claude import ClaudeCliProfile
-from .connection_claude import ClaudeConnectionAdapter
-from .providers.claude_cli import ClaudeCliProvider
+from .providers.claude import profile as claude
+from .providers.claude.profile import ClaudeCliProfile
+from .providers.claude.connection import ClaudeConnectionAdapter
+from .providers.claude.content import ClaudeCliProvider
 from . import release_checks
 
 

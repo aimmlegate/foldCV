@@ -12,9 +12,9 @@ import sys
 import pytest
 
 from resume_api.app import ProviderSlot
-from resume_api.cli.profiles.claude import ClaudeCliProfile
-from resume_api.connection_claude import ClaudeConnectionAdapter
-from resume_api.providers.claude_cli import ClaudeCliProvider, FixtureTransport
+from resume_api.providers.claude.profile import ClaudeCliProfile
+from resume_api.providers.claude.connection import ClaudeConnectionAdapter
+from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from tests.service.app_fixtures import PROJECT, HealthyConnection, add_project, export, make_app, open_project, signed_in
 
 STAND_IN = Path(__file__).resolve().parents[1] / "providers" / "fake_claude.py"

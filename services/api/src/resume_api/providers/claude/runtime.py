@@ -26,12 +26,12 @@ from resume_api.agent.base import TOKEN_ENV
 from resume_api.agent.base import RuntimeResult, SessionFinished, terminal_cleanup
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.profiles import claude as profile_rules
-from resume_api.cli.profiles.claude import ClaudeProfileError
+from resume_api.providers.claude import profile as profile_rules
+from resume_api.providers.claude.profile import ClaudeProfileError
 from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
-from resume_api.providers.claude_cli import skipped
+from resume_api.providers.claude.content import skipped
 from resume_api.providers.shared import strict_json
 from resume_api.providers.content import ContentFailure
 

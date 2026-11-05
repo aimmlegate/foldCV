@@ -15,7 +15,7 @@ from packages.resume_core.project_limits import finalization_seconds, import_sec
 from packages.resume_core.templates.operations import derive_task
 from resume_api.importer.template_transport import JOB_PERMIT, ProviderTemplateTransport
 from resume_api.inference_admission import INFERENCE
-from resume_api.providers.claude_cli import ClaudeCliProvider, FixtureTransport
+from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from tests.templates.evidence_references import by_reference
 from tests.templates.generic_fixtures import REVIEWS, TABLES, generic_package, generic_script, source_fixture
 from tests.templates.template_runtime_fixtures import EmploymentFixture

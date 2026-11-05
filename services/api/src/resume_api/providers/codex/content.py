@@ -15,7 +15,7 @@ from contextlib import contextmanager
 from pydantic import BaseModel, ValidationError
 
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex.profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.inference_admission import INFERENCE, AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
@@ -28,10 +28,10 @@ from resume_api.providers.content import (ContentFailure, ContentInput, ContentR
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, preflight_key
-from resume_api.cli.profile import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments, overrides,
-                                     qualify)
+from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments,
+                                             overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
-from .shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, _combine, strict_json
+from ..shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, _combine, strict_json
 
 
 # What `exec --json` sends today. A newer CLI adds events of its own; tools only ever run as items, which stay checked.

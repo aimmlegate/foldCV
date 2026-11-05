@@ -18,9 +18,7 @@ import time
 import uuid
 
 from packages.resume_core import host
-from .profile import (
-    FIXTURE_PROFILE, GAPS, REAL_PROFILE, REQUIRED_FLAGS, exec_arguments, overrides,
-)
+from ..providers.codex.pins import FIXTURE_PROFILE, GAPS, REAL_PROFILE, REQUIRED_FLAGS, exec_arguments, overrides
 
 
 SCHEMA = {

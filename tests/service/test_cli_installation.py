@@ -19,11 +19,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src")
 
 from resume_api import release_checks
 from resume_api.app import create_app
-from resume_api.cli import distribution as release
-from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, installed_profile
+from resume_api.providers.codex import distribution as release
+from resume_api.providers.codex.profile import ExperimentalCliProfile, ExperimentalProfileError, installed_profile
 from resume_api.cli.installation import CliInstallation, InstallationFailure, MARKER
 from resume_api.cli.releases import Release
-from resume_api.connection import ConnectionAdapter
+from resume_api.providers.codex.connection import ConnectionAdapter
 from resume_api.providers.base import Metadata, Quota
 from resume_api.lifecycle import OperationFiles
 from tests.settings.test_providers import running_rewrite
@@ -223,8 +223,8 @@ def test_package_failure_and_publish_failure_preserve_previous(package, tmp_path
 
 
 def test_relocated_agent_uses_the_pinned_local_companion(package, tmp_path, monkeypatch):
-    from resume_api.agent.profile import AgentProfile
-    from resume_api.agent import host_profile as agent
+    from resume_api.providers.codex.agent_profile import AgentProfile
+    from resume_api.providers.codex import host_profile as agent
 
     installer = CliInstallation(tmp_path / "cli-runtime")
     assert install(installer, tmp_path)
@@ -354,7 +354,7 @@ async def test_changed_installed_binary_offers_install_again(package, tmp_path):
 
 def test_discovery_rechecks_path_after_external_install(tmp_path, monkeypatch):
     selected = [None]
-    monkeypatch.setattr("resume_api.connection.shutil.which", lambda _: selected[0])
+    monkeypatch.setattr("resume_api.providers.codex.connection.shutil.which", lambda _: selected[0])
     adapter = ConnectionAdapter()
     cli = tmp_path / "codex"
     cli.write_bytes(b"native binary fixture")
@@ -400,7 +400,7 @@ def test_the_package_pinned_before_updates_still_counts(tmp_path, monkeypatch):
 
 def test_on_macos_the_package_must_carry_openais_signature(tmp_path, monkeypatch):
     from resume_api.cli import qualification
-    from resume_api.cli.profile import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
+    from resume_api.providers.codex.pins import HOST_IDENTIFIER, IDENTIFIER, TEAM_ID
     signed = []
 
     def publisher(path, team, identifier):

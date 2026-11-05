@@ -9,7 +9,7 @@ from resume_api.importer.template_transport import ProviderTemplateTransport
 from resume_api.inference_admission import INFERENCE
 from resume_api.projects.imports import ImportCommand, ImportService
 from resume_api.projects.service import ProjectService
-from resume_api.providers.codex_cli import CodexCliProvider
+from resume_api.providers.codex.content import CodexCliProvider
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 
 

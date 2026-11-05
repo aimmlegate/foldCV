@@ -7,7 +7,7 @@ import pytest
 
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers.admitted import generate_admitted
-from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport
+from resume_api.providers.codex.content import CodexCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentResult, GenerationPolicy, ReportedUsage
 from tests.providers.fixtures import Summary, fake, request  # noqa: F401 (fake is a fixture)
 

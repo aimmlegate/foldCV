@@ -13,8 +13,8 @@ import time
 from packages.resume_core.preferences import PreferencesFailure
 from packages.resume_core.rules import RulesFailure
 
-from ..cli.experimental_profile import ExperimentalProfileError
-from ..cli.profiles.claude import ClaudeProfileError
+from ..providers.codex.profile import ExperimentalProfileError
+from ..providers.claude.profile import ClaudeProfileError
 from ..providers.base import ConnectionFailure, Metadata
 from ..host_models import (ConnectionPayload, EnableProviderRequest, HostRequest, LoginCodeRequest, ProviderState,
                            ProviderSummary, QuotaPayload, SelectModelRequest)

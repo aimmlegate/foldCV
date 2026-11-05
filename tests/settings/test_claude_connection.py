@@ -8,8 +8,8 @@ import sys
 import pytest
 
 from resume_api.app import ProviderSlot
-from resume_api.connection_claude import ClaudeConnectionAdapter
-from resume_api.providers.claude_cli import FixtureTransport
+from resume_api.providers.claude.connection import ClaudeConnectionAdapter
+from resume_api.providers.claude.content import FixtureTransport
 from resume_api.providers.registry import ProviderRegistry
 from tests.settings.support import MetadataAdapter, application, client_session
 

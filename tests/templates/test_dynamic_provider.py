@@ -7,7 +7,7 @@ import pytest
 
 from tests.providers.fixtures import PROMPT, fake  # noqa: F401 (fake is a fixture)
 from resume_api.lifecycle import OperationFiles
-from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport
+from resume_api.providers.codex.content import CodexCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 from resume_api.providers.dynamic_result import dynamic_result
 from packages.resume_core.templates.projection import SchemaFailure
@@ -69,7 +69,7 @@ def test_server_only_format_and_defaults_are_not_decoder_coercions():
 
 
 def test_direct_unexpected_post_return_decoder_failure_keeps_accounting(fake,monkeypatch):
-    from resume_api.providers.codex_cli import Events
+    from resume_api.providers.codex.content import Events
     def fail(*_args,**_kwargs): raise RuntimeError('synthetic decoder failure')
     monkeypatch.setattr(Events,'result',fail)
     with pytest.raises(ContentFailure,match='CLI_FAILED') as caught: direct(fake,VALID)
@@ -79,7 +79,7 @@ def test_direct_unexpected_post_return_decoder_failure_keeps_accounting(fake,mon
 
 
 def test_direct_return_checkpoint_precedes_decoder_and_preserves_raw_failure(fake, monkeypatch):
-    from resume_api.providers.codex_cli import Events
+    from resume_api.providers.codex.content import Events
     frames, order = [], []
     original = Events.result
     def decode(self, *args, **kwargs):

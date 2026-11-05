@@ -7,8 +7,8 @@ import sys
 
 import pytest
 
-from resume_api.agent import host_profile as agent
-from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
+from resume_api.providers.codex import host_profile as agent
+from resume_api.providers.codex.profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.cli.qualification import QualificationError
 
 

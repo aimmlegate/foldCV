@@ -4,7 +4,7 @@ import pytest
 
 from packages.resume_core.reasoning import default_effort, model_reasoning
 from resume_api.cli.qualification import Version
-from resume_api.providers import claude_catalog
+from resume_api.providers.claude import catalog as claude_catalog
 
 
 def item(levels, default):
