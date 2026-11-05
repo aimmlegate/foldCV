@@ -28,7 +28,7 @@ jobs:
       - run: .venv/bin/ruff check .
       - run: npm ci
         working-directory: apps/web
-      - run: .venv/bin/python -m pytest -q -p no:cacheprovider -n auto
+      - run: .venv/bin/python -m pytest -q -p no:cacheprovider
       - run: npm run test:state
         working-directory: apps/web
       - run: npm run typecheck

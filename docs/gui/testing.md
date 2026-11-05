@@ -33,8 +33,9 @@ npm run contracts:check
   checkout; without it, modules that import `resume_api` do not collect.
   The documented run is serial; `-n 4` (pytest-xdist, pinned) runs the default suite in
   four processes, about 4x faster (3217 passed in 292–316 s three times against about
-  1 150 s serial, 2026-11-05), and the fast CI job uses `-n auto`. The slow suite stays
-  serial. Add `--durations=25` to see the slowest tests; pass paths for a focused run.
+  1 150 s serial, 2026-11-05). CI stays serial: under `-n auto` on the runner
+  `test_codex_adapter.py::test_events_of_a_newer_cli_are_skipped_and_named_once` failed with
+  `PROCESS_CLEANUP_FAILED` (run 42118819384), green serially. The slow suite stays serial. Add `--durations=25` to see the slowest tests; pass paths for a focused run.
 - `pyright` (pinned, basic mode, `[tool.pyright]` in `pyproject.toml`; needs Node 22 on `PATH`) is report-only:
   1 621 errors on 2026-11-05, most of them pydantic constructor calls by field alias. It is no CI gate.
 - No product path converts a document (the PDF is printed, D133). The slow conversion test
