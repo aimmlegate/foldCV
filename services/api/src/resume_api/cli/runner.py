@@ -1,4 +1,4 @@
-"""Small POSIX process experiment. Real generation fails closed pending evidence."""
+"""Owned operation directories and process groups for CLI and worker runs: create, stop, reap and clean up."""
 
 import argparse
 from contextlib import contextmanager

@@ -5,10 +5,6 @@
 > editor. No initial prose rewrite. Settings use a separate screen with left
 > section navigation.
 
-> D039: MVP exports DOCX only through the existing Python writer. PDF export and
-> paginated preview are deferred; the new flow must work without LibreOffice.
-> Portable project save/open and PDF source import remain supported.
-
 > D133: PDF export prints a paged copy of the shown sheet through the system print
 > window (WebKit on macOS, Chromium on Windows); no LibreOffice, no server call.
 
@@ -43,7 +39,7 @@ flowchart LR
     UI -->|.foldcv upload| API
 ```
 
-Define ports for `Extractor`, `ContentProvider`, `DocumentRenderer`,
+Define ports for `Extractor`, `ContentProvider`, the DOCX renderer,
 `CliRuntime`, and `HostBridge`. The browser must not import desktop shell APIs,
 spawn processes, read arbitrary filesystem paths, or receive provider secrets.
 The macOS app (`apps/desktop-tauri`) is a Tauri window over the system WebKit that
@@ -67,7 +63,7 @@ apps/web/src/{workbench,rich,assistant,projects,api,connection,errors,contracts}
 services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
 contracts/{json-schema,examples,error-messages.ru.json}
-templates/{generic,bundled,foldcv-reference}/   bundled: generic-two-column.yaml, generic-one-column.yaml,
+templates/bundled/   generic-two-column.yaml, generic-one-column.yaml,
                                                 generic-skills-table.yaml, generic-questionnaire.yaml, generic-project-cards.yaml, shared assets/
 templates/local/   ignored; private templates of a local build, each folder with its own assets/
 tests/  (layout in testing.md)
@@ -267,7 +263,7 @@ footer email, saved as its next revision with the text edited in place; `templat
 `GET /v1/rich/template-import` (import availability, templates, default);
 `POST /v1/rich/projects/template-input` and `/template-input/{templateId}` (the upload that
 creates a V7 pre-draft with the default or the chosen template; an unknown template answers 404 before the upload is
-parsed); `GET /v1/template-package`. A new template id is one URL path segment (letters, digits, `.`, `_`, `-`); the
+parsed). A new template id is one URL path segment (letters, digits, `.`, `_`, `-`); the
 compiler refuses other ids, stored packages keep opening. The template routes are in `templates_routes.py`, the others
 in `app.py`.
 
@@ -460,101 +456,6 @@ Prove the restricted profile in T00B before sending real resumes. Keep model
 responses task-specific and schema-constrained. Archive bookkeeping, evidence,
 duration labels and all other deterministic work run in code.
 
-## Canonical project contract
-
-> First-release contract design (`models/contracts.py`, `schemaVersion: 3`). Stored
-> projects are `WorkspaceV7` (`models/template_workspace.py`); see [Storage and transport](#storage-and-transport).
-
-Use a new project schema version, distinct from the current version 2 experiment.
-Migrate old archives explicitly; never reinterpret them as complete atomic facts.
-
-`Project` contains:
-
-- `schemaVersion`, random `projectId`, `revision`, frozen `asOf`, `createdAt`.
-- `sources`: file ID, original name/MIME, byte hash, original-byte reference,
-  parser/version, ordered source units, warnings, and correction overlays.
-- `facts`: stable fact IDs, revision, kind, typed value, evidence, importance,
-  origin, and any job/project association.
-- `employment`: employers, roles, dated periods, subprojects, and fact IDs.
-- `views`: block IDs and order, selected facts, text, locks, exclusions, and rules.
-- `templates`: exact package/version/hash and assets required to reproduce output.
-- `review`: issues, decisions, fact dispositions, acknowledgments and revisions.
-- `operations`: request metadata, usage, statuses, proposed changes, and local undo.
-- `renders`: snapshot hashes, renderer versions, artifact hashes, optional bytes.
-
-Keep original files and large assets outside JSON inside the project ZIP; use
-references to manifest entries. Do not base64-copy them into every API request.
-
-### Source and fact example
-
-```json
-{
-  "id": "fact_team_01",
-  "revision": 1,
-  "kind": "leadership",
-  "jobId": "job_recent",
-  "value": {
-    "action": "built_and_led_team",
-    "from": 0,
-    "to": 5,
-    "unit": "engineers",
-    "attribution": "personal"
-  },
-  "evidence": [{"sourceId": "src_01", "unitId": "u_21"}],
-  "importance": "essential",
-  "origin": "source"
-}
-```
-
-Numeric facts should retain value or range, comparison operator, units, period,
-baseline, result, scope, attribution, and qualifiers. Do not reduce "up to 2000
-per day" to the unordered token `2000`. Generic text facts are still needed;
-use a small set of typed kinds rather than an ontology project.
-
-Source units preserve extraction text exactly. Facts normalize meaning and point
-back to units. User corrections are overlays with their own origin and revision.
-An added fact uses `origin: user`, not fabricated source references. Changing
-extraction or parsing creates a new source revision; old references remain intact.
-
-### View block example
-
-```json
-{
-  "id": "profile",
-  "kind": "profile",
-  "revision": 4,
-  "text": "Backend developer focused on recent payment integrations.",
-  "factIds": ["fact_domain_01", "fact_integration_02"],
-  "factRevisions": {"fact_domain_01": 1, "fact_integration_02": 2},
-  "origin": "manual",
-  "locked": true,
-  "status": "ready",
-  "contentPolicyVersion": "editorial-1"
-}
-```
-
-Block status is one of `empty`, `running`, `proposed`, `ready`, `stale`, or `error`.
-Visibility is separate from status. An operation has `queued`, `running`,
-`completed`, `failed`, `cancelled`, or `interrupted`. Keep the accepted text while
-a proposal is running; do not overload one status with both states.
-
-### Dependencies and patch rules
-
-Track dependency hashes over selected fact revisions, content policy, language,
-and template rules. A layout-only template change invalidates renders; a rule
-change can invalidate selected blocks. A fact correction invalidates dependent
-prose and derived experience. Unrelated blocks keep their revisions and locks.
-
-A proposal includes `operationId`, `blockId`, `baseBlockRevision`,
-`dependencyHash`, replacement content, evidence, and validation findings. Accept
-it only if the base revision and dependencies still match. Replace an allowlisted
-block payload; do not execute arbitrary JSON Patch paths returned by a model.
-
-Maintain one previous accepted revision per block for first-release undo, including
-text, lock, provenance and review state. Preserve it in explicit project exports;
-retain current review decisions. Do not retain arbitrary model conversation
-transcripts. Derived values are reproducible and can be recomputed from facts.
-
 ## Application API
 
 The routes are listed under [Storage and transport](#routes). Rules for all of them:
@@ -650,36 +551,17 @@ this separate from what the application stores locally.
 
 ## DOCX and PDF rendering
 
-The authoritative chain is `RenderSnapshot → DOCX → PDF`. Use a trusted DOCX base,
-python-docx for structured elements and styles, and narrowly scoped docxtpl tags
-if useful. Preserve editability: paragraphs, runs, lists, cells, and inline images;
-never render whole pages as images in a Word container.
-[python-docx styles](https://python-docx.readthedocs.io/en/stable/user/styles-using.html),
-[docxtpl features](https://docxtpl.readthedocs.io/en/stable/)
-
-Start with a technical spike reproducing the two-column reference: page size,
-margins, source fonts, sidebar, logo, focus icons, gray bars, footer, and pagination.
-Test multi-page tables, long names, long education, empty fields, and many projects.
-Use flowing editable elements and avoid absolute-position text boxes where possible.
-Do not sacrifice editability or shrink text to force a preset page count.
-
-Convert the generated DOCX with a pinned LibreOffice build and controlled fonts.
-Run conversion in a unique operation directory with an isolated user profile,
-no macros, no external links, a timeout, and process-tree cleanup. Its documented
-CLI supports headless conversion and a separate user profile.
-[LibreOffice parameters](https://help.libreoffice.org/latest/en-US/text/shared/guide/start_parameters.html)
+The export writes an editable DOCX from the captured template package (`rendering/captured_docx.py` in the render
+worker): paragraphs, runs, lists, cells and inline images, never whole pages as images in a Word container.
+[python-docx styles](https://python-docx.readthedocs.io/en/stable/user/styles-using.html)
 
 Export renders the snapshot the editor sends (`TemplateSnapshotIdentity`) through
 the render worker; typing never renders. The reply names the snapshot it rendered
 and the client refuses a different one. The project records one completed attempt
 with the artifact hash; a retry reuses the attempt id.
 
-PDF is the visual reference. Word and LibreOffice can paginate DOCX differently;
-test both target readers and report any material discrepancy. Do not promise
-pixel-identical DOCX display in every editor. The existing ReportLab renderer
-remains a regression reference, not a separate production PDF path that drifts
-from DOCX. If the DOCX spike cannot meet fidelity, record a concrete alternative
-before continuing the renderer-dependent tasks.
+The PDF is printed from the page (D133). Word and LibreOffice can paginate a DOCX differently; do not promise
+pixel-identical DOCX display in every editor.
 
 ## Portable project format
 
@@ -723,21 +605,7 @@ For deployment, document reverse-proxy buffering, temporary storage and retentio
 settings. In-memory application state alone does not establish that infrastructure
 never writes to disk. Candidate data must not enter shared caches or backups.
 
-## Reuse of the current experiment
-
-- Reuse editorial rules, fonts/icons, source snapshots, duration union logic and
-  synthetic policy tests.
-- Refactor `archive.py` file-writing logic into extraction/preservation functions
-  that accept bytes and return models. Explicit project saving belongs to the UI.
-- Split `check_archive.py` into source-integrity, fact-coverage, view-consistency,
-  and document checks. It currently reopens files and verifies whole archives.
-- Replace substring-only technology checks with canonical IDs and alias/display
-  mappings. Avoid adding awkward duplicate names solely to satisfy a matcher.
-- Extend numeric checks to typed metrics, qualifiers and attribution. A number set
-  alone cannot detect an inverted result or lost ownership.
-- Use `render.py` and current PDFs as visual references. Build an editable DOCX
-  path instead of embedding existing PDF pages in DOCX.
-- Preserve the CLI wrappers until the new path passes regression checks.
+## PDF extraction licence
 
 The existing parser uses PyMuPDF. Its published license options are AGPL and
 commercial; resolve licensing or use a suitable alternative before distribution.

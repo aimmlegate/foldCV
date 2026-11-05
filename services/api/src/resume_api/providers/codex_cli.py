@@ -1,4 +1,4 @@
-"""Versioned Codex CLI adapter. Real generation remains closed by D004."""
+"""The Codex CLI content provider: structured generation through `codex exec` with a pinned profile."""
 
 from __future__ import annotations
 

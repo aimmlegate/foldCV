@@ -52,7 +52,6 @@ export default defineConfig(() => ({
   server: { host: "127.0.0.1", fs: { allow: [
     fileURLToPath(new URL("./", import.meta.url)),
     fileURLToPath(new URL("../../contracts", import.meta.url)),
-    fileURLToPath(new URL("../../templates/foldcv-reference", import.meta.url)),
     fileURLToPath(new URL("../../templates/bundled/assets", import.meta.url)),
     fileURLToPath(new URL("../../design/future-editor/visual", import.meta.url)),
   ] } },
