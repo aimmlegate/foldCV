@@ -1,5 +1,5 @@
-"""The render workers under the service: the V7 export (POST /v2/projects/{id}/export through
-`projects.exports.production_render` and `rendering.TemplateDocxRenderer`) and the PDF `rendering.DocumentRenderer`."""
+"""The render worker under the service: the V7 export (POST /v2/projects/{id}/export through
+`projects.exports.production_render` and `rendering.TemplateDocxRenderer`)."""
 
 from __future__ import annotations
 
@@ -14,12 +14,11 @@ import httpx
 import pytest
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rendering.template import RenderFailure
 from resume_api import lifecycle, rendering
 from resume_api.cli import runner as cli_runner
 from resume_api.cli.runner import group_members
-from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.rendering import DocumentRenderer, TemplateDocxRenderer
+from resume_api.lifecycle import SpikeError
+from resume_api.rendering import TemplateDocxRenderer
 from tests.service.app_fixtures import (DOCX_WORKER, ORIGIN, PROJECT, HealthyConnection, add_project, export, make_app,
                                         open_project, operations, signed_in, status)
 from tests.templates.storage_fixtures import joined, literal, workspace
@@ -406,63 +405,3 @@ async def test_an_intent_unlink_failure_blocks_a_restart_without_a_directory(tmp
     assert list(root.glob("op-*")) == [] and len(list(root.glob(".cleanup-intent-op-*.json"))) == 1
     monkeypatch.undo()
     await assert_restart_blocked(tmp_path)
-
-
-@pytest.mark.parametrize(("worker", "code"), [
-    ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'FONT_UNAVAILABLE'}))\nsys.exit(4)\n",
-     "FONT_UNAVAILABLE"),
-    ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'ASSET_MISMATCH'}))\nsys.exit(4)\n",
-     "ASSET_MISMATCH"),
-    ("import sys\nsys.stderr.write('private-crash-marker')\nsys.exit(7)\n", "RICH_RENDER_FAILED"),
-])
-@pytest.mark.asyncio
-async def test_a_worker_failure_code_reaches_the_reply(tmp_path, monkeypatch, worker, code):
-    use_worker(monkeypatch, tmp_path, worker)
-    app = service(tmp_path)
-    async with signed_in(app) as client:
-        failed = await export(client, await open_project(client))
-        assert "private-crash-marker" not in failed.text
-        assert operations(tmp_path) == []
-        assert failed.status_code == 422 and failed.json()["error"]["code"] == code
-
-
-@pytest.mark.asyncio
-async def test_a_refused_fragment_reaches_the_reply_and_nothing_else_of_the_status(tmp_path, monkeypatch):
-    use_worker(monkeypatch, tmp_path, "import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'FONT_UNAVAILABLE', "
-        "'blockId': 'block-1', 'fragment': 'Текст', 'private': 'private-marker'}))\nsys.exit(4)\n")
-    app = service(tmp_path)
-    async with signed_in(app) as client:
-        failed = await export(client, await open_project(client))
-    assert failed.status_code == 422 and "private-marker" not in failed.text
-    assert (failed.json()["blockId"], failed.json()["fragment"]) == ("block-1", "Текст")
-
-
-def test_a_crashed_export_worker_gets_the_export_message():
-    catalog = json.loads((Path(__file__).resolve().parents[2] / "contracts/error-messages.ru.json").read_text(encoding="utf-8"))
-    assert catalog["codes"]["RICH_RENDER_FAILED"] == catalog["codes"]["RENDER_FAILED"] == "export"
-
-
-@pytest.mark.parametrize(("worker", "code"), [
-    ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'FONT_UNAVAILABLE'}))\nsys.exit(4)\n",
-     "FONT_UNAVAILABLE"),
-    ("import json, sys\nopen('render-status.json', 'w').write(json.dumps({'code': 'private-marker'}))\nsys.exit(4)\n",
-     "RENDER_FAILED"),
-    ("import zipfile\nwith zipfile.ZipFile('render-output.zip', 'w') as out:\n    out.writestr('private.txt', 'x')\n",
-     "RENDER_FAILED"),
-    ("import sys\nsys.exit(0)\n", "RENDER_OUTPUT_LIMIT"),
-])
-@pytest.mark.asyncio
-async def test_the_pdf_worker_reports_only_public_codes_and_cleans(tmp_path, monkeypatch, worker, code):
-    script = use_worker(monkeypatch, tmp_path, worker)
-    files = OperationFiles(tmp_path / "operations")
-
-    class Request:
-        # The worker is replaced, so the request body only has to serialize.
-        def model_dump_json(self, **_options):
-            return "{}"
-
-    with pytest.raises(RenderFailure) as caught:
-        with files.open():
-            await DocumentRenderer().render(Request(), files)
-    assert caught.value.code == code and "private" not in str(caught.value)
-    assert operations(tmp_path) == [] and script.is_file()

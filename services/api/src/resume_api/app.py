@@ -6,7 +6,6 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from dataclasses import dataclass
-from io import BytesIO
 from contextlib import asynccontextmanager
 from http.cookies import SimpleCookie
 import json
@@ -14,11 +13,10 @@ from pathlib import Path
 import secrets
 import threading
 import time
-from zipfile import ZipFile, ZIP_STORED
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
@@ -34,7 +32,6 @@ from .cli.profiles.claude import ClaudeProfileError
 from .providers.codex_cli import CodexCliProvider
 from .providers.registry import DESCRIPTORS, ProviderRegistry, discovered
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
-from packages.resume_core.rendering.template import ROOT as TEMPLATE_ROOT, MANIFEST as TEMPLATE_MANIFEST, RenderFailure, require_template
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 from packages.resume_core.models.settings import (RulesSettings, RulesSettingsError, SaveAnalysisPreference,
     SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
@@ -741,21 +738,6 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
             return rules_response(captured)
         except RulesFailure as error:
             return rules_failure(error)
-
-    @app.get("/v1/template-package")
-    async def template_package():
-        try:
-            manifest = require_template()
-            output = BytesIO()
-            with ZipFile(output, "w", compression=ZIP_STORED) as archive:
-                archive.write(TEMPLATE_MANIFEST, "template/manifest.json")
-                for relative in sorted(manifest["assets"]):
-                    archive.write(TEMPLATE_ROOT / relative, f"template/{relative}")
-            if output.tell() > 2 * 1024 * 1024:
-                return problem("TEMPLATE_UNAVAILABLE", 503)
-            return Response(output.getvalue(), media_type="application/zip", headers={"Cache-Control": "no-store"})
-        except (RenderFailure, OSError):
-            return problem("TEMPLATE_UNAVAILABLE", 503)
 
     login_tasks: dict[str, asyncio.Task] = {}
     install_tasks: dict[str, asyncio.Task] = {}

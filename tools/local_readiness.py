@@ -40,22 +40,14 @@ def check_local() -> None:
             raise ReadinessError(f"Python dependency {package} must be {expected}; install requirements-dev.txt.")
     if not (ROOT / "apps/web/dist/index.html").is_file():
         raise ReadinessError("Frontend build is missing; run npm ci and npm run build in apps/web.")
-    from packages.resume_core.rendering.template import RenderFailure, require_template
+    from packages.resume_core.templates import store
+    from packages.resume_core.templates.projection import SchemaFailure
 
-    try:
-        require_template()
-    except RenderFailure as error:
-        remedies = {
-            "CONVERTER_UNAVAILABLE": "Run tools/install-local-renderer.sh.",
-            "CONVERTER_MISMATCH": "Install the pinned LibreOffice with tools/install-local-renderer.sh.",
-            "FONT_UNAVAILABLE": "Run tools/install-local-renderer.sh to install app-local fonts.",
-            "FONT_MISMATCH": "Restore app-local fonts with tools/install-local-renderer.sh.",
-            "ASSET_UNAVAILABLE": "Restore the checked-in template assets.",
-            "ASSET_MISMATCH": "Restore the checked-in template assets.",
-            "TEMPLATE_UNAVAILABLE": "Restore the checked-in template manifest.",
-            "TEMPLATE_MISMATCH": "Restore the checked-in template manifest.",
-        }
-        raise ReadinessError(f"Renderer {error.code}: {remedies.get(error.code, 'Check local renderer assets.')}") from None
+    for template_id in store.shipped_templates():
+        try:
+            store.bundled_package(template_id)
+        except (OSError, ValueError, SchemaFailure):
+            raise ReadinessError(f"Template {template_id} does not compile: restore the checked-in template assets.") from None
 
 
 def bounded_version(executable: Path) -> str | None:

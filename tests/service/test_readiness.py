@@ -11,15 +11,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
 from tools import local_readiness as readiness
-from packages.resume_core.rendering import template
+from packages.resume_core.templates import store
+from packages.resume_core.templates.projection import SchemaFailure
 from resume_api.connection import ConnectionAdapter, ConnectionFailure
 from tests.support.foundation import LOCAL_MANIFEST as MANIFEST, run_local
 
 
 @pytest.fixture
 def pinned_host(monkeypatch, tmp_path):
-    """The manifest's host with a frontend build and a renderer, on any machine. `tools/run-local.py --check` is the
-    check of the real host."""
+    """The manifest's host with a frontend build, on any machine; the bundled templates compile as they are.
+    `tools/run-local.py --check` is the check of the real host."""
     monkeypatch.setattr(platform, "system", lambda: "Darwin")
     monkeypatch.setattr(platform, "machine", lambda: MANIFEST["architecture"])
     monkeypatch.setattr(platform, "mac_ver", lambda: (MANIFEST["macos"], (), ""))
@@ -27,7 +28,6 @@ def pinned_host(monkeypatch, tmp_path):
     (tmp_path / "apps/web/dist").mkdir(parents=True)
     (tmp_path / "apps/web/dist/index.html").write_text("<html></html>", encoding="utf-8")
     monkeypatch.setattr(readiness, "ROOT", tmp_path)
-    monkeypatch.setattr(template, "require_template", dict)
 
 
 def test_version_probe_signals_owned_group_before_reaping(monkeypatch):
@@ -82,16 +82,11 @@ def test_local_readiness_reports_host_and_dependency_errors(pinned_host, monkeyp
         readiness.check_local()
 
 
-@pytest.mark.parametrize("code,remedy", [
-    ("CONVERTER_UNAVAILABLE", "install-local-renderer.sh"),
-    ("FONT_UNAVAILABLE", "app-local fonts"),
-    ("ASSET_MISMATCH", "checked-in template assets"),
-])
-def test_local_readiness_reports_renderer_failure(pinned_host, monkeypatch, code, remedy):
-    def fail():
-        raise template.RenderFailure(code)
-    monkeypatch.setattr(template, "require_template", fail)
-    with pytest.raises(readiness.ReadinessError, match=remedy):
+def test_local_readiness_reports_a_template_that_does_not_compile(pinned_host, monkeypatch):
+    def fail(_template_id):
+        raise SchemaFailure("/assets", "asset bytes do not match")
+    monkeypatch.setattr(store, "bundled_package", fail)
+    with pytest.raises(readiness.ReadinessError, match="checked-in template assets"):
         readiness.check_local()
 
 

@@ -111,19 +111,20 @@ async def serve(root: Path, control=None, output=None) -> None:
 def check() -> int:
     """Build check of the frozen helper: every file the service reads at run time is in place."""
     from packages.resume_core.rendering.captured_docx import renderer_identity
-    from packages.resume_core.rendering.layout import ASSETS
-    from packages.resume_core.rendering.rich_docx import renderer_sha256
     from packages.resume_core.rules import DEFAULT_RULES
-    from packages.resume_core.templates.store import BUNDLED_TEMPLATES
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATES, bundled_folder, bundled_package
     from .assistant.skills import SKILLS, read_skill
 
-    missing = [str(path) for path in (frontend() / "index.html", ASSETS, *BUNDLED_TEMPLATES.values())
+    # The asset files each compiled bundled package names, beside its template file.
+    assets = [bundled_folder(template_id) / asset.path for template_id in BUNDLED_TEMPLATES
+              for asset in bundled_package(template_id).assets]
+    missing = [str(path) for path in (frontend() / "index.html", *BUNDLED_TEMPLATES.values(), *assets)
                if not path.exists()]
     skills = [read_skill(skill.id, resource)["resource"] for skill in SKILLS for resource in skill.resources]
     if missing or not DEFAULT_RULES:
         raise RuntimeError("Missing resources: " + ", ".join(missing))
-    print(json.dumps({"renderer": renderer_identity().sha256, "richRenderer": renderer_sha256(),
-                      "templates": sorted(BUNDLED_TEMPLATES), "skills": len(skills)}))
+    print(json.dumps({"renderer": renderer_identity().sha256, "templates": sorted(BUNDLED_TEMPLATES),
+                      "skills": len(skills)}))
     return 0
 
 
