@@ -11,7 +11,6 @@
   "templatePackageSha256": "af3f212612f59650e1e9ea4c7cc32d2edfbbaa77c71cf3c34cc87ce06957d1f8",
   "pythonPackages": {
     "PyMuPDF": "1.28.2",
-    "reportlab": "5.0.1",
     "Pillow": "12.3.0",
     "PyYAML": "6.0.3",
     "pydantic": "2.12.5",

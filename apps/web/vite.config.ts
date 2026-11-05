@@ -53,7 +53,7 @@ export default defineConfig(() => ({
     fileURLToPath(new URL("./", import.meta.url)),
     fileURLToPath(new URL("../../contracts", import.meta.url)),
     fileURLToPath(new URL("../../templates/foldcv-reference", import.meta.url)),
-    fileURLToPath(new URL("../../skills/format-resume/assets", import.meta.url)),
+    fileURLToPath(new URL("../../templates/bundled/assets", import.meta.url)),
     fileURLToPath(new URL("../../design/future-editor/visual", import.meta.url)),
   ] } },
   build: { target: "es2022", cssCodeSplit: true, rollupOptions: { input: {

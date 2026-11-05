@@ -29,7 +29,10 @@ fi
 
 FONTS="$APP/Contents/Resources/fonts/truetype"
 mkdir -p "$FONTS"
-cp "$ROOT"/skills/format-resume/assets/fonts/SourceSansPro-*.ttf "$FONTS/"
+# The five upright faces the converter used before; the folder also holds the italics.
+for FACE in Light Regular Semibold Bold Black; do
+  cp "$ROOT/templates/bundled/assets/SourceSansPro-$FACE.ttf" "$FONTS/"
+done
 VERSION="$("$APP/Contents/MacOS/soffice" --version)"
 if [[ "$VERSION" != "LibreOffice 26.2.6.3 "* ]]; then
   echo "Wrong LibreOffice version: $VERSION" >&2

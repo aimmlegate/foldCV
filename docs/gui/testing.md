@@ -23,7 +23,7 @@ npm run typecheck && npm run lint && npm run build
 npm run contracts:check
 ```
 
-- `pytest.ini`: `testpaths = tests skills/format-resume/tests`, `addopts = --strict-markers
+- `pytest.ini`: `testpaths = tests`, `addopts = --strict-markers
   --strict-config -m "not slow"`. A `-m slow` on the command line wins. `slow` is the only
   marker.
 - Without `PYTHONPATH=services/api/src`, modules that import `resume_api` do not collect.
@@ -100,7 +100,6 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
 | `tests/foundation` | contract drift check, private git guard |
 | `tests/architecture` | import rules |
 | `tests/support`, `tests/fixtures` | helpers and synthetic fixtures |
-| `skills/format-resume/tests` | skill archive and policy regressions |
 | `apps/web/unit` | client: V7 extraction, translation and projection, edit transport, history, panel, structure, rewrite, export, assistant, import notices, settings, tab lock |
 
 ## Rules for tests

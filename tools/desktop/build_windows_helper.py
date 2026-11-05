@@ -39,8 +39,7 @@ MSVCP140 = "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9"
 # mcp imports pywin32 on Windows; pip on another host leaves out dependencies marked for win32.
 WINDOWS_ONLY = ("pywin32==311",)
 # Read at run time; kept at their checkout paths (as in build_helper.py), next to the two source trees.
-DATA = ("apps/web/dist", "skills/format-resume/SKILL.md", "skills/format-resume/references",
-        "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
+DATA = ("apps/web/dist", "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
         "requirements.txt", "packaging/helper_entry.py")
 SOURCES = ("packages", "services/api/src/resume_api")
 # sys.path of the helper; the interpreter ignores PYTHONPATH and the registry when this file exists.
