@@ -11,7 +11,6 @@ from jsonschema import Draft202012Validator
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from packages.resume_core.models.contracts import Project
 from resume_api.projects.archive import ArchiveDownload
 from resume_api.projects.exports import ExportCommand, ExportRetry
 from resume_api.projects.imports import ImportCommand
@@ -91,20 +90,6 @@ def test_shared_case(case: dict) -> None:
     assert accepted is case["valid"]
     if accepted:
         assert list(schema(case["contract"]).iter_errors(data)) == []
-
-
-def test_manual_value_edit_keeps_identity() -> None:
-    edited = case_data(next(c for c in CASES if c["name"] == "manual_value_edit_keeps_id"))
-    project = Project.model_validate(edited)
-    assert project.facts[2].id == BASES["project"]["facts"][2]["id"]
-    assert project.facts[2].revision == 2
-
-
-def test_partial_save_preserves_source_bytes_reference() -> None:
-    partial = case_data(next(c for c in CASES if c["name"] == "partial_project_save"))
-    project = Project.model_validate(partial)
-    assert project.sources[0].byte_ref == "sources/source_1/original.txt"
-    assert project.template is None
 
 
 def test_every_route_body_is_strict_and_refuses_unknown_fields(tmp_path):

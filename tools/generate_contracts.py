@@ -10,7 +10,6 @@ from packages.resume_core.extraction.models import ExtractResult
 from packages.resume_core.models.agent import AGENT_CONTRACTS
 from packages.resume_core.models.assistant import ASSISTANT_CONTRACTS
 from packages.resume_core.models.connection import CliInstallationPayload
-from packages.resume_core.models.contracts import Project
 from packages.resume_core.models.projects import PROJECT_CONTRACTS, TemplateRewritePreviewV1
 from packages.resume_core.models.registry import Registry
 from packages.resume_core.models.rich_document import RichDocumentV1
@@ -62,7 +61,6 @@ CONTRACTS = {
     "registry": Registry,
     "cli_installation_payload": CliInstallationPayload,
     "extract_result": ExtractResult,
-    "project": Project,
 }
 
 

@@ -1,4 +1,5 @@
-"""Version 3 wire contracts. All persisted candidate state is explicit."""
+"""The shared wire base, ids, dates, source and evidence models, and the version 3 project model `dates.py`
+still reads."""
 
 from __future__ import annotations
 
@@ -379,72 +380,6 @@ class RenderSnapshot(Wire):
     pdf: AssetRef | None
 
 
-class ZipEntry(Wire):
-    path: str
-    role: Literal["project", "source_original", "source_extracted", "template_asset", "render", "checks"]
-    sha256: Sha256
-    uncompressed_size: int = Field(ge=0)
-
-
-class ZipManifest(Wire):
-    schema_version: Literal[3]
-    app_version: str
-    renderer_version: str
-    project_id: Id
-    entries: list[ZipEntry]
-
-    @model_validator(mode="after")
-    def valid_entries(self) -> ZipManifest:
-        return validate_manifest(self)
-
-
-class ArchiveEntry(Wire):
-    path: str
-    role: Literal["project", "workspace", "source_original", "template_asset", "render"]
-    sha256: Sha256
-    uncompressed_size: int = Field(ge=0, le=32 * 1024 * 1024)
-
-    @model_validator(mode="after")
-    def valid_path(self) -> ArchiveEntry:
-        if not _safe_path(self.path):
-            raise ValueError("unsafe archive path")
-        return self
-
-
-class ArchiveManifest(Wire):
-    schema_version: Literal[4]
-    app_version: str
-    renderer_version: str | None
-    template_package_sha256: Sha256 | None
-    template_assets_included: bool
-    project_id: Id | None
-    entries: list[ArchiveEntry] = Field(min_length=1, max_length=47)
-
-    @model_validator(mode="after")
-    def valid_entries(self) -> ArchiveManifest:
-        paths = [entry.path for entry in self.entries]
-        _unique(paths, "archive entry")
-        if len({path.casefold() for path in paths}) != len(paths):
-            raise ValueError("case alias archive entry")
-        if [entry.path for entry in self.entries if entry.role == "workspace"] != ["workspace.json"]:
-            raise ValueError("workspace entry is required")
-        project_paths = [entry.path for entry in self.entries if entry.role == "project"]
-        if project_paths != (["project.json"] if self.project_id is not None else []):
-            raise ValueError("project entry mismatch")
-        if self.project_id is None and (self.renderer_version is not None or self.template_package_sha256 is not None):
-            raise ValueError("partial project cannot claim renderer identity")
-        if (self.renderer_version is None) != (self.template_package_sha256 is None):
-            raise ValueError("renderer and template identity must be paired")
-        if self.template_assets_included != any(entry.role == "template_asset" for entry in self.entries):
-            raise ValueError("template asset status mismatch")
-        for entry in self.entries:
-            if entry.role == "render" and not entry.path.startswith("renders/"):
-                raise ValueError("render entry path mismatch")
-            if entry.role == "template_asset" and not entry.path.startswith("template/"):
-                raise ValueError("template entry path mismatch")
-        return self
-
-
 class Project(Wire):
     schema_version: Literal[3]
     project_id: Id
@@ -615,17 +550,3 @@ def validate_project(project: Project) -> Project:
         if any(event.request_id != operation.id for event in operation.events):
             raise ValueError("event request ID mismatch")
     return project
-
-
-def validate_manifest(manifest: ZipManifest) -> ZipManifest:
-    paths = _unique([e.path for e in manifest.entries], "ZIP entry")
-    if "project.json" not in paths:
-        raise ValueError("ZIP manifest lacks project.json")
-    project_entries = [entry for entry in manifest.entries if entry.role == "project"]
-    if len(project_entries) != 1 or project_entries[0].path != "project.json":
-        raise ValueError("project.json must be the sole project-role entry")
-    for path in paths:
-        if not _safe_path(path):
-            raise ValueError("unsafe ZIP path")
-    return manifest
-

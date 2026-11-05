@@ -169,7 +169,7 @@ def test_markdown_code_fences_keep_hash_lines_as_text():
 
 
 def test_absent_structure_keeps_legacy_source_unit_serialization_and_hash_inputs():
-    legacy = json.loads(Path("contracts/examples/project.json").read_text())["sources"][0]
+    legacy = json.loads(Path("tests/fixtures/synthetic/legacy-project.json").read_text())["sources"][0]
     source = Source.model_validate(legacy)
     assert all(u.structure is None for u in source.units)
     assert source.model_dump(by_alias=True)["units"] == legacy["units"]

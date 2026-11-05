@@ -15,7 +15,7 @@ from packages.resume_core.dates import (
 from packages.resume_core.models.contracts import Period, Project
 
 
-EXAMPLE = json.loads((Path(__file__).resolve().parents[2] / "contracts/examples/project.json").read_text())
+EXAMPLE = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/synthetic/legacy-project.json").read_text())
 
 
 def project_with_technology(*, as_of=True, duplicate=False) -> Project:
