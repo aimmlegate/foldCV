@@ -22,10 +22,11 @@ pytestmark = pytest.mark.slow
 
 EXPORTS = {}
 F10_LINE = 'Reduced median latency by 80%.'
-# W01's measured faces and sizes (half-points): name, profession, section, project, body.
-STYLES = {'name': ('Source Sans Pro Black', '36', '0'), 'profession': ('Source Sans Pro Semibold', '32', '0'),
-    'section': ('Source Sans Pro', '28', '1'), 'project': ('Source Sans Pro Semibold', '24', '0'),
-    'body': ('Source Sans Pro Light', '20', '0'), 'emphasis': ('Source Sans Pro Semibold', '20', '0')}
+# W01's measured sizes (half-points) on the two faces D127 left: Bold for name, profession, section, project and
+# emphasis, Regular for body.
+STYLES = {'name': ('Source Sans Pro', '36', '1'), 'profession': ('Source Sans Pro', '32', '1'),
+    'section': ('Source Sans Pro', '28', '1'), 'project': ('Source Sans Pro', '24', '1'),
+    'body': ('Source Sans Pro', '20', '0'), 'emphasis': ('Source Sans Pro', '20', '1')}
 
 
 async def f10_export(tmp_path_factory):

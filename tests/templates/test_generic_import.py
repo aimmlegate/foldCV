@@ -125,11 +125,13 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
         assert 'Message queue platform for internal services.' in projects
         assert shown['other_projects'] == ['ДРУГИЕ ПРОЕКТЫ', 'Old Systems'] and 'Old Systems' not in projects
     else:
-        assert shown['summary'][1] == 'Summary: Backend engineer focused on reliable queue systems.'
-        assert 'Product: message queue platform for internal services.' in projects and 'Old Systems' in projects
+        # D134: the known label «Summary:» leaves in code, and a model value that is its source line word for word
+        # but for a label and case stays as the model wrote it («Product:», «Career:» below).
+        assert shown['summary'][1] == 'Backend engineer focused on reliable queue systems.'
+        assert 'Message queue platform for internal services.' in projects and 'Old Systems' in projects
     # The career-wide highlight has no owner; both employment records and the old job's technology stay facts.
     assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', 'Mentored five engineers across teams.' if rewrite
-        else 'Career: Mentored five engineers across teams']
+        else 'Mentored five engineers across teams']
     highlight = next(record for record in workspace.project.facts.extensions if record.semantic_type == 'foldcv:career_highlights')
     assert not highlight.relations and not any(relation.subject_id == highlight.id for relation in workspace.project.facts.relations)
     assert sorted(record.employer.raw_text for record in records(workspace, 'employment')) == ['Example Labs', 'Old Systems']

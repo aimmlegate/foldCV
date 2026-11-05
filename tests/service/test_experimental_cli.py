@@ -32,6 +32,17 @@ SECRET = "synthetic-personal-experiment-0123456789"
 VERSION = "codex-cli " + distribution.RELEASE
 
 
+def owned_profile(tmp_path, monkeypatch):
+    """A profile whose CLI is an executable file it owns under tmp_path, so a runner needs no installed Codex; the
+    binary check is the seam that would otherwise read the file's signature."""
+    executable = tmp_path / "bin" / "codex"
+    executable.parent.mkdir(mode=0o700)
+    executable.write_bytes(b"#!/bin/sh\nexit 1\n")
+    executable.chmod(0o700)
+    monkeypatch.setattr(ExperimentalCliProfile, "check_binary", lambda _self: None)
+    return ExperimentalCliProfile(tmp_path / "profile", executable)
+
+
 class MetadataOnly:
     def inspect(self, _files, _cancel, *, full=True):
         assert full
@@ -39,11 +50,11 @@ class MetadataOnly:
 
 
 @pytest.mark.asyncio
-async def test_readiness_requires_opt_in_status_and_selection_then_detaches(tmp_path: Path):
+async def test_readiness_requires_opt_in_status_and_selection_then_detaches(tmp_path: Path, monkeypatch):
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / "index.html").write_text("<html>fixture</html>")
-    profile = ExperimentalCliProfile(tmp_path / "profile")
+    profile = owned_profile(tmp_path, monkeypatch)
     app = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", data_root=tmp_path / "store",
                      dist=dist, connection_adapter=MetadataOnly(), experimental_profile=profile)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
@@ -86,7 +97,7 @@ async def test_connection_refresh_login_detach_and_cancel_invalidate_content_pre
     (dist / "index.html").write_text("fixture")
     app = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist,
         data_root=tmp_path / "store", connection_adapter=metadata,
-        experimental_profile=ExperimentalCliProfile(tmp_path / "profile"))
+        experimental_profile=owned_profile(tmp_path, monkeypatch))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         await client.post("/v1/session/exchange", headers={"Origin": ORIGIN}, json={"secret": SECRET})
         async def post(action):
@@ -171,7 +182,7 @@ async def test_a_generation_finished_after_detach_is_refused_but_a_refresh_keeps
     (dist / "index.html").write_text("<html>fixture</html>")
     app = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / "operations", dist=dist,
                      data_root=tmp_path / "store", connection_adapter=MetadataOnly(),
-                     experimental_profile=ExperimentalCliProfile(tmp_path / "profile"))
+                     experimental_profile=owned_profile(tmp_path, monkeypatch))
     add_project(app)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN,
                                  headers={"Origin": ORIGIN}) as client:
