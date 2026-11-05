@@ -1,15 +1,10 @@
 """Technical Focus, grounded duration estimates and local logo provenance."""
 
-from io import BytesIO
 from pathlib import Path
-from zipfile import ZipFile
 import hashlib
 import json
 
-from lxml import etree
-
 from packages.resume_core.models.rich_facts import WorkingFacts
-from packages.resume_core.rendering.rich_docx import render_rich_docx
 from packages.resume_core.rich_fields import set_text
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import panel_mutation
@@ -58,7 +53,7 @@ def test_partial_year_bounds_and_open_periods_never_assume_today():
     assert technology_experience(facts)["sql"][0] == "Срок не указан"
 
 
-def test_stated_qualified_experience_wins_is_editable_and_exports_the_same_label():
+def test_stated_qualified_experience_wins_and_is_editable():
     facts, doc = technology_facts([job("2020-01", "2021-12"),
         {"kind": "technology", "display": "Python", "experience": "Более 5 лет", "technical": True}])
     selected = next(r for r in facts.records if r.kind == "technology" and r.job_id is None)
@@ -66,9 +61,6 @@ def test_stated_qualified_experience_wins_is_editable_and_exports_the_same_label
     set_text(selected, "experience", "Около 6 лет")
     labels = [v.experience for v in presentation(doc, facts).blocks.values() if v.role == "focus_entry"]
     assert labels == ["6 years"]
-    with ZipFile(BytesIO(render_rich_docx(doc, facts=facts))) as archive:
-        xml = etree.fromstring(archive.read("word/document.xml"))
-        assert "6 years" in xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
     assert WorkingFacts.model_validate_json(facts.model_dump_json(by_alias=True)).records == facts.records
 
 

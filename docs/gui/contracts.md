@@ -10,7 +10,7 @@ field or meaning needs a new version, with no implicit fallback.
 
 ## Contract list
 
-`CONTRACTS` in `tools/generate_contracts.py`, 69 models:
+`CONTRACTS` in `tools/generate_contracts.py`, 67 models:
 
 | Group | Contracts |
 |---|---|
@@ -21,7 +21,7 @@ field or meaning needs a new version, with no implicit fallback.
 | Assistant (`models/assistant.py`, `ASSISTANT_CONTRACTS`) | `assistant_error_v1`, `assistant_run_request_v2`, `assistant_run_v1`, `assistant_conversation_v1`, `assistant_conversation_list_v1`, `assistant_messages_v1`, `assistant_events_v1`, `assistant_change_proposal_v1`, `assistant_change_proposal_list_v1`, `assistant_apply_request_v1`, `assistant_apply_result_v1`, `assistant_skill_list_v1`, `propose_changes_v1`, `publish_findings_v1`, `assistant_capabilities_v1`, `assistant_file_v1` |
 | Agent records shared with the run files (`models/agent.py`, `AGENT_CONTRACTS`) | `agent_error`, `agent_settings`, `agent_settings_request`, `agent_message`, `agent_web_source`, `agent_finding`, `agent_event`, `agent_fetch_request` |
 | Settings (`models/settings.py`, `SETTINGS_CONTRACTS`) | `rules`, `rules_settings`, `rules_settings_error`, `save_rules_request`, `preferences`, `save_import_model_preference`, `save_limits_preference`, `save_analysis_preference` |
-| Other | `registry`, `cli_installation_payload`; domain and worker models `extract_result`, `render_request`, `prepare_request`, `project` (kept tests read their examples) |
+| Other | `registry`, `cli_installation_payload`; domain and worker models `extract_result`, `project` (kept tests read their examples) |
 
 The generator also writes `contracts/template-source.schema.json`: editor hints for
 template YAML in both forms, with no TypeScript type. To add a contract, register the

@@ -39,11 +39,58 @@
     "base": "project",
     "valid": true,
     "edits": [
-      { "op": "clone", "path": ["sources"], "from": ["sources", 0] },
-      { "op": "set", "path": ["sources", 1, "revision"], "value": 2 },
-      { "op": "set", "path": ["sources", 1, "units", 0, "revision"], "value": 2 },
-      { "op": "set", "path": ["sources", 1, "units", 0, "representedFactIds"], "value": [] },
-      { "op": "set", "path": ["sources", 1, "units", 1, "revision"], "value": 2 }
+      {
+        "op": "clone",
+        "path": [
+          "sources"
+        ],
+        "from": [
+          "sources",
+          0
+        ]
+      },
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          1,
+          "revision"
+        ],
+        "value": 2
+      },
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          1,
+          "units",
+          0,
+          "revision"
+        ],
+        "value": 2
+      },
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          1,
+          "units",
+          0,
+          "representedFactIds"
+        ],
+        "value": []
+      },
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          1,
+          "units",
+          1,
+          "revision"
+        ],
+        "value": 2
+      }
     ]
   },
   {
@@ -467,7 +514,7 @@
           "value",
           "number"
         ],
-        "value": 1e999
+        "value": Infinity
       }
     ]
   },
@@ -581,675 +628,391 @@
     "contract": "project",
     "base": "project",
     "valid": false,
-    "edits": [{ "op": "set", "path": ["sources", 0, "byteRef"], "value": "../outside.txt" }]
-  },
-  {
-    "name": "stale_block_fact_revision_saved", "contract": "project", "base": "project", "valid": true,
-    "edits": [{ "op": "set", "path": ["views", 0, "state", "factRevisions", "fact_metric"], "value": 1 }]
-  },
-  {
-    "name": "stale_review_decision_saved", "contract": "project", "base": "project", "valid": true,
-    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "fact", "targetId": "fact_metric", "disposition": "shown", "reason": null, "targetRevision": 1 } }]
-  },
-  {
-    "name": "stale_render_saved", "contract": "project", "base": "project", "valid": true,
-    "edits": [{ "op": "set", "path": ["renders", 0, "projectRevision"], "value": 2 }]
-  },
-  {
-    "name": "stale_operation_saved", "contract": "project", "base": "project", "valid": true,
-    "edits": [{ "op": "set", "path": ["operations", 0, "baseRevision"], "value": 1 }]
-  },
-  {
-    "name": "stale_proposal_saved", "contract": "project", "base": "project", "valid": true,
-    "edits": [{ "op": "set", "path": ["proposals", 0, "baseBlockRevision"], "value": 1 }]
-  },
-  {
-    "name": "represented_user_fact_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "append", "path": ["sources", 0, "units", 0, "representedFactIds"], "value": "fact_user" }]
-  },
-  {
-    "name": "evidence_without_representation_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["sources", 0, "units", 0, "representedFactIds"], "value": [] }]
-  },
-  {
-    "name": "job_lists_foreign_fact_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "append", "path": ["employment", 0, "factIds"], "value": "fact_user" }]
-  },
-  {
-    "name": "job_omits_owned_fact_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["employment", 0, "factIds"], "value": [] }]
-  },
-  {
-    "name": "subproject_lists_foreign_fact_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "append", "path": ["employment", 0, "subprojects", 0, "factIds"], "value": "fact_user" }]
-  },
-  {
-    "name": "subproject_omits_owned_fact_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["employment", 0, "subprojects", 0, "factIds"], "value": [] }]
-  },
-  {
-    "name": "future_block_fact_revision_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["views", 0, "state", "factRevisions", "fact_metric"], "value": 999 }]
-  },
-  {
-    "name": "future_previous_fact_revision_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["views", 0, "previous", "factRevisions", "fact_metric"], "value": 999 }]
-  },
-  {
-    "name": "future_fact_review_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "fact", "targetId": "fact_metric", "disposition": "shown", "reason": null, "targetRevision": 999 } }]
-  },
-  {
-    "name": "future_block_review_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "append", "path": ["review", "decisions"], "value": { "targetKind": "block", "targetId": "profile", "disposition": "shown", "reason": null, "targetRevision": 999 } }]
-  },
-  {
-    "name": "future_render_project_revision_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["renders", 0, "projectRevision"], "value": 999 }]
-  },
-  {
-    "name": "future_operation_base_revision_rejected", "contract": "project", "base": "project", "valid": false,
-    "edits": [{ "op": "set", "path": ["operations", 0, "baseRevision"], "value": 999 }]
-  },
-  {
-    "name": "render_request_valid",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": true,
-    "edits": []
-  },
-  {
-    "name": "render_snapshot_hash_mismatch",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
     "edits": [
       {
         "op": "set",
         "path": [
-          "snapshot",
-          "snapshotSha256"
+          "sources",
+          0,
+          "byteRef"
         ],
-        "value": "0000000000000000000000000000000000000000000000000000000000000000"
+        "value": "../outside.txt"
       }
     ]
   },
   {
-    "name": "render_revision_mismatch",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
+    "name": "stale_block_fact_revision_saved",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
     "edits": [
       {
         "op": "set",
         "path": [
-          "baseRevision"
+          "views",
+          0,
+          "state",
+          "factRevisions",
+          "fact_metric"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "stale_review_decision_saved",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "review",
+          "decisions"
+        ],
+        "value": {
+          "targetKind": "fact",
+          "targetId": "fact_metric",
+          "disposition": "shown",
+          "reason": null,
+          "targetRevision": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "stale_render_saved",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "renders",
+          0,
+          "projectRevision"
         ],
         "value": 2
       }
     ]
   },
   {
-    "name": "render_unknown_template",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "templateId"
-        ],
-        "value": "external"
-      }
-    ]
-  },
-  {
-    "name": "render_icon_path_rejected",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "set",
-        "path": [
-          "document",
-          "focus",
-          0,
-          "icon"
-        ],
-        "value": "../private"
-      }
-    ]
-  },
-  {
-    "name": "render_missing_project_role",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "projects",
-          0,
-          "role"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "render_missing_summary",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "candidate",
-          "summary"
-        ]
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "43f98b20a9d2eb08f083cbae11b470797091bf291d981511eba65005988a7ba8"
-      }
-    ]
-  },
-  {
-    "name": "render_missing_footer",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "footer"
-        ]
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "f610fb428d8eac27a9d1fa0f76af2d2120256886e513cbc147a89ec0f047cb51"
-      }
-    ]
-  },
-  {
-    "name": "render_missing_duration",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "focus",
-          0,
-          "duration"
-        ]
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "8ba522343b339986d4ce3ccd5f5b0b64d5771da492c90bb5582097936b08c81e"
-      }
-    ]
-  },
-  {
-    "name": "render_missing_description",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "projects",
-          0,
-          "description"
-        ]
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "718ef1964de9566d9d90eade54868c94b07093fb5d52878f499a33e4d4de1d4d"
-      }
-    ]
-  },
-  {
-    "name": "render_missing_stack",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "remove",
-        "path": [
-          "document",
-          "projects",
-          0,
-          "stack"
-        ]
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "20ceb5e4e7d81ffc2c14e222c39f9cfac59ce951a3abe21e40fef42a8480bfd5"
-      }
-    ]
-  },
-  {
-    "name": "render_complete_empty_content",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "stale_operation_saved",
+    "contract": "project",
+    "base": "project",
     "valid": true,
     "edits": [
       {
         "op": "set",
         "path": [
-          "document",
-          "candidate",
-          "summary"
-        ],
-        "value": ""
-      },
-      {
-        "op": "set",
-        "path": [
-          "document",
-          "footer"
-        ],
-        "value": ""
-      },
-      {
-        "op": "set",
-        "path": [
-          "document",
-          "focus",
+          "operations",
           0,
-          "duration"
+          "baseRevision"
         ],
-        "value": ""
-      },
-      {
-        "op": "set",
-        "path": [
-          "document",
-          "projects",
-          0,
-          "description"
-        ],
-        "value": ""
-      },
-      {
-        "op": "set",
-        "path": [
-          "document",
-          "projects",
-          0,
-          "stack"
-        ],
-        "value": ""
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "2f102badf5187cb2fc14751938dc8cda700fac8dab7528f06e32faeb72bd1f81"
+        "value": 1
       }
     ]
   },
   {
-    "name": "render_astral_item_4000_valid",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "stale_proposal_saved",
+    "contract": "project",
+    "base": "project",
     "valid": true,
     "edits": [
       {
-        "op": "repeat_text",
-        "path": [
-          "document",
-          "sidebar",
-          0,
-          "items",
-          0
-        ],
-        "text": "🚀",
-        "count": 4000
-      },
-      {
         "op": "set",
         "path": [
-          "snapshot",
-          "snapshotSha256"
+          "proposals",
+          0,
+          "baseBlockRevision"
         ],
-      "value": "fcdb34893eb109dc68537ae04c383796a7c07006b134e35812aec5273dc29b22"
+        "value": 1
       }
     ]
   },
   {
-    "name": "render_astral_item_4001_invalid",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "represented_user_fact_rejected",
+    "contract": "project",
+    "base": "project",
     "valid": false,
     "edits": [
       {
-        "op": "repeat_text",
+        "op": "append",
         "path": [
-          "document",
-          "sidebar",
+          "sources",
           0,
-          "items",
-          0
+          "units",
+          0,
+          "representedFactIds"
         ],
-        "text": "🚀",
-        "count": 4001
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "eea78226894fd31039dce6a4e52aacae5394837c4780ac6694016e28b6abf736"
+        "value": "fact_user"
       }
     ]
   },
   {
-    "name": "render_astral_total_97500_valid",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "evidence_without_representation_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "sources",
+          0,
+          "units",
+          0,
+          "representedFactIds"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "job_lists_foreign_fact_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "employment",
+          0,
+          "factIds"
+        ],
+        "value": "fact_user"
+      }
+    ]
+  },
+  {
+    "name": "job_omits_owned_fact_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "factIds"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "subproject_lists_foreign_fact_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "employment",
+          0,
+          "subprojects",
+          0,
+          "factIds"
+        ],
+        "value": "fact_user"
+      }
+    ]
+  },
+  {
+    "name": "subproject_omits_owned_fact_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "employment",
+          0,
+          "subprojects",
+          0,
+          "factIds"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "future_block_fact_revision_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "views",
+          0,
+          "state",
+          "factRevisions",
+          "fact_metric"
+        ],
+        "value": 999
+      }
+    ]
+  },
+  {
+    "name": "future_previous_fact_revision_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "views",
+          0,
+          "previous",
+          "factRevisions",
+          "fact_metric"
+        ],
+        "value": 999
+      }
+    ]
+  },
+  {
+    "name": "future_fact_review_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "review",
+          "decisions"
+        ],
+        "value": {
+          "targetKind": "fact",
+          "targetId": "fact_metric",
+          "disposition": "shown",
+          "reason": null,
+          "targetRevision": 999
+        }
+      }
+    ]
+  },
+  {
+    "name": "future_block_review_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "review",
+          "decisions"
+        ],
+        "value": {
+          "targetKind": "block",
+          "targetId": "profile",
+          "disposition": "shown",
+          "reason": null,
+          "targetRevision": 999
+        }
+      }
+    ]
+  },
+  {
+    "name": "future_render_project_revision_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "renders",
+          0,
+          "projectRevision"
+        ],
+        "value": 999
+      }
+    ]
+  },
+  {
+    "name": "future_operation_base_revision_rejected",
+    "contract": "project",
+    "base": "project",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operations",
+          0,
+          "baseRevision"
+        ],
+        "value": 999
+      }
+    ]
+  },
+  {
+    "name": "extract_valid_literal_source",
+    "contract": "extract_result",
+    "base": "extract_result",
     "valid": true,
-    "edits": [
-      {
-        "op": "fill_sidebar",
-        "path": [
-          "document",
-          "sidebar"
-        ],
-        "text": "🚀",
-        "repeat": 25,
-        "items": 100,
-        "sections": 39
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-      "value": "bf1b0614524c555dde912debd136ec2b1b3f4c7da8ab8304488d7597259814d6"
-      }
-    ]
+    "edits": []
   },
   {
-    "name": "render_astral_total_over_100000_invalid",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "fill_sidebar",
-        "path": [
-          "document",
-          "sidebar"
-        ],
-        "text": "🚀",
-        "repeat": 25,
-        "items": 100,
-        "sections": 40
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "b3a4370033ddbd3c5839466613b0c40479b4facd0223991ee51ca325b28ca11a"
-      }
-    ]
-  },
-  {
-    "name": "render_lone_surrogate_rejected",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {"op": "set", "path": ["document", "candidate", "summary"], "value": "\ud800"},
-      {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "67f5de8c0d16e719c494a2e00a630b490d078ce57636e5fbb1bd88a5816ac31b"}
-    ]
-  },
-  {
-    "name": "render_lone_low_surrogate_text_rejected",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "extract_duplicate_unit_id",
+    "contract": "extract_result",
+    "base": "extract_result",
     "valid": false,
     "edits": [
       {
         "op": "set",
         "path": [
-          "document",
-          "candidate",
-          "summary"
-        ],
-        "value": "\udc00"
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "e18ba1470369a1a42431c784b1e9e99ee7b5f9222227ed300b3fcf2f4e1e06bc"
-      }
-    ]
-  },
-  {
-    "name": "render_lone_high_surrogate_id_rejected",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": false,
-    "edits": [
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
+          "units",
+          1,
           "id"
         ],
-        "value": "\ud800"
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "346406e4d79bead3b9e386d5846600eaeac8b36c1621fac3ba4e7a4e497b8369"
+        "value": "unit_1"
       }
     ]
   },
   {
-    "name": "render_lone_low_surrogate_id_rejected",
-    "contract": "render_request",
-    "base": "render_request",
+    "name": "extract_wrong_order",
+    "contract": "extract_result",
+    "base": "extract_result",
     "valid": false,
     "edits": [
       {
         "op": "set",
         "path": [
-          "snapshot",
-          "id"
+          "units",
+          1,
+          "order"
         ],
-        "value": "\udc00"
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-        "value": "053d010a089783e620a84f14176f62bff07c73a5fbd8c1d523eff3bd825ce619"
+        "value": 8
       }
     ]
   },
   {
-    "name": "render_valid_astral_snapshot_id",
-    "contract": "render_request",
-    "base": "render_request",
-    "valid": true,
+    "name": "extract_missing_links",
+    "contract": "extract_result",
+    "base": "extract_result",
+    "valid": false,
     "edits": [
       {
-        "op": "set",
+        "op": "remove",
         "path": [
-          "snapshot",
-          "id"
-        ],
-        "value": "synthetic-\ud83d\ude80"
-      },
-      {
-        "op": "set",
-        "path": [
-          "snapshot",
-          "snapshotSha256"
-        ],
-      "value": "3b092947f82f7df27de83f0678c8f54709f1caafa3f525be17aa784918b687fc"
+          "links"
+        ]
       }
     ]
   },
-  {
-  "name": "prepare_valid_explicit_bindings",
-  "contract": "prepare_request",
-  "base": "prepare_request",
-  "valid": true,
-  "edits": []
-},
-  {
-  "name": "prepare_missing_job_binding",
-  "contract": "prepare_request",
-  "base": "prepare_request",
-  "valid": false,
-  "edits": [
-    {
-      "op": "remove",
-      "path": [
-        "presentation",
-        "jobProseBlocks",
-        "job_2"
-      ]
-    }
-  ]
-},
-  {
-  "name": "prepare_wrong_template_identity",
-  "contract": "prepare_request",
-  "base": "prepare_request",
-  "valid": false,
-  "edits": [
-    {
-      "op": "set",
-      "path": [
-        "project",
-        "template",
-        "packageSha256"
-      ],
-      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-    }
-  ]
-},
-  {
-  "name": "prepare_duplicate_job_binding",
-  "contract": "prepare_request",
-  "base": "prepare_request",
-  "valid": false,
-  "edits": [
-    {
-      "op": "set",
-      "path": [
-        "presentation",
-        "jobProseBlocks",
-        "job_2"
-      ],
-      "value": "work-one"
-    }
-  ]
-},
-  {
-  "name": "prepare_extra_visible_prose",
-  "contract": "prepare_request",
-  "base": "prepare_request",
-  "valid": false,
-  "edits": [
-    {
-      "op": "clone",
-      "path": [
-        "project",
-        "views"
-      ],
-      "from": [
-        "project",
-        "views",
-        1
-      ]
-    }
-  ]
-},
-  {
-  "name": "extract_valid_literal_source",
-  "contract": "extract_result",
-  "base": "extract_result",
-  "valid": true,
-  "edits": []
-},
-  {
-  "name": "extract_duplicate_unit_id",
-  "contract": "extract_result",
-  "base": "extract_result",
-  "valid": false,
-  "edits": [{"op": "set", "path": ["units", 1, "id"], "value": "unit_1"}]
-},
-  {
-  "name": "extract_wrong_order",
-  "contract": "extract_result",
-  "base": "extract_result",
-  "valid": false,
-  "edits": [{"op": "set", "path": ["units", 1, "order"], "value": 8}]
-},
-  {
-  "name": "extract_missing_links",
-  "contract": "extract_result",
-  "base": "extract_result",
-  "valid": false,
-  "edits": [{"op": "remove", "path": ["links"]}]
-},
-  {"name": "render_unknown_language", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "set", "path": ["document", "sourceLanguage"], "value": "fr"}]},
-  {"name": "render_default_language_uses_canonical_hash", "contract": "render_request", "base": "render_request", "valid": true, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}]},
-  {"name": "render_omitted_language_raw_hash_is_invalid", "contract": "render_request", "base": "render_request", "valid": false, "edits": [{"op": "remove", "path": ["document", "sourceLanguage"]}, {"op": "set", "path": ["snapshot", "snapshotSha256"], "value": "dac7a557f3d1eb7ceae55a2ad3ea7e5f202889d5371401448dcc55e001accc45"}]},
   {
     "name": "recovery_preferences_valid",
     "contract": "preferences",
@@ -1302,47 +1065,47 @@
     ]
   },
   {
-  "name": "rules_settings_parsed_presets_valid",
-  "contract": "rules_settings",
-  "base": "rules_settings",
-  "valid": true,
-  "edits": []
-},
+    "name": "rules_settings_parsed_presets_valid",
+    "contract": "rules_settings",
+    "base": "rules_settings",
+    "valid": true,
+    "edits": []
+  },
   {
-  "name": "legacy_reconcile_edits_accepts_one_attempt",
-  "contract": "project",
-  "base": "project",
-  "valid": true,
-  "edits": [
-    {
-      "op": "append",
-      "path": [
-        "operations"
-      ],
-      "value": {
-        "id": "operation_reconcile",
-        "kind": "reconcile_edits",
-        "status": "cancelled",
-        "baseRevision": 2,
-        "usage": {
-          "logicalAttempts": 1,
-          "internalInferenceRequests": null,
-          "reportedInputTokens": null,
-          "reportedOutputTokens": null
-        },
-        "events": [
-          {
-            "requestId": "operation_reconcile",
-            "sequence": 0,
-            "type": "cancelled",
-            "stage": null,
-            "usage": null
-          }
-        ]
+    "name": "legacy_reconcile_edits_accepts_one_attempt",
+    "contract": "project",
+    "base": "project",
+    "valid": true,
+    "edits": [
+      {
+        "op": "append",
+        "path": [
+          "operations"
+        ],
+        "value": {
+          "id": "operation_reconcile",
+          "kind": "reconcile_edits",
+          "status": "cancelled",
+          "baseRevision": 2,
+          "usage": {
+            "logicalAttempts": 1,
+            "internalInferenceRequests": null,
+            "reportedInputTokens": null,
+            "reportedOutputTokens": null
+          },
+          "events": [
+            {
+              "requestId": "operation_reconcile",
+              "sequence": 0,
+              "type": "cancelled",
+              "stage": null,
+              "usage": null
+            }
+          ]
+        }
       }
-    }
-  ]
-},
+    ]
+  },
   {
     "name": "agent agent_settings valid",
     "contract": "agent_settings",
@@ -1598,13 +1361,105 @@
       }
     ]
   },
-  {"name": "clear global technologies", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": true, "edits": []},
-  {"name": "clear job technologies", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": true, "edits": [{"op": "set", "path": ["jobId"], "value": "job-1"}]},
-  {"name": "reject other clear kind", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["recordKind"], "value": "employment"}]},
-  {"name": "reject clear record", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["recordId"], "value": "technology-1"}]},
-  {"name": "reject clear period", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["periodId"], "value": "period-1"}]},
-  {"name": "reject clear values", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["values"], "value": {"display": "Rust"}}]},
-  {"name": "reject unknown panel operation", "contract": "rich_panel_request", "base": "rich_panel_request", "valid": false, "edits": [{"op": "set", "path": ["operation"], "value": "clear_all"}]},
+  {
+    "name": "clear global technologies",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": true,
+    "edits": []
+  },
+  {
+    "name": "clear job technologies",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": true,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "jobId"
+        ],
+        "value": "job-1"
+      }
+    ]
+  },
+  {
+    "name": "reject other clear kind",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "recordKind"
+        ],
+        "value": "employment"
+      }
+    ]
+  },
+  {
+    "name": "reject clear record",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "recordId"
+        ],
+        "value": "technology-1"
+      }
+    ]
+  },
+  {
+    "name": "reject clear period",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "periodId"
+        ],
+        "value": "period-1"
+      }
+    ]
+  },
+  {
+    "name": "reject clear values",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "values"
+        ],
+        "value": {
+          "display": "Rust"
+        }
+      }
+    ]
+  },
+  {
+    "name": "reject unknown panel operation",
+    "contract": "rich_panel_request",
+    "base": "rich_panel_request",
+    "valid": false,
+    "edits": [
+      {
+        "op": "set",
+        "path": [
+          "operation"
+        ],
+        "value": "clear_all"
+      }
+    ]
+  },
   {
     "name": "import_model_selected",
     "contract": "save_import_model_preference",

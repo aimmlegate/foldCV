@@ -1,9 +1,5 @@
 """Facts keep explicit skill lists styled, punctuated and manually ordered."""
 
-from io import BytesIO
-from zipfile import ZipFile
-
-from lxml import etree
 from pydantic import TypeAdapter
 import pytest
 
@@ -12,7 +8,6 @@ from packages.resume_core.models.rich_workspace import WorkspaceV6
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import field_block, panel_mutation
 from packages.resume_core.rich_presentation import authored_text, presentation
-from packages.resume_core.rendering.rich_docx import render_rich_docx
 from packages.resume_core.template_inverse import inverse_mutation
 from tests.facts.panel_fixtures import apply, edit, job, technology_facts, technology_workspace
 from tests.support.rich import without_sources
@@ -62,19 +57,13 @@ def test_add_uses_existing_list_paragraph_styles_and_no_standalone_tail():
     assert presentation(changed.project.document, changed.project.facts).blocks["tools"].role == "body"
 
 
-def test_move_changes_text_export_and_reload_and_undo_redo_keep_source_facts_exact():
+def test_move_changes_text_and_reload_and_undo_redo_keep_source_facts_exact():
     workspace, records = fixture()
     changed = apply(workspace, operation="move_technology", recordId=records["SQL"].id, beforeRecordId=records["Python"].id)
     assert authored_text(tools(changed)) == "SQL, Python, Docker"
     assert changed.project.facts == workspace.project.facts and changed.project.sources == workspace.project.sources
     transferred = WorkspaceV6.model_validate_json(changed.model_dump_json(by_alias=True))
     assert transferred.project.document == changed.project.document
-    with ZipFile(BytesIO(render_rich_docx(changed.project.document, facts=changed.project.facts))) as archive:
-        xml = etree.fromstring(archive.read("word/document.xml"))
-    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-    paragraph = next(p for p in xml.xpath("//w:p", namespaces=ns) if "".join(p.xpath(".//w:t/text()", namespaces=ns)) == "SQL, Python, Docker")
-    assert paragraph.xpath("./w:pPr/w:jc/@w:val", namespaces=ns) == ["both"]
-    assert paragraph.xpath(".//w:i", namespaces=ns)
     undo = inverse_mutation(workspace, changed, mutation_id="undo-order", session_id="order")
     restored, _ = apply_rich_mutation(changed, undo)
     assert authored_text(tools(restored)) == "Python, Docker, SQL"
@@ -122,7 +111,7 @@ def test_invalid_move_target_is_atomic(before):
     assert workspace.model_dump_json() == raw
 
 
-def test_manual_focus_order_survives_year_edit_new_membership_export_and_reload():
+def test_manual_focus_order_survives_year_edit_new_membership_and_reload():
     workspace, records = fixture()
     moved = apply(workspace, operation="move_focus", recordId=records["Python"].id, beforeRecordId=records["SQL"].id)
     section = moved.project.document.regions[1].blocks[0]
@@ -133,10 +122,6 @@ def test_manual_focus_order_survives_year_edit_new_membership_export_and_reload(
     assert [entry.display for entry in presentation(changed.project.document, changed.project.facts).focus_entries] == expected
     reopened = WorkspaceV6.model_validate_json(changed.model_dump_json(by_alias=True))
     assert reopened.project.document.regions[1].blocks[0].props.manual_order
-    with ZipFile(BytesIO(render_rich_docx(reopened.project.document, facts=reopened.project.facts))) as archive:
-        xml = etree.fromstring(archive.read("word/document.xml"))
-    text = xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
-    assert text.index("Python") < text.index("SQL") < text.index("Docker")
 
 
 def test_cross_group_move_keeps_destination_style_and_hides_empty_source_group():

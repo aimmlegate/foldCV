@@ -4,17 +4,23 @@ import base64
 from copy import deepcopy
 from io import BytesIO
 import json
+import os
+from pathlib import Path
+from types import SimpleNamespace
 
 from fontTools.ttLib import TTFont
 from PIL import Image
 import pytest
 
+from packages.resume_core.rendering import captured_assets
 from packages.resume_core.rendering.captured_assets import font_name,load_captured_assets
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.templates.compiler import canonical,compile_bytes,sha256
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE,package_identity,verify_package
 from tests.templates.storage_fixtures import with_logo
+
+ROOT=Path(__file__).resolve().parents[2]
 
 
 def package():
@@ -41,9 +47,17 @@ def changed_asset(before,identifier,*,content=None,mime=None,embedding=None):
 
 def test_actual_captured_fonts_and_logo_decode_and_materialize_exact_bytes(tmp_path,monkeypatch):
     captured=package();logo_id=captured.recipe.style.header.logo.asset
-    def forbidden(*_args,**_kwargs):pytest.fail('captured assets must not use reference/template filesystem assets')
-    monkeypatch.setattr('packages.resume_core.rendering.template.require_template',forbidden)
-    monkeypatch.setattr('packages.resume_core.rendering.rich_template.require_rich_template',forbidden)
+    # Installed after package() read the bundled assets: the loader itself may open no template or skill file.
+    def guarded(reader):
+        def read(source,*args,**kwargs):
+            if isinstance(source,(str,os.PathLike)) and any(Path(source).resolve().is_relative_to(ROOT/name)
+                    for name in ('templates','skills')):
+                pytest.fail('captured assets must not use reference/template filesystem assets')
+            return reader(source,*args,**kwargs)
+        return read
+    monkeypatch.setattr(captured_assets,'TTFont',guarded(TTFont))
+    monkeypatch.setattr(captured_assets,'Image',SimpleNamespace(open=guarded(Image.open),
+        DecompressionBombError=Image.DecompressionBombError))
     loaded=load_captured_assets(captured,list(captured.recipe.style.fonts),logo_id)
     assert set(loaded.fonts)==set(captured.recipe.style.fonts)
     assert all(font.family and font.units_per_em>=16 for font in loaded.fonts.values())

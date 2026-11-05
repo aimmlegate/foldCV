@@ -25,7 +25,7 @@ from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts
 from .captured_layout import BodyGeometry, CapturedMetrics, half_points, native_units
 from .captured_styles import CapturedStyleResolver, authored_spans, resize_run, visible_text
-from .rich_docx import Writer, element, fill
+from .docx_writer import Writer, element, fill
 from .template import RenderFailure
 
 ROOT = Path(__file__).resolve().parents[3]

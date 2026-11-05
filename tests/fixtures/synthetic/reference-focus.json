@@ -1,0 +1,18 @@
+{
+ "minimumEntryHeight": 38,
+ "logoBox": {
+  "xFromSidebar": 4.5,
+  "width": 28,
+  "height": 32,
+  "preserveAspect": true
+ },
+ "textFromSidebar": 37,
+ "labelFont": "semibold",
+ "labelSize": 10,
+ "lineHeight": 12.57,
+ "maximumLogos": 8,
+ "entryCountLimit": null,
+ "textOnlyUsesSameSpacing": true,
+ "referenceLogoEntries": 8,
+ "referenceTextOnlyEntries": 2
+}

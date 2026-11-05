@@ -29,10 +29,12 @@ npm run contracts:check
 - Without `PYTHONPATH=services/api/src`, modules that import `resume_api` do not collect.
   There is no pytest-xdist; the run is one process. Add `--durations=25` to see the slowest
   tests; pass paths for a focused run.
-- The slow conversions need the pinned LibreOffice (`tools/install-local-renderer.sh`, macOS
-  arm64, installs into `.tools/`).
+- No product path converts a document (the PDF is printed, D133). The slow conversion test
+  (`tests/render/test_captured_conversion.py`, helpers in `tests/support/convert.py`) and manual
+  PDF checks use the pinned LibreOffice of `tools/install-local-renderer.sh` (macOS arm64,
+  installs into `.tools/`).
 - The default run needs neither `.tools/` nor `apps/web/dist`, and passes on any host: the
-  readiness tests stub the host, frontend and renderer. `tools/run-local.py --check` checks
+  readiness tests stub the host and frontend. `tools/run-local.py --check` checks
   the real machine.
 - `test:state` runs `node --test` with `tsx` over `apps/web/unit/*.test.ts` with the default
   reporter and coverage for `src/assistant` and `src/rich`.
@@ -87,7 +89,7 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
 | `tests/assistant` | runs, tools, compiler, proposals, permissions, actions, store, MCP listener, runtime, web fetcher, skills |
 | `tests/templates` | V7 template domain: preparation, mutations, paste, scopes, relations, sync, import pipeline, sidecar, review, captured DOCX; scripted two-column and second-template imports (slow); golden corpus in `golden/` |
 | `tests/facts` | facts panel, fact mutations, sync, dependencies, dates, technology lists |
-| `tests/render` | DOCX rendering, layout, Focus, localization; real conversions (slow) |
+| `tests/render` | V6 Focus membership and years, technology Focus; the captured export through LibreOffice (slow) |
 | `tests/rewrite` | rewrite preview route, timing, text rewrite |
 | `tests/import` | import models |
 | `tests/extract`, `tests/docx` | PDF and DOCX extraction; DOCX basics |

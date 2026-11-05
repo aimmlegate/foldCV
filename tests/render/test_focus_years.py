@@ -1,9 +1,5 @@
 """Whole-year display, quick edits, sorting and missing-duration behavior."""
 
-from io import BytesIO
-from zipfile import ZipFile
-
-from lxml import etree
 import pytest
 
 from packages.resume_core.models.rich_mutations import RichMutation
@@ -12,7 +8,6 @@ from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import panel_mutation
 from packages.resume_core.rich_presentation import authored_text, presentation
 from packages.resume_core.technology_experience import technology_years
-from packages.resume_core.rendering.rich_docx import render_rich_docx
 from tests.facts.panel_fixtures import edit, job, technology_facts, technology_workspace
 from tests.support.rich import capture
 
@@ -41,12 +36,6 @@ def test_focus_sorts_known_years_descending_and_keeps_unknown_last_without_a_sub
     view = presentation(document, facts)
     assert [(entry.display, entry.years) for entry in view.focus_entries] == [("Docker", 6), ("Python", 2), ("Linux", None)]
     assert view.blocks[focus.children[-1].id].experience is None
-    with ZipFile(BytesIO(render_rich_docx(document, facts=facts))) as archive:
-        xml = etree.fromstring(archive.read("word/document.xml"))
-    text = xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
-    assert "DevOps" not in text and "NoIconTool" not in text
-    assert text.index("Docker") < text.index("Python") < text.index("Linux")
-    assert not any("not stated" in value or "не указан" in value or "≈" in value or "year+" in value for value in text)
 
 
 def test_quick_year_edit_resorts_in_the_same_mutation_and_can_be_cleared_undone_and_reloaded():

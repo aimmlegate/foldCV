@@ -1,10 +1,6 @@
 """Focus membership is a reversible document choice, independent of facts."""
 
-from io import BytesIO
-from zipfile import ZipFile
-
 from jsonschema import Draft202012Validator
-from lxml import etree
 import pytest
 
 from packages.resume_core.models.rich_document import ParagraphBlock
@@ -12,7 +8,6 @@ from packages.resume_core.models.rich_workspace import WorkspaceV6
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import RichPanelRequest, field_block, panel_mutation
 from packages.resume_core.rich_presentation import presentation
-from packages.resume_core.rendering.rich_docx import render_rich_docx
 from tests.facts.panel_fixtures import edit, job, technology_workspace
 
 
@@ -55,7 +50,7 @@ def test_remove_preserves_facts_evidence_and_other_mentions_and_readd_sorts_with
     assert change(removed, "Docker", False) is removed
 
 
-def test_remove_last_hides_heading_and_restore_survives_reload_and_docx():
+def test_remove_last_hides_heading_and_restore_survives_reload():
     original = workspace([{"kind": "technology", "display": "Python", "experience": "2"}])
     removed = change(original, "Python", False)
     assert removed.project.document.regions[1].blocks == []
@@ -66,12 +61,6 @@ def test_remove_last_hides_heading_and_restore_survives_reload_and_docx():
     assert len(restored.project.document.regions[1].blocks) == 1
     assert [e.display for e in view(restored).focus_entries] == ["Python"]
     assert restored.project.facts == original.project.facts
-    for value, expected in [(removed, False), (restored, True)]:
-        with ZipFile(BytesIO(render_rich_docx(value.project.document, facts=value.project.facts))) as archive:
-            xml = etree.fromstring(archive.read("word/document.xml"))
-        text = xml.xpath("//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})
-        assert ("ФОКУС" in text) == expected
-        assert ("Python" in text) == expected
 
 
 def test_aliases_share_membership_and_options_prefer_the_general_fact():

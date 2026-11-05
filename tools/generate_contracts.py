@@ -21,8 +21,6 @@ from packages.resume_core.models.template_document import RichDocumentV2
 from packages.resume_core.models.template_import import ImportOperation
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateSnapshotIdentity
 from packages.resume_core.models.template_workspace import ArchiveManifestV7, WorkspaceV7
-from packages.resume_core.rendering.models import RenderRequest
-from packages.resume_core.rendering.preparation import PrepareRequest
 from packages.resume_core.rich_panel import RichPanelRequest
 from packages.resume_core.template_api import TemplateProjectResponseV1
 from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
@@ -64,8 +62,6 @@ CONTRACTS = {
     "registry": Registry,
     "cli_installation_payload": CliInstallationPayload,
     "extract_result": ExtractResult,
-    "render_request": RenderRequest,
-    "prepare_request": PrepareRequest,
     "project": Project,
 }
 

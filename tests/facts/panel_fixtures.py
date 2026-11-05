@@ -1,16 +1,20 @@
 """Facts-panel request builders and a small technology facts fixture with the sidebar Focus it implies."""
 
 import hashlib
+import json
+from pathlib import Path
 
 from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
-from packages.resume_core.rendering.rich_template import require_rich_template
 from packages.resume_core.rich_assembly import date_field, field
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.rich_panel import RichPanelRequest, panel_mutation
 from packages.resume_core.technologies import resolve_technology
 from packages.resume_core.technology_focus import focus_candidates
 from tests.support.rich import capture, without_sources
+
+# The Focus section of the retired reference template's spec, as the V6 panel tests knew it.
+FOCUS = json.loads((Path(__file__).resolve().parents[1] / "fixtures/synthetic/reference-focus.json").read_text())
 
 
 def edit(workspace, **values):
@@ -65,8 +69,7 @@ def records(rows):
 
 
 def focus_section(raw):
-    spec = require_rich_template().specification["focus"]
-    selected = focus_candidates(raw, spec["referenceLogoEntries"] + spec["referenceTextOnlyEntries"])
+    selected = focus_candidates(raw, FOCUS["referenceLogoEntries"] + FOCUS["referenceTextOnlyEntries"])
     if not selected:
         return []
     children = []

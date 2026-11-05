@@ -6,14 +6,16 @@ from pathlib import Path
 
 from PIL import Image
 
+from packages.resume_core.models.contracts import TemplateManifest
 from packages.resume_core.models.rich_document import ImageBlock
 from packages.resume_core.models.rich_mutations import RichMutation, RichSelection
 from packages.resume_core.models.rich_workspace import WorkspaceV6
-from packages.resume_core.rendering.rich_template import require_rich_template
 from packages.resume_core.rich_images import normalize_image
 from packages.resume_core.rich_sync import RichCompletionRequest, selection_checksum, selection_parts
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/rich_workspace.json"
+# The manifest the retired reference template loader built; V6 workspaces still carry it.
+MANIFEST = Path(__file__).resolve().parents[1] / "fixtures/synthetic/rich-template-manifest.json"
 
 
 def fixture():
@@ -22,7 +24,7 @@ def fixture():
 
 def without_sources():
     workspace = fixture()
-    workspace.project.template = require_rich_template().manifest
+    workspace.project.template = TemplateManifest.model_validate_json(MANIFEST.read_text())
     workspace.project.sources = []
     workspace.project.assets = []
     workspace.project.document.regions[2].blocks = [b for b in workspace.project.document.regions[2].blocks if b.type != "image"]
