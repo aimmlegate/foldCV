@@ -6,7 +6,8 @@ from pathlib import Path
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.importing.template_identity import capture_span
-from packages.resume_core.templates.compiler import compile_bytes, sha256
+from packages.resume_core.templates.compiler import compile_bytes
+from packages.resume_core.hashing import sha256
 from packages.resume_core.templates import compiler
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

@@ -12,7 +12,7 @@ from packages.resume_core.editing.template_mutations import HistoryAuthorization
 from packages.resume_core.editing.template_preparation_cells import human_cell_steps
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.editing.template_scope_displays import capture_source, inline_addresses, node_hash
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 
 

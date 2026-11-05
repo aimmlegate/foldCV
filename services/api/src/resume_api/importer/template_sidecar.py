@@ -12,7 +12,7 @@ import os
 import re
 
 from packages.resume_core import host
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_import import ImportOperation
 from packages.resume_core.project_limits import PROJECT_CEILING_BYTES as WORKSPACE_CEILING_BYTES

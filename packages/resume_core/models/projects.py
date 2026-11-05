@@ -134,5 +134,5 @@ PROJECT_CONTRACTS = {
 
 
 def digest_request(value) -> Sha256:
-    from ..templates.compiler import canonical, sha256
+    from ..hashing import canonical, sha256
     return sha256(canonical(value))

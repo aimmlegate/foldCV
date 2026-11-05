@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.repository.archive_zip import ArchiveFailure, write_zip
 from packages.resume_core.repository.project_repository import blob_path, decode_project
-from packages.resume_core.repository.project_store import ProjectStoreFailure
+from packages.resume_core.storage import ProjectStoreFailure
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.importing.template_import import identity

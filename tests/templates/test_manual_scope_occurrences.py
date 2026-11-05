@@ -16,7 +16,7 @@ from packages.resume_core.editing.template_preparation import prepare_text_edit
 from packages.resume_core.editing.template_preparation_cells import human_cell_steps
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_template_preparation import command, response
 

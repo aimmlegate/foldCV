@@ -8,7 +8,7 @@ from packages.resume_core.models.template_document import FieldOccurrence
 from packages.resume_core.models.template_import import TaskResultRecord
 from packages.resume_core.importing.template_assembly import assemble_template
 from packages.resume_core.importing.template_identity import capture_span, source_slice
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.materialize import materialize
 from packages.resume_core.templates.materialize_nodes import DisplayField, render_nodes
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity

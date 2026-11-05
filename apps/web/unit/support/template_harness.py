@@ -21,7 +21,7 @@ class ScriptedRewrite:
         self.calls, self.held = [], {}
 
     async def text(self, _project, request_id, instruction, source, _admitted):
-        from packages.resume_core.repository.project_repository import RepositoryFailure
+        from packages.resume_core.storage import RepositoryFailure
         self.calls.append({'requestId': request_id, 'instruction': instruction, 'source': source})
         if instruction == 'hold':
             event = self.held[request_id] = asyncio.Event()

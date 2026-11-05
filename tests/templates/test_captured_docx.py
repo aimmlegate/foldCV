@@ -19,7 +19,8 @@ from packages.resume_core.rendering.captured_styles import CapturedStyleResolver
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.importing.template_assembly import assemble_template
 from packages.resume_core.responses.template_export import capture_export, snapshot_identity
-from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
+from packages.resume_core.hashing import canonical, sha256
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.pipeline_fixtures import source_draft

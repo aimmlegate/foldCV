@@ -2,7 +2,7 @@
 import base64, json, sys
 sys.path[:0] = [".", "services/api/src"]
 from tests.templates.golden.corpus import corpus
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.loading import load_declared_definition, load_definition
 from packages.resume_core.templates.models import TemplateDefinition
 

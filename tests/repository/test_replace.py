@@ -5,7 +5,8 @@ import hashlib
 import pytest
 
 from packages.resume_core.project_limits import ARCHIVE_ENTRY_BYTES
-from packages.resume_core.repository.project_repository import RepositoryFailure, blob_path
+from packages.resume_core.storage import RepositoryFailure
+from packages.resume_core.repository.project_repository import blob_path
 from tests.repository.support import PROJECT, edit, repository, text_of
 
 

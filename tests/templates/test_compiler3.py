@@ -13,7 +13,8 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.repository.project_repository import ProjectRepository
-from packages.resume_core.templates.compiler import canonical,compile_bytes,compile_definition,compile_template
+from packages.resume_core.hashing import canonical
+from packages.resume_core.templates.compiler import compile_bytes, compile_definition, compile_template
 from packages.resume_core.templates.loading import load_declared_definition,load_definition
 from packages.resume_core.templates.models import TemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure

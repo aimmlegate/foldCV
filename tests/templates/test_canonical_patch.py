@@ -6,7 +6,7 @@ import random
 import pytest
 
 from packages.resume_core.editing.canonical_patch import apply_patch, build_patch
-from packages.resume_core.templates.compiler import canonical, sha256
+from packages.resume_core.hashing import canonical, sha256
 
 
 def wire(steps):

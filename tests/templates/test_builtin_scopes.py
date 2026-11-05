@@ -16,7 +16,7 @@ from packages.resume_core.repository.template_archive import archive_payload_v7,
 from packages.resume_core.editing.fields import field_key, working_field
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.test_relation_transactions import related_workspace
 from tests.templates.test_transactions import authorization, extension_step, issue, request
 

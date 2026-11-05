@@ -159,7 +159,7 @@ def test_the_bundled_files_still_name_every_shipped_template():
 @pytest.mark.asyncio
 async def test_an_export_with_an_own_logo_and_email_carries_both(tmp_path):
     from lxml import etree
-    from packages.resume_core.templates.compiler import sha256
+    from packages.resume_core.hashing import sha256
     store_root = tmp_path / 'store'
     TemplateConfig(store_root).save_branding(TWO, request(picture(900, 300), 'hr@example.com'))
     branded = TemplateStore(store_root).current(TWO)

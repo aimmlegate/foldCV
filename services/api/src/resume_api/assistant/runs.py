@@ -24,7 +24,7 @@ from packages.resume_core.repository.assistant_store import AgentFailure, Assist
 from packages.resume_core.models.agent import AgentError, AgentEvent, AgentMessage, AgentReference, AgentUsage, ErrorCode
 from packages.resume_core.models.assistant import (TERMINAL, AssistantCapabilitiesV1, AssistantErrorV1,
     AssistantEventsV1, AssistantFileV1, AssistantMessagesV1, AssistantRunV1, ModelChoiceV1)
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.templates.presentation import snapshot_identity
 
 from resume_api.agent.base import BASE_INSTRUCTIONS, RuntimeInput, RuntimeResult

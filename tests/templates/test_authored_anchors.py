@@ -10,7 +10,7 @@ from packages.resume_core.template_anchors import anchor_steps, coverage_address
 from packages.resume_core.editing.template_authoring import copy_blocks, merge_blocks, split_block
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_local_history import values
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization, issue, request
 

@@ -11,7 +11,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE
 from lxml import etree
 
 from ..rich_limits import DOCX_BYTES
-from ..templates.compiler import sha256
+from ..hashing import sha256
 from .template import RenderFailure
 
 

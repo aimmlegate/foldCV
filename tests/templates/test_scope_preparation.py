@@ -12,7 +12,7 @@ from packages.resume_core.editing.template_inverse import inverse_template_mutat
 from packages.resume_core.editing.template_mutations import HistoryAuthorization
 from packages.resume_core.editing.template_preparation import prepare_text_edit
 from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_scope_displays import copied_workspace
 from tests.templates.test_template_preparation import command,response

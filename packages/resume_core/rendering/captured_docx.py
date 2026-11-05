@@ -17,7 +17,8 @@ from docx.shared import Pt, Twips
 from ..models.template_document import PresentedText, TemplateParagraphBlock
 from ..models.template_render import TemplateRendererIdentity, TemplateRenderRequestV1
 from ..rich_limits import DOCX_BYTES
-from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES, canonical
+from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES
+from ..hashing import canonical
 from ..templates.focus import icon_catalog, row_icon
 from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target, table_rows
 from ..templates.materialize_nodes import reference

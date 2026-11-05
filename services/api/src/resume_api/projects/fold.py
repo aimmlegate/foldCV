@@ -10,8 +10,9 @@ from __future__ import annotations
 import logging
 
 from packages.resume_core.models.template_import import ImportOperation
-from packages.resume_core.repository.project_repository import RepositoryFailure, read_history_file
-from packages.resume_core.repository.project_store import ProjectStoreFailure
+from packages.resume_core.storage import RepositoryFailure
+from packages.resume_core.repository.project_repository import read_history_file
+from packages.resume_core.storage import ProjectStoreFailure
 from packages.resume_core.importing.template_import import retain_operation
 
 from ..importer.template_sidecar import PROGRESS, OperationSidecar

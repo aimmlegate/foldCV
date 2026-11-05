@@ -1,7 +1,7 @@
 """Serialize Python-owned display changes with original guards and retained children."""
 
 from .dependencies import placements
-from ..templates.compiler import canonical
+from ..hashing import canonical
 
 
 def changed_block_steps(before, after):

@@ -4,7 +4,7 @@ shared manual scopes, ownership moves and cascaded deletion; metadata outside th
 import pytest
 
 from packages.resume_core.models.projects import RenameRequestV1
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.editing.template_inverse import semantic
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_materialize import fallback_edit, text

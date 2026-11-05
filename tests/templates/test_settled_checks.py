@@ -143,7 +143,7 @@ def test_a_category_is_left_to_the_model_even_when_its_word_stands_in_the_cited_
     from packages.resume_core.models.contracts import Source
     from packages.resume_core.importing.template_identity import capture_span
     from packages.resume_core.importing.template_review import settled_checks
-    from packages.resume_core.templates.compiler import sha256
+    from packages.resume_core.hashing import sha256
     text = 'Reliable Queues, Systems Notes, not published'
     src = Source(id='source-category', revision=1, originalName='category.txt', mimeType='text/plain',
         byteSha256=sha256(text.encode()), byteRef='sources/category.txt', parser='text', parserVersion='1',

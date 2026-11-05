@@ -6,7 +6,7 @@ import json
 import re
 
 from ..models.canonical_patch import CanonicalPatchV1
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 def tokens(pointer):

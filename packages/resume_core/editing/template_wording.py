@@ -6,7 +6,7 @@ from ..models.template_import import EvidenceOption
 from ..importing.template_completion import stating, stating_words
 from ..importing.template_import import digest
 from ..template_source_cleanup import clean_source_wording, without_form
-from ..templates.compiler import canonical
+from ..hashing import canonical
 
 
 def display_text(raw):

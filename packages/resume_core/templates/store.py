@@ -13,9 +13,10 @@ from pathlib import Path
 import threading
 
 from ..storage import atomic_write, locked_root
-from ..repository.project_store import owned_file, strict_json
-from .compiler import (ADDED_CAPABILITIES, CAPABILITIES, COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3, OPERATION_VERSION, PACKAGE_BYTES,
-                       PROJECTION_VERSION, canonical, compile_definition, compile_template, sha256)
+from ..storage import owned_file, strict_json
+from .compiler import (ADDED_CAPABILITIES, CAPABILITIES, COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3,
+                       OPERATION_VERSION, PACKAGE_BYTES, PROJECTION_VERSION, compile_definition, compile_template)
+from ..hashing import canonical, sha256
 from .loading import load_declared_definition,load_definition
 from .models import TemplateDefinition, TemplatePackage
 from .projection import SchemaFailure, validate_schema

@@ -21,7 +21,8 @@ from packages.resume_core.editing.template_panel_creation import addable_kinds
 from packages.resume_core.editing.template_panel_records import panel_plan
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
-from packages.resume_core.templates.compiler import canonical, compile_bytes
+from packages.resume_core.hashing import canonical
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.editor_fixtures import TemplateEditor

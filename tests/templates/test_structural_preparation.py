@@ -9,7 +9,7 @@ from packages.resume_core.repository.template_archive import archive_payload_v7,
 from packages.resume_core.editing.fields import occurrences
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.editing.template_preparation import prepare_edit
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_authored_anchors import anchored
 from tests.templates.editor_fixtures import TemplateEditor

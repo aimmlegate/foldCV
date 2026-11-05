@@ -669,7 +669,7 @@ class ImportOperation(Wire):
         _unique([(value.task_id, value.discovery_attempt_id, value.key) for value in self.relation_allocations], 'relation allocation')
         _unique([value.relation_id for value in self.relation_allocations], 'allocated relation')
         if self.authorizations:
-            from ..templates.compiler import canonical, sha256
+            from ..hashing import canonical, sha256
             by_attempt = {value.id: value for value in self.attempts}
             by_receipt = {value.id: value for value in self.receipts}
             by_input = {value.attempt_id: value for value in self.review_inputs}

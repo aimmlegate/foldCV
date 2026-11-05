@@ -4,7 +4,8 @@ import threading
 
 import pytest
 
-from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository.project_repository import ProjectRepository
+from packages.resume_core.storage import RepositoryFailure
 from tests.repository.support import PROJECT, create_other, edit, repository, text_of, typing
 
 

@@ -61,7 +61,7 @@ Source layout:
 ```text
 apps/web/src/{workbench,rich,assistant,projects,api,connection,errors,contracts}/
 services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
-packages/resume_core/{models,extraction,rendering,templates}/ plus project_*, template_*, rich_*, assistant_*
+packages/resume_core/{models,extraction,templates,editing,importing,rendering,repository,responses}/ plus root utilities
 contracts/{json-schema,examples,error-messages.ru.json}
 templates/bundled/   generic-two-column.yaml, generic-one-column.yaml,
                                                 generic-skills-table.yaml, generic-questionnaire.yaml, generic-project-cards.yaml, shared assets/
@@ -332,7 +332,7 @@ stall check). Nothing there is durable.
 - Files (`projects/sources.py`, `projects/images.py`, `projects/blobs.py`): reads
   only private, owned files with size and hash checks; unreferenced images are
   removed at session close.
-- Archive (`projects/archive.py`, `template_archive.py`): the `.foldcv` V7 format is
+- Archive (`projects/archive.py`, `repository/template_archive.py`): the `.foldcv` V7 format is
   unchanged; the journal is not included.
 
 ### Assistant
@@ -354,7 +354,7 @@ MCP listener with a bearer token (`agent/mcp.py`), the public page fetcher
   by count. Run files (event lines, the run state, the answer, sources, findings and
   proposals) are written on one writer thread, in order and never on the event loop;
   the terminal event shows once its line is on disk and the run's control is gone.
-- Proposals (`assistant_store.py`, `assistant_compiler.py`, `assistant/proposals.py`):
+- Proposals (`repository/assistant_store.py`, `repository/assistant_compiler.py`, `assistant/proposals.py`):
   a proposal file holds the ops, the preview and the hash of each touched block or
   record in the pinned workspace. Only the user applies it (D093). Apply runs inside
   one `repository.mutate`: a changed hash gives `ASSISTANT_PROPOSAL_STALE` with the
@@ -565,7 +565,7 @@ pixel-identical DOCX display in every editor.
 
 ## Portable project format
 
-`.foldcv` is a ZIP in the V7 archive format (`template_archive.py`):
+`.foldcv` is a ZIP in the V7 archive format (`repository/template_archive.py`):
 
 ```text
 manifest.json                 ArchiveManifestV7: path, role, SHA-256 and size of every entry
@@ -581,7 +581,7 @@ Download: `POST /v2/projects/{id}/archive`. Upload: `POST /v2/projects/archive`
 creates a new project. The undo journal, renders, credentials, provider secrets,
 tokens and filesystem paths are never included.
 
-Open an archive only after validation (`archive_zip.py`, `open_archive_v7`). Reject
+Open an archive only after validation (`repository/archive_zip.py`, `open_archive_v7`). Reject
 path traversal, symlinks, duplicate entries, excessive expansion, oversized entries
 or totals, unknown versions, invalid templates and hash or source mismatches. Hashes
 detect corruption, not trusted authorship. Never execute imported code. Only version

@@ -10,7 +10,7 @@ from ..template_anchors import anchor_steps
 from .template_authoring import (allocate_classified_blocks, copy_blocks, copy_fragment, inserted_paragraph,
                                  merge_blocks, move_occurrence_steps, split_block)
 from .template_preparation_common import allocator_for, finish_preparation, prepared_response, validate_preparation
-from ..templates.compiler import canonical
+from ..hashing import canonical
 
 
 def target(document, identifier, revision):

@@ -9,7 +9,7 @@ from packages.resume_core.models.rich_facts import WorkingPeriod
 from packages.resume_core.template_capture import capture_existing_items, item_identities, prepare_builtin_identities
 from packages.resume_core.importing.template_import import (TemplateImportFailure, admit_operation, digest,
                                                             resume_operation, start_operation)
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.models import InputRef
 from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.templates.human_authority_fixtures import human_papers
@@ -140,7 +140,7 @@ def test_selected_unproven_builtin_stays_explicit_with_empty_effective_cells():
 
 
 def test_save_cannot_refresh_or_erase_an_existing_identity_capture():
-    from packages.resume_core.repository.project_store import ProjectStoreFailure
+    from packages.resume_core.storage import ProjectStoreFailure
     from packages.resume_core.importing.template_import import retain_operation
     _empty, command, captured, src, _facts = setup_operation()
     facts = human_papers('human_raw')

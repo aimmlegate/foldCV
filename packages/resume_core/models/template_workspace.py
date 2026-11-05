@@ -59,7 +59,7 @@ def history_text(digest: str) -> bytes | None:
 
 
 def history_bytes(operation) -> bytes:
-    from ..templates.compiler import canonical
+    from ..hashing import canonical
     return canonical(operation)
 
 
@@ -144,7 +144,7 @@ class ProjectV6(Wire):
         assets={a.id:a for a in self.assets};retained={}
         recipe=self.template_package.recipe
         from ..editing.fields import working_field, field_key
-        from ..templates.compiler import canonical,sha256
+        from ..hashing import canonical, sha256
         from ..templates.projection import reachable_schema,schema_at
         types={t.id:reachable_schema(t.data_schema,self.template_package.definition.content_definitions) for t in self.template_package.definition.fact_types}
         declarations = {t.id: t for t in self.template_package.definition.fact_types}
@@ -299,7 +299,7 @@ class RichPreDraftV2(RichPreDraft):
     @model_validator(mode='after')
     def captured_integrity(self):
         from ..importing.template_identity import source_slice
-        from ..templates.compiler import canonical, sha256
+        from ..hashing import canonical, sha256
         from ..templates.projection import reachable_schema, schema_at
         _unique([(source.id, source.revision) for source in self.sources], 'pre-draft source revision')
         for source in self.sources:

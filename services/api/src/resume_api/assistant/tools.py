@@ -17,7 +17,7 @@ from packages.resume_core.repository.assistant_compiler import CompileFailure, f
 from packages.resume_core.repository.assistant_store import AgentFailure, identity
 from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, AgentFinding
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.editing.dependencies import dependency
 from packages.resume_core.editing.fields import inline_groups
 from packages.resume_core.editing.mutations import inline_text, utf16_slice

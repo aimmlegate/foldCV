@@ -7,7 +7,7 @@ with `#1`, `#2`, ... in order of first appearance. Sync rows live beside `projec
 
 import re
 
-from packages.resume_core.templates.compiler import canonical, sha256
+from packages.resume_core.hashing import canonical, sha256
 
 
 DROPPED = frozenset({'revision', 'projectRevision', 'documentRevision', 'updatedAt', 'mutationReplay', 'syncedFactRevision'})

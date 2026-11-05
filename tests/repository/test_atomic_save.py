@@ -8,7 +8,8 @@ import pytest
 
 from packages.resume_core.repository import project_journal
 from packages.resume_core import storage
-from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository.project_repository import ProjectRepository
+from packages.resume_core.storage import RepositoryFailure
 from tests.repository.support import PROJECT, create_other, edit, history, repository, text_of
 
 

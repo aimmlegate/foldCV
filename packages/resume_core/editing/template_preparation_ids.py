@@ -1,6 +1,6 @@
 """Opening-bound allocation uses named source slots, never traversal counters."""
 
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 def allocate_id(factory, prefix, slot):

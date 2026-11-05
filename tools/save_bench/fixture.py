@@ -13,7 +13,7 @@ def build(root, *, records=720, coverage=1774, cells=5, evidence_text=90, issues
     from packages.resume_core.models.template_facts import ExtensionRecord, WorkingFactsV2
     from packages.resume_core.models.template_workspace import WorkspaceV7
     from packages.resume_core.importing.template_identity import capture_span
-    from packages.resume_core.templates.compiler import canonical, sha256
+    from packages.resume_core.hashing import canonical, sha256
     from tests.templates.storage_fixtures import PAPER_SCHEMA, package, presentation
 
     captured = package()
@@ -93,7 +93,7 @@ def build(root, *, records=720, coverage=1774, cells=5, evidence_text=90, issues
 
 def sizes(workspace):
     from packages.resume_core.repository.project_repository import rich_snapshot_bytes
-    from packages.resume_core.templates.compiler import canonical
+    from packages.resume_core.hashing import canonical
     project = workspace.project
     return {'workspace': len(rich_snapshot_bytes(workspace)), 'facts': len(canonical(project.facts)),
         'document': len(canonical(project.document)), 'coverage': len(canonical([row.model_dump(mode='json', by_alias=True) for row in project.import_coverage])),

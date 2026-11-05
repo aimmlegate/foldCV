@@ -8,8 +8,9 @@ import stat
 import pytest
 
 from packages.resume_core.repository import project_repository
-from packages.resume_core.repository.project_repository import RepositoryFailure, blob_path
-from packages.resume_core.repository.project_store import encoded
+from packages.resume_core.storage import RepositoryFailure
+from packages.resume_core.repository.project_repository import blob_path
+from packages.resume_core.storage import encoded
 from packages.resume_core.storage import atomic_write
 from tests.projects.support import Editor, v2_app
 from tests.projects.test_edit_routes import typing

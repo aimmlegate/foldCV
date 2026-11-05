@@ -5,7 +5,7 @@ from ..models.template_document import ManualScopeSpan, PresentedText
 from ..models.template_mutations import ScopeDisplaySource, SetManualScopeDisplays
 from .fields import inline_groups
 from .template_scope_occurrences import active_scope_cells
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 def node_hash(span):

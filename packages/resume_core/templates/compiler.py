@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import json
 import re
 from pathlib import Path, PurePosixPath
 
@@ -18,6 +16,7 @@ from .projection import (FORMATS, PROFILE_ID, PROFILE_VERSION, SchemaFailure,
 from .builtin_mapping import check_item_roots, types_at, validate_builtin_mapping, validate_item_pointer
 from .focus import icon_catalog
 from .operations import runnable
+from ..hashing import canonical, sha256
 
 COMPILER_VERSION = "template-compiler-1"
 COMPILER_VERSION_2 = "template-compiler-2"
@@ -75,14 +74,8 @@ def compiler_version(definition):
     return COMPILER_VERSION_3
 
 
-def canonical(value) -> bytes:
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json", by_alias=True)
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def sha256(raw: bytes) -> str:
-    return hashlib.sha256(raw).hexdigest()
 
 
 def unique(values, path):

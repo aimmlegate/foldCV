@@ -2,7 +2,7 @@
 
 import json
 
-from ..templates.compiler import canonical
+from ..hashing import canonical
 
 
 def selector(kind, identifier):

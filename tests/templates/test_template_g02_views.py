@@ -11,7 +11,8 @@ from packages.resume_core.repository.template_archive import archive_payload_v7,
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_preparation import prepare_edit
-from packages.resume_core.templates.compiler import canonical, compile_bytes
+from packages.resume_core.hashing import canonical
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.presentation_plan import editor_plan
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import employment_package, employment_source

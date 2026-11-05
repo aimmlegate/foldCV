@@ -9,9 +9,9 @@ import json
 import threading
 import time
 
-from packages.resume_core.repository.project_repository import (RepositoryFailure, decode_project, rich_snapshot_bytes,
-                                                                verifying)
-from packages.resume_core.repository.project_store import strict_json
+from packages.resume_core.storage import RepositoryFailure
+from packages.resume_core.repository.project_repository import decode_project, rich_snapshot_bytes, verifying
+from packages.resume_core.storage import strict_json
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, PublicationOutcome,
     ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.importing.template_admission import admit_proposal, task_facts_digest

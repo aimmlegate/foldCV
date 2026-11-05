@@ -10,7 +10,8 @@ import pytest
 from packages.resume_core.rendering.captured_assets import load_captured_assets
 from packages.resume_core.rendering.captured_fonts import CapturedFontResolver,FontRequest
 from packages.resume_core.rendering.template import RenderFailure
-from packages.resume_core.templates.compiler import canonical,compile_bytes,sha256
+from packages.resume_core.hashing import canonical, sha256
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.models import TemplatePackage
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE,TemplateStore

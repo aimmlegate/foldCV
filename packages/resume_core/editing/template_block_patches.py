@@ -3,7 +3,7 @@
 from .canonical_patch import apply_patch, build_patch, tokens
 from ..models.template_mutations import AuthoredBlockHistoryDelta
 from ..models.canonical_patch import CanonicalPatchV1
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 SYNCED = 'syncedFactRevision'

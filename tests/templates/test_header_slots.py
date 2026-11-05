@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from packages.resume_core.templates.compiler import canonical,compile_definition,compile_definition_v1,compile_template
+from packages.resume_core.hashing import canonical
+from packages.resume_core.templates.compiler import compile_definition, compile_definition_v1, compile_template
 from packages.resume_core.templates.models import TemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE,verify_package

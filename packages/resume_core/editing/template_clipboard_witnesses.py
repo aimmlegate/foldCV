@@ -5,7 +5,7 @@ from ..models.template_clipboard import (ClipboardActiveCell, ClipboardFieldWitn
 from .fields import builtin_cell_values, field_key, working_field
 from ..importing.template_identity import source_slice
 from .template_scope_occurrences import active_scope_cells
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 def fingerprint(value):

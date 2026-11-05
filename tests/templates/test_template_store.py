@@ -6,7 +6,8 @@ import pytest
 
 from packages.resume_core.storage import atomic_write
 from packages.resume_core.templates import store as module
-from packages.resume_core.templates.compiler import canonical, compile_bytes, compile_template
+from packages.resume_core.hashing import canonical
+from packages.resume_core.templates.compiler import compile_bytes, compile_template
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore, UnknownTemplate
 from tests.templates.employment_fixtures import employment_package

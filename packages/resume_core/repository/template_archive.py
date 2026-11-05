@@ -8,7 +8,7 @@ from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, 
 from ..models.template_workspace import ArchiveManifestV7, WorkspaceV7
 from ..models.rich_document import ImageBlock
 from ..rich_images import ImageFailure, verify_image_bytes
-from ..templates.compiler import canonical
+from ..hashing import canonical
 from ..models.template_import import ImportOperation
 from ..models.template_workspace import history_bytes, history_text
 from ..templates.models import TemplatePackage, remember_asset

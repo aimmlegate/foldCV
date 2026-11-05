@@ -11,7 +11,7 @@ from ..importing.template_identity import _bound_root
 from .template_panel_lines import line_container, period_fields, period_words, row_start
 from .template_panel_values import written_dates
 from .template_preparation_panel import restore_view
-from ..templates.compiler import canonical
+from ..hashing import canonical
 from ..templates.materialize_nodes import fallback_style, locale_text, reference, styled
 from ..templates.projection import pointer_tokens
 

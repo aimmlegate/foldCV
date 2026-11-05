@@ -12,7 +12,7 @@ from packages.resume_core.editing.template_clipboard_witnesses import (captured_
                                                                        ownership_witness, scope_witness,
                                                                        source_witness, verify_witness, verify_witnesses)
 from packages.resume_core.editing.template_facts import human_edit
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.presentation import snapshot_identity
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.storage_fixtures import workspace

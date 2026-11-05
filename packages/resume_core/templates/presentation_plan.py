@@ -3,7 +3,7 @@
 from urllib.parse import urlsplit
 
 from ..rendering.captured_styles import authored_spans
-from .compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from .focus import catalog_for, row_icon
 from .materialize_nodes import locale_text
 from .models import remember_asset

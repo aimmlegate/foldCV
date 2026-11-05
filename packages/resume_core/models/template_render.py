@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 from .contracts import Id, Revision, Sha256, Wire, _safe_path
 from .template_document import RichDocumentV2
 from .template_facts import WorkingFactsV2
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.models import TemplatePackage
 from ..templates.store import verify_package
 

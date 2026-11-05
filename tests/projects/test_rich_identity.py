@@ -4,7 +4,7 @@ import hashlib
 from types import SimpleNamespace
 
 from packages.resume_core.rich_identity import resume_identity
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.projects.support import v2_app
 from tests.support.rich import without_sources
 from tests.templates.storage_fixtures import workspace as papers

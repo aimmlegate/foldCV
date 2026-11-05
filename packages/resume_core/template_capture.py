@@ -2,7 +2,7 @@
 
 from .models.template_facts import BuiltinItemIdentity, CapturedItemIdentity
 from .templates.builtin_mapping import bind_builtin_allocation
-from .templates.compiler import canonical, sha256
+from .hashing import canonical, sha256
 from .templates.projection import reachable_schema
 
 

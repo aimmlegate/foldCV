@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from packages.resume_core.models.projects import DeleteRequestV1
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.importing.template_import import entries_of, spent_calls
 from resume_api.inference_admission import InferenceAdmission
 from resume_api.projects import rewrite

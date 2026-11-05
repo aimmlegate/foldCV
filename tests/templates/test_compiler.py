@@ -273,7 +273,7 @@ def test_binding_payload_and_semantic_cell_shapes_are_compatible(config):
 
 
 def test_rehashed_package_cannot_replace_derived_server_schema_or_projection():
-    from packages.resume_core.templates.compiler import canonical,sha256
+    from packages.resume_core.hashing import canonical, sha256
     from packages.resume_core.templates.store import package_identity
     package=compile_template(BUNDLED_TEMPLATE)
     package.blocks[0].full_schema={'type':'integer'}

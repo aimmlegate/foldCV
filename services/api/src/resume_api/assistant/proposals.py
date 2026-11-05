@@ -17,7 +17,7 @@ from packages.resume_core.models.assistant import (AssistantActionResultV1, Assi
 from packages.resume_core.models.contracts import PartialDate
 from packages.resume_core.models.projects import DeleteRequestV1, RenameRequestV1
 from packages.resume_core.repository.project_journal import JournalStale, apply as apply_payloads, snapshot
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 
 from resume_api.projects import editing
 from resume_api.projects.errors import ProjectFailure

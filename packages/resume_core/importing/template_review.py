@@ -6,12 +6,12 @@ import re
 
 from ..models.template_import import (CheckTarget, ReferencedReviewReply, ReviewDisposition, ReviewInput,
                                       ReviewReceipt, ReviewReply, SettledCheck)
-from ..repository.project_store import strict_json
+from ..storage import strict_json
 from .template_identity import (capture_span, empty_value, evidence_options, offered_evidence, payload_value,
                                 restore_evidence, source_slice)
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
 from ..templates.models import Check
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.projection import SchemaFailure, pointer_tokens, resolve, schema_at, validate_payload
 from ..templates.replies import (FAILING_ONLY_PROTOCOLS, REVIEW_PROTOCOL, check_references, review_protocol,
                                  review_schema)

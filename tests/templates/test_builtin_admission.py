@@ -10,7 +10,7 @@ from packages.resume_core.importing.template_import import dispatch_attempt, rec
 from packages.resume_core.importing.template_identity import capture_span
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.importing.template_review import record_review
-from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.hashing import sha256
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
 from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, usage

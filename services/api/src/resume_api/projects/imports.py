@@ -11,7 +11,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.models.template_import import ResumeTemplateImportV1
-from packages.resume_core.repository.project_repository import RepositoryFailure, decode_project
+from packages.resume_core.storage import RepositoryFailure
+from packages.resume_core.repository.project_repository import decode_project
 from packages.resume_core.reasoning import ReasoningEffort
 from packages.resume_core.importing.template_import import TemplateImportFailure
 

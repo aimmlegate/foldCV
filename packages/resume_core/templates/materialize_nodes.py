@@ -6,7 +6,7 @@ from ..models.template_facts import ExtensionCell
 from ..models.template_document import BoundLink, FieldOccurrence, FieldRef, ManualScopeSpan, PresentedText
 from .models import AuthoredPresentation
 from .projection import pointer_tokens
-from .compiler import canonical, sha256
+from ..hashing import canonical, sha256
 
 
 OVERRIDES = {'font': None, 'size': None, 'color': None, 'alignment': None, 'bold': None, 'italic': None}

@@ -7,7 +7,7 @@ from packages.resume_core.editing.mutations import cut_inline
 from packages.resume_core.editing.template_authoring import (copy_blocks, copy_fragment, copy_inline,
                                                              inserted_paragraph, split_block)
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 
 

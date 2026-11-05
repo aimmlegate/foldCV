@@ -31,9 +31,11 @@ from ..models.rich_workspace import RichMutationReplay
 from ..models.template_workspace import WorkspaceV7
 from .project_journal import JournalStale, ProjectJournal, apply as apply_payloads, snapshot
 from ..project_limits import ARCHIVE_ENTRY_BYTES, project_file_bytes
-from .project_store import SAFE_ID, ProjectStore, ProjectStoreFailure, owned_file, strict_json
+from .project_store import SAFE_ID, ProjectStore
+from ..storage import ProjectStoreFailure, owned_file, strict_json
 from ..rich_limits import DOCX_BYTES, WORKSPACE_BYTES
 from ..storage import StorageFailure, atomic_write, locked_root, private_directory
+from ..storage import RepositoryFailure
 
 REPLAY_WINDOW = 200
 CLIPBOARD_CAPTURES = 20
@@ -46,13 +48,6 @@ LOG = logging.getLogger(__name__)
 BLOB_KINDS = {'sources': '.bin', 'history': '.bin', 'template-assets': '.bin', 'renders': '.docx'}
 
 
-class RepositoryFailure(Exception):
-    """A refused repository operation; `code` is a public error code, `details` go into the reply body."""
-
-    def __init__(self, code, **details):
-        self.code = code
-        self.details = details
-        super().__init__(code)
 
 
 def verifying():
@@ -1018,7 +1013,7 @@ def _stored(directory, raw, after, loaded):
 
 
 def _digest(workspace):
-    from ..templates.compiler import canonical
+    from ..hashing import canonical
     return hashlib.sha256(canonical(workspace)).hexdigest()
 
 

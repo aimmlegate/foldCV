@@ -10,7 +10,7 @@ from pydantic import Field
 
 from .. import host
 from ..models.contracts import Wire
-from .project_store import ProjectStoreFailure, owned_file, strict_json
+from ..storage import ProjectStoreFailure, owned_file, strict_json
 from ..storage import StorageFailure, atomic_write, locked_root
 
 LOG = logging.getLogger(__name__)

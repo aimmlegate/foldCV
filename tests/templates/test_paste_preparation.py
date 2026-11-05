@@ -7,7 +7,7 @@ from packages.resume_core.models.template_document import ManualScopeSpan,Presen
 from packages.resume_core.editing.mutations import apply_rich_mutation, inline_text
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.importing.template_identity import capture_span
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace
 from tests.templates.editor_fixtures import TemplateEditor

@@ -6,7 +6,7 @@ import json
 import pytest
 
 from packages.resume_core.repository.project_repository import ProjectRepository
-from packages.resume_core.repository.project_store import ProjectStoreFailure
+from packages.resume_core.storage import ProjectStoreFailure
 from tests.projects.support import Editor, source_blobs, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 

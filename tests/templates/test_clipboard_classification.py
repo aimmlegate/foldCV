@@ -8,7 +8,7 @@ from packages.resume_core.editing.mutations import RichMutationFailure
 from packages.resume_core.editing.template_authoring import (allocate_classified_blocks, classify_blocks,
                                                              classify_fragment, classify_inline, split_block)
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_sync_preparation import link_mentions

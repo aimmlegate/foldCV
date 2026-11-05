@@ -11,7 +11,7 @@ from packages.resume_core.editing.dependencies import dependencies_current
 from packages.resume_core.editing.mutations import apply_rich_mutation, RichMutationFailure
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.editing.template_synchronization import occurrence_blocks, row_hash
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_structural_preparation import intent,selection,place
 from tests.templates.test_template_preparation import response

@@ -5,7 +5,8 @@ import json
 import re
 
 from packages.resume_core.models.contracts import Source
-from packages.resume_core.templates.compiler import compile_bytes, sha256
+from packages.resume_core.templates.compiler import compile_bytes
+from packages.resume_core.hashing import sha256
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.storage_fixtures import package
 

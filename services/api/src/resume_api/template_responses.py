@@ -3,7 +3,7 @@
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.responses.template_api import TemplateProjectResponseV1
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 
 
 def wire_response(value, *, status=200):

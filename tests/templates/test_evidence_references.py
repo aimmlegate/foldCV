@@ -13,7 +13,7 @@ from packages.resume_core.importing.template_proposals import parse_proposal, re
 from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.importing.template_review import (make_review_input, record_review, reusable_receipt,
                                                             validate_review_reply)
-from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.hashing import sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
 from packages.resume_core.templates.replies import check_references, proposal_schema, review_schema, model_targets
 from resume_api.providers.dynamic_result import dynamic_result

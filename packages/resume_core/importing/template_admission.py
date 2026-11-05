@@ -8,7 +8,7 @@ from .template_builtin_admission import (apply_builtin_records, current_handles,
                                          inferred_owner_relations, make_builtin_candidate)
 from ..editing.template_mutations import _set_builtin_owner
 from .template_review import check_review_reply, decide_review
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.projection import reachable_schema
 from ..template_capture import item_identities, retain_builtin_identity
 from ..editing.template_wording import display_raw_input

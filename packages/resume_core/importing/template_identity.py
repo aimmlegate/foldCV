@@ -8,7 +8,7 @@ from ..models.contracts import _unique
 from ..models.template_facts import HandleAllocation, Lineage, SourceSpan
 from ..models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
 from .template_import import digest
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.builtin_mapping import item_root
 from ..templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
 

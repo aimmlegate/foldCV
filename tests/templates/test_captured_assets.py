@@ -15,7 +15,8 @@ import pytest
 from packages.resume_core.rendering import captured_assets
 from packages.resume_core.rendering.captured_assets import font_name,load_captured_assets
 from packages.resume_core.rendering.template import RenderFailure
-from packages.resume_core.templates.compiler import canonical,compile_bytes,sha256
+from packages.resume_core.hashing import canonical, sha256
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE,package_identity,verify_package
 from tests.templates.storage_fixtures import with_logo

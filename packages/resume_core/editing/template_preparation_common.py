@@ -8,7 +8,7 @@ from .mutations import apply_rich_mutation
 from ..responses.template_api import TemplateProjectResponseV1
 from ..template_issue_impacts import issue_impacts
 from .template_mutations import apply_fact_steps
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.presentation import project_presentation, snapshot_identity
 
 

@@ -10,7 +10,7 @@ from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.template_authoring import split_block
 from packages.resume_core.editing.template_facts import human_edit
 from packages.resume_core.editing.template_preparation import prepare_edit
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_clipboard_retention import captured

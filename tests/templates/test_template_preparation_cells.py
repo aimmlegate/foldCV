@@ -9,7 +9,7 @@ from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.importing.template_builtin_admission import unknown
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_preparation_cells import human_cell_steps
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_builtin_scopes import pending_steps, scoped_workspace
 from tests.templates.test_template_preparation_ids import allocator

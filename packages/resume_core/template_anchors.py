@@ -3,7 +3,7 @@
 import json
 
 from .models.template_mutations import CoverageAnchorTarget, IssueAnchorTarget, SetAuthoredAnchors
-from .templates.compiler import canonical, sha256
+from .hashing import canonical, sha256
 
 
 def coverage_identity(coverage):

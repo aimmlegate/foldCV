@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.storage import RepositoryFailure
 from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
 
 

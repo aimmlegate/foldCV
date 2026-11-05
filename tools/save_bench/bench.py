@@ -42,7 +42,7 @@ def main():
     sys.path[:0] = [args.root, args.root + '/services/api/src']
     import gc
     import fixture
-    from packages.resume_core.templates.compiler import canonical
+    from packages.resume_core.hashing import canonical
     from tests.templates.test_template_preparation import command
     workspace, sources = fixture.build(args.root, records=args.records, coverage=args.coverage)
     sizes = fixture.sizes(workspace)

@@ -4,7 +4,7 @@ import pytest
 
 from packages.resume_core.models.template_facts import HandleAllocation, Lineage
 from packages.resume_core.importing.template_replacements import apply_accepted_records
-from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.hashing import sha256
 from tests.templates.storage_fixtures import papers
 from tests.templates.human_authority_fixtures import human_papers
 

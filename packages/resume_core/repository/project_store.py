@@ -3,49 +3,25 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
 import re
 
 from pydantic import ValidationError
 
 from ..models.registry import Registry, RegistryEntry
-from ..storage import StorageFailure, atomic_write, data_root, locked_root, private_directory, private_file
+from ..storage import StorageFailure, atomic_write, data_root, locked_root, private_directory
+from ..storage import MAX_SNAPSHOT_BYTES, ProjectStoreFailure, encoded, owned_file, strict_json
 
 
-MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 
 
-class ProjectStoreFailure(Exception):
-    def __init__(self, code):
-        self.code = code
-        super().__init__(code)
 
 
-def encoded(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8") + b"\n"
 
 
-def strict_json(raw):
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError("duplicate key")
-            result[key] = value
-        return result
-    def invalid(_value):
-        raise ValueError("invalid constant")
-    return json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid)
 
 
-def owned_file(path, limit=MAX_SNAPSHOT_BYTES):
-    if any(parent.is_symlink() for parent in path.parents):
-        raise StorageFailure("UNSAFE_STORAGE")
-    private_file(path)
-    if path.stat().st_nlink != 1 or path.stat().st_size > limit:
-        raise StorageFailure("UNSAFE_STORAGE")
 
 
 class ProjectStore:

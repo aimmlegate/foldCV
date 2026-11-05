@@ -13,7 +13,7 @@ from packages.resume_core.editing.fields import field_key, set_text
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_preparation import prepare_edit
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_builtin_scopes import scoped_workspace
 from tests.templates.test_relation_transactions import related_workspace, owner_sections

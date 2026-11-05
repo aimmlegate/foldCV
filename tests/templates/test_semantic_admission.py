@@ -14,7 +14,7 @@ from packages.resume_core.importing.template_review import (decide_review, make_
                                                             reusable_receipt)
 from packages.resume_core.templates.projection import SchemaFailure, project_payload, validate_payload
 from packages.resume_core.templates.replies import model_targets, proposal_schema, review_schema
-from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.hashing import sha256
 from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, setup_operation, usage
 

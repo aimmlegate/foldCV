@@ -3,12 +3,12 @@
 from ..models.template_facts import Observation, Relation
 from ..models.template_import import (ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation,
                                       DroppedValue)
-from ..repository.project_store import strict_json
+from ..storage import strict_json
 from ..editing.fields import field_key
 from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, offered_references, payload_value,
                                 resolve_fields, resolve_lineage, restore_evidence, source_slice)
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
-from ..templates.compiler import canonical, sha256
+from ..hashing import canonical, sha256
 from ..templates.projection import pointer_tokens, reachable_schema, validate_payload
 from ..templates.replies import proposal_schema, strip_unoffered_bookkeeping
 from ..template_capture import item_identities

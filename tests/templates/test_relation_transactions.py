@@ -8,7 +8,8 @@ from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_authoring import move_occurrence_steps
 from packages.resume_core.models.template_document import TemplateSectionBlock
-from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
+from packages.resume_core.hashing import canonical, sha256
+from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_relations import facts

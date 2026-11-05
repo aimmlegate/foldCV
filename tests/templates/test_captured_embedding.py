@@ -13,7 +13,7 @@ import pytest
 from packages.resume_core.rendering.captured_embedding import embed_captured_fonts,obfuscate_font
 from packages.resume_core.rendering.captured_fonts import CapturedFontResolver,FontRequest
 from packages.resume_core.rendering.template import RenderFailure
-from packages.resume_core.templates.compiler import sha256
+from packages.resume_core.hashing import sha256
 from tests.templates.test_captured_assets import package
 
 

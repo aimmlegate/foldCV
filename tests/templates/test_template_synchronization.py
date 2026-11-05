@@ -14,7 +14,7 @@ from packages.resume_core.editing.template_authoring import copy_blocks, move_oc
 from packages.resume_core.editing.template_dependencies import selector
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_synchronization import live_sync_record, occurrence_blocks, row_hash
-from packages.resume_core.templates.compiler import canonical
+from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_relation_transactions import related_workspace, owner_sections
 from tests.templates.editor_fixtures import TemplateEditor
