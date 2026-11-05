@@ -10,9 +10,9 @@ import stat
 from resume_api.cli.experimental_profile import BINARY, ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.cli import distribution, profile as codex
 from resume_api.cli.qualification import QualificationError, require_publisher
+from .base import TOKEN_ENV
 
 
-TOKEN_ENV = "FOLDCV_AGENT_MCP_CAPABILITY"
 TOOLS = ("get_resume_context", "check_resume", "read_public_page")
 PACKAGE = BINARY.parents[3]
 CODE_MODE_HOST = PACKAGE / distribution.HOST

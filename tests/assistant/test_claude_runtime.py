@@ -12,7 +12,7 @@ import pytest
 from packages.resume_core import agent_limits as limits
 from resume_api.agent.claude_runtime import ClaudeAgentRuntime
 from resume_api.agent.mcp import PrivateMcp
-from resume_api.agent.runtime import RuntimeInput
+from resume_api.agent.base import RuntimeInput
 from resume_api.inference_admission import InferenceAdmission
 
 STAND_IN = Path(__file__).resolve().parent / "fake_claude_agent.py"

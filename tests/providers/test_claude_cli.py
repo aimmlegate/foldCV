@@ -20,7 +20,7 @@ from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.cli.profiles import claude as rules
-from resume_api.connection import ConnectionFailure
+from resume_api.providers.base import ConnectionFailure
 from resume_api.connection_claude import ClaudeConnectionAdapter
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers import claude_catalog

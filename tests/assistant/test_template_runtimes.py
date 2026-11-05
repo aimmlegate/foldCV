@@ -4,7 +4,8 @@ import threading
 
 import pytest
 
-from resume_api.agent.runtime import BASE_INSTRUCTIONS, DEVELOPER_INSTRUCTIONS, NativeSession, RuntimeInput
+from resume_api.agent.base import BASE_INSTRUCTIONS, DEVELOPER_INSTRUCTIONS, RuntimeInput
+from resume_api.agent.runtime import NativeSession
 from resume_api.assistant.template_tools import TEMPLATE_BASE_INSTRUCTIONS, TEMPLATE_DEVELOPER_INSTRUCTIONS
 from tests.assistant.test_claude_runtime import run
 from tests.support.appserver import complete_events, input_value, runtime, script

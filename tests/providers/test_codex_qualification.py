@@ -13,7 +13,8 @@ from resume_api.cli import distribution, profile as codex, qualification
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.cli.profiles import claude
 from resume_api.cli.qualification import Compatibility, QualificationError, Signature
-from resume_api.connection import ConnectionAdapter, ConnectionFailure
+from resume_api.connection import ConnectionAdapter
+from resume_api.providers.base import ConnectionFailure
 from resume_api.lifecycle import OperationFiles
 from tests.service.test_connection import cli  # noqa: F401  (fixture)
 

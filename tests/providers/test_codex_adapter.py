@@ -13,7 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 import pytest
 
 from resume_api.lifecycle import OperationFiles, SpikeError, has_blocked_owned
-from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport, strict_json
+from resume_api.providers.codex_cli import CodexCliProvider, FixtureTransport
+from resume_api.providers.shared import strict_json
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 from tests.providers.fixtures import PROMPT, Summary, fake, request
 

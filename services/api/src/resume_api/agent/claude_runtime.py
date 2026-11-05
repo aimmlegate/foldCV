@@ -22,8 +22,8 @@ from packages.resume_core.agent_progress import PublicProgress
 from packages.resume_core.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentUsage
 from packages.resume_core.storage import StorageFailure
-from resume_api.agent.host_profile import TOKEN_ENV
-from resume_api.agent.runtime import RuntimeResult, SessionFinished, terminal_cleanup
+from resume_api.agent.base import TOKEN_ENV
+from resume_api.agent.base import RuntimeResult, SessionFinished, terminal_cleanup
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.profiles import claude as profile_rules
@@ -32,7 +32,7 @@ from resume_api.inference_admission import INFERENCE, AdmissionBlocked, Admissio
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers.claude_cli import skipped
-from resume_api.providers.codex_cli import strict_json
+from resume_api.providers.shared import strict_json
 from resume_api.providers.content import ContentFailure
 
 SERVER = "foldcv"

@@ -25,7 +25,7 @@ from resume_api.inference_admission import INFERENCE, AdmissionBlocked, Admissio
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers import claude_catalog
-from resume_api.providers.codex_cli import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
+from resume_api.providers.shared import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec

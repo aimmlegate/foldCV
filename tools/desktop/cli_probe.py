@@ -18,7 +18,8 @@ from resume_api.cli.experimental_profile import ExperimentalCliProfile
 from resume_api.cli.installation import ClaudeInstallation, CliInstallation
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.profiles import claude
-from resume_api.connection import ConnectionAdapter, ConnectionFailure
+from resume_api.connection import ConnectionAdapter
+from resume_api.providers.base import ConnectionFailure
 from resume_api.connection_claude import ClaudeConnectionAdapter
 from resume_api.lifecycle import OperationFiles, SpikeError
 

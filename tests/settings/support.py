@@ -6,7 +6,7 @@ import httpx
 
 from packages.resume_core.reasoning import ModelReasoning
 from resume_api.app import create_app
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from tests.support.generation import CreationProvider, frozen_now
 
 ORIGIN = 'http://127.0.0.1:39272'

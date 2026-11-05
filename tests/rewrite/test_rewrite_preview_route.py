@@ -16,7 +16,7 @@ from packages.resume_core.templates.presentation import snapshot_identity
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
 from resume_api.app import ProviderSlot
 from resume_api.cli.profiles.claude import ClaudeCliProfile
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from resume_api.providers.content import ContentResult, ReportedUsage
 from resume_api.template_rewrite import EARLY_CANCELS_KEPT, TemplateRewrite
 from tests.projects.support import Editor, v2_app

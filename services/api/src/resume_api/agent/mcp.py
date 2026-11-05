@@ -15,7 +15,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import JSONResponse, Response
 import uvicorn
 from packages.resume_core import agent_limits as limits
-from resume_api.providers.codex_cli import strict_json
+from resume_api.providers.shared import strict_json
 from resume_api.providers.content import ContentFailure
 
 

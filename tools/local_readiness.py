@@ -115,7 +115,8 @@ def check_cli(executable: Path | None = None) -> str:
     except QualificationError:
         return "This CLI build cannot be used; manual editing and rendering are ready."
 
-    from resume_api.connection import ConnectionAdapter, ConnectionFailure
+    from resume_api.connection import ConnectionAdapter
+    from resume_api.providers.base import ConnectionFailure
     from resume_api.launcher import trusted_temp_root
     from resume_api.lifecycle import OperationFiles, SpikeError
 
@@ -143,7 +144,8 @@ def check_cli(executable: Path | None = None) -> str:
 
 def check_experimental_cli() -> str:
     from resume_api.cli.experimental_profile import installed_profile, ExperimentalProfileError
-    from resume_api.connection import ConnectionAdapter, ConnectionFailure
+    from resume_api.connection import ConnectionAdapter
+    from resume_api.providers.base import ConnectionFailure
     from resume_api.launcher import trusted_temp_root
     from resume_api.lifecycle import OperationFiles, SpikeError
 

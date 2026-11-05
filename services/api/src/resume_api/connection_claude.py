@@ -8,7 +8,7 @@ from typing import Callable
 
 from resume_api.cli.process_runner import ProcessExit
 from resume_api.cli.profiles.claude import ClaudeCliProfile, ClaudeProfileError
-from resume_api.connection import ConnectionFailure, Metadata, Quota
+from resume_api.providers.base import ConnectionFailure, Metadata, Quota
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.claude_cli import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure

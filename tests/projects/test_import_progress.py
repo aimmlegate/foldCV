@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from packages.resume_core.reasoning import ModelReasoning
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from resume_api.projects.import_progress import import_progress, phase_of, quiet_limit
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.test_template_import_app import CatalogAdapter, app_client, operation_of, upload

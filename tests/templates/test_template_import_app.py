@@ -10,7 +10,7 @@ import pytest
 from packages.resume_core.project_repository import decode_project
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.templates.store import TemplateStore
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from tests.templates.employment_fixtures import employment_package
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 

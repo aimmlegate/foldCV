@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 import json
 import logging
-import math
 from pathlib import Path
-import re
 import shutil
 import threading
 import time
@@ -33,14 +31,9 @@ from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache
 from resume_api.cli.profile import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments, overrides,
                                      qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
+from .shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, _combine, strict_json
 
 
-MODEL = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z")
-PLAN = re.compile(r"[a-z][a-z0-9_]{0,39}\Z")
-MAX_SCHEMA = 65_536
-MAX_RESULT = 65_536
-MAX_DEPTH = 32
-REPAIR_FEEDBACK = "The completed response was invalid JSON or did not match the schema. Return only a valid JSON object matching the schema."
 # What `exec --json` sends today. A newer CLI adds events of its own; tools only ever run as items, which stay checked.
 EXEC_EVENTS = frozenset({"thread.started", "turn.started", "item.started", "item.updated", "item.completed",
                          "turn.completed", "error", "turn.failed"})
@@ -49,51 +42,6 @@ LOG = logging.getLogger(__name__)
 _GENERATION_LOCK = INFERENCE
 
 
-def strict_json(raw: bytes | str, *, max_bytes: int = MAX_RESULT) -> object:
-    try:
-        if isinstance(raw, bytes):
-            if len(raw) > max_bytes:
-                raise ValueError()
-            text = raw.decode("utf-8", "strict")
-        else:
-            text = raw
-            if len(text.encode("utf-8", "strict")) > max_bytes:
-                raise ValueError()
-
-        def pairs(items: list[tuple[str, object]]) -> dict[str, object]:
-            value: dict[str, object] = {}
-            for key, item in items:
-                if key in value:
-                    raise ValueError()
-                value[key] = item
-            return value
-
-        def number(value: str) -> float:
-            parsed = float(value)
-            if not math.isfinite(parsed):
-                raise ValueError()
-            return parsed
-
-        value = json.loads(text, object_pairs_hook=pairs, parse_float=number,
-                           parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()))
-
-        def inspect(item: object, depth: int) -> None:
-            if depth > MAX_DEPTH:
-                raise ValueError()
-            if isinstance(item, str):
-                item.encode("utf-8", "strict")
-            elif isinstance(item, list):
-                for part in item:
-                    inspect(part, depth + 1)
-            elif isinstance(item, dict):
-                for key, part in item.items():
-                    inspect(key, depth + 1)
-                    inspect(part, depth + 1)
-
-        inspect(value, 0)
-        return value
-    except (ValueError, UnicodeError, RecursionError, OverflowError):
-        raise ContentFailure("INVALID_RESULT") from None
 
 
 def _usage(raw: object) -> ReportedUsage:
@@ -107,19 +55,8 @@ def _usage(raw: object) -> ReportedUsage:
     return ReportedUsage(raw["input_tokens"], raw["cached_input_tokens"], raw["output_tokens"], True)
 
 
-def _combine(usages: list[ReportedUsage]) -> ReportedUsage:
-    def total(name: str) -> int | None:
-        values = [getattr(usage, name) for usage in usages]
-        known = [value for value in values if value is not None]
-        return sum(known) if known else None
-
-    return ReportedUsage(total("input_tokens"), total("cached_input_tokens"),
-                         total("output_tokens"), bool(usages) and all(u.complete for u in usages))
 
 
-class InvalidFinal(ContentFailure):
-    def __init__(self):
-        super().__init__("INVALID_RESULT")
 
 
 class Events:

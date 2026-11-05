@@ -17,7 +17,7 @@ from packages.resume_core.text_rewrite import PlainTextReply
 from resume_api import app as service
 from resume_api.app import ProviderSlot
 from resume_api.cli.profiles.claude import ClaudeCliProfile
-from resume_api.connection import ConnectionFailure, Metadata, Quota
+from resume_api.providers.base import ConnectionFailure, Metadata, Quota
 from resume_api.inference_admission import INFERENCE
 from resume_api.providers import registry as providers
 from resume_api.providers.content import ContentResult, ReportedUsage

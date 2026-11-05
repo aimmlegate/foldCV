@@ -15,7 +15,7 @@ from packages.resume_core.rules import RulesFailure
 
 from ..cli.experimental_profile import ExperimentalProfileError
 from ..cli.profiles.claude import ClaudeProfileError
-from ..connection import ConnectionFailure, Metadata
+from ..providers.base import ConnectionFailure, Metadata
 from ..host_models import (ConnectionPayload, EnableProviderRequest, HostRequest, LoginCodeRequest, ProviderState,
                            ProviderSummary, QuotaPayload, SelectModelRequest)
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout

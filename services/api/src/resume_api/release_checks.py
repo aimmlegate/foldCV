@@ -10,7 +10,8 @@ from .agent.host_profile import check_host
 from .cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from .cli.installation import InstallationFailure
 from .cli.profiles.claude import ClaudeCliProfile
-from .connection import ConnectionAdapter, ConnectionFailure
+from .connection import ConnectionAdapter
+from .providers.base import ConnectionFailure
 from .lifecycle import SpikeError
 from .providers.claude_cli import ClaudeCliProvider
 from .providers.content import ContentFailure

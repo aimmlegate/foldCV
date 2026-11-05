@@ -6,8 +6,8 @@ import time
 
 import httpx
 
-from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
-from resume_api.connection import Metadata, Quota
+from resume_api.agent.base import RuntimeResult, ScriptedAgentRuntime
+from resume_api.providers.base import Metadata, Quota
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 

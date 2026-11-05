@@ -9,7 +9,7 @@ import httpx
 
 from resume_api.app import create_app
 from resume_api.cli.profile import VERSION
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from tests.projects.support import source_blobs
 from tests.support.foundation import ForbiddenContentProvider
 from tests.templates.storage_fixtures import workspace

@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from packages.resume_core import agent_limits as limits
-from resume_api.agent.runtime import DEVELOPER_INSTRUCTIONS
+from resume_api.agent.base import DEVELOPER_INSTRUCTIONS
 from resume_api.assistant.tools import TOOL_NAMES
 from tests.support.assistant_tools import mcp_client, tool_call, tool_session
 

@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from resume_api.agent.runtime import RuntimeResult
+from resume_api.agent.base import RuntimeResult
 from tests.assistant.support import Tools
 
 TBASE = '/v2/templates/assistant'

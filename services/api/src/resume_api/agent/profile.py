@@ -4,7 +4,8 @@ import json
 from urllib.parse import urlsplit
 
 from packages.resume_core.assistant_store import AgentFailure
-from resume_api.agent.host_profile import AgentProofProfile, TOKEN_ENV
+from resume_api.agent.host_profile import AgentProofProfile
+from resume_api.agent.base import TOKEN_ENV
 
 
 class AgentProfile(AgentProofProfile):

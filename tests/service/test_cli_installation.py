@@ -23,7 +23,8 @@ from resume_api.cli import distribution as release
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError, installed_profile
 from resume_api.cli.installation import CliInstallation, InstallationFailure, MARKER
 from resume_api.cli.releases import Release
-from resume_api.connection import ConnectionAdapter, Metadata, Quota
+from resume_api.connection import ConnectionAdapter
+from resume_api.providers.base import Metadata, Quota
 from resume_api.lifecycle import OperationFiles
 from tests.settings.test_providers import running_rewrite
 
@@ -244,7 +245,7 @@ def test_relocated_agent_uses_the_pinned_local_companion(package, tmp_path, monk
 class InstalledMetadata(ConnectionAdapter):
     def inspect(self, files, cancel, *, full=True):
         if not self.executable.is_file():
-            from resume_api.connection import ConnectionFailure
+            from resume_api.providers.base import ConnectionFailure
             raise ConnectionFailure("CLI_MISSING")
         return Metadata("codex-cli " + VERSION, ("gpt-6-luna",), "plus", Quota("available", 25, 1800000000))
 
@@ -419,7 +420,7 @@ def test_on_macos_the_package_must_carry_openais_signature(tmp_path, monkeypatch
     ("CLI_PROFILE_UNSAFE", "install_failed"),
 ])
 def test_the_codex_capability_check_refuses_only_what_the_cli_cannot_do(tmp_path, monkeypatch, failure, code):
-    from resume_api.connection import ConnectionFailure
+    from resume_api.providers.base import ConnectionFailure
     checked = []
 
     def version(_adapter, _files, _cancel, _deadline):

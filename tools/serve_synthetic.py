@@ -29,11 +29,11 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.storage import atomic_write
 from packages.resume_core.text_rewrite import PlainTextReply
-from resume_api.agent.runtime import RuntimeResult, ScriptedAgentRuntime
+from resume_api.agent.base import RuntimeResult, ScriptedAgentRuntime
 from resume_api.app import ProviderSlot, create_app
 from resume_api.cli.installation import ClaudeInstallation, MARKER
 from resume_api.cli.releases import RECORD, Record, Release
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -80,7 +80,7 @@ class ScriptedClaude(ScriptedConnection):
 
     def inspect(self, _files, _cancel, *, full=True):
         self.calls.append('inspect_claude')
-        from resume_api.connection import ConnectionFailure
+        from resume_api.providers.base import ConnectionFailure
         if self.installation is not None and not self.installation.executable.is_file():
             raise ConnectionFailure('CLI_MISSING')
         version = ((self.installation.installed() if self.installation else None) or '2.1.308') + ' (Claude Code)'
@@ -342,7 +342,7 @@ class LiveBudget:
         return len(self.ledger.read_text().splitlines()) if self.ledger.is_file() else 0
 
     async def run(self, value, cancel, emit):
-        from resume_api.agent.runtime import RuntimeResult
+        from resume_api.agent.base import RuntimeResult
         if self.used() >= self.limit:
             return RuntimeResult(state='failed', error='AGENT_QUOTA')
         # Charged before the start, so an unknown outcome still counts.

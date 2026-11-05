@@ -7,7 +7,7 @@ import time
 
 from packages.resume_core.models.template_render import TemplateRendererIdentity
 from packages.resume_core.reasoning import ModelReasoning
-from resume_api.connection import Metadata, Quota
+from resume_api.providers.base import Metadata, Quota
 from tests.assistant.support import MODEL, PROJECT, MetadataAdapter, assistant_app, base, conversation, finish, start
 
 

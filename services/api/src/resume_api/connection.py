@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
 import json
 import os
@@ -11,41 +10,24 @@ import shutil
 import threading
 import time
 
-from packages.resume_core.reasoning import ModelReasoning, model_reasoning
+from packages.resume_core.reasoning import model_reasoning
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.experimental_profile import ExperimentalCliProfile, ExperimentalProfileError
 from resume_api.lifecycle import OperationFiles, SpikeError
-from resume_api.providers.codex_cli import ACTION_METHODS, MODEL, PLAN, strict_json
+from resume_api.providers.codex_cli import ACTION_METHODS
+from resume_api.providers.shared import MODEL, PLAN, strict_json
 from resume_api.cli.profile import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
+from .providers.base import ConnectionFailure, Metadata, Quota
 
 
 MAX_MODELS = 100
 
 
-class ConnectionFailure(Exception):
-    def __init__(self, code: str, version: str | None = None):
-        super().__init__(code)
-        self.code = code
-        self.version = version
 
 
-@dataclass(frozen=True)
-class Quota:
-    state: str = "unknown"
-    used_percent: float | None = None
-    resets_at: int | None = None
 
 
-@dataclass(frozen=True)
-class Metadata:
-    version: str
-    models: tuple[str, ...]
-    plan: str | None
-    quota: Quota
-    reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
-    # "graceful": newer than the last tested version; shown as a notice (plan section 5).
-    version_status: str = "supported"
 
 
 def quota_from_result(raw: object) -> Quota:

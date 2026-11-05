@@ -27,7 +27,7 @@ from packages.resume_core.models.assistant import (TERMINAL, AssistantCapabiliti
 from packages.resume_core.project_repository import RepositoryFailure
 from packages.resume_core.templates.presentation import snapshot_identity
 
-from resume_api.agent.runtime import BASE_INSTRUCTIONS, RuntimeInput, RuntimeResult
+from resume_api.agent.base import BASE_INSTRUCTIONS, RuntimeInput, RuntimeResult
 from resume_api.inference_admission import INFERENCE
 from resume_api.projects.errors import ProjectFailure
 
