@@ -10,6 +10,7 @@ import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
 import type { TaskStatusV1 } from "../contracts/generated/contracts";
 import { templateExportArtifact } from "../contracts/template-export";
 import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
+import { errorCodeOf } from "../api/errors";
 
 /** One open V7 project on the /v2 routes: the editor token, the last verified response and the server's undo state (D109).
  * Replies are parsed with JSON.parse and typed; the server validated them before sending. */
@@ -36,9 +37,7 @@ export async function v2Request<T>(path: string, method = "GET", body?: unknown,
   try { value = text ? JSON.parse(text) : null; } catch { throw new ProjectApiFailure("INVALID_RESULT", response.status); }
   if (!response.ok) {
     const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-    const error = record["error"], code = typeof error === "object" && error !== null && typeof Reflect.get(error, "code") === "string"
-      ? String(Reflect.get(error, "code")) : "REQUEST_FAILED";
-    throw new ProjectApiFailure(code, response.status, record);
+    throw new ProjectApiFailure(errorCodeOf(value), response.status, record);
   }
   return value as T;
 }

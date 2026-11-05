@@ -2,16 +2,11 @@ import type { RulesSettings } from "../contracts/generated/contracts";
 import type { SaveRulesRequest } from "../contracts/generated/contracts";
 import type { Preferences } from "../contracts/generated/contracts";
 import type { SaveLimitsPreference } from "../contracts/generated/contracts";
+import { errorCodeOf } from "./errors";
 
 /** The session exchange and the /v1/settings calls; replies are parsed with JSON.parse and typed (plan 2.6). */
 export class ApiFailure extends Error {
   constructor(readonly code: string) { super(code); }
-}
-function errorCode(value: unknown): string {
-  if (typeof value !== "object" || value === null || !("error" in value)) return "REQUEST_FAILED";
-  const error = value.error;
-  return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
-    ? error.code : "REQUEST_FAILED";
 }
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const init: RequestInit = { method, credentials: "same-origin", cache: "no-store" };
@@ -20,7 +15,7 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
   const text = await response.text();
   let value: unknown = null;
   try { value = text ? JSON.parse(text) : null; } catch { throw new ApiFailure("INVALID_RESULT"); }
-  if (!response.ok) throw new ApiFailure(errorCode(value));
+  if (!response.ok) throw new ApiFailure(errorCodeOf(value));
   if (typeof value !== "object" || value === null) throw new ApiFailure("INVALID_RESULT");
   return value as T;
 }

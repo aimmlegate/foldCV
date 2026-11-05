@@ -370,16 +370,14 @@ MCP listener with a bearer token (`agent/mcp.py`), the public page fetcher
 
 ## Frontend controls and appearance
 
-React, TypeScript, Radix Primitives, and Tailwind are confirmed. Use standard HTML
-controls for simple fields and buttons, and Radix for dialogs, menus, and tabs.
-Radix handles interaction behavior; Tailwind and shared theme values define the
-appearance. Keep components small and extract repeated controls and variants.
-
-Define shared CSS variables for backgrounds, text, borders, accents, and status
-colors, and map them to semantic Tailwind utilities such as `bg-surface`,
-`text-content`, `border-outline`, and `text-danger`. Keep light and dark values
-in one place and apply them across native controls and Radix components. Use
-complete utility names or explicit variant maps so Tailwind can detect them.
+React, TypeScript and Radix Primitives (popover, tabs, dropdown-menu) are in use. Standard
+HTML controls serve simple fields and buttons; Radix handles popovers, tabs and menus.
+Appearance comes from CSS files over the tokens of `workbench/settings/themes.ts` (D140:
+every interface color is a token written to the root; `apps/web/tools/theme-tokens.ts` writes
+the first-paint `tokens.css` and the sheet's `sheet-light.css` from it). Tailwind utilities come in only through `workbench/styles/utilities.css`,
+which scans the BlockNote shadcn components (select, popover, …) that use them, with the
+`@theme inline` aliases of `workbench/styles/aliases.css`; there is no Preflight. Use complete
+utility names or explicit variant maps so Tailwind can detect them.
 
 Support light, dark, and system modes. Default to system, follow OS theme changes
 in that mode, and persist a manual choice as an application preference. Apply the
@@ -391,8 +389,10 @@ Do not use Redux or Redux Toolkit. Consider XState for specific workflows when
 statecharts simplify transitions and testing. It is optional, not a current
 dependency or required global store.
 
-Keep the planned pure action/reducer project model. Native React bindings versus
-Zustand remains undecided; no project store library is confirmed.
+The editor state is the V7 client model in `rich/v7-*` with its own history. Shell state
+(appearance, pane order and widths, collapsed panes, the open screen and the Settings request)
+is React state in `App.tsx` and `useResumeWorkspace`, stored under the keys of
+`workbench/settings/interface.ts` and `ui/PanelHandle.tsx`. No store library is used.
 
 ## TypeScript safety
 

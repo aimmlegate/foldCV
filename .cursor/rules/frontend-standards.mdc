@@ -6,7 +6,13 @@ alwaysApply: false
 
 # Frontend standards
 
-- Use React, TypeScript, Radix Primitives, and Tailwind.
+- Use React, TypeScript and Radix Primitives (popover, tabs, dropdown-menu). Styles are CSS
+  files over the theme tokens; Tailwind utilities come in only through
+  `workbench/styles/utilities.css`, which scans the BlockNote shadcn components, with the
+  `@theme inline` aliases of `workbench/styles/aliases.css`.
+- Shell state (appearance, pane order and widths, collapsed panes, the open screen) is React
+  state in `App.tsx` and `useResumeWorkspace`, stored under the keys of
+  `workbench/settings/interface.ts` and `ui/PanelHandle.tsx`; there is no store library.
 - Do not use Redux or Redux Toolkit.
 - Consider XState only for specific workflows where statecharts simplify
   transitions and testing; it is optional, not a required global store.
@@ -23,7 +29,7 @@ alwaysApply: false
   Radix Dialog Portal/focus trap. Engine-owned DOM may use a narrow adapter.
 - Themes (D140): the interface follows the system or a fixed light/dark scheme with
   a theme per side, a contrast slider and a glass opacity. Every interface color
-  is a token from `settings/themes.ts`, written to the root by `applyAppearance`;
+  is a token from `workbench/settings/themes.ts`, written to the root by `applyAppearance`;
   `tokens.css` and `sheet-light.css` are generated from it by
   `apps/web/tools/theme-tokens.ts`. Stylesheets reference tokens only; raw colors
   stay only in the resume sheet, the original document views and print, which

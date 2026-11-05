@@ -22,7 +22,6 @@
     "@tiptap/core": "3.31.4",
     "@tiptap/pm": "3.31.4",
     "docx-preview": "0.4.1",
-    "fflate": "0.8.3",
     "monaco-editor": "0.52.2",
     "monaco-yaml": "5.5.1",
     "pdfjs-dist": "6.4.299",
