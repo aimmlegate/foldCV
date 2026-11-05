@@ -82,9 +82,10 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
   starts gets an explicit temporary root. Never the default data root
   (`~/Library/Application Support/FoldCV`), which is the user's store. For a full run, a
   temporary `HOME` is an extra guard: `HOME="$(mktemp -d)" .venv/bin/python -m pytest ...`.
-- `tests/architecture/test_imports.py` (AST only) fails when a module of `packages/resume_core`
-  or `resume_api` imports a deleted layer or carries a deleted module name, and when
-  `packages/resume_core` imports `resume_api`.
+- `tests/architecture/test_imports.py` (AST only) fails when `packages/resume_core` imports
+  `resume_api`, and when a core module imports a higher layer (models with extraction and the
+  root modules, templates, editing, importing, rendering, repository, responses) outside the
+  pairs of `tests/architecture/layer_exceptions.txt`, or a listed pair no longer goes up.
 - `tests/foundation/test_private_resume_git.py` covers the private resume data guard
   (`tools/check_private_resume_data.py`).
 

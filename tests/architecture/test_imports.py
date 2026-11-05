@@ -1,48 +1,19 @@
-"""No module imports the legacy generations, the job stack or spikes, and none of the deleted modules is back (plan 1.3,
-1.4, S22).
+"""The core keeps its layer order and never imports the api. Static AST check over every module of packages/resume_core
+and resume_api; the modules are never imported. Function-level imports count.
 
-Static AST check over every module of packages/resume_core and resume_api; the modules are never imported.
-Function-level imports count.
+Layers of packages/resume_core, lowest first: models (with extraction and the root modules), templates, editing,
+importing, rendering, repository, responses. A module imports its own layer or a lower one. The pairs that do not are
+listed in layer_exceptions.txt (MT08, 2026-11-05): a new pair fails, and so does a listed pair that no longer goes up,
+so the list only shrinks.
 """
 
 import ast
-import fnmatch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGES = {'packages.resume_core': ROOT / 'packages/resume_core', 'resume_api': ROOT / 'services/api/src/resume_api'}
-
-# Module names SR06 deleted (plan 1.3, 1.4 and the dead V6 import modules); none may exist again.
-DELETED = [
-    'packages.resume_core.background_*', 'packages.resume_core.template_commit_proofs',
-    'packages.resume_core.template_preparation_store', 'packages.resume_core.template_writer_*',
-    'packages.resume_core.template_delta', 'packages.resume_core.template_address_map',
-    'packages.resume_core.template_retention', 'packages.resume_core.template_clipboard_store',
-    'packages.resume_core.template_finalization', 'packages.resume_core.rich_project_store',
-    'packages.resume_core.rich_snapshot_merge', 'packages.resume_core.rich_asset_lifecycle', 'packages.resume_core.rich_archive',
-    'packages.resume_core.rich_import', 'packages.resume_core.rich_timeline', 'packages.resume_core.rich_format',
-    'packages.resume_core.agent_store', 'packages.resume_core.agent_artifacts', 'packages.resume_core.agent_edits',
-    'packages.resume_core.assistant_actions', 'packages.resume_core.assistant_coverage',
-    'packages.resume_core.assistant_proposals', 'packages.resume_core.assistant_publication',
-    'packages.resume_core.gui_*', 'packages.resume_core.normalization', 'packages.resume_core.drafting',
-    'packages.resume_core.rewriting', 'packages.resume_core.checks', 'packages.resume_core.import_*',
-    'packages.resume_core.resume_assessment', 'packages.resume_core.extraction_outcome', 'packages.resume_core.source_dates',
-    'packages.resume_core.models.background', 'packages.resume_core.models.template_writer',
-    'packages.resume_core.models.template_delta', 'packages.resume_core.models.template_authority',
-    'packages.resume_core.models.template_publication', 'packages.resume_core.models.template_address',
-    'packages.resume_core.models.assistant_*', 'packages.resume_core.models.recovery',
-    'resume_api.jobs', 'resume_api.jobs.*', 'resume_api.rich_*', 'resume_api.template_exports', 'resume_api.template_imports',
-    'resume_api.importer.template_checkpoints', 'resume_api.importer.template_persistence', 'resume_api.importer.job',
-    'resume_api.importer.direct', 'resume_api.importer.template_direct', 'resume_api.importer.template_export',
-    'resume_api.importer.session', 'resume_api.importer.result', 'resume_api.projects.pipeline',
-    'resume_api.agent.approval*', 'resume_api.agent.action_*', 'resume_api.agent.continuation',
-    'resume_api.agent.capabilities', 'resume_api.agent.history_proposals', 'resume_api.agent.outcomes',
-    'resume_api.agent.project_*', 'resume_api.agent.proposals', 'resume_api.agent.publication',
-    'resume_api.agent.leases', 'resume_api.agent.events', 'resume_api.agent.edits', 'resume_api.agent.service',
-    'resume_api.agent.routes', 'resume_api.agent.tools', 'resume_api.agent.context', 'resume_api.agent.skills',
-    'resume_api.gui_*', 'resume_api.normalization_content', 'resume_api.drafting_content', 'resume_api.rewriting_content',
-    'resume_api.resume_assessment_content', 'resume_api.original_sources', 'resume_api.contracts',
-]
+LAYERS = ['models', 'templates', 'editing', 'importing', 'rendering', 'repository', 'responses']
+EXCEPTIONS = Path(__file__).with_name('layer_exceptions.txt')
 
 
 def modules():
@@ -75,23 +46,29 @@ def imported(name, path, known):
     return result
 
 
-def forbidden(target):
-    parts = target.split('.')
-    return (any(part.startswith(('gui_', 'background_')) for part in parts)
-        or target == 'packages.resume_core.models.recovery' or parts[-1] == 'rich_project_store'
-        or target == 'resume_api.jobs' or target.startswith('resume_api.jobs.')
-        or target == 'spikes' or target.startswith('spikes.'))
+def layer(name):
+    """The layer of a core module: its package under packages/resume_core; root modules are models level."""
+    parts = name.split('.')[2:]
+    top = parts[0] if len(parts) > 1 else 'models'
+    return {'extraction': 'models'}.get(top, top if top in LAYERS else 'models')
 
 
-def deleted(name):
-    return any(fnmatch.fnmatchcase(name, pattern) for pattern in DELETED)
-
-
-def test_no_module_imports_a_legacy_generation_job_stack_or_spike():
+def upward_pairs():
     known = modules()
-    found = [(name, target) for name, path in known.items() for target in sorted(imported(name, path, known))
-        if forbidden(target) or deleted(target)]
-    assert found == []
+    core = {name: path for name, path in known.items() if name.startswith('packages.resume_core.')}
+    return {(name, target) for name, path in core.items() for target in imported(name, path, known)
+            if target in core and LAYERS.index(layer(target)) > LAYERS.index(layer(name))}
+
+
+def listed():
+    return {tuple(line.split(' -> ')) for line in EXCEPTIONS.read_text(encoding='utf-8').splitlines()
+            if line.strip() and not line.startswith('#')}
+
+
+def test_core_imports_its_own_layer_or_a_lower_one():
+    found, allowed = upward_pairs(), listed()
+    assert sorted(found - allowed) == [], 'a new import goes up a layer'
+    assert sorted(allowed - found) == [], 'a listed pair no longer goes up: take it out of layer_exceptions.txt'
 
 
 def test_core_does_not_import_the_api():
@@ -99,8 +76,3 @@ def test_core_does_not_import_the_api():
     found = [(name, target) for name, path in known.items() if name.startswith('packages.')
         for target in sorted(imported(name, path, known)) if target == 'resume_api' or target.startswith('resume_api.')]
     assert found == []
-
-
-def test_no_module_is_named_like_a_deleted_one():
-    assert [name for name in modules() if deleted(name)] == []
-    assert not (ROOT / 'spikes').exists()
