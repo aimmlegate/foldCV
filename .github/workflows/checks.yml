@@ -24,11 +24,11 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: python -m venv .venv
       - run: .venv/bin/pip install -r requirements-dev.txt
+      - run: .venv/bin/pip install -e .
+      - run: .venv/bin/ruff check .
       - run: npm ci
         working-directory: apps/web
-      - run: .venv/bin/python -m pytest -q -p no:cacheprovider
-        env:
-          PYTHONPATH: services/api/src
+      - run: .venv/bin/python -m pytest -q -p no:cacheprovider -n auto
       - run: npm run test:state
         working-directory: apps/web
       - run: npm run typecheck
@@ -52,7 +52,6 @@ jobs:
           python-version: '3.13'
       - run: python -m venv .venv
       - run: .venv/bin/pip install -r requirements-dev.txt
+      - run: .venv/bin/pip install -e .
       - run: bash tools/install-local-renderer.sh
       - run: .venv/bin/python -m pytest -q -p no:cacheprovider -m slow
-        env:
-          PYTHONPATH: services/api/src

@@ -3,7 +3,6 @@ return the exact earlier and later states (G3); two runs allocate the same raw i
 
 import pytest
 
-from packages.resume_core.models.template_workspace import WorkspaceV7
 from tests.projects.support import Editor, v2_app
 from tests.templates.golden.corpus import corpus, loaded, results, with_capture
 from tests.templates.golden.normalize import created_ids, new_ids, normalized_hash

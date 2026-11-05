@@ -5,6 +5,7 @@ project `.venv`, Node 22.14.0 and the built web app:
 
 ```sh
 .venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -e .
 cd apps/web && npm ci && npm run build && cd ../..
 .venv/bin/python tools/run-local.py
 ```

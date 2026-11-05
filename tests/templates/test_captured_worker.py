@@ -7,9 +7,7 @@ import sys
 
 import pytest
 
-from packages.resume_core.rendering.captured_docx import renderer_identity
-from packages.resume_core.rendering.template import RenderFailure
-from tests.templates.test_captured_docx import captured_request, emitted, xml
+from tests.templates.test_captured_docx import captured_request, emitted, xml  # noqa: F401 (pytest fixture)
 
 WORKER = Path('packages/resume_core/rendering/worker.py').resolve()
 

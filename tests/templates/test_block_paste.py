@@ -6,7 +6,7 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import PresentedText
 from packages.resume_core.archive_zip import write_zip
 from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_mutations import apply_rich_mutation,inline_text
+from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_facts import human_edit
 from packages.resume_core.template_preparation import prepare_edit

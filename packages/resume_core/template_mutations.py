@@ -7,7 +7,7 @@ from .models.rich_mutations import MoveBlock, PutBlock, PutRecord, RemoveBlock, 
 from .models.template_facts import WorkingFactsV2
 from .models.template_mutations import (PutExtension, RemoveExtension, PutRelation, RemoveRelation,
     PutManualScope, SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors, RestoreAuthoredBlockPatch,
-    SetManualScopeDisplays, TemplateMutationV1, PutTemplateSync, RemoveTemplateSync)
+    SetManualScopeDisplays, PutTemplateSync, RemoveTemplateSync)
 from .rich_fact_mutations import apply_record_mutations
 from .template_facts import delete_subject_in_place
 

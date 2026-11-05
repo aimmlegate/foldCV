@@ -5,7 +5,7 @@ import pytest
 
 from packages.resume_core.rendering.captured_docx import render_captured_docx
 from tests.support.convert import ConverterUnavailable, convert, normalize, require_converter, words_in_order
-from tests.templates.test_captured_docx import captured_request, emitted, xml
+from tests.templates.test_captured_docx import captured_request, emitted, xml  # noqa: F401 (pytest fixture)
 
 pytestmark = pytest.mark.slow
 NS = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}

@@ -12,7 +12,7 @@ from resume_api.providers.claude import content as claude_cli
 from resume_api.providers.codex.content import CodexCliProvider, FixtureTransport, Probe
 from resume_api.providers.content import ContentFailure
 from resume_api.providers.preflight import QUALIFICATION_SECONDS, TTL_SECONDS, PreflightCache, preflight_key
-from tests.providers.fixtures import fake, request
+from tests.providers.fixtures import fake, request  # noqa: F401 (pytest fixture)
 
 
 def commands(cli):

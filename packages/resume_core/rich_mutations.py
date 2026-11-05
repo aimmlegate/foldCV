@@ -123,7 +123,6 @@ def apply_rich_mutation(workspace: WorkspaceV6, request, *, history_authorizatio
             raise RichMutationFailure('STALE_MUTATION') from None
     result = workspace.model_copy(deep=True)
     project, document = result.project, result.project.document
-    facts = {record.id: record for record in project.facts.records}
     blocks = {block.id: block for block in document.blocks()}
     for step in request.steps:
         if isinstance(step, DOMAIN_STEPS):

@@ -32,3 +32,5 @@ apps/web/playwright-report/
 /templates/local
 # The merged schema contracts:generate feeds to json2ts.
 /apps/web/.contracts-bundle.schema.json
+# The editable install writes this next to pyproject.toml.
+/*.egg-info/

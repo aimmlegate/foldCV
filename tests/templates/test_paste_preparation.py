@@ -3,7 +3,7 @@
 import pytest
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.models.template_document import BoundLink,ManualScopeSpan,PresentedHyperlink,PresentedText
+from packages.resume_core.models.template_document import ManualScopeSpan,PresentedHyperlink,PresentedText
 from packages.resume_core.rich_mutations import apply_rich_mutation,inline_text
 from packages.resume_core.template_preparation import prepare_edit
 from packages.resume_core.template_identity import capture_span

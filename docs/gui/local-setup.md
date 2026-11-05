@@ -16,6 +16,7 @@ From the repository root:
 node --version
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -e .
 cd apps/web
 npm ci
 npm run build

@@ -171,7 +171,7 @@ def start_operation(project_id, command, package, sources, facts, existing, now,
 
 def admit_operation(operation, now):
     result = operation.model_copy(deep=True)
-    authority = authorization(result)
+    authorization(result)
     if result.admitted_at is None:
         result.admitted_at, result.expires_at = now, expiry(now, result.capture.policy.processing_seconds)
         result.last_observed_at = now

@@ -2,12 +2,10 @@
 
 from copy import deepcopy
 import json
-from pathlib import Path
 import subprocess
 import sys
 
 import pytest
-import yaml
 
 from packages.resume_core.templates.compiler import compile_bytes, compile_template
 from packages.resume_core.templates.loading import CONFIG_DEPTH, load_definition

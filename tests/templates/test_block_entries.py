@@ -211,7 +211,6 @@ async def test_a_per_entry_block_outlines_extracts_each_entry_in_parallel_and_cl
     assert [attempt.slot for attempt in result.attempts].count('outline') == 1 and spent_calls(result) == 6
     assert {attempt.model.effort for attempt in result.attempts if attempt.slot in {'outline', 'initial'}} == {'medium'}
     # Each entry request names its lines and the other entries; its reply is one item on a one-item schema.
-    calls = {value['slot']: value for value in fixture.transport.calls if 'entry' in value and value['slot'] == 'initial'}
     entry_calls = [value for value in fixture.transport.calls if value.get('slot') == 'initial']
     assert [value['entry']['lines'] for value in entry_calls] == [[ref_of(value, 'paper-a')] for value in entry_calls[:1]] + [
         [ref_of(entry_calls[1], 'paper-b')]]

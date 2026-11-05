@@ -3,7 +3,6 @@
 Built only from tests/templates fixtures; no user data. Deterministic. Usage: build(root_of_checkout) -> (workspace, sources).
 """
 
-import hashlib
 import json
 import sys
 

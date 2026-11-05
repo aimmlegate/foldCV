@@ -224,7 +224,7 @@ def prune_empty_lists(project, steps):
 
 
 def insert_technology(project, record, before_id=None, moving=False):
-    from .rich_panel import field_block, put_block
+    from .rich_panel import field_block
     original = project
     project = project.model_copy(deep=True)
     bind_lists(project, record.job_id)

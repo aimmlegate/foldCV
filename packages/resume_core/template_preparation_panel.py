@@ -7,7 +7,7 @@ from .rich_fields import field_key, inline_groups, occurrences, set_text, workin
 from .template_anchors import anchor_steps
 from .template_facts import delete_subject
 from .template_panel_lines import block_node, is_row, node_labels, show_fields, sibling_lists, sync_period_lines, template_literal
-from .template_panel_values import field_occurrence, period_endpoint, period_field_id, written_dates
+from .template_panel_values import field_occurrence, period_endpoint, period_field_id, written_dates  # noqa: F401 (re-exported: the panel focus and records modules read it here)
 from .template_preparation_blocks import changed_block_steps
 from .template_preparation_common import allocator_for, finish_preparation, next_facts, prepared_response, validate_preparation
 from .templates.materialize_nodes import fallback_style, heading_style, literal, locale_text, reference

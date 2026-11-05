@@ -1,6 +1,5 @@
 """Generation checks detect added files and leave the original snapshot intact."""
 
-from pathlib import Path
 import subprocess
 
 import pytest

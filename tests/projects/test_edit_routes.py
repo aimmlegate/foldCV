@@ -6,7 +6,6 @@ import json
 import pytest
 
 from packages.resume_core import project_repository
-from packages.resume_core.templates.presentation import snapshot_identity
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 from tests.templates.test_template_preparation import command

@@ -15,6 +15,7 @@ Verified on macOS arm64 with Python 3.13 and Node 22.14.
 ```sh
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -e .
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 bash tools/install-local-renderer.sh
@@ -79,5 +80,5 @@ the bundled generic templates; `FOLDCV_PUBLIC_TEMPLATES=1` keeps the private one
 ## Tests
 
 ```sh
-PYTHONPATH=services/api/src .venv/bin/python -m pytest -q -p no:cacheprovider
+.venv/bin/python -m pytest -q -p no:cacheprovider
 ```

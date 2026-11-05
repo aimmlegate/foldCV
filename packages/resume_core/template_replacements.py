@@ -2,7 +2,7 @@
 
 from .models.rich_facts import RecordTombstone
 from .models.template_facts import WorkingFactsV2
-from .template_mutations import content, extension_content
+from .template_mutations import extension_content
 
 
 def _effective_value(cell):

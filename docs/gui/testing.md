@@ -8,10 +8,13 @@ From the repository root:
 
 ```sh
 # Default run: one process; pytest.ini leaves out the slow tests.
-PYTHONPATH=services/api/src .venv/bin/python -m pytest -q -p no:cacheprovider
+.venv/bin/python -m pytest -q -p no:cacheprovider
 
 # Slow tests only: scripted full imports and real document conversions.
-PYTHONPATH=services/api/src .venv/bin/python -m pytest -q -p no:cacheprovider -m slow
+.venv/bin/python -m pytest -q -p no:cacheprovider -m slow
+
+# Lint: syntax errors and pyflakes rules (`pyproject.toml`), in the fast CI job too.
+.venv/bin/ruff check .
 ```
 
 Client, in `apps/web` with the arm64 Node 22 from nvm:
@@ -26,9 +29,14 @@ npm run contracts:check
 - `pytest.ini`: `testpaths = tests`, `addopts = --strict-markers
   --strict-config -m "not slow"`. A `-m slow` on the command line wins. `slow` is the only
   marker.
-- Without `PYTHONPATH=services/api/src`, modules that import `resume_api` do not collect.
-  There is no pytest-xdist; the run is one process. Add `--durations=25` to see the slowest
-  tests; pass paths for a focused run.
+- `pip install -e .` (the root `pyproject.toml`) makes `packages` and `resume_api` importable from the
+  checkout; without it, modules that import `resume_api` do not collect.
+  The documented run is serial; `-n 4` (pytest-xdist, pinned) runs the default suite in
+  four processes, about 4x faster (3217 passed in 292–316 s three times against about
+  1 150 s serial, 2026-11-05), and the fast CI job uses `-n auto`. The slow suite stays
+  serial. Add `--durations=25` to see the slowest tests; pass paths for a focused run.
+- `pyright` (pinned, basic mode, `[tool.pyright]` in `pyproject.toml`; needs Node 22 on `PATH`) is report-only:
+  1 621 errors on 2026-11-05, most of them pydantic constructor calls by field alias. It is no CI gate.
 - No product path converts a document (the PDF is printed, D133). The slow conversion test
   (`tests/render/test_captured_conversion.py`, helpers in `tests/support/convert.py`) and manual
   PDF checks use the pinned LibreOffice of `tools/install-local-renderer.sh` (macOS arm64,
@@ -73,7 +81,7 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
 - Data roots: every test uses `tmp_path` or `temp_root`, and every app, launcher or store a test
   starts gets an explicit temporary root. Never the default data root
   (`~/Library/Application Support/FoldCV`), which is the user's store. For a full run, a
-  temporary `HOME` is an extra guard: `HOME="$(mktemp -d)" PYTHONPATH=services/api/src ...`.
+  temporary `HOME` is an extra guard: `HOME="$(mktemp -d)" .venv/bin/python -m pytest ...`.
 - `tests/architecture/test_imports.py` (AST only) fails when a module of `packages/resume_core`
   or `resume_api` imports a deleted layer or carries a deleted module name, and when
   `packages/resume_core` imports `resume_api`.

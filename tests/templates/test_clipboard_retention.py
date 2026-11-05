@@ -8,7 +8,7 @@ from packages.resume_core.models.template_authoring import TemplateClipboardCapt
 from packages.resume_core.models.template_document import BoundLink,FieldRef,PresentedText
 from packages.resume_core.template_authoring import split_block
 from packages.resume_core.template_clipboard import capture_clipboard
-from packages.resume_core.template_clipboard_witnesses import (captured_package_hash,field_witness,fingerprint,ownership_witness,scope_witness,
+from packages.resume_core.template_clipboard_witnesses import (captured_package_hash,field_witness,ownership_witness,scope_witness,
     source_witness,verify_witness,verify_witnesses)
 from packages.resume_core.template_facts import human_edit
 from packages.resume_core.templates.compiler import canonical

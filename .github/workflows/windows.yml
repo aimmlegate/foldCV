@@ -19,7 +19,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 60
     env:
-      PYTHONPATH: ${{ github.workspace }};${{ github.workspace }}\services\api\src
+      PYTHONPATH: ${{ github.workspace }}
     defaults:
       run:
         shell: pwsh
@@ -45,7 +45,9 @@ jobs:
           cargo test --release --locked
           cargo build --release --locked
       - name: Python environment
-        run: python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+        run: |
+          python -m pip install --quiet --disable-pip-version-check -r requirements-dev.txt
+          python -m pip install --quiet --disable-pip-version-check -e .
       - name: Template definition diagnostic
         continue-on-error: true
         run: python tools\desktop\template_diff.py

@@ -10,7 +10,7 @@ from pydantic import Field, model_validator
 from .models.contracts import Id, Wire
 from .models.rich_document import RichBlock
 from .models.rich_facts import RichFact
-from .models.rich_mutations import ActionCapture, RichSelection, RichStep, PutRecord, RemoveRecord
+from .models.rich_mutations import ActionCapture, RichSelection, PutRecord, RemoveRecord
 from .rich_dependencies import dependency, placements
 from .rich_fields import occurrences, set_text, working_field
 

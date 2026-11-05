@@ -1024,10 +1024,11 @@ class TemplatePipeline:
                     error.code, error.logical_attempts, error.usage, error.cleanup_verified, error.dispatch_witness,
                     policy.effort))
             else:
+                # The lambda runs inside update_operation while this except block still binds `error`.
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
-                    record_return(result, attempt_id, error.raw_return,
-                        attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,
-                        attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code))
+                    record_return(result, attempt_id, error.raw_return,  # noqa: F821
+                        attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,  # noqa: F821
+                        attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code))  # noqa: F821
         else:
             if attempt_in(operation_in(await self.view(project), operation_id), attempt_id).state == 'dispatch_started':
                 await asyncio.to_thread(returned, ContentTransportReturn(response.raw_return, 'completed', None,

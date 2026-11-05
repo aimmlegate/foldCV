@@ -1,7 +1,6 @@
 """Closed proposal/review schemas retain raw payload assertions and typed sidecars."""
 
 from copy import deepcopy
-import json
 
 from ..models.template_import import (OutlineReply, OutlineReviewReply, ProposalReply, ReferencedProposalReply,
     ReferencedReviewReply, ReviewReply)

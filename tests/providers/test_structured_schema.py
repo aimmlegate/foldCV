@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 import pytest
 
-from tests.providers.fixtures import PROMPT, fake
+from tests.providers.fixtures import PROMPT, fake  # noqa: F401 (pytest fixture)
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers.codex.content import CodexCliProvider, Events, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy

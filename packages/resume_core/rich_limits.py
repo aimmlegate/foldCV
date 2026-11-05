@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from .models.rich_workspace import LocalImageAsset
 # Ceilings for reading and validating saved projects; Settings bound new saves (project_limits).
-from .project_limits import ARCHIVE_BYTES as ZIP_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES as WORKSPACE_BYTES
+from .project_limits import ARCHIVE_BYTES as ZIP_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES as WORKSPACE_BYTES  # noqa: F401 (re-exported under these names)
 
 MIB = 1024 * 1024
 MUTATION_BYTES = MIB

@@ -4,7 +4,7 @@ import base64
 
 from pydantic import ValidationError
 
-from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip, write_zip
+from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip
 from .models.template_workspace import ArchiveManifestV7, WorkspaceV7
 from .models.rich_document import ImageBlock
 from .rich_images import ImageFailure, verify_image_bytes

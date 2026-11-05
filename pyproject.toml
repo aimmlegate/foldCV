@@ -1,0 +1,33 @@
+# The two import namespaces for an editable install (`pip install -e .`); the requirements files stay the pinned
+# versions, so the project declares no dependencies.
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "foldcv"
+version = "0.2.0"
+requires-python = ">=3.13"
+
+[tool.setuptools.packages.find]
+where = [".", "services/api/src"]
+include = ["packages", "packages.*", "resume_api", "resume_api.*"]
+
+[tool.setuptools.package-data]
+"packages.resume_core" = ["default_rules.md"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# A test names a fixture it imported as a parameter; pytest resolves it by that name.
+"tests/**" = ["F811"]
+
+# Report-only (MT12): not a CI gate until it reports no error.
+[tool.pyright]
+include = ["packages", "services"]
+typeCheckingMode = "basic"
+pythonVersion = "3.13"

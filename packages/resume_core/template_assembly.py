@@ -1,6 +1,6 @@
 """Publish the initial template tree while retaining original sources and fact history."""
 
-from .models.template_workspace import ProjectV6, WorkspaceV7, validated_with_history
+from .models.template_workspace import ProjectV6, validated_with_history
 from .templates.focus import catalog_for, remembered_icon, row_name
 from .templates.materialize import materialize
 from .templates.presentation_plan import focus_row

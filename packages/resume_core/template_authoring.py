@@ -3,7 +3,7 @@
 import uuid
 from types import SimpleNamespace
 
-from .models.rich_document import FactFieldSpan, Hyperlink, SectionBlock, TableBlock, ImageBlock
+from .models.rich_document import FactFieldSpan, Hyperlink, SectionBlock, TableBlock
 from .models.template_document import BoundLink, ManualScopeSpan, PresentedHyperlink, PresentedText, TemplateParagraphBlock
 from .models.template_facts import ManualEditScope, Relation
 from .rich_fields import bound_link_fields, inline_groups, occurrences

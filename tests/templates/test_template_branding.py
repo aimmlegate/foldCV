@@ -8,7 +8,7 @@ from PIL import Image
 import pytest
 
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore
-from resume_api.template_branding import (LOGO_BYTES, LOGO_SIDE, NO_PLACE, NOT_EDITABLE, NOT_EMAIL, NOT_IMAGE, TOO_LARGE,
+from resume_api.template_branding import (LOGO_BYTES, LOGO_SIDE, NO_PLACE, NOT_EMAIL, NOT_IMAGE, TOO_LARGE,
     TemplateBrandingRequest, edited_yaml)
 from resume_api.template_config import TemplateConfig
 from tests.templates.generic_fixtures import export_through_service, generic_import
