@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 from fastapi.responses import Response
 
-from packages.resume_core.project_repository import blob_path
+from packages.resume_core.repository.project_repository import blob_path
 from packages.resume_core.extraction.parser import MAX_SOURCE
 
 from .blobs import read_owned

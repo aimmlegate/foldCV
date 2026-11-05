@@ -9,8 +9,8 @@ import re
 
 from pydantic import ValidationError
 
-from .models.registry import Registry, RegistryEntry
-from .storage import StorageFailure, atomic_write, data_root, locked_root, private_directory, private_file
+from ..models.registry import Registry, RegistryEntry
+from ..storage import StorageFailure, atomic_write, data_root, locked_root, private_directory, private_file
 
 
 MAX_SNAPSHOT_BYTES = 64 * 1024 * 1024

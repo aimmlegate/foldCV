@@ -327,9 +327,9 @@ def test_materialized_fallback_issue_edit_undo_redo_is_scoped_without_new_checks
 
 
 def test_failed_save_of_materialized_issue_edit_keeps_coherent_disk_and_retry_transfer(tmp_path, monkeypatch):
-    from packages.resume_core import project_repository as module
-    from packages.resume_core.archive_zip import write_zip
-    from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+    from packages.resume_core.repository import project_repository as module
+    from packages.resume_core.repository.archive_zip import write_zip
+    from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
     from tests.templates.editor_fixtures import TemplateEditor
     before, sources = issue_workspace()
     editor = TemplateEditor(tmp_path, before, sources)

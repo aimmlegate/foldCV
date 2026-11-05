@@ -5,8 +5,8 @@ import pytest
 from packages.resume_core.template_inverse import semantic
 from packages.resume_core.models.template_document import BoundLink,FieldOccurrence,FieldRef,PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_dependencies import dependencies_current
 from packages.resume_core.rich_mutations import apply_rich_mutation,RichMutationFailure
 from packages.resume_core.template_preparation import prepare_edit

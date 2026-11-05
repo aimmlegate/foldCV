@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.preferences import PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.project_limits import MIB, USER_LIMITS, apply_preferences, import_seconds, project_file_bytes
 from packages.resume_core.storage import StorageFailure, atomic_write
 from tests.settings.support import application, client_session
@@ -48,7 +48,7 @@ async def test_saved_limits_apply_now_survive_restart_and_a_failed_write_keeps_t
         def denied(*_args):
             raise StorageFailure("denied")
         with monkeypatch.context() as patch:
-            patch.setattr("packages.resume_core.preferences.atomic_write", denied)
+            patch.setattr("packages.resume_core.repository.preferences.atomic_write", denied)
             failed = await client.put("/v1/settings/limits", json={"importMinutes": 5, "projectMegabytes": 10})
             assert failed.status_code == 409 and failed.json()["error"]["code"] == "PREFERENCES_SAVE_FAILED"
         assert import_seconds() == 90 * 60
@@ -67,7 +67,7 @@ async def test_a_full_disk_during_a_limits_save_gives_the_preferences_code(tmp_p
 
         def full(*_args):
             raise OSError(28, "No space left on device")
-        monkeypatch.setattr("packages.resume_core.preferences.atomic_write", full)
+        monkeypatch.setattr("packages.resume_core.repository.preferences.atomic_write", full)
         failed = await client.put("/v1/settings/limits", json={"importMinutes": 5, "projectMegabytes": 10})
         assert failed.status_code == 409 and failed.json()["error"]["code"] == "PREFERENCES_SAVE_FAILED"
     assert import_seconds() == 90 * 60 and project_file_bytes() == 128 * MIB

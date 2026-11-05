@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
 from tests.repository.support import PROJECT, repository
 
 

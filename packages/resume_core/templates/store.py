@@ -13,7 +13,7 @@ from pathlib import Path
 import threading
 
 from ..storage import atomic_write, locked_root
-from ..project_store import owned_file, strict_json
+from ..repository.project_store import owned_file, strict_json
 from .compiler import (ADDED_CAPABILITIES, CAPABILITIES, COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3, OPERATION_VERSION, PACKAGE_BYTES,
                        PROJECTION_VERSION, canonical, compile_definition, compile_template, sha256)
 from .loading import load_declared_definition,load_definition

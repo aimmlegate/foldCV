@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
 from tests.repository.support import PROJECT, create_other, edit, repository, text_of, typing
 
 
@@ -95,7 +95,7 @@ def test_edits_do_not_write_the_registry_but_close_does(tmp_path):
 
 
 def test_an_outside_write_is_adopted_instead_of_overwritten(tmp_path):
-    from packages.resume_core.project_repository import rich_snapshot_bytes
+    from packages.resume_core.repository.project_repository import rich_snapshot_bytes
     from packages.resume_core.storage import atomic_write
     repo = repository(tmp_path)
     edit(repo, 'Mine', identifier='edit-1', action='one')
@@ -176,7 +176,7 @@ def test_a_failed_registry_write_on_eviction_does_not_fail_another_open(tmp_path
 
 
 def test_an_edit_racing_a_delete_is_refused_even_when_cleanup_fails(tmp_path, monkeypatch):
-    from packages.resume_core import project_repository
+    from packages.resume_core.repository import project_repository
     repo = repository(tmp_path)
     workspace_file = tmp_path / 'data/projects' / PROJECT / 'workspace.json'
     raw = workspace_file.read_bytes()

@@ -17,9 +17,9 @@ import logging
 import os
 from pathlib import Path
 
-from . import host
-from .storage import StorageFailure, atomic_write, private_directory
-from .template_local_history import values
+from .. import host
+from ..storage import StorageFailure, atomic_write, private_directory
+from ..template_local_history import values
 
 ACTIONS = 200
 BYTES = 16 * 1024 * 1024
@@ -92,8 +92,8 @@ def _ordered(target, kind, current):
 
 
 def rebuild(workspace, target):
-    from .rich_dependencies import placements
-    from .template_anchors import coverage_addresses
+    from ..rich_dependencies import placements
+    from ..template_anchors import coverage_addresses
     project = workspace.project
     data = workspace.model_dump(mode='json', by_alias=True)
     if project.template_operations:

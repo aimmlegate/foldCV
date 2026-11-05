@@ -2,8 +2,8 @@
 
 import pytest
 
-from packages.resume_core.agent_settings import AgentSettingsStore
-from packages.resume_core.preferences import PreferencesFailure, PreferencesStore
+from packages.resume_core.repository.agent_settings import AgentSettingsStore
+from packages.resume_core.repository.preferences import PreferencesFailure, PreferencesStore
 from packages.resume_core.storage import StorageFailure, atomic_write
 from resume_api.projects.errors import ProjectFailure
 from tests.settings.support import application, client_session
@@ -49,7 +49,7 @@ async def test_import_setting_validates_catalog_and_failed_writes_without_changi
         def denied(*_args):
             raise StorageFailure("denied")
         with monkeypatch.context() as patch:
-            patch.setattr("packages.resume_core.preferences.atomic_write", denied)
+            patch.setattr("packages.resume_core.repository.preferences.atomic_write", denied)
             failed = await client.put(path, json={"model": "model-a"})
             assert failed.status_code == 409
         preferences = (await client.get("/v1/settings/preferences")).json()

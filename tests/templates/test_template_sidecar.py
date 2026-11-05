@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from packages.resume_core import project_repository as repository_module
-from packages.resume_core.project_repository import RepositoryFailure, rich_snapshot_bytes
+from packages.resume_core.repository import project_repository as repository_module
+from packages.resume_core.repository.project_repository import RepositoryFailure, rich_snapshot_bytes
 from packages.resume_core.template_import import spent_calls
 from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
 

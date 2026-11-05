@@ -9,7 +9,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.preferences import PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.storage import atomic_write

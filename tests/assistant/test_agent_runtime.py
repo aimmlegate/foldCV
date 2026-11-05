@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from resume_api.providers.codex.runtime import NativeSession, SERVER_REQUESTS, frame
 from resume_api.inference_admission import AdmissionBlocked, AdmissionCancelled, InferenceAdmission
 from tests.support.appserver import (JumpClock, complete_events, config_result, input_value, model_result, notification,

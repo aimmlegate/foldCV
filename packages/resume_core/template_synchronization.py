@@ -263,7 +263,7 @@ def live_sync_record(workspace, sync_id, before_hash, before_lifecycle_id):
 
 
 def restore_sync_rows(current, restored, delta):
-    from .project_repository import RepositoryFailure
+    from .repository.project_repository import RepositoryFailure
     from pydantic import TypeAdapter
     from .models.rich_workspace import RichSyncRecord
     adapter = TypeAdapter(TemplateSyncRecord | RichSyncRecord)

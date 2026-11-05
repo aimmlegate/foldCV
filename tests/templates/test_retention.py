@@ -7,11 +7,11 @@ from PIL import Image
 
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.archive_zip import ArchiveFailure, digest, read_zip, write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import ArchiveFailure, digest, read_zip, write_zip
 from packages.resume_core.rich_images import normalize_image
 from packages.resume_core.models.template_document import TemplateImageBlock
-from packages.resume_core.project_repository import ProjectRepository
+from packages.resume_core.repository.project_repository import ProjectRepository
 from tests.templates.editor_fixtures import source_blobs
 from tests.templates.storage_fixtures import workspace
 

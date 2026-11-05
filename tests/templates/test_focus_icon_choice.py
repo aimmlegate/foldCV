@@ -9,8 +9,8 @@ import os
 from pydantic import ValidationError
 import pytest
 
-from packages.resume_core import focus_icons
-from packages.resume_core.focus_icons import FocusIconStore
+from packages.resume_core.repository import focus_icons
+from packages.resume_core.repository.focus_icons import FocusIconStore
 from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_assembly import assemble_template

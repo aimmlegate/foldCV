@@ -5,7 +5,7 @@ import stat
 
 import pytest
 
-from packages.resume_core.preferences import PreferencesFailure, PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesFailure, PreferencesStore
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.storage import StorageFailure, atomic_write
 from resume_api.app import create_app
@@ -128,7 +128,7 @@ def test_failed_preference_write_preserves_acknowledged_model(tmp_path, monkeypa
 
     def denied(*_args):
         raise StorageFailure('denied')
-    monkeypatch.setattr('packages.resume_core.preferences.atomic_write', denied)
+    monkeypatch.setattr('packages.resume_core.repository.preferences.atomic_write', denied)
     with pytest.raises(PreferencesFailure, match='PREFERENCES_SAVE_FAILED'):
         store.select_model('model-b')
     assert store.path.read_bytes() == before
@@ -170,7 +170,7 @@ async def test_denied_model_and_failed_save_keep_runtime_choice(tmp_path, monkey
 
         def denied(*_args):
             raise StorageFailure('denied')
-        monkeypatch.setattr('packages.resume_core.preferences.atomic_write', denied)
+        monkeypatch.setattr('packages.resume_core.repository.preferences.atomic_write', denied)
         assert (await client.post('/v1/host/select', json={'model': 'model-b'})).status_code == 409
         assert (await client.get('/v1/settings/connection')).json()['selectedModel'] == 'model-a'
 

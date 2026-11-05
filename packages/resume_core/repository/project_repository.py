@@ -26,14 +26,14 @@ import re
 import secrets
 import threading
 
-from . import host
-from .models.rich_workspace import RichMutationReplay
-from .models.template_workspace import WorkspaceV7
+from .. import host
+from ..models.rich_workspace import RichMutationReplay
+from ..models.template_workspace import WorkspaceV7
 from .project_journal import JournalStale, ProjectJournal, apply as apply_payloads, snapshot
-from .project_limits import ARCHIVE_ENTRY_BYTES, project_file_bytes
+from ..project_limits import ARCHIVE_ENTRY_BYTES, project_file_bytes
 from .project_store import SAFE_ID, ProjectStore, ProjectStoreFailure, owned_file, strict_json
-from .rich_limits import DOCX_BYTES, WORKSPACE_BYTES
-from .storage import StorageFailure, atomic_write, locked_root, private_directory
+from ..rich_limits import DOCX_BYTES, WORKSPACE_BYTES
+from ..storage import StorageFailure, atomic_write, locked_root, private_directory
 
 REPLAY_WINDOW = 200
 CLIPBOARD_CAPTURES = 20
@@ -76,7 +76,7 @@ def budget_bytes(workspace, raw):
     files (D105), so they do not count before it either: a run must not fail at its last step on them."""
     if workspace.project is not None or workspace.pre_draft is None:
         return len(raw)
-    from .models.template_workspace import history_bytes
+    from ..models.template_workspace import history_bytes
     return len(raw) - sum(len(history_bytes(value)) for value in workspace.pre_draft.template_operations)
 
 
@@ -103,7 +103,7 @@ def inline_history(data) -> bool:
 
 def history_blobs(workspace):
     """Content-addressed files for a project's loaded import records and every captured asset (D104)."""
-    from .models.template_workspace import history_bytes
+    from ..models.template_workspace import history_bytes
     blobs = []
     owner = workspace.project or workspace.pre_draft if workspace.schema_version == 7 else None
     if owner is None:
@@ -128,7 +128,7 @@ def blob_path(directory, kind, identifier):
 
 
 def read_history_file(directory, digest):
-    from .models.template_workspace import remember_history
+    from ..models.template_workspace import remember_history
     if not isinstance(digest, str) or re.fullmatch(r'[0-9a-f]{64}', digest) is None:
         raise ProjectStoreFailure('PROJECT_LOAD_FAILED')
     path = blob_path(directory, 'history', digest)
@@ -145,7 +145,7 @@ def read_history_file(directory, digest):
 def load_stored_data(directory, raw, *, history=False):
     """The JSON of a project file with its asset bytes remembered from the project's asset files and, when asked for,
     its import records read from its history files (D104)."""
-    from .templates.models import asset_text, remember_asset
+    from ..templates.models import asset_text, remember_asset
     data = strict_json(raw)
     for owner in stored_owners(data):
         for asset in stored_assets(owner):
@@ -503,7 +503,7 @@ class ProjectRepository:
 
     @staticmethod
     def _seeded(workspace):
-        from .template_preparation_ids import existing_ids
+        from ..template_preparation_ids import existing_ids
         replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
             row.resulting_revision, 'edit', details={'created_ids': row.created_ids, 'created_blocks': row.created_blocks,
             'changed_block_ids': row.changed_block_ids}, replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
@@ -671,7 +671,7 @@ class ProjectRepository:
 
     def _commit(self, session, after, *, client_mutation_id, request_sha256, action_id, kind, details, blobs=(),
             reason=None):
-        from .models.template_workspace import validated_with_history
+        from ..models.template_workspace import validated_with_history
         before = session.workspace
         if after.project_id != session.project_id or after.schema_version != 7:
             raise RepositoryFailure('JOB_SCOPE_INVALID')
@@ -717,7 +717,7 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
         except OSError:
             raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
-        from .template_preparation_ids import existing_ids
+        from ..template_preparation_ids import existing_ids
         session.workspace, session.file_key = after, key
         session.occupied_ids |= existing_ids(after) if kind != 'edit' else _created(details)
         session.registry_dirty = True
@@ -765,7 +765,7 @@ class ProjectRepository:
 
     def _write_blobs(self, directory, blobs):
         """Content-addressed files: written when missing, verified by hash when present."""
-        from .models.template_workspace import remember_history
+        from ..models.template_workspace import remember_history
         for kind, identifier, blob, checksum in blobs:
             path = blob_path(directory, kind, identifier)
             if kind == 'history':
@@ -1018,7 +1018,7 @@ def _stored(directory, raw, after, loaded):
 
 
 def _digest(workspace):
-    from .templates.compiler import canonical
+    from ..templates.compiler import canonical
     return hashlib.sha256(canonical(workspace)).hexdigest()
 
 

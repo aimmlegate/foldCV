@@ -6,8 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from packages.resume_core.models.template_mutations import TemplateMutationV1, TemplateOwnershipConflict, TemplateSyncWrite
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_dependencies import dependencies_current, dependency
 from packages.resume_core.rich_mutations import apply_rich_mutation, RichMutationFailure
 from packages.resume_core.template_authoring import copy_blocks, move_occurrence_steps
@@ -262,7 +262,7 @@ def test_delete_and_recreate_in_one_action_undo_redo_restore_both_row_orders(tmp
 
 
 def test_archive_import_also_clears_crafted_foreign_capture_and_pending_authority():
-    from packages.resume_core.archive_zip import read_zip,write_zip,parse_json,json_bytes,digest
+    from packages.resume_core.repository.archive_zip import read_zip, write_zip, parse_json, json_bytes, digest
     before,sources=workspace();current,_=apply_rich_mutation(before,add(before))
     source=current.sync_records[0];source.status='pending';source.ready=True
     files=read_zip(write_zip(archive_payload_v7(current,sources,{})))

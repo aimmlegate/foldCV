@@ -1,6 +1,6 @@
 """Original bytes keep their hash, private-file checks and safe download name."""
 
-from packages.resume_core.project_repository import blob_path
+from packages.resume_core.repository.project_repository import blob_path
 from tests.projects.support import v2_app
 from tests.templates.storage_fixtures import workspace as papers
 

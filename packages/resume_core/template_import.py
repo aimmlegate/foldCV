@@ -512,7 +512,7 @@ def cancel_operation(operation, *, commit_claimed=False):
 
 # A sidecar may only move an operation forward: spending, captured inputs and review evidence are append-only.
 def _refuse():
-    from .project_store import ProjectStoreFailure
+    from .repository.project_store import ProjectStoreFailure
     raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
 
 
@@ -631,7 +631,7 @@ def finalization_hashes(operation, project):
 
 
 def capture_finalization(operation, project, now, *, id_factory=identity):
-    from .project_repository import RepositoryFailure
+    from .repository.project_repository import RepositoryFailure
     current = authorization(operation)
     if any(task.state not in {'accepted', 'empty', 'source_fallback'} for task in operation.tasks):
         raise RepositoryFailure('JOB_SCOPE_INVALID')

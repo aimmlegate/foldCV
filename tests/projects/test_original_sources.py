@@ -3,7 +3,7 @@ hash and symlink checks of test_sources.py do not reach."""
 
 import pytest
 
-from packages.resume_core.project_repository import blob_path
+from packages.resume_core.repository.project_repository import blob_path
 from tests.projects.support import ORIGIN, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 

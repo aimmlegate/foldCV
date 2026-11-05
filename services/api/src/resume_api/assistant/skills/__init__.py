@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 
 HERE = Path(__file__).resolve().parent
 

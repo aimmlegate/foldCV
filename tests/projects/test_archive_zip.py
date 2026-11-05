@@ -6,8 +6,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 
-from packages.resume_core import archive_zip as codec
-from packages.resume_core.template_archive import archive_payload_v7
+from packages.resume_core.repository import archive_zip as codec
+from packages.resume_core.repository.template_archive import archive_payload_v7
 from tests.templates.storage_fixtures import workspace as papers
 
 

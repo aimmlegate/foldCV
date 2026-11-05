@@ -10,8 +10,8 @@ import pytest
 from packages.resume_core.models.template_document import BoundLink, FieldOccurrence
 from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.template_export import capture_export, snapshot_identity
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes

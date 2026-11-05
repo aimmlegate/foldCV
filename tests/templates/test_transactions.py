@@ -155,7 +155,7 @@ def test_explicit_model_context_keeps_authoritative_raw_and_pending_scope_values
 
 def test_extension_only_inverse_obeys_the_existing_history_capacity(monkeypatch):
     from packages.resume_core import template_inverse as module
-    from packages.resume_core.project_repository import RepositoryFailure
+    from packages.resume_core.repository.project_repository import RepositoryFailure
     before, _ = workspace()
     edited = human_edit(before.project.facts, 'paper-a', 'year', 'forthcoming')
     changed, _ = apply_rich_mutation(before, request(before, [extension_step(before, edited.extensions[0])]))

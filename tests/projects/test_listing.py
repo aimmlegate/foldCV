@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository, blob_path
+from packages.resume_core.repository.project_repository import ProjectRepository, blob_path
 from packages.resume_core.templates import models
 from resume_api.projects.service import ProjectService
 from tests.projects.support import v2_app

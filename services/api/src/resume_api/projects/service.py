@@ -7,10 +7,10 @@ import logging
 import threading
 
 from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResultV1, TaskStatusV1
-from packages.resume_core.project_catalog import ProjectCatalog
-from packages.resume_core.project_repository import RepositoryFailure
-from packages.resume_core.project_store import ProjectStoreFailure
-from packages.resume_core.project_tasks import TaskRegistry
+from packages.resume_core.repository.project_catalog import ProjectCatalog
+from packages.resume_core.repository.project_repository import RepositoryFailure
+from packages.resume_core.repository.project_store import ProjectStoreFailure
+from packages.resume_core.repository.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.template_api import TemplateProjectResponseV1, verify_response, verifying

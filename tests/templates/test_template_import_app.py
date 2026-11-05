@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from packages.resume_core.project_repository import decode_project
+from packages.resume_core.repository.project_repository import decode_project
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.templates.store import TemplateStore
 from resume_api.providers.base import Metadata, Quota

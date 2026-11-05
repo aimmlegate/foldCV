@@ -3,7 +3,7 @@
 import pytest
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_store import FILE_BYTES, AgentFailure, AssistantStore
+from packages.resume_core.repository.assistant_store import FILE_BYTES, AgentFailure, AssistantStore
 from packages.resume_core.models.agent import AgentMessage, AgentWebSource
 from packages.resume_core.models.assistant import AssistantRunV1
 
@@ -30,7 +30,7 @@ def test_a_failed_atomic_write_keeps_the_previous_file_and_reports_the_failure(t
 
     def denied(*_):
         raise OSError("synthetic write failure")
-    monkeypatch.setattr("packages.resume_core.assistant_store.atomic_write", denied)
+    monkeypatch.setattr("packages.resume_core.repository.assistant_store.atomic_write", denied)
     with pytest.raises(AgentFailure, match="AGENT_SAVE_FAILED"):
         store.update_conversation(PROJECT, conversation.id, lambda value: value.messages.append(message(0)))
     assert path.read_bytes() == original and store.conversation(PROJECT, conversation.id).messages == []

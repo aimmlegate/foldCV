@@ -13,11 +13,11 @@ from mcp.types import CallToolResult, TextContent
 from pydantic import ValidationError
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_compiler import CompileFailure, find_record, target_text
-from packages.resume_core.assistant_store import AgentFailure, identity
+from packages.resume_core.repository.assistant_compiler import CompileFailure, find_record, target_text
+from packages.resume_core.repository.assistant_store import AgentFailure, identity
 from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, AgentFinding
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
-from packages.resume_core.project_repository import RepositoryFailure
+from packages.resume_core.repository.project_repository import RepositoryFailure
 from packages.resume_core.rich_dependencies import dependency
 from packages.resume_core.rich_fields import inline_groups
 from packages.resume_core.rich_mutations import inline_text, utf16_slice

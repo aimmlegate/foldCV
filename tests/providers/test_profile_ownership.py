@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.storage import private_directory
 from resume_api.inference_admission import AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.profile_ownership import BLOCKED, native_profile, recover_profile

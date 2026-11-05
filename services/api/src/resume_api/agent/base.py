@@ -12,7 +12,7 @@ import time
 from typing import Callable, Protocol
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentUsage
 
 from ..inference_admission import AdmissionCancelled, AdmissionTimeout, INFERENCE

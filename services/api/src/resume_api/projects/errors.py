@@ -21,8 +21,8 @@ def failure_response(code, status, details=None, stage='project'):
 
 
 def mount_errors(app):
-    from packages.resume_core.project_repository import RepositoryFailure
-    from packages.resume_core.project_tasks import TaskFailure
+    from packages.resume_core.repository.project_repository import RepositoryFailure
+    from packages.resume_core.repository.project_tasks import TaskFailure
 
     @app.exception_handler(ProjectFailure)
     async def project_failure(_request: Request, error: ProjectFailure):

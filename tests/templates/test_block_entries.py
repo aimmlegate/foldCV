@@ -11,7 +11,7 @@ import pytest
 from types import SimpleNamespace
 
 from packages.resume_core.models.contracts import Source
-from packages.resume_core.project_store import ProjectStoreFailure
+from packages.resume_core.repository.project_store import ProjectStoreFailure
 from packages.resume_core.template_entries import line_options, ordered_entries, outline_scopes, reorder_records, splits_entries
 from packages.resume_core.template_identity import capture_span, evidence_options, line_spans
 from packages.resume_core.template_import import (TemplateImportFailure, add_entry_tasks, add_outline_review, admit_operation,

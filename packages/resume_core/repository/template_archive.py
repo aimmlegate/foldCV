@@ -5,14 +5,14 @@ import base64
 from pydantic import ValidationError
 
 from .archive_zip import ArchiveFailure, alias, digest, json_bytes, parse_json, read_zip
-from .models.template_workspace import ArchiveManifestV7, WorkspaceV7
-from .models.rich_document import ImageBlock
-from .rich_images import ImageFailure, verify_image_bytes
-from .templates.compiler import canonical
-from .models.template_import import ImportOperation
-from .models.template_workspace import history_bytes, history_text
-from .templates.models import TemplatePackage, remember_asset
-from .templates.store import verify_package
+from ..models.template_workspace import ArchiveManifestV7, WorkspaceV7
+from ..models.rich_document import ImageBlock
+from ..rich_images import ImageFailure, verify_image_bytes
+from ..templates.compiler import canonical
+from ..models.template_import import ImportOperation
+from ..models.template_workspace import history_bytes, history_text
+from ..templates.models import TemplatePackage, remember_asset
+from ..templates.store import verify_package
 
 
 def referenced_assets(project):

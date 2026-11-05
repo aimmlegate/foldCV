@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.assistant_compiler import CompileFailure, compile_ops, preview, target_text
+from packages.resume_core.repository.assistant_compiler import CompileFailure, compile_ops, preview, target_text
 from packages.resume_core.models.assistant import ProposeChangesV1
 from packages.resume_core.template_panel_records import technology_targets
 from resume_api.projects.service import response_for_workspace

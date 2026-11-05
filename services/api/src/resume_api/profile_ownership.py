@@ -8,7 +8,7 @@ import threading
 import time
 
 from packages.resume_core import host
-from packages.resume_core.project_store import owned_file, strict_json
+from packages.resume_core.repository.project_store import owned_file, strict_json
 from packages.resume_core.storage import StorageFailure, private_file, atomic_write
 from .inference_admission import AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
 from .lifecycle import has_blocked_owned, SpikeError

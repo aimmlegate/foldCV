@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from packages.resume_core.models.settings import (RulesSettings, RulesSettingsError, SaveAnalysisPreference,
     SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
-from packages.resume_core.preferences import PreferencesFailure, PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesFailure, PreferencesStore
 from packages.resume_core.project_limits import apply_preferences as apply_limits
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
 

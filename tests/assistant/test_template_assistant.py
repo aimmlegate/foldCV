@@ -6,7 +6,7 @@ import hashlib
 import json
 import threading
 
-from packages.resume_core.assistant_store import RUNS_KEPT
+from packages.resume_core.repository.assistant_store import RUNS_KEPT
 from packages.resume_core.models.assistant import TemplateProposalV1
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from resume_api.assistant.skills import SKILLS, TEMPLATE_SKILLS, skill_catalog

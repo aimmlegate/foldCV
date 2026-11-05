@@ -8,7 +8,7 @@ import asyncio
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentSettingsRequest
 from packages.resume_core.models.assistant import AssistantApplyRequestV1, AssistantRunRequestV2, AssistantSkillListV1, AssistantSkillV1
 from packages.resume_core.models.assistant import AssistantChangeProposalListV1

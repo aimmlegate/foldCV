@@ -9,7 +9,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.preferences import PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.reasoning import ModelReasoning
 from tests.settings.test_rewrite_reasoning import Adapter
 from packages.resume_core.templates.presentation import snapshot_identity

@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from resume_api.assistant import skills
 from resume_api.assistant.skills import SKILLS, read_skill
 

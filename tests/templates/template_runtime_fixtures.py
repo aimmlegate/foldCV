@@ -6,7 +6,7 @@ import json
 from itertools import count
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.project_repository import ProjectRepository, decode_project
+from packages.resume_core.repository.project_repository import ProjectRepository, decode_project
 from packages.resume_core.template_identity import source_slice
 from packages.resume_core.template_import import CleanupProof, TemplateImportFailure, digest
 from tests.templates.pipeline_fixtures import NOW, owner, setup_operation, source_draft

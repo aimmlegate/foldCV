@@ -10,7 +10,7 @@ import secrets
 import threading
 import time
 
-from packages.resume_core.preferences import PreferencesFailure
+from packages.resume_core.repository.preferences import PreferencesFailure
 from packages.resume_core.rules import RulesFailure
 
 from ..providers.codex.profile import ExperimentalProfileError

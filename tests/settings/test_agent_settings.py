@@ -5,10 +5,10 @@ import stat
 
 import pytest
 
-from packages.resume_core.agent_settings import AgentSettingsStore
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.agent_settings import AgentSettingsStore
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.agent import AgentSettingsRequest
-from packages.resume_core.preferences import PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.storage import atomic_write
 
 

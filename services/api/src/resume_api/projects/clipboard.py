@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from packages.resume_core.models.projects import digest_request
 from packages.resume_core.models.template_authoring import TemplateClipboardCaptureV1
-from packages.resume_core.project_repository import RepositoryFailure
+from packages.resume_core.repository.project_repository import RepositoryFailure
 from packages.resume_core.rich_mutations import RichMutationFailure
 from packages.resume_core.template_clipboard import capture_clipboard, selected_witnesses
 from packages.resume_core.template_clipboard_witnesses import verify_witnesses

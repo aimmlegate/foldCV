@@ -8,7 +8,7 @@ import zlib
 from io import BytesIO
 from zipfile import ZipFile, ZIP_STORED
 
-from .project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
+from ..project_limits import ARCHIVE_BYTES, ARCHIVE_EXPANDED_BYTES, PROJECT_CEILING_BYTES
 
 # Ceilings sized for the largest project file; Settings bound new saves.
 MAX_ARCHIVE = ARCHIVE_BYTES

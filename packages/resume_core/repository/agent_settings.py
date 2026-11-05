@@ -5,10 +5,10 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .assistant_store import AgentFailure
-from .models.agent import AgentSettings, AgentSettingsRequest, wire_bytes
-from .reasoning import ModelReasoning
+from ..models.agent import AgentSettings, AgentSettingsRequest, wire_bytes
+from ..reasoning import ModelReasoning
 from .project_store import owned_file, strict_json
-from .storage import StorageFailure, atomic_write, locked_root
+from ..storage import StorageFailure, atomic_write, locked_root
 
 
 class AgentSettingsStore:

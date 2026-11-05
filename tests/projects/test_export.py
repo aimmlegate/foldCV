@@ -9,7 +9,7 @@ import threading
 import pytest
 
 from packages.resume_core.models.template_render import TemplateRendererIdentity, TemplateSnapshotIdentity
-from packages.resume_core.project_repository import EXPORT_ATTEMPTS, ProjectRepository, blob_path
+from packages.resume_core.repository.project_repository import EXPORT_ATTEMPTS, ProjectRepository, blob_path
 from packages.resume_core.template_import import digest
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers

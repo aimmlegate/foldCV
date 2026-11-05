@@ -10,8 +10,8 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import builtin_cell_values, field_key
 from packages.resume_core.rich_mutations import RichMutationFailure
 from packages.resume_core.template_assembly import assemble_template

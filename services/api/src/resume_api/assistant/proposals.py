@@ -9,15 +9,15 @@ the current workspace and commits them with the proposal id as the action id, so
 from __future__ import annotations
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_compiler import (CompileFailure, changed_targets, compile_ops, preview, target_text,
-    touched)
-from packages.resume_core.assistant_store import AgentFailure, digest, identity, timestamp
+from packages.resume_core.repository.assistant_compiler import (CompileFailure, changed_targets, compile_ops, preview,
+                                                                target_text, touched)
+from packages.resume_core.repository.assistant_store import AgentFailure, digest, identity, timestamp
 from packages.resume_core.models.assistant import (AssistantActionResultV1, AssistantApplyResultV1,
     AssistantChangeProposalV1)
 from packages.resume_core.models.contracts import PartialDate
 from packages.resume_core.models.projects import DeleteRequestV1, RenameRequestV1
-from packages.resume_core.project_journal import JournalStale, apply as apply_payloads, snapshot
-from packages.resume_core.project_repository import RepositoryFailure
+from packages.resume_core.repository.project_journal import JournalStale, apply as apply_payloads, snapshot
+from packages.resume_core.repository.project_repository import RepositoryFailure
 
 from resume_api.projects import editing
 from resume_api.projects.errors import ProjectFailure

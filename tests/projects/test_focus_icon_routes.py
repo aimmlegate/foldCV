@@ -52,6 +52,6 @@ async def test_a_failed_icon_memory_write_keeps_the_saved_pick(tmp_path, monkeyp
         sql = technology(editor.workspace(), 'SQL')
         def full(*_args, **_kwargs):
             raise OSError(errno.ENOSPC, 'no space')
-        monkeypatch.setattr('packages.resume_core.focus_icons.atomic_write', full)
+        monkeypatch.setattr('packages.resume_core.repository.focus_icons.atomic_write', full)
         editor.edit(command(editor, 'set_focus_icon', sql.id, 'pick', {'icon': 'mysql'}))
         assert chosen(editor.workspace(), sql.id) == 'mysql'

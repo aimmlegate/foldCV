@@ -21,7 +21,7 @@ class ScriptedRewrite:
         self.calls, self.held = [], {}
 
     async def text(self, _project, request_id, instruction, source, _admitted):
-        from packages.resume_core.project_repository import RepositoryFailure
+        from packages.resume_core.repository.project_repository import RepositoryFailure
         self.calls.append({'requestId': request_id, 'instruction': instruction, 'source': source})
         if instruction == 'hold':
             event = self.held[request_id] = asyncio.Event()
@@ -67,7 +67,7 @@ def scenario_workspace(scenario):
 
 def application(root, scenario):
     from fastapi import FastAPI
-    from packages.resume_core.project_repository import ProjectRepository
+    from packages.resume_core.repository.project_repository import ProjectRepository
     from resume_api.projects.routes import mount_projects_v2
     from resume_api.projects.service import ProjectService
     value, sources = scenario_workspace(scenario)

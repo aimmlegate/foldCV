@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.project_repository import decode_project
+from packages.resume_core.repository.project_repository import decode_project
 from resume_api.inference_admission import InferenceAdmission
 from tests.projects.support import Editor, v2_app
 from tests.projects.test_edit_routes import typing

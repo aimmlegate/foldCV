@@ -3,7 +3,7 @@
 import threading
 
 from packages.resume_core.models.assistant import AssistantApplyRequestV1
-from packages.resume_core.project_journal import JournalStale
+from packages.resume_core.repository.project_journal import JournalStale
 from resume_api.assistant import proposals as proposal_service
 from resume_api.projects.errors import ProjectFailure
 from tests.assistant.support import (PROJECT, Editor, apply, assistant_app, base, manual_edit, proposals, proposing,

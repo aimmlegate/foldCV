@@ -3,8 +3,8 @@
 from .models.rich_mutations import RichMutation
 from .models.template_mutations import TemplateMutationV1
 from .project_limits import INVERSE_BYTES
-from .project_repository import RepositoryFailure
-from .project_store import encoded
+from .repository.project_repository import RepositoryFailure
+from .repository.project_store import encoded
 from .rich_dependencies import placements
 from .rich_mutations import locate, parent_items, subtree
 from .template_mutations import content, extension_content

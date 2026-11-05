@@ -11,8 +11,8 @@ from packages.resume_core.models.rich_facts import WorkingPeriod
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.rich_fields import field_key, working_field
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation

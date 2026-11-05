@@ -1,6 +1,6 @@
 """Read only private, owned project files; map retained import blobs to their existing names."""
 
-from packages.resume_core.project_store import owned_file
+from packages.resume_core.repository.project_store import owned_file
 from packages.resume_core.storage import StorageFailure
 
 from .errors import ProjectFailure

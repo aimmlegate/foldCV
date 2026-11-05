@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
 from packages.resume_core.template_import import admit_operation
 from packages.resume_core.templates.operations import derive_task
 from resume_api.projects.fold import register_import_fold, sidecar_store
@@ -145,7 +145,7 @@ async def test_resume_after_publication_keeps_later_manual_text(tmp_path, monkey
 
 @pytest.mark.asyncio
 async def test_a_revision_change_during_assembly_refuses_publication(tmp_path):
-    from packages.resume_core.project_repository import RepositoryFailure
+    from packages.resume_core.repository.project_repository import RepositoryFailure
     source, raw = employment_source('F01')
     fixture = EmploymentFixture(tmp_path / 'fixture', captured=employment_package(), src=source, original_bytes=raw,
         scripted=scripted_employment(source), cap=4, fallback=False)

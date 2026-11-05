@@ -5,7 +5,7 @@ import hashlib
 import pytest
 
 from packages.resume_core.project_limits import ARCHIVE_ENTRY_BYTES
-from packages.resume_core.project_repository import RepositoryFailure, blob_path
+from packages.resume_core.repository.project_repository import RepositoryFailure, blob_path
 from tests.repository.support import PROJECT, edit, repository, text_of
 
 
@@ -63,7 +63,7 @@ def test_a_workspace_computed_from_an_older_revision_is_refused(tmp_path):
 
 
 def test_revisions_move_forward_and_memory_matches_the_file(tmp_path):
-    from packages.resume_core.project_repository import ProjectRepository
+    from packages.resume_core.repository.project_repository import ProjectRepository
     repo = repository(tmp_path)
     computed = repo.read(PROJECT).model_copy(deep=True)
     computed.title = 'Metadata only'
@@ -102,7 +102,7 @@ def test_a_lowered_size_setting_blocks_growth_and_allows_a_smaller_project(tmp_p
     repo = repository(tmp_path)
     edit(repo, 'x' * 4000, identifier='long')
     size = (tmp_path / 'data/projects' / PROJECT / 'workspace.json').stat().st_size
-    monkeypatch.setattr('packages.resume_core.project_repository.project_file_bytes', lambda: size - 2000)
+    monkeypatch.setattr('packages.resume_core.repository.project_repository.project_file_bytes', lambda: size - 2000)
     with pytest.raises(RepositoryFailure) as refused:
         edit(repo, 'x' * 5000, identifier='longer')
     assert refused.value.code == 'PROJECT_TOO_LARGE'

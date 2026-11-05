@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-from packages.resume_core.project_repository import decode_project
+from packages.resume_core.repository.project_repository import decode_project
 from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.projects.support import ORIGIN, v2_app
 from tools.save_bench.composition import analyze

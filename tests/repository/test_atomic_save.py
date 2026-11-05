@@ -6,8 +6,9 @@ import os
 
 import pytest
 
-from packages.resume_core import project_journal, storage
-from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository import project_journal
+from packages.resume_core import storage
+from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
 from tests.repository.support import PROJECT, create_other, edit, history, repository, text_of
 
 
@@ -153,7 +154,7 @@ def test_a_journal_gap_is_written_down_before_the_next_line(tmp_path, monkeypatc
 
 
 def test_a_decode_failure_commits_nothing_and_keeps_the_history(tmp_path, monkeypatch):
-    from packages.resume_core import project_repository
+    from packages.resume_core.repository import project_repository
     monkeypatch.setenv('FOLDCV_VERIFY', '1')
     repo = repository(tmp_path)
     original = text_of(repo.read(PROJECT))

@@ -6,7 +6,7 @@ import pytest
 
 from resume_api.providers.content import ContentFailure, ReportedUsage
 
-from packages.resume_core.preferences import PreferencesFailure, PreferencesStore
+from packages.resume_core.repository.preferences import PreferencesFailure, PreferencesStore
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider, scripted_template_answer, scripted_template_result
 from tests.templates.test_template_import_app import app_client, operation_of, run_import as run_task, upload
 

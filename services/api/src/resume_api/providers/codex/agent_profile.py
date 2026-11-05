@@ -3,7 +3,7 @@
 import json
 from urllib.parse import urlsplit
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from resume_api.providers.codex.host_profile import AgentProofProfile
 from resume_api.agent.base import TOKEN_ENV
 

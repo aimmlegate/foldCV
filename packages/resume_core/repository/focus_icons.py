@@ -4,9 +4,9 @@ by an import or from the facts panel, take the remembered icon when their templa
 import json
 import re
 
-from .storage import StorageFailure, atomic_write, locked_root, private_file
-from .technologies import normalize_name
-from .templates.focus import remembered_catalog
+from ..storage import StorageFailure, atomic_write, locked_root, private_file
+from ..technologies import normalize_name
+from ..templates.focus import remembered_catalog
 
 MAX_BYTES = 256 * 1024
 MAX_NAMES = 2000

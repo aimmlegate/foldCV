@@ -32,14 +32,14 @@ from .agent.base import AgentRuntime
 from .extracting import MAX_BODY as MAX_EXTRACT_BODY
 from packages.resume_core.rules import RulesStore
 from .projects.errors import ProjectFailure
-from packages.resume_core.preferences import PreferencesStore, PreferencesFailure
+from packages.resume_core.repository.preferences import PreferencesStore, PreferencesFailure
 from packages.resume_core.project_limits import ARCHIVE_BYTES, apply_preferences as apply_limits
 from packages.resume_core.templates.loading import CONFIG_BYTES
 from .profile_ownership import recover_profile
 from .host.connections import HostConnections
 from .host.routes import mount_host_routes
 from .settings_routes import SettingsContext, mount_settings_routes
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from .providers.codex.runtime import CodexAgentRuntime
 
 
@@ -335,7 +335,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     except PreferencesFailure:
         apply_limits(None)
 
-    from packages.resume_core.project_repository import ProjectRepository
+    from packages.resume_core.repository.project_repository import ProjectRepository
     from .projects.exports import ExportService, production_render
     from .projects.fold import register_import_fold
     from .projects.imports import ImportService
@@ -347,7 +347,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     # Every project write goes through the repository (D109).
     project_repository = ProjectRepository(rules_store.root)
     register_import_fold(project_repository)
-    from packages.resume_core.focus_icons import FocusIconStore
+    from packages.resume_core.repository.focus_icons import FocusIconStore
     projects = ProjectService(project_repository, icons=FocusIconStore(rules_store.root))
     app.state.projects = projects
     intake = TemplateIntake(project_repository, temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,

@@ -4,7 +4,7 @@ import asyncio
 from collections import OrderedDict
 import threading
 
-from packages.resume_core.preferences import PreferencesFailure
+from packages.resume_core.repository.preferences import PreferencesFailure
 from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
 from .inference_admission import AdmissionCancelled
 from .lifecycle import OperationFiles, SpikeError

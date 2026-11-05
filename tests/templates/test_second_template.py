@@ -105,8 +105,8 @@ def test_the_editor_plan_and_recipe_carry_the_templates_columns_and_type():
 
 def test_a_transfer_keeps_the_template_its_equal_titles_and_its_owners():
     # N04: copy the project out and back in; package, document and facts survive unchanged.
-    from packages.resume_core.archive_zip import write_zip
-    from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+    from packages.resume_core.repository.archive_zip import write_zip
+    from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
     workspace, originals = publications_workspace('F11')
     copied, *_ = open_archive_v7(write_zip(archive_payload_v7(workspace, originals, {})), 'publications-transfer')
     assert copied.project.template_package.package_hash == workspace.project.template_package.package_hash

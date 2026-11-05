@@ -20,7 +20,7 @@ import certifi
 
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.host import WINDOWS, Confined
-from packages.resume_core.assistant_store import AgentFailure, identity, timestamp
+from packages.resume_core.repository.assistant_store import AgentFailure, identity, timestamp
 from packages.resume_core.models.agent import AgentWebSource, wire_bytes
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.lifecycle import OperationFiles, SpikeError, python_worker, safe_environment

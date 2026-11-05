@@ -9,7 +9,7 @@ from io import BytesIO
 
 import pytest
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.template_render import TemplateRendererIdentity
 from resume_api.assistant import context
 from tests.assistant.support import PROJECT, Editor, assistant_app, base, conversation, finish, manual_edit, start

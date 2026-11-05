@@ -26,7 +26,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(ROOT / "services/api/src")]
 
-from packages.resume_core.project_repository import ProjectRepository  # noqa: E402
+from packages.resume_core.repository.project_repository import ProjectRepository
 from tests.templates.storage_fixtures import workspace  # noqa: E402
 
 SOURCES = ROOT / "tests/fixtures/synthetic/import"

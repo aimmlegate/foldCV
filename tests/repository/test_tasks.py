@@ -2,8 +2,8 @@
 
 import pytest
 
-from packages.resume_core import project_tasks
-from packages.resume_core.project_tasks import TaskFailure, TaskRegistry
+from packages.resume_core.repository import project_tasks
+from packages.resume_core.repository.project_tasks import TaskFailure, TaskRegistry
 
 
 class Clock:

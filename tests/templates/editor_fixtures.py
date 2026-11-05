@@ -5,7 +5,7 @@ import hashlib
 
 from packages.resume_core.models.projects import ClipboardCaptureRequestV1, EditRequestV1, HistoryRequestV1
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.project_repository import ProjectRepository, blob_path
+from packages.resume_core.repository.project_repository import ProjectRepository, blob_path
 from packages.resume_core.rich_mutations import apply_rich_mutation, mutation_sha256
 from packages.resume_core.templates.presentation import snapshot_identity
 from resume_api.projects import clipboard, editing

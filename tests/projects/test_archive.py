@@ -10,9 +10,9 @@ import zipfile
 from PIL import Image
 import pytest
 
-from packages.resume_core.archive_zip import ArchiveFailure
+from packages.resume_core.repository.archive_zip import ArchiveFailure
 from packages.resume_core.models.rich_workspace import LocalImageAsset
-from packages.resume_core.template_archive import _verify_image
+from packages.resume_core.repository.template_archive import _verify_image
 from tests.projects.support import Editor, v2_app
 from tests.templates.storage_fixtures import workspace as papers
 

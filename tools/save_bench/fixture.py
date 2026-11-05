@@ -92,7 +92,7 @@ def build(root, *, records=720, coverage=1774, cells=5, evidence_text=90, issues
 
 
 def sizes(workspace):
-    from packages.resume_core.project_repository import rich_snapshot_bytes
+    from packages.resume_core.repository.project_repository import rich_snapshot_bytes
     from packages.resume_core.templates.compiler import canonical
     project = workspace.project
     return {'workspace': len(rich_snapshot_bytes(workspace)), 'facts': len(canonical(project.facts)),

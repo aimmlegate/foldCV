@@ -12,15 +12,15 @@ import json
 
 from pydantic import ValidationError
 
-from .models.rich_document import InlineStyles
-from .models.template_authoring import TemplateEditPreparationV1
-from .models.template_document import BoundLink, ManualScopeSpan
-from .rich_dependencies import placements
-from .rich_fields import inline_groups, working_field
-from .rich_mutations import RichMutationFailure, inline_text, utf16_slice
-from .rich_panel import FIELDS
-from .template_panel_records import REMOVABLE, technology_targets
-from .template_preparation import _fields, _leaves, _length, prepare_edit
+from ..models.rich_document import InlineStyles
+from ..models.template_authoring import TemplateEditPreparationV1
+from ..models.template_document import BoundLink, ManualScopeSpan
+from ..rich_dependencies import placements
+from ..rich_fields import inline_groups, working_field
+from ..rich_mutations import RichMutationFailure, inline_text, utf16_slice
+from ..rich_panel import FIELDS
+from ..template_panel_records import REMOVABLE, technology_targets
+from ..template_preparation import _fields, _leaves, _length, prepare_edit
 
 KINDS = {'paragraph': {'type': 'paragraph'}, 'bullet': {'type': 'bullet_list'},
     'numbered': {'type': 'numbered_list', 'start': None}}

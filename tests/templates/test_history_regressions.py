@@ -7,8 +7,8 @@ from packages.resume_core.rich_mutations import apply_rich_mutation
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_facts import ambiguous_edit
 from packages.resume_core.template_authoring import duplicate_entity
-from packages.resume_core.archive_zip import write_zip
-from packages.resume_core.template_archive import archive_payload_v7, open_archive_v7
+from packages.resume_core.repository.archive_zip import write_zip
+from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 
 
 def undo(before, after, action, name):

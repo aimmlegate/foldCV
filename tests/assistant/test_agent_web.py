@@ -10,7 +10,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.agent import wire_bytes
 from resume_api.agent.web import BODY_BYTES, PinnedConnection, PublicFetcher, destination, fetch_page
 

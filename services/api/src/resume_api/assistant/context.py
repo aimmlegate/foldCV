@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_compiler import container_text
-from packages.resume_core.assistant_store import AgentFailure
+from packages.resume_core.repository.assistant_compiler import container_text
+from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.rich_document import FactFieldSpan
 from packages.resume_core.models.template_document import BoundLink
 from packages.resume_core.rich_dependencies import placements

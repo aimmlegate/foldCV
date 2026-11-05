@@ -16,7 +16,7 @@ from typing import Literal
 from mcp.types import CallToolResult
 
 from packages.resume_core import agent_limits as limits
-from packages.resume_core.assistant_store import AssistantStore, identity, timestamp
+from packages.resume_core.repository.assistant_store import AssistantStore, identity, timestamp
 from packages.resume_core.models.assistant import TEMPLATE_TEXT_BYTES, DraftEditV1, TemplateProposalV1
 from packages.resume_core.sample_summary import sample_summary, summary_bytes
 from packages.resume_core.templates.store import UnknownTemplate

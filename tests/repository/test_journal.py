@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from packages.resume_core import project_journal
-from packages.resume_core.project_repository import ProjectRepository, RepositoryFailure
+from packages.resume_core.repository import project_journal
+from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
 from tests.repository.support import PROJECT, edit, history, repository, text_of
 
 
@@ -133,7 +133,7 @@ def test_a_corrupt_tail_is_truncated_and_the_earlier_lines_load(tmp_path):
 
 def test_undo_restores_fact_order_issues_and_sync_rows_exactly(tmp_path):
     from tests.templates.golden.corpus import corpus as stored_corpus, loaded
-    from packages.resume_core.project_journal import apply, changes, snapshot
+    from packages.resume_core.repository.project_journal import apply, changes, snapshot
     from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
     from packages.resume_core.template_preparation import prepare_edit
     from tests.templates.test_template_preparation import response
@@ -150,7 +150,7 @@ def test_undo_restores_fact_order_issues_and_sync_rows_exactly(tmp_path):
 
 
 def test_a_payload_that_no_longer_validates_is_stale_history(tmp_path, monkeypatch):
-    from packages.resume_core import project_repository
+    from packages.resume_core.repository import project_repository
     from packages.resume_core.models.template_workspace import WorkspaceV7
     repo = repository(tmp_path)
     edit(repo, 'One', identifier='edit-1', action='one')
