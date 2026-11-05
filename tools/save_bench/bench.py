@@ -51,7 +51,7 @@ def main():
     out = [f'fixture {json.dumps(sizes)}', f'checkout {args.root}', f'python {sys.version.split()[0]}', f'api {args.api}']
     if args.api == 'repository':
         from packages.resume_core.repository.project_repository import ProjectRepository
-        from packages.resume_core.template_api import TemplateProjectResponseV1
+        from packages.resume_core.responses.template_api import TemplateProjectResponseV1
         from packages.resume_core.template_preparation import prepare_edit
         from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
         repo = ProjectRepository(store / 'data')

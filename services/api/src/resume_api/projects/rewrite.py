@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from packages.resume_core.models.projects import TemplateRewritePreviewV1
-from packages.resume_core.template_rewrite import rewrite_source
+from packages.resume_core.responses.template_rewrite import rewrite_source
 
 from .errors import ProjectFailure
 

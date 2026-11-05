@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from packages.resume_core.models.rich_workspace import RichRenderSnapshot
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateSnapshotIdentity
 from packages.resume_core.rich_limits import DOCX_BYTES
-from packages.resume_core.template_export import capture_export
+from packages.resume_core.responses.template_export import capture_export
 from packages.resume_core.template_import import TemplateImportFailure
 from packages.resume_core.templates.compiler import sha256
 

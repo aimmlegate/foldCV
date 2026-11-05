@@ -8,7 +8,7 @@ from lxml import etree
 
 from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
-from packages.resume_core.template_export import capture_export, snapshot_identity
+from packages.resume_core.responses.template_export import capture_export, snapshot_identity
 from packages.resume_core.templates.compiler import sha256
 from packages.resume_core.templates.focus import icon_catalog
 from tests.templates.generic_fixtures import direct_generic, generic_import, export_through_service as exported

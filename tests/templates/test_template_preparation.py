@@ -6,7 +6,7 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import FieldOccurrence, ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
-from packages.resume_core.template_api import TemplateProjectResponseV1
+from packages.resume_core.responses.template_api import TemplateProjectResponseV1
 from packages.resume_core.template_inverse import inverse_template_mutation, semantic
 from packages.resume_core.template_preparation import prepare_text_edit
 from packages.resume_core.templates.compiler import canonical

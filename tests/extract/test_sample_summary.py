@@ -6,7 +6,7 @@ import docx
 import pymupdf
 
 from packages.resume_core.extraction.parser import extract
-from packages.resume_core.sample_summary import sample_summary, summary_bytes
+from packages.resume_core.responses.sample_summary import sample_summary, summary_bytes
 
 PHONE, MAIL = "+7 915 123-45-67", "sample.person@example.com"
 

@@ -12,7 +12,7 @@ from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.template_export import capture_export, snapshot_identity
+from packages.resume_core.responses.template_export import capture_export, snapshot_identity
 from packages.resume_core.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.focus import icon_catalog
@@ -214,7 +214,7 @@ async def test_a_missing_experience_leaves_the_name_line_only(tmp_path):
 
 @pytest.mark.asyncio
 async def test_editor_plan_names_band_focus_icons_live_links_and_captured_faces(tmp_path):
-    from packages.resume_core.template_api import TemplateProjectResponseV1
+    from packages.resume_core.responses.template_api import TemplateProjectResponseV1
     from packages.resume_core.templates.presentation import project_presentation
     _fixture, workspace, _originals = await published(tmp_path)
     plan = project_presentation(workspace)['editor']

@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.template_api import TemplateProjectResponseV1
+from packages.resume_core.responses.template_api import TemplateProjectResponseV1
 from resume_api.projects.service import response_for_workspace
 from tests.templates.pipeline_fixtures import setup_operation, source_draft
 from tests.templates.test_materialize import issue_workspace

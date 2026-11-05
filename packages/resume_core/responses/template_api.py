@@ -4,13 +4,13 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
-from .models.contracts import Id, Revision, Sha256, Wire
-from .models.template_render import TemplateSnapshotIdentity
-from .models.template_workspace import WorkspaceV7
-from .rich_api import RichGenerationState
-from .rich_identity import ResumeIdentity
-from .templates.models import AuthoredPresentation, CompiledRecipe
-from .templates.presentation import presentation_matches, snapshot_identity
+from ..models.contracts import Id, Revision, Sha256, Wire
+from ..models.template_render import TemplateSnapshotIdentity
+from ..models.template_workspace import WorkspaceV7
+from .api import RichGenerationState
+from ..rich_identity import ResumeIdentity
+from ..templates.models import AuthoredPresentation, CompiledRecipe
+from ..templates.presentation import presentation_matches, snapshot_identity
 
 
 class EditorFaces(Wire):

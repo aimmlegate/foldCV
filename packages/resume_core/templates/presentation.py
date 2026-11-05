@@ -1,7 +1,7 @@
 """Presentation and snapshot identity come only from the project's captured package."""
 
 from ..models.template_render import presentation_value
-from ..template_export import snapshot_identity as authored_snapshot_identity
+from ..responses.template_export import snapshot_identity as authored_snapshot_identity
 
 
 SUPPORTED_AUTHORING = frozenset({'node_index'})

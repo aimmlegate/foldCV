@@ -18,7 +18,7 @@ from packages.resume_core.rendering.captured_layout import CapturedMetrics, half
 from packages.resume_core.rendering.captured_styles import CapturedStyleResolver, authored_spans, visible_text
 from packages.resume_core.rendering.template import RenderFailure
 from packages.resume_core.template_assembly import assemble_template
-from packages.resume_core.template_export import capture_export, snapshot_identity
+from packages.resume_core.responses.template_export import capture_export, snapshot_identity
 from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

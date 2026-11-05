@@ -5,7 +5,7 @@ from .models.template_mutations import TemplateMutationV1
 from .rich_dependencies import dependencies_current
 from .rich_identity import resume_identity
 from .rich_mutations import apply_rich_mutation
-from .template_api import TemplateProjectResponseV1
+from .responses.template_api import TemplateProjectResponseV1
 from .template_issue_impacts import issue_impacts
 from .template_mutations import apply_fact_steps
 from .templates.compiler import canonical, sha256

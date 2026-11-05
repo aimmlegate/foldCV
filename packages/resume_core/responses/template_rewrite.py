@@ -1,8 +1,8 @@
 """Selected-text rewrite for V7: generation reads verified text; only an explicit Apply edits the document."""
 
-from .rich_mutations import locate, utf16_slice
-from .template_preparation import _range_content
-from .templates.presentation import snapshot_identity
+from ..rich_mutations import locate, utf16_slice
+from ..template_preparation import _range_content
+from ..templates.presentation import snapshot_identity
 
 
 def rewrite_source(workspace, request):

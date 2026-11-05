@@ -3,10 +3,10 @@
 from typing import Literal
 from pydantic import Field
 
-from .models.contracts import Id, Revision, Wire
-from .models.rich_workspace import WorkspaceV6
-from .rich_presentation import RichPresentation
-from .rich_identity import ResumeIdentity
+from ..models.contracts import Id, Revision, Wire
+from ..models.rich_workspace import WorkspaceV6
+from .presentation import RichPresentation
+from ..rich_identity import ResumeIdentity
 
 
 class RichGenerationState(Wire):

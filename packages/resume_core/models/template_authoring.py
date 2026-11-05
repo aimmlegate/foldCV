@@ -10,7 +10,7 @@ from .rich_mutations import ActionCapture
 from .template_mutations import TemplateMutationV1
 from .template_render import TemplateSnapshotIdentity
 from ..rich_panel import RichPanelRequest
-from ..template_api import TemplateProjectResponseV1
+from ..responses.template_api import TemplateProjectResponseV1
 
 
 class FieldInsertionTarget(Wire):
