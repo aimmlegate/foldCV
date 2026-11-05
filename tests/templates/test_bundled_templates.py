@@ -16,7 +16,7 @@ from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.presentation import project_presentation
 from packages.resume_core.templates.projection import validate_payload
-from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, shipped_templates
+from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, bundled_package, shipped_templates
 from tests.templates.generic_fixtures import generic_import, f10
 from tests.templates.test_captured_docx import NS, emitted, xml
 from tests.templates.test_panel_preparation import move
@@ -43,7 +43,7 @@ def test_the_two_column_package_keeps_its_exact_hash_in_the_shared_folder():
 @pytest.mark.parametrize('block', ['programming', 'data_and_tools', 'infrastructure', 'role_tools'])
 def test_a_long_technology_list_stays_a_valid_reply(template, block):
     # A list limit refuses the whole reply: 41 tools of 40 lost the repair that added the two a review found missing.
-    schema = next(item.full_schema for item in compile_template(BUNDLED_TEMPLATES[template]).blocks if item.id == block)
+    schema = next(item.full_schema for item in bundled_package(template).blocks if item.id == block)
     validate_payload(schema, {'items': [f'Tool {index}' for index in range(120)]})
 
 
@@ -160,7 +160,7 @@ def test_the_table_templates_import_and_export_their_rows_as_docx_tables(templat
     """D143: the same scripted F10 import fills each table template; the editor plan labels the rows and the DOCX writes
     one table per run of rows, with the label texts of the template."""
     table = {key: value for key, value in f10(True).items() if key != 'focus'}
-    package = compile_template(BUNDLED_TEMPLATES[template])
+    package = bundled_package(template)
     _fixture, result, workspace, _originals = asyncio.run(generic_import(tmp_path, 'F10', table=table, package=package))
     assert result.state == 'published'
     plan = project_presentation(workspace)['editor']

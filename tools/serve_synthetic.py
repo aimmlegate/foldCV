@@ -216,12 +216,11 @@ async def views_workspace(root):
 
 async def generic_workspace(root, name, template=None):
     """A published scripted import of one synthetic fixture with a bundled template, the two-column one by default."""
-    from packages.resume_core.templates.compiler import compile_template
-    from packages.resume_core.templates.store import BUNDLED_TEMPLATES
+    from packages.resume_core.templates.store import bundled_package
     from tests.templates.generic_fixtures import generic_import
     work = root / 'fixture'
     work.mkdir(mode=0o700)
-    package = compile_template(BUNDLED_TEMPLATES[template]) if template else None
+    package = bundled_package(template) if template else None
     _fixture, _result, value, originals = await generic_import(work, name, package=package)
     return value, originals
 

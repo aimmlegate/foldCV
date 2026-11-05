@@ -31,6 +31,8 @@ REASONS = {
     'unsupported configuration for captured compiler version': 'эта настройка не поддерживается версией, сохранённой в шаблоне',
     'unsupported package/recipe compatibility': 'пакет шаблона несовместим с этой версией приложения',
     'bundled template id mismatch': 'идентификатор не совпадает со встроенным шаблоном',
+    'the shared template base is missing': 'нет общей основы встроенных шаблонов (_base.yaml)',
+    'a section of the base is not shared whole': 'раздел общей основы задан и в самом шаблоне',
     'invalid package hash': 'неверная контрольная сумма шаблона',
     'package hash mismatch': 'контрольная сумма шаблона не совпадает',
     'package id mismatch': 'идентификатор шаблона не совпадает',

@@ -10,12 +10,13 @@ import base64
 from collections import OrderedDict
 import os
 from pathlib import Path
+import re
 import threading
 
 from ..storage import atomic_write, locked_root
 from ..storage import owned_file, strict_json
 from .compiler import (ADDED_CAPABILITIES, CAPABILITIES, COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3,
-                       OPERATION_VERSION, PACKAGE_BYTES, PROJECTION_VERSION, compile_definition, compile_template)
+                       OPERATION_VERSION, PACKAGE_BYTES, PROJECTION_VERSION, compile_bytes, compile_definition)
 from ..hashing import canonical, sha256
 from .loading import load_declared_definition,load_definition
 from .models import TemplateDefinition, TemplatePackage
@@ -124,10 +125,45 @@ class TemplateRefused(Exception):
         super().__init__(code)
 
 
+# The top-level sections of a bundled file in their order; a base section goes back where the order puts it.
+SECTION_ORDER = ("schema_version", "template", "model", "blocks", "style", "layout", "source", "content_definitions",
+                 "fact_types", "operations", "assets", "provenance")
+BASE_LINE = b"base: _base\n"
+_SECTION = re.compile(rb"^([a-z_]+):", re.M)
+
+
+def _sections(raw: bytes):
+    """(text before the first key, [(key, bytes of the section up to the next key)])."""
+    starts = [(match.start(), match.group(1).decode("ascii")) for match in _SECTION.finditer(raw)]
+    if not starts:
+        return raw, []
+    ends = [start for start, _ in starts[1:]] + [len(raw)]
+    return raw[:starts[0][0]], [(key, raw[start:end]) for (start, key), end in zip(starts, ends)]
+
+
+def bundled_source(template_id: str) -> bytes:
+    """The full YAML text of a shipped template: a file that names `base: _base` gets each section it omits from
+    `_base.yaml` in its own folder, whole and at its place, so the text equals the file before the base existed."""
+    path = BUNDLED_TEMPLATES.get(template_id)
+    if path is None: raise UnknownTemplate(template_id)
+    raw = path.read_bytes()
+    prefix, sections = _sections(raw)
+    if ("base", BASE_LINE) not in sections:
+        return raw
+    base_path = path.parent / "_base.yaml"
+    if not base_path.is_file(): raise SchemaFailure("/base", "the shared template base is missing")
+    _base_prefix, base_sections = _sections(base_path.read_bytes())
+    own = {key: text for key, text in sections if key != "base"}
+    shared = dict(base_sections)
+    if set(own) - set(SECTION_ORDER) or set(shared) - set(SECTION_ORDER) or set(shared) & set(own):
+        raise SchemaFailure("/base", "a section of the base is not shared whole")
+    return prefix + b"".join(own.get(key) or shared.get(key, b"") for key in SECTION_ORDER)
+
+
 def bundled_package(template_id: str) -> TemplatePackage | None:
     path = BUNDLED_TEMPLATES.get(template_id)
     if path is None: return None
-    package = compile_template(path)
+    package = compile_bytes(bundled_source(template_id), path.parent, original_format="yaml")
     if package.id != template_id: raise SchemaFailure("/template/id", "bundled template id mismatch")
     return package
 

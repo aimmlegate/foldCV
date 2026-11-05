@@ -105,7 +105,9 @@ test("a problem opens the tab of its first key; a problem of the whole text open
 });
 
 test("every bundled template splits into the five tabs with each key in one of them", () => {
-  const bundled = new URL("../../../templates/bundled/", import.meta.url);
+  // The texts the editor shows: the table templates take shared sections from _base.yaml, and the service resolves
+  // them to these bytes (tests/templates/test_template_base.py).
+  const bundled = new URL("../../../tests/fixtures/synthetic/templates/pre-base/", import.meta.url);
   const files = readdirSync(bundled).filter(name => name.endsWith(".yaml"));
   assert.equal(files.length, 5);
   for (const file of files) {

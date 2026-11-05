@@ -14,7 +14,7 @@ from packages.resume_core.templates.loading import load_declared_definition, loa
 from packages.resume_core.templates.models import TemplateDefinition
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.shorthand import STANDARD_SUPPORT, expand
-from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore
+from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore, bundled_source
 from resume_api.template_config import TemplateConfig
 from tools.shorten_template import shorten
 
@@ -34,7 +34,10 @@ def block(**fields):
 
 
 def full(path):
-    return TemplateDefinition.model_validate(load_definition(path.read_bytes())).model_dump(mode='json', by_alias=True)
+    # A shipped file that names a base reads as its resolved text (MT10).
+    shipped = {value: key for key, value in BUNDLED_TEMPLATES.items()}
+    raw = bundled_source(shipped[path]) if path in shipped else path.read_bytes()
+    return TemplateDefinition.model_validate(load_definition(raw)).model_dump(mode='json', by_alias=True)
 
 
 def test_the_bundled_short_template_is_the_same_package_as_its_full_form():

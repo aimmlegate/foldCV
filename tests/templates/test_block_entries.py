@@ -383,7 +383,7 @@ async def test_a_resumed_import_keeps_the_entries_it_added_and_finishes_them(tmp
 def test_the_short_form_declares_per_entry_and_the_bundled_projects_blocks_use_it():
     from packages.resume_core.templates.compiler import compile_template
     from packages.resume_core.templates.shorthand import expand
-    from packages.resume_core.templates.store import BUNDLED_TEMPLATES
+    from packages.resume_core.templates.store import BUNDLED_TEMPLATES, bundled_package
     from packages.resume_core.templates.projection import SchemaFailure
     definitions = {'text': {'type': ['string', 'null'], 'minLength': 1}}
     def block(**fields):
@@ -393,8 +393,8 @@ def test_the_short_form_declares_per_entry_and_the_bundled_projects_blocks_use_i
     with pytest.raises(SchemaFailure):
         expand({'schema_version': 4, 'blocks': [{'id': 'jobs', 'region': 'main', 'order': 1, 'view': {'nodes': []},
             'schema': [{'name': 'text'}], 'per_entries': True}]})
-    for path in BUNDLED_TEMPLATES.values():
-        package = compile_template(path)
+    for template in BUNDLED_TEMPLATES:
+        package = bundled_package(template)
         assert [item.id for item in package.definition.blocks if item.per_entry] == ['projects']
     assert compile_template(BUNDLED_TEMPLATES['generic-two-column']).revision == '1.4.0'
     assert compile_template(BUNDLED_TEMPLATES['generic-one-column']).revision == '1.4.0'
