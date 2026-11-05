@@ -1,12 +1,12 @@
 """Publish the initial template tree while retaining original sources and fact history."""
 
-from .models.template_workspace import ProjectV6, validated_with_history
-from .templates.focus import catalog_for, remembered_icon, row_name
-from .templates.materialize import materialize
-from .templates.presentation_plan import focus_row
-from .templates.span_coverage import overlaps
-from .template_capture import item_identities
-from .template_effective import effective_cells
+from ..models.template_workspace import ProjectV6, validated_with_history
+from ..templates.focus import catalog_for, remembered_icon, row_name
+from ..templates.materialize import materialize
+from ..templates.presentation_plan import focus_row
+from ..templates.span_coverage import overlaps
+from ..template_capture import item_identities
+from ..template_effective import effective_cells
 from .template_identity import payload_value
 from .template_proposals import relation_evidence
 

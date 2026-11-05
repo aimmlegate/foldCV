@@ -122,7 +122,7 @@ class ProjectV6(Wire):
 
     @model_validator(mode="after")
     def integrity(self):
-        from ..template_identity import source_slice
+        from ..importing.template_identity import source_slice
         from ..template_scope_occurrences import validate_scope_occurrences
         verify_package(self.template_package)
         validate_scope_occurrences(self)
@@ -298,7 +298,7 @@ class RichPreDraftV2(RichPreDraft):
 
     @model_validator(mode='after')
     def captured_integrity(self):
-        from ..template_identity import source_slice
+        from ..importing.template_identity import source_slice
         from ..templates.compiler import canonical, sha256
         from ..templates.projection import reachable_schema, schema_at
         _unique([(source.id, source.revision) for source in self.sources], 'pre-draft source revision')
@@ -350,7 +350,7 @@ class WorkspaceV7(WorkspaceV6):
         owner = self.project or self.pre_draft
         if any(operation.project_id != self.project_id for operation in owner.template_operations):
             raise ValueError('workspace template operation belongs to another project')
-        from ..template_identity import source_slice
+        from ..importing.template_identity import source_slice
         for operation in owner.template_operations:
             for result in operation.task_results:
                 for span in result.source_spans:

@@ -6,7 +6,7 @@ from packages.resume_core.models.rich_facts import TechnologyRecord, WorkingPeri
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_fields import field_key, set_text
 from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_builtin_admission import unknown
+from packages.resume_core.importing.template_builtin_admission import unknown
 from packages.resume_core.template_inverse import inverse_template_mutation
 from packages.resume_core.template_preparation_cells import human_cell_steps
 from packages.resume_core.templates.compiler import canonical

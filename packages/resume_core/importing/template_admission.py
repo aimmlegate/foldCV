@@ -1,17 +1,17 @@
 """Only complete coordinator receipts can promote a model's effective cells."""
 
-from .models.template_facts import ExtensionCell, ExtensionRecord
+from ..models.template_facts import ExtensionCell, ExtensionRecord
 from .template_identity import empty_value, payload_value
 from .template_import import TemplateImportFailure, authorization, checked, digest, instant, task_in
 from .template_replacements import apply_accepted_records
-from .template_builtin_admission import (apply_builtin_records, current_handles, human_authority, inferred_owner_relations,
-    make_builtin_candidate)
-from .template_mutations import _set_builtin_owner
+from .template_builtin_admission import (apply_builtin_records, current_handles, human_authority,
+                                         inferred_owner_relations, make_builtin_candidate)
+from ..template_mutations import _set_builtin_owner
 from .template_review import check_review_reply, decide_review
-from .templates.compiler import canonical, sha256
-from .templates.projection import reachable_schema
-from .template_capture import item_identities, retain_builtin_identity
-from .template_wording import display_raw_input
+from ..templates.compiler import canonical, sha256
+from ..templates.projection import reachable_schema
+from ..template_capture import item_identities, retain_builtin_identity
+from ..template_wording import display_raw_input
 
 
 def task_facts_digest(operation, task_id, facts):

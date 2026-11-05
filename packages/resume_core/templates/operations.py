@@ -207,7 +207,7 @@ def operation_context(operation, data):
 
 def derive_task(operation, task, data):
     """The deterministic result of an operation task or a derived view task, from admitted facts only."""
-    from ..template_import import TemplateImportFailure
+    from ..importing.template_import import TemplateImportFailure
     context = operation_context(operation, data)
     definition = data.template_package.definition
     declaration = next((value for value in definition.operations if value.id == task.block_id), None)

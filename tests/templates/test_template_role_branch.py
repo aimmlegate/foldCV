@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from packages.resume_core.template_identity import capture_span
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.importing.template_identity import capture_span
+from packages.resume_core.importing.template_import import spent_calls
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.models import RoleOperation

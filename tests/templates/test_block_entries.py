@@ -12,10 +12,12 @@ from types import SimpleNamespace
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.repository.project_store import ProjectStoreFailure
-from packages.resume_core.template_entries import line_options, ordered_entries, outline_scopes, reorder_records, splits_entries
-from packages.resume_core.template_identity import capture_span, evidence_options, line_spans
-from packages.resume_core.template_import import (TemplateImportFailure, add_entry_tasks, add_outline_review, admit_operation,
-    capture_task_input, children_of, digest, entries_of, reserve_attempt, retain_operation, spent_calls)
+from packages.resume_core.importing.template_entries import (line_options, ordered_entries, outline_scopes,
+                                                             reorder_records, splits_entries)
+from packages.resume_core.importing.template_identity import capture_span, evidence_options, line_spans
+from packages.resume_core.importing.template_import import (TemplateImportFailure, add_entry_tasks, add_outline_review,
+                                                            admit_operation, capture_task_input, children_of, digest,
+                                                            entries_of, reserve_attempt, retain_operation, spent_calls)
 from packages.resume_core.templates.compiler import sha256
 from packages.resume_core.templates.replies import proposal_protocol
 from resume_api.importer.template_pipeline import Spawned
@@ -486,7 +488,7 @@ async def test_the_outline_and_its_review_may_name_only_lines(tmp_path):
 
 
 def test_consecutive_outline_entries_join_into_as_many_groups_as_calls_run_at_once():
-    from packages.resume_core.template_entries import grouped
+    from packages.resume_core.importing.template_entries import grouped
     def groups(lines, count):
         return [[title for title, _spans in group] for group in grouped([(str(index), ['line'] * size)
             for index, size in enumerate(lines)], count)]
@@ -539,7 +541,7 @@ async def test_a_value_every_entry_states_is_cited_from_each_entrys_own_line(tmp
         outline=lambda value: outline_answer(value, ('paper-a', 'paper-b', 'paper-c', 'paper-d')))
     result = await run_import(fixture)
     assert result.state == 'published' and not result.issues
-    from packages.resume_core.template_import import attempt_in
+    from packages.resume_core.importing.template_import import attempt_in
     entries = entries_of(result, result.tasks[0].id)
     assert len(entries) == 4
     for task in entries:

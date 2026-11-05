@@ -7,8 +7,8 @@ import pytest
 from packages.resume_core.models.template_import import ImportOperation
 from packages.resume_core.models.rich_facts import WorkingPeriod
 from packages.resume_core.template_capture import capture_existing_items, item_identities, prepare_builtin_identities
-from packages.resume_core.template_import import (TemplateImportFailure, admit_operation, digest,
-    resume_operation, start_operation)
+from packages.resume_core.importing.template_import import (TemplateImportFailure, admit_operation, digest,
+                                                            resume_operation, start_operation)
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.models import InputRef
 from resume_api.importer.template_pipeline import TemplatePipeline
@@ -17,7 +17,7 @@ from tests.templates.pipeline_fixtures import NOW, resume_command, setup_operati
 from tests.templates.test_builtin_effective import admitted_employment
 from tests.templates.test_relations import facts as related_facts
 from tests.templates.employment_fixtures import employment_package, employment_source
-from packages.resume_core.template_builtin_admission import unknown
+from packages.resume_core.importing.template_builtin_admission import unknown
 
 
 def serial():
@@ -141,7 +141,7 @@ def test_selected_unproven_builtin_stays_explicit_with_empty_effective_cells():
 
 def test_save_cannot_refresh_or_erase_an_existing_identity_capture():
     from packages.resume_core.repository.project_store import ProjectStoreFailure
-    from packages.resume_core.template_import import retain_operation
+    from packages.resume_core.importing.template_import import retain_operation
     _empty, command, captured, src, _facts = setup_operation()
     facts = human_papers('human_raw')
     command.capture.fact_revisions = {record.id: record.revision for record in facts.extensions}

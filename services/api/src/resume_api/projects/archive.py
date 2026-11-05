@@ -11,7 +11,7 @@ from packages.resume_core.repository.project_repository import blob_path, decode
 from packages.resume_core.repository.project_store import ProjectStoreFailure
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.template_import import identity
+from packages.resume_core.importing.template_import import identity
 from packages.resume_core.extraction.parser import MAX_SOURCE
 from packages.resume_core.rich_limits import IMAGE_BYTES
 

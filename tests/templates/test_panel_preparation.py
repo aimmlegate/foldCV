@@ -23,7 +23,7 @@ from tests.templates.test_transactions import authorization, issue
 
 
 def period_workspace():
-    from packages.resume_core.template_builtin_admission import unknown
+    from packages.resume_core.importing.template_builtin_admission import unknown
     before,sources=scoped_workspace()
     record=next(value for value in before.project.facts.records if value.id=='employer-a')
     record.periods=[WorkingPeriod(id='exact-period',revision=1,start=unknown(),end=unknown(),present=unknown(),evidence=[])]

@@ -3,7 +3,7 @@
 from ..models.template_import import ExportAttempt
 from ..models.template_render import (CapturedTemplateRenderInputV1, TemplateExportCapture, TemplateRenderAsset,
                                       TemplateRenderRequestV1, TemplateSnapshotIdentity, presentation_value)
-from ..template_import import TemplateImportFailure, digest, identity
+from ..importing.template_import import TemplateImportFailure, digest, identity
 
 
 def snapshot_identity(workspace):

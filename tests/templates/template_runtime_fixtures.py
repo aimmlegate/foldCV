@@ -7,8 +7,8 @@ from itertools import count
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.project_repository import ProjectRepository, decode_project
-from packages.resume_core.template_identity import source_slice
-from packages.resume_core.template_import import CleanupProof, TemplateImportFailure, digest
+from packages.resume_core.importing.template_identity import source_slice
+from packages.resume_core.importing.template_import import CleanupProof, TemplateImportFailure, digest
 from tests.templates.pipeline_fixtures import NOW, owner, setup_operation, source_draft
 from tests.templates.storage_fixtures import presentation, workspace
 from tests.templates.test_semantic_admission import raw_proposal
@@ -197,7 +197,7 @@ class RuntimeFixture:
 
 class EmploymentFixture(RuntimeFixture):
     def assemble(self, before, operation):
-        from packages.resume_core.template_assembly import assemble_template
+        from packages.resume_core.importing.template_assembly import assemble_template
         return assemble_template(before, operation)
 
 

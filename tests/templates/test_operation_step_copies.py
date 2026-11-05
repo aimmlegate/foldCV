@@ -1,7 +1,8 @@
 """Import steps share what they do not change with their input and never change the input itself (S8 speed)."""
 
-from packages.resume_core.template_import import (CleanupProof, cancel_operation, digest, dispatch_attempt, observe_time,
-    reconcile_cleanup, record_return, reserve_attempt, resume_operation)
+from packages.resume_core.importing.template_import import (CleanupProof, cancel_operation, digest, dispatch_attempt,
+                                                            observe_time, reconcile_cleanup, record_return,
+                                                            reserve_attempt, resume_operation)
 from tests.templates.pipeline_fixtures import NOW, cleaned, model, owner, ready_operation, resume_command, usage
 
 LATER = '2026-10-21T00:00:05+00:00'

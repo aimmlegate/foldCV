@@ -4,12 +4,12 @@ import json
 
 import pytest
 
-from packages.resume_core.template_admission import admit_proposal
-from packages.resume_core.template_builtin_admission import apply_builtin_records, make_builtin_candidate
-from packages.resume_core.template_import import dispatch_attempt, record_return, reserve_attempt
-from packages.resume_core.template_identity import capture_span
-from packages.resume_core.template_proposals import parse_proposal
-from packages.resume_core.template_review import record_review
+from packages.resume_core.importing.template_admission import admit_proposal
+from packages.resume_core.importing.template_builtin_admission import apply_builtin_records, make_builtin_candidate
+from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
+from packages.resume_core.importing.template_identity import capture_span
+from packages.resume_core.importing.template_proposals import parse_proposal
+from packages.resume_core.importing.template_review import record_review
 from packages.resume_core.templates.compiler import sha256
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
 from tests.templates.evidence_references import by_reference
@@ -204,7 +204,7 @@ def test_rejected_owner_withholds_its_entire_nested_dependency_chain():
 
 def withheld_case(monkeypatch, kind, relations=()):
     from types import SimpleNamespace
-    from packages.resume_core import template_builtin_admission as admission
+    from packages.resume_core.importing import template_builtin_admission as admission
     monkeypatch.setattr(admission, 'bind_builtin_allocation', lambda *_args, **_options: None)
     declarations = {'sub': SimpleNamespace(builtin_kind='subproject', builtin_fields={'value': None}),
         'job': SimpleNamespace(builtin_kind='employment', builtin_fields={'value': None}),
@@ -269,7 +269,7 @@ def test_disabled_rewriting_keeps_a_value_that_is_part_of_its_cited_line():
 def test_an_entry_subproject_without_an_employer_joins_the_employment_above_its_lines():
     # D117 cut the four projects of one employer from its lines; the model named no company and the projects were lost.
     from types import SimpleNamespace
-    from packages.resume_core.template_builtin_admission import inferred_owner_relations
+    from packages.resume_core.importing.template_builtin_admission import inferred_owner_relations
     units = [SimpleNamespace(id='u1', text='Acme\nProgrammer\n'), SimpleNamespace(id='u2', text='Tasks: - built a service\n'),
         SimpleNamespace(id='u3', text='Projects: - Project: Integration layer\n'), SimpleNamespace(id='u4', text='Globex\nProgrammer\n')]
     sources = [SimpleNamespace(id='s', units=units)]
@@ -294,7 +294,7 @@ def test_an_entry_subproject_without_an_employer_joins_the_employment_above_its_
 
 def test_a_subproject_before_any_employment_keeps_no_inferred_owner():
     from types import SimpleNamespace
-    from packages.resume_core.template_builtin_admission import inferred_owner_relations
+    from packages.resume_core.importing.template_builtin_admission import inferred_owner_relations
     sources = [SimpleNamespace(id='s', units=[SimpleNamespace(id='u1', text='Project: Tool\nAcme\n')])]
     facts = SimpleNamespace(records=[SimpleNamespace(id='job', kind='employment',
         evidence=[SimpleNamespace(source_id='s', unit_id='u1', text='Acme')])])

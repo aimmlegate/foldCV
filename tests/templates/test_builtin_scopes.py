@@ -190,7 +190,7 @@ def test_one_scope_can_cover_builtin_and_extension_cells_without_erasing_either(
 def test_period_removal_clears_current_scope_and_undo_restores_exact_period_identity():
     before, _sources = scoped_workspace()
     record = next(record for record in before.project.facts.records if record.id == 'employer-a')
-    from packages.resume_core.template_builtin_admission import unknown
+    from packages.resume_core.importing.template_builtin_admission import unknown
     record.periods = [WorkingPeriod(id='exact-period', revision=1, start=unknown(), end=unknown(),
         present=unknown(), evidence=[])]
     before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))

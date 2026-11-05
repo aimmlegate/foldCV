@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.importing.template_import import spent_calls
 from tests.templates.claim_runtime_fixtures import claim_fixture, claim_proposal
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from resume_api.importer.template_pipeline import DerivedTask

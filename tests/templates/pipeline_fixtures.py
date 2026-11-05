@@ -5,7 +5,7 @@ from itertools import count
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportCapture, LaunchOwner, ModelCapture,
     ObservedUsage, ResumeTemplateImportV1, RuntimePolicy, StartTemplateImportV1)
-from packages.resume_core.template_import import admit_operation, capture_task_input, digest, start_operation
+from packages.resume_core.importing.template_import import admit_operation, capture_task_input, digest, start_operation
 from tests.templates.storage_fixtures import package, source
 
 

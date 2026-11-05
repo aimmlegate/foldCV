@@ -6,8 +6,8 @@ import pytest
 
 from packages.resume_core.models.template_document import FieldOccurrence
 from packages.resume_core.models.template_import import TaskResultRecord
-from packages.resume_core.template_assembly import assemble_template
-from packages.resume_core.template_identity import capture_span, source_slice
+from packages.resume_core.importing.template_assembly import assemble_template
+from packages.resume_core.importing.template_identity import capture_span, source_slice
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.materialize import materialize
 from packages.resume_core.templates.materialize_nodes import DisplayField, render_nodes
@@ -143,7 +143,7 @@ def test_fallback_places_disconnected_evidence_added_by_suppression_once_without
 def test_captured_nested_human_claim_without_sidecar_stays_with_current_owner_as_plain_text(owner):
     from packages.resume_core.template_capture import prepare_builtin_identities
     from packages.resume_core.template_facts import move_owned
-    from packages.resume_core.template_import import start_operation
+    from packages.resume_core.importing.template_import import start_operation
     from tests.templates.pipeline_fixtures import NOW, setup_operation
     from tests.templates.test_existing_capture import serial
     from tests.templates.test_relations import facts as related_facts
@@ -209,7 +209,7 @@ def test_source_fallback_with_no_nodes_needs_an_explicit_captured_style(explicit
 
 def test_captured_human_classification_is_retained_in_facts_without_becoming_cv_text():
     from packages.resume_core.template_capture import schema_hash
-    from packages.resume_core.template_import import start_operation
+    from packages.resume_core.importing.template_import import start_operation
     from tests.templates.pipeline_fixtures import NOW, setup_operation
     operation, facts, package, src, _raw = admitted()
     for record in facts.extensions:
@@ -362,7 +362,7 @@ def test_failed_save_of_materialized_issue_edit_keeps_coherent_disk_and_retry_tr
 
 @pytest.mark.parametrize('state', ['human_raw', 'pending_manual'])
 def test_captured_human_fields_survive_source_fallback_without_resurrecting_old_wording(state):
-    from packages.resume_core.template_import import start_operation
+    from packages.resume_core.importing.template_import import start_operation
     from tests.templates.pipeline_fixtures import NOW, setup_operation
     from tests.templates.human_authority_fixtures import HUMAN_TEXT, human_papers
     _empty, command, package, src, _facts = setup_operation()
@@ -397,8 +397,8 @@ def test_a_fallback_suppresses_a_shared_cell_only_in_its_own_view():
 def test_lines_a_review_names_as_missing_show_only_where_no_view_shows_them():
     # LIVE-09: a coverage gap repeated lines another block already showed; such lines now place only once, nowhere
     # twice, while the accepted values stay.
-    from packages.resume_core.template_identity import line_spans
-    from packages.resume_core.template_import import digest
+    from packages.resume_core.importing.template_identity import line_spans
+    from packages.resume_core.importing.template_import import digest
     from packages.resume_core.templates.span_coverage import overlaps
     operation, facts, package, src, _raw = admitted()
     _document, before = materialize(package, facts, [operation], [src], operation_id=operation.id)

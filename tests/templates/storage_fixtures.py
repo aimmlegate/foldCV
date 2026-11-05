@@ -6,7 +6,7 @@ from pathlib import Path
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.template_facts import ExtensionRecord, WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.template_identity import capture_span
+from packages.resume_core.importing.template_identity import capture_span
 from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
 from packages.resume_core.templates.loading import load_definition
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

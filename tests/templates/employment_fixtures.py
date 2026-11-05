@@ -2,7 +2,7 @@
 
 import json
 
-from packages.resume_core.template_identity import capture_span
+from packages.resume_core.importing.template_identity import capture_span
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.storage_fixtures import package, source_fixture

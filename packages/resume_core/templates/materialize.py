@@ -4,8 +4,8 @@ from ..models.template_document import RichDocumentV2
 from ..models.template_workspace import SpanCoverage
 from ..template_capture import item_identities
 from ..template_effective import builtin_effective_cells, effective_cells
-from ..template_identity import _bound_root, capture_span, line_spans, source_slice
-from ..template_import import digest
+from ..importing.template_identity import _bound_root, capture_span, line_spans, source_slice
+from ..importing.template_import import digest
 from ..template_source_cleanup import without_contacts
 from .captured_fields import capture_fields, ownership_parents, visible_path
 from .focus import focus_durations

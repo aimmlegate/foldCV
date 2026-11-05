@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.importing.template_import import spent_calls
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.template_runtime_fixtures import EmploymentFixture, scripted_employment
 

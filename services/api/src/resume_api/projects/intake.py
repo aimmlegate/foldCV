@@ -17,7 +17,7 @@ from packages.resume_core.models.template_import import MAX_IMPORT_CONCURRENCY, 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.project_limits import finalization_seconds, import_seconds
 from packages.resume_core.sources import canonical_source
-from packages.resume_core.template_import import TemplateImportFailure, digest, identity
+from packages.resume_core.importing.template_import import TemplateImportFailure, digest, identity
 from packages.resume_core.templates.store import TemplateStore, UnknownTemplate
 
 from ..extracting import UploadFailure, run_extract

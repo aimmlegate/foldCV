@@ -9,7 +9,7 @@ from .rich_fields import inline_groups
 from .rich_mutations import locate
 from .template_authoring import citation_spans,classify_blocks,classify_fragment
 from .template_clipboard_witnesses import captured_package_hash,field_witness,fingerprint,scope_witness,source_witness,verify_witnesses
-from .template_identity import capture_span
+from .importing.template_identity import capture_span
 from .templates.presentation import snapshot_identity,validate_presentation
 from .templates.store import verify_package
 

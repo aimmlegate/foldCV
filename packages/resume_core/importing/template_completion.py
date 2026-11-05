@@ -24,7 +24,7 @@ import json
 import re
 
 from .template_identity import _binding_instances, _bound_root, empty_value, payload_value
-from .templates.projection import pointer_tokens
+from ..templates.projection import pointer_tokens
 
 # A derived value cites at most this many offered entries; each states it word for word.
 STATED_LIMIT = 3

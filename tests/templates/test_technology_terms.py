@@ -43,7 +43,7 @@ def test_key_skills_stay_phrases():
 @pytest.mark.parametrize('block', BLOCKS)
 def test_the_model_reads_the_name_only_rule_in_its_prompt_and_its_review(block):
     # The model is told before it answers, and the reviewing model fails a non-name; the server limits come last.
-    from packages.resume_core.template_review import required_rules
+    from packages.resume_core.importing.template_review import required_rules
     package = compile_template(BUNDLED_TEMPLATE)
     declaration = next(value for value in package.definition.blocks if value.id == block)
     item = declaration.content_schema['properties']['items']['items']

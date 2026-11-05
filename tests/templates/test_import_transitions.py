@@ -6,10 +6,12 @@ from itertools import count
 import pytest
 
 from packages.resume_core.models.template_import import CleanupOutcome
-from packages.resume_core.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure,
-    admit_operation, cancel_operation, capture_task_input, digest, dispatch_attempt, observe_time, reconcile_cleanup,
-    owed_reviews, record_return, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation, stopped_call,
-    stops_import)
+from packages.resume_core.importing.template_import import (CleanupProof, ProcessingDeadline, TemplateImportFailure,
+                                                            admit_operation, cancel_operation, capture_task_input,
+                                                            digest, dispatch_attempt, observe_time, reconcile_cleanup,
+                                                            owed_reviews, record_return, recover_operation,
+                                                            reserve_attempt, resume_operation, spent_calls,
+                                                            start_operation, stopped_call, stops_import)
 from tests.templates.pipeline_fixtures import (NOW, blocks_package, cleaned, owner, ready_operation, resume_command, setup_operation,
     usage)
 

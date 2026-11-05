@@ -6,8 +6,8 @@ from .models.template_document import (BoundLink, FieldOccurrence, ManualScopeSp
     TemplateParagraphBlock, TemplateSectionBlock)
 from .rich_fields import builtin_cell_values, inline_groups, set_text, working_field, field_key
 from .rich_mutations import locate, parent_items, subtree
-from .template_builtin_admission import unknown
-from .template_identity import _bound_root
+from .importing.template_builtin_admission import unknown
+from .importing.template_identity import _bound_root
 from .template_panel_lines import line_container, period_fields, period_words, row_start
 from .template_panel_values import written_dates
 from .template_preparation_panel import restore_view

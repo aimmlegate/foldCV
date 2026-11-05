@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from packages.resume_core.template_import import CleanupProof, digest, reconcile_cleanup, spent_calls
+from packages.resume_core.importing.template_import import CleanupProof, digest, reconcile_cleanup, spent_calls
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
 from tests.templates.generic_fixtures import span
 from tests.templates.pipeline_fixtures import resume_command
@@ -107,7 +107,7 @@ async def test_restart_never_replays_an_unknown_call_and_can_consume_a_retained_
     assert spent_calls(operation) == 1
     fixture.transport.fail_at = None
     # P03: the prompt is a pure function of the stored request, so a reloaded attempt reads byte for byte the same.
-    from packages.resume_core.template_prompt import model_prompt
+    from packages.resume_core.importing.template_prompt import model_prompt
     assert model_prompt(operation.attempts[0].request_value) == fixture.transport.prompts[0]
     fresh = fixture.restart()
     if cutpoint == 'dispatch':
@@ -291,7 +291,7 @@ async def test_a_refused_first_reply_without_room_for_a_repair_and_its_review_fa
 def test_refusal_text_names_paths_and_rules_but_no_reply_values():
     # P09: a refused value may quote the source; the stored refusal and the repair note keep only its path and rule.
     from pydantic import BaseModel, ConfigDict, ValidationError
-    from packages.resume_core.template_proposals import reply_error
+    from packages.resume_core.importing.template_proposals import reply_error
     from packages.resume_core.templates.projection import SchemaFailure, validate_payload
     phrase = 'Example Labs Quality Award'
     schema = {'type': 'object', 'properties': {'year': {'type': 'integer'}, 'status': {'enum': ['published', 'draft']},
@@ -518,7 +518,7 @@ async def test_a_coverage_finding_without_a_reviewed_repair_is_still_shown(tmp_p
 
 
 def test_a_repair_wins_only_when_it_keeps_every_admitted_value():
-    from packages.resume_core.template_review import ShownValue, _text_key, repair_wins
+    from packages.resume_core.importing.template_review import ShownValue, _text_key, repair_wins
     def shown(text, line='u1', reworded=False):
         return ShownValue('item-' + text, 'foldcv:programming', 'display', _text_key(text), frozenset({('s', line, 0, 10)}), reworded)
     first = [shown('Go'), shown('NodeJS'), shown('Kafka 4.0.x')]
@@ -539,12 +539,12 @@ def test_a_repair_wins_only_when_it_keeps_every_admitted_value():
 
 def shown_at(item, text, spans=(), reworded=False):
     # The repair comparison needs only these parts of a value.
-    from packages.resume_core.template_review import ShownValue, _text_key
+    from packages.resume_core.importing.template_review import ShownValue, _text_key
     return ShownValue(item, 'foldcv:programming', 'display', _text_key(text), frozenset(spans), reworded)
 
 
 def test_two_lines_of_one_source_unit_are_two_claims():
-    from packages.resume_core.template_review import repair_wins
+    from packages.resume_core.importing.template_review import repair_wins
     # One PDF text block is one unit: the repair writes the claim of its third line over the admitted claim of its second.
     admitted = shown_at('claim', 'Настроил мониторинг', {('s', 'block', 20, 40)}, True)
     other_line = shown_at('claim', 'Сократил задержку на 80%', {('s', 'block', 40, 60)}, True)
@@ -557,12 +557,12 @@ def test_two_lines_of_one_source_unit_are_two_claims():
     ('Kafka 4.0.x', 'Kafka', False), ('Node.js', 'NodeJS', True), ('node-js', 'Node JS', True), ('C#', 'c#', True),
     ('Настроил очереди.', 'Настроил очереди', True)])
 def test_the_comparison_ignores_spelling_but_keeps_symbols_of_a_name(first, second, same):
-    from packages.resume_core.template_review import _text_key
+    from packages.resume_core.importing.template_review import _text_key
     assert (_text_key(first) == _text_key(second)) is same
 
 
 def test_a_changed_or_added_technology_counts_though_its_letters_match():
-    from packages.resume_core.template_review import repair_wins
+    from packages.resume_core.importing.template_review import repair_wins
     assert not repair_wins([shown_at('a', 'C#')], {'cell-1'}, [shown_at('a', 'C++')], set())
     # D107: the addition beside an equal letter breaks a coverage tie.
     scope = {'scope-task'}
@@ -571,7 +571,7 @@ def test_a_changed_or_added_technology_counts_though_its_letters_match():
 
 def test_an_equal_value_on_another_item_does_not_keep_a_lost_one():
     from dataclasses import replace
-    from packages.resume_core.template_review import repair_wins
+    from packages.resume_core.importing.template_review import repair_wins
     first = [shown_at('job-1', 'Python'), shown_at('job-2', 'Python')]
     assert not repair_wins(first, {'cell-1'}, [first[0], shown_at('job-2', 'Django')], set())
     # An item the repair does not send may have its value carried to a new one, as by a split.
@@ -770,7 +770,7 @@ def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=(
     import asyncio
     import threading
     from types import SimpleNamespace
-    from packages.resume_core.template_import import TemplateImportFailure
+    from packages.resume_core.importing.template_import import TemplateImportFailure
     events, state, cancel = [], {'now': 0, 'peak': 0}, threading.Event()
     async def execute(_project, _operation, identifier, _deadline, _cancel):
         events.append(('start', identifier))
@@ -811,7 +811,7 @@ async def test_a_task_waits_for_the_tasks_it_depends_on(tmp_path):
 
 @pytest.mark.asyncio
 async def test_a_failure_starts_nothing_new_lets_running_tasks_end_and_is_raised(tmp_path):
-    from packages.resume_core.template_import import TemplateImportFailure
+    from packages.resume_core.importing.template_import import TemplateImportFailure
     run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ())], 2, fail='a', slow={'b'})
     with pytest.raises(TemplateImportFailure, match='IMPORT_AUTHORITY_REVOKED'):
         await run
@@ -836,7 +836,7 @@ async def test_a_dependency_cycle_runs_in_declaration_order_instead_of_waiting_f
 @pytest.mark.asyncio
 async def test_a_review_goes_stale_only_when_its_own_items_change(tmp_path):
     # CT10: another block's observation leaves this block's review valid; one on this block's own item does not.
-    from packages.resume_core.template_admission import task_facts_digest
+    from packages.resume_core.importing.template_admission import task_facts_digest
     from tests.templates.pipeline_fixtures import blocks_package
     fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), concurrency=2, cap=20)
     fixture.transport.scripted = lambda _request, value: satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)
@@ -1007,7 +1007,7 @@ async def test_a_failure_of_one_call_still_falls_back_for_that_block(tmp_path):
 async def test_an_import_stopped_before_its_first_call_saves_nothing_and_recovers(tmp_path, monkeypatch):
     # The app closed during an import before any model call: recovery used to fill every task with a fallback and
     # failed to start the app on an operation task with no view; such an import now stays unsaved (D104).
-    from packages.resume_core.template_import import TemplateImportFailure
+    from packages.resume_core.importing.template_import import TemplateImportFailure
     from resume_api.importer.template_pipeline import TemplatePipeline
     async def stopped(*_args, **_kwargs):
         raise TemplateImportFailure('IMPORT_PROCESSING_STOPPED')

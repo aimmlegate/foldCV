@@ -14,22 +14,29 @@ from packages.resume_core.repository.project_repository import (RepositoryFailur
 from packages.resume_core.repository.project_store import strict_json
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, PublicationOutcome,
     ReferenceTable, ReviewInputRecord, TaskResultRecord)
-from packages.resume_core.template_admission import admit_proposal, task_facts_digest
-from packages.resume_core.template_builtin_admission import current_handles
+from packages.resume_core.importing.template_admission import admit_proposal, task_facts_digest
+from packages.resume_core.importing.template_builtin_admission import current_handles
 from packages.resume_core.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
-from packages.resume_core.template_identity import (capture_span, empty_value, evidence_options, line_spans,
-    offered_evidence, source_slice)
-from packages.resume_core.template_entries import (closed_state, entry_part, entry_records, grouped, line_options,
-    ordered_entries, outline_part, parse_outline, parse_outline_review, reorder_records, splits_entries)
-from packages.resume_core.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
-    TemplateImportFailure, add_entry_tasks, add_outline_review, admit_operation, attempt_in, authorization, cancel_operation,
-    capture_finalization, capture_task_input, checked, children_of, digest, dispatch_attempt, entries_of, identity, observe_time,
-    record_return, reconcile_cleanup, recover_operation, reserve_attempt, resume_operation, spent_calls, start_operation,
-    stopped_call, stops_import, task_in)
-from packages.resume_core.template_proposals import parse_proposal, transport_refusal
-from packages.resume_core.template_review import decide_review, make_review_input, record_review, repair_wins, shown_values
-from packages.resume_core.template_prompt import model_prompt
+from packages.resume_core.importing.template_identity import (capture_span, empty_value, evidence_options, line_spans,
+                                                              offered_evidence, source_slice)
+from packages.resume_core.importing.template_entries import (closed_state, entry_part, entry_records, grouped,
+                                                             line_options, ordered_entries, outline_part,
+                                                             parse_outline, parse_outline_review, reorder_records,
+                                                             splits_entries)
+from packages.resume_core.importing.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
+                                                            TemplateImportFailure, add_entry_tasks, add_outline_review,
+                                                            admit_operation, attempt_in, authorization,
+                                                            cancel_operation, capture_finalization, capture_task_input,
+                                                            checked, children_of, digest, dispatch_attempt, entries_of,
+                                                            identity, observe_time, record_return, reconcile_cleanup,
+                                                            recover_operation, reserve_attempt, resume_operation,
+                                                            spent_calls, start_operation, stopped_call, stops_import,
+                                                            task_in)
+from packages.resume_core.importing.template_proposals import parse_proposal, transport_refusal
+from packages.resume_core.importing.template_review import (decide_review, make_review_input, record_review,
+                                                            repair_wins, shown_values)
+from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL, outline_review_schema,
     outline_schema, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL)
@@ -1112,7 +1119,7 @@ class TemplatePipeline:
                 and (allocated[field.item_handle].cell_ids[field.field_key] in rejected
                     or allocated[field.item_handle].record_id in denied) for span in field.evidence] if proposal else []
             if proposal is not None:
-                from packages.resume_core.template_proposals import relation_evidence
+                from packages.resume_core.importing.template_proposals import relation_evidence
                 affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
                     if identifier in rejected for span in spans)
             cited = list({digest(span): span for span in affected}.values())

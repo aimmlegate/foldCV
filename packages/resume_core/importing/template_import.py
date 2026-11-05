@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from .models.template_import import (AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope, FinalizationCandidate, ImportAttempt,
-    ImportAuthorization, ImportOperation, ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
-from .templates.compiler import canonical, dependency_order, sha256
+from ..models.template_import import (AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope,
+                                      FinalizationCandidate, ImportAttempt, ImportAuthorization, ImportOperation,
+                                      ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
+from ..templates.compiler import canonical, dependency_order, sha256
 
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
@@ -130,7 +131,7 @@ def start_operation(project_id, command, package, sources, facts, existing, now,
                 if getattr(record, 'active', True)}):
         raise TemplateImportFailure('IMPORT_CAPTURE_STALE')
     instant(now)
-    from .template_capture import capture_existing_items
+    from ..template_capture import capture_existing_items
     try:
         captured_items = capture_existing_items(facts, package, existing)
     except ValueError:
@@ -512,7 +513,7 @@ def cancel_operation(operation, *, commit_claimed=False):
 
 # A sidecar may only move an operation forward: spending, captured inputs and review evidence are append-only.
 def _refuse():
-    from .repository.project_store import ProjectStoreFailure
+    from ..repository.project_store import ProjectStoreFailure
     raise ProjectStoreFailure('PROJECT_SAVE_FAILED')
 
 
@@ -631,7 +632,7 @@ def finalization_hashes(operation, project):
 
 
 def capture_finalization(operation, project, now, *, id_factory=identity):
-    from .repository.project_repository import RepositoryFailure
+    from ..repository.project_repository import RepositoryFailure
     current = authorization(operation)
     if any(task.state not in {'accepted', 'empty', 'source_fallback'} for task in operation.tasks):
         raise RepositoryFailure('JOB_SCOPE_INVALID')

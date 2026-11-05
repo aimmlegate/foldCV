@@ -5,9 +5,11 @@ import json
 
 import pytest
 
-from packages.resume_core.template_completion import complete_reply
-from packages.resume_core.template_identity import capture_span, evidence_options, line_spans, offered_evidence, source_slice
-from packages.resume_core.template_import import admit_operation, capture_task_input, dispatch_attempt, record_return, reserve_attempt
+from packages.resume_core.importing.template_completion import complete_reply
+from packages.resume_core.importing.template_identity import (capture_span, evidence_options, line_spans,
+                                                              offered_evidence, source_slice)
+from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, dispatch_attempt,
+                                                            record_return, reserve_attempt)
 from packages.resume_core.templates.projection import pointer_tokens
 from tests.templates.evidence_references import by_reference
 from tests.templates.generic_fixtures import TABLES, block_reply, date, generic_package, job, period
@@ -49,7 +51,7 @@ def parsed(block_id, reply_for):
 
 
 def parse_proposal_of(operation, attempt, package, src, facts):
-    from packages.resume_core.template_proposals import parse_proposal
+    from packages.resume_core.importing.template_proposals import parse_proposal
     return parse_proposal(operation, attempt, package, [src], facts)
 
 
@@ -208,7 +210,7 @@ async def test_an_generic_import_with_lean_first_replies_publishes_the_same_bloc
     # P13: first replies carry the payload and entries only for values not copied word for word; no discoveries,
     # lineage or relations. Repairs stay explicit. The published blocks match the explicit F10 import.
     import re
-    from packages.resume_core.template_completion import stated_text
+    from packages.resume_core.importing.template_completion import stated_text
     from tests.templates.generic_fixtures import F10_REJECTED, F10_RESULT, entry_items, entry_table, generic_import
     from tests.templates.test_generic_import import views
     src = source_fixture('F10')[0]
@@ -381,7 +383,7 @@ def test_an_undeclared_relation_is_dropped_and_a_captured_relation_named_for_ano
 # I2 (2026-10-25): a reworded value binds to the lines of its own item that state its word stems.
 from types import SimpleNamespace
 
-from packages.resume_core.template_completion import stating_stems
+from packages.resume_core.importing.template_completion import stating_stems
 
 
 def stem_table(*lines):
@@ -488,7 +490,7 @@ def test_a_request_without_offers_has_no_bookkeeping_keys_and_ignores_the_ones_a
 
 
 # I4 (2026-10-25): a repair that still states a value no source line states loses that value and keeps the block.
-from packages.resume_core.template_completion import without_unbound
+from packages.resume_core.importing.template_completion import without_unbound
 
 
 def test_unbound_values_leave_the_payload_and_later_pointers_move_down():
@@ -512,7 +514,7 @@ from types import SimpleNamespace
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.template_import import ReferenceTable
-from packages.resume_core.template_completion import stated_text, stating
+from packages.resume_core.importing.template_completion import stated_text, stating
 from packages.resume_core.template_wording import display_raw_input
 from packages.resume_core.templates.compiler import sha256
 

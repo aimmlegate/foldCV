@@ -5,7 +5,7 @@ import json
 import pytest
 
 from packages.resume_core.repository.project_repository import ProjectRepository, RepositoryFailure
-from packages.resume_core.template_import import admit_operation
+from packages.resume_core.importing.template_import import admit_operation
 from packages.resume_core.templates.operations import derive_task
 from resume_api.projects.fold import register_import_fold, sidecar_store
 from resume_api.importer.template_pipeline import TemplatePipeline

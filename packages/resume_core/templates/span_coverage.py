@@ -1,6 +1,6 @@
 """Merge exact fallback intervals and suppress only overlapping authored values."""
 
-from ..template_identity import capture_span, source_slice
+from ..importing.template_identity import capture_span, source_slice
 
 
 def unit_key(span):

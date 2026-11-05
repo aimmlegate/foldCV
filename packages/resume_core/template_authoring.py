@@ -8,7 +8,7 @@ from .models.template_document import BoundLink, ManualScopeSpan, PresentedHyper
 from .models.template_facts import ManualEditScope, Relation
 from .rich_fields import bound_link_fields, inline_groups, occurrences
 from .rich_mutations import cut_inline, inline_text, locate, subtree
-from .template_identity import capture_span
+from .importing.template_identity import capture_span
 from .template_preparation_ids import allocate_id
 
 

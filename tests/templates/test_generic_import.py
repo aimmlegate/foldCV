@@ -3,7 +3,7 @@
 import pytest
 
 from packages.resume_core.models.template_document import BoundLink, FieldOccurrence
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.importing.template_import import spent_calls
 from tests.templates.generic_fixtures import F10_REJECTED, F10_RESULT, TABLES, generic_import, export_through_service, f06
 from tests.templates.test_template_view_adapters import text
 

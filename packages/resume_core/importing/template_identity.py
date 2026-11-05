@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import uuid
 
-from .models.contracts import _unique
-from .models.template_facts import HandleAllocation, Lineage, SourceSpan
-from .models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
+from ..models.contracts import _unique
+from ..models.template_facts import HandleAllocation, Lineage, SourceSpan
+from ..models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
 from .template_import import digest
-from .templates.compiler import canonical, sha256
-from .templates.builtin_mapping import item_root
-from .templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
+from ..templates.compiler import canonical, sha256
+from ..templates.builtin_mapping import item_root
+from ..templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
 
 
 def source_slice(sources,span: SourceSpan) -> str:
@@ -231,7 +231,7 @@ def allocate_discoveries(reply: ProposalReply,*,operation_id,task_id,attempt_id,
         elif allocation.discovery_hash!=discovery_hash:
             raise ValueError("discovery key was reused with different type/schema/fields")
         if declaration is not None:
-            from .templates.builtin_mapping import bind_builtin_allocation
+            from ..templates.builtin_mapping import bind_builtin_allocation
             allocation = bind_builtin_allocation(allocation, declaration, id_factory, new=new)
         result.append(allocation)
     all_allocations = {**indexed, **{(a.operation_id,a.task_id,a.discovery_attempt_id,a.key): a for a in result}}

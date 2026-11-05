@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from packages.resume_core.template_import import spent_calls
+from packages.resume_core.importing.template_import import spent_calls
 from resume_api.inference_admission import InferenceAdmission
 from resume_api.projects.imports import ImportCommand, ImportService
 from resume_api.projects.service import ProjectService

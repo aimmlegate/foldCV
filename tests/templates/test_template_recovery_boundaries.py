@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-from packages.resume_core.template_import import (CleanupProof, admit_operation, capture_task_input, digest,
-    dispatch_attempt, reserve_attempt, spent_calls)
+from packages.resume_core.importing.template_import import (CleanupProof, admit_operation, capture_task_input, digest,
+                                                            dispatch_attempt, reserve_attempt, spent_calls)
 from tests.templates.pipeline_fixtures import owner, resume_command
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from tests.templates.test_semantic_admission import raw_proposal

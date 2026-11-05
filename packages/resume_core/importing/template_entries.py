@@ -8,9 +8,9 @@ loses neither. The review of the outline runs beside them and may add an entry t
 ended, the block closes with what they collected, its records in the entries' order.
 """
 
-from .models.template_import import OutlineReply, OutlineReviewReply
+from ..models.template_import import OutlineReply, OutlineReviewReply
 from .template_import import digest, entries_of
-from .templates.compiler import splits_entries  # noqa: F401 (re-exported: the import pipeline and tests read it here)
+from ..templates.compiler import splits_entries  # noqa: F401 (re-exported: the import pipeline and tests read it here)
 
 MAX_TITLE = 120
 # D117 review: an entry the outline review names, whose lines another entry already holds, is named in the notice.

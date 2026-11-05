@@ -3,7 +3,7 @@
 from .models.template_clipboard import (ClipboardActiveCell,ClipboardFieldWitness,ClipboardOwnershipWitness,
     ClipboardRecordOwnership,ClipboardScopeWitness,ClipboardSourceWitness)
 from .rich_fields import builtin_cell_values,field_key,working_field
-from .template_identity import source_slice
+from .importing.template_identity import source_slice
 from .template_scope_occurrences import active_scope_cells
 from .templates.compiler import canonical,sha256
 

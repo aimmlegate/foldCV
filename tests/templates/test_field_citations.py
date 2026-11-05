@@ -7,7 +7,7 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.rich_mutations import cut_inline
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.template_authoring import allocate_classified_inline,classify_fragment
-from packages.resume_core.template_identity import capture_span
+from packages.resume_core.importing.template_identity import capture_span
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace

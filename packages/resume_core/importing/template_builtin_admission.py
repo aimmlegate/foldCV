@@ -2,15 +2,15 @@
 
 from pydantic import TypeAdapter
 
-from .models.contracts import PartialDate
-from .models.evidence import EvidenceSpan
-from .models.rich_facts import RichFact, WorkingField, RecordTombstone
-from .rich_fact_mutations import _revise
-from .rich_fields import working_field
+from ..models.contracts import PartialDate
+from ..models.evidence import EvidenceSpan
+from ..models.rich_facts import RichFact, WorkingField, RecordTombstone
+from ..rich_fact_mutations import _revise
+from ..rich_fields import working_field
 from .template_identity import empty_value, payload_value, source_slice
 from .template_import import TemplateImportFailure
-from .template_mutations import content
-from .templates.builtin_mapping import DATE_KEYS, bind_builtin_allocation
+from ..template_mutations import content
+from ..templates.builtin_mapping import DATE_KEYS, bind_builtin_allocation
 
 
 # The fields a new record of each supported kind starts with, all unknown.
@@ -32,7 +32,7 @@ def human_authority(record):
 
 
 def current_handles(operation, facts):
-    from .template_capture import item_identities
+    from ..template_capture import item_identities
     records = {record.id: record for record in facts.records}
     result = {record.item_handle: record for record in facts.extensions}
     result.update({allocation.item_handle: records[allocation.record_id] for allocation in item_identities(operation)
@@ -69,7 +69,7 @@ def inferred_owner_relations(proposal, allocations, declarations, facts, sources
     have cut the projects of an employer from the lines that name it, so the model cannot state the employer. A CV
     lists an employer's projects under it, so the subproject joins the nearest employment above its first cited line.
     The relations stand in for the reply's during admission only; the record keeps its owner as its job id."""
-    from .models.template_facts import Relation
+    from ..models.template_facts import Relation
     owned = {relation.subject_id for relation in relations if relation.active and relation.kind == 'owned_by'}
     known = {record.id for record in facts.records}
     order = {(source.id, unit.id): (index, position) for index, source in enumerate(sources)
@@ -103,7 +103,7 @@ def inferred_owner_relations(proposal, allocations, declarations, facts, sources
 
 
 def owner_values(record_id, operation, facts, declarations, relations):
-    from .template_capture import item_identities
+    from ..template_capture import item_identities
     records = {record.id: record for record in facts.records}
     allocations = {allocation.record_id: allocation for allocation in item_identities(operation)}
     def kind(identifier):

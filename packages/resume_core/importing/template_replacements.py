@@ -1,8 +1,8 @@
 """Apply coordinator-admitted extension replacements as one scoped candidate."""
 
-from .models.rich_facts import RecordTombstone
-from .models.template_facts import WorkingFactsV2
-from .template_mutations import extension_content
+from ..models.rich_facts import RecordTombstone
+from ..models.template_facts import WorkingFactsV2
+from ..template_mutations import extension_content
 
 
 def _effective_value(cell):

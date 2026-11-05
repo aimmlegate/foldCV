@@ -2,7 +2,7 @@
 
 import pytest
 
-from packages.resume_core.template_import import cleanup_verified, spent_calls
+from packages.resume_core.importing.template_import import cleanup_verified, spent_calls
 from tests.providers.claude_relay import EFFORT, MODEL, audit, relay_import
 from tests.templates.generic_fixtures import generic_import
 from tests.templates.test_template_view_adapters import text

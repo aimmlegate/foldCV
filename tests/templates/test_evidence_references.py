@@ -6,11 +6,13 @@ import json
 import pytest
 
 from packages.resume_core.models.template_import import ReferenceTable, ReferencedProposalReply, ReviewInputRecord
-from packages.resume_core.template_identity import capture_span, evidence_options
-from packages.resume_core.template_import import TemplateImportFailure, digest, dispatch_attempt, record_return, reserve_attempt
-from packages.resume_core.template_proposals import parse_proposal, restore_reply
-from packages.resume_core.template_prompt import model_prompt
-from packages.resume_core.template_review import make_review_input, record_review, reusable_receipt, validate_review_reply
+from packages.resume_core.importing.template_identity import capture_span, evidence_options
+from packages.resume_core.importing.template_import import (TemplateImportFailure, digest, dispatch_attempt,
+                                                            record_return, reserve_attempt)
+from packages.resume_core.importing.template_proposals import parse_proposal, restore_reply
+from packages.resume_core.importing.template_prompt import model_prompt
+from packages.resume_core.importing.template_review import (make_review_input, record_review, reusable_receipt,
+                                                            validate_review_reply)
 from packages.resume_core.templates.compiler import sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
 from packages.resume_core.templates.replies import check_references, proposal_schema, review_schema, model_targets
