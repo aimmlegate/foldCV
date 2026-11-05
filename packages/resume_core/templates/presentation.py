@@ -8,7 +8,7 @@ SUPPORTED_AUTHORING = frozenset({'node_index'})
 
 
 def validate_presentation(document, package):
-    from ..rich_fields import inline_groups
+    from ..editing.fields import inline_groups
     for block in document.blocks():
         if block.presentation is None:
             raise ValueError('template block has no authored presentation')

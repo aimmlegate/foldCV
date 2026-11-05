@@ -18,9 +18,9 @@ from packages.resume_core.repository.assistant_store import AgentFailure, identi
 from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, AgentFinding
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
 from packages.resume_core.repository.project_repository import RepositoryFailure
-from packages.resume_core.rich_dependencies import dependency
-from packages.resume_core.rich_fields import inline_groups
-from packages.resume_core.rich_mutations import inline_text, utf16_slice
+from packages.resume_core.editing.dependencies import dependency
+from packages.resume_core.editing.fields import inline_groups
+from packages.resume_core.editing.mutations import inline_text, utf16_slice
 
 from resume_api.agent.mcp import PrivateMcp
 from resume_api.agent.web import bind_run

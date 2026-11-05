@@ -6,7 +6,7 @@ from ..templates.materialize import materialize
 from ..templates.presentation_plan import focus_row
 from ..templates.span_coverage import overlaps
 from ..template_capture import item_identities
-from ..template_effective import effective_cells
+from ..editing.template_effective import effective_cells
 from .template_identity import payload_value
 from .template_proposals import relation_evidence
 

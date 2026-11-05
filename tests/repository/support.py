@@ -3,7 +3,7 @@
 import hashlib
 
 from packages.resume_core.repository.project_repository import ProjectRepository
-from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace as papers
 from tests.templates.test_transactions import request

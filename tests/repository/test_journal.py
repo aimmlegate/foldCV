@@ -135,7 +135,7 @@ def test_undo_restores_fact_order_issues_and_sync_rows_exactly(tmp_path):
     from tests.templates.golden.corpus import corpus as stored_corpus, loaded
     from packages.resume_core.repository.project_journal import apply, changes, snapshot
     from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-    from packages.resume_core.template_preparation import prepare_edit
+    from packages.resume_core.editing.template_preparation import prepare_edit
     from tests.templates.test_template_preparation import response
     corpus = stored_corpus()
     for name in ['delete_entity', 'resolve_template_sync', 'replace_text']:

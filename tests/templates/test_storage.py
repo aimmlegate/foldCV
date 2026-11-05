@@ -10,9 +10,9 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.project_store import ProjectStoreFailure
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.repository.project_repository import ProjectRepository, decode_project
-from packages.resume_core.template_facts import ambiguous_edit, human_edit
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.editing.template_facts import ambiguous_edit, human_edit
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.templates.compiler import canonical, compile_bytes, sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

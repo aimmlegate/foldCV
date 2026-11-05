@@ -3,9 +3,9 @@
 import pytest
 
 from packages.resume_core.models.rich_mutations import RichMutation
-from packages.resume_core.rich_fields import inline_groups, occurrences
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import RichPanelProposal, narrative_steps, panel_mutation
+from packages.resume_core.editing.fields import inline_groups, occurrences
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import RichPanelProposal, narrative_steps, panel_mutation
 from tests.facts.panel_fixtures import apply, edit
 from tests.support.rich import capture, mutation, without_sources
 
@@ -116,7 +116,7 @@ def test_narrative_panel_patch_preserves_structure_styles_links_and_rejects_unre
 
 
 def test_moving_user_created_exact_technology_changes_only_its_working_job():
-    from packages.resume_core.rich_sync import exact_completion, RichCompletionRequest
+    from packages.resume_core.editing.sync import exact_completion, RichCompletionRequest
     workspace = without_sources()
     workspace = apply(workspace, operation='add', recordKind='technology', jobId='job-1', values={'display':'Go'})
     technology = workspace.project.facts.records[-1]
@@ -152,7 +152,7 @@ def test_cited_focus_label_gets_exact_technology_update_without_matching_unlinke
 def test_closing_open_period_and_reopening_it_updates_the_existing_endpoint_span():
     from packages.resume_core.models.rich_document import ParagraphBlock
     workspace = without_sources(); job = workspace.project.facts.records[1]; period = job.periods[0]
-    from packages.resume_core.rich_fields import set_text
+    from packages.resume_core.editing.fields import set_text
     set_text(job, f'period:{period.id}:present', 'по настоящее время')
     raw={'id':'date-endpoint','revision':1,'type':'paragraph','props':{},'children':[], 'provenance':[],
         'content':[{'type':'fact_field','bindingId':'endpoint','recordId':job.id,'fieldKey':f'period:{period.id}:present','text':'по настоящее время','styles':{'italic':True},'syncedFactRevision':1}]}
@@ -168,8 +168,8 @@ def test_closing_open_period_and_reopening_it_updates_the_existing_endpoint_span
 def test_removing_period_retains_other_edits_in_the_same_block():
     from packages.resume_core.models.rich_document import FactFieldSpan, StyledText
     from packages.resume_core.models.rich_mutations import PutBlock
-    from packages.resume_core.rich_dependencies import placements
-    from packages.resume_core.rich_panel import period_blocks, put_block
+    from packages.resume_core.editing.dependencies import placements
+    from packages.resume_core.editing.panel import period_blocks, put_block
     workspace = without_sources()
     project = workspace.project
     record = project.facts.records[1]

@@ -11,10 +11,10 @@ import pytest
 from pydantic import ValidationError
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
-from packages.resume_core.rich_fields import field_key
-from packages.resume_core.rich_panel import RichPanelRequest
-from packages.resume_core.template_panel_records import technology_targets
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.fields import field_key
+from packages.resume_core.editing.panel import RichPanelRequest
+from packages.resume_core.editing.template_panel_records import technology_targets
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.materialize_nodes import literal
 from packages.resume_core.templates.presentation_plan import editor_plan
 from tests.templates.generic_fixtures import TABLES, export_through_service, generic_import

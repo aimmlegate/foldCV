@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from packages.resume_core.canonical_patch import apply_patch, build_patch
+from packages.resume_core.editing.canonical_patch import apply_patch, build_patch
 from packages.resume_core.templates.compiler import canonical, sha256
 
 

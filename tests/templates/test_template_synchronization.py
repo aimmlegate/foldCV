@@ -8,12 +8,12 @@ from pydantic import ValidationError
 from packages.resume_core.models.template_mutations import TemplateMutationV1, TemplateOwnershipConflict, TemplateSyncWrite
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_dependencies import dependencies_current, dependency
-from packages.resume_core.rich_mutations import apply_rich_mutation, RichMutationFailure
-from packages.resume_core.template_authoring import copy_blocks, move_occurrence_steps
-from packages.resume_core.template_dependencies import selector
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_synchronization import live_sync_record, occurrence_blocks, row_hash
+from packages.resume_core.editing.dependencies import dependencies_current, dependency
+from packages.resume_core.editing.mutations import apply_rich_mutation, RichMutationFailure
+from packages.resume_core.editing.template_authoring import copy_blocks, move_occurrence_steps
+from packages.resume_core.editing.template_dependencies import selector
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_synchronization import live_sync_record, occurrence_blocks, row_hash
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_relation_transactions import related_workspace, owner_sections
@@ -133,7 +133,7 @@ def test_conflict_payload_must_match_actual_atomic_ownership_and_occurrences(dam
 
 
 def test_existing_row_update_keeps_index_and_current_dependencies_follow_final_fact_revision():
-    from packages.resume_core.template_facts import human_edit
+    from packages.resume_core.editing.template_facts import human_edit
     from tests.templates.test_transactions import extension_step
     before,_=workspace()
     for identifier,previous in [('first',None),('second','first')]:
@@ -155,7 +155,7 @@ def test_existing_row_update_keeps_index_and_current_dependencies_follow_final_f
 
 
 def test_stale_existing_dependencies_cannot_be_refreshed_into_new_authority():
-    from packages.resume_core.template_facts import human_edit
+    from packages.resume_core.editing.template_facts import human_edit
     from tests.templates.test_transactions import extension_step
     before,_=workspace();before,_=apply_rich_mutation(before,add(before));original=before.sync_records[0]
     facts=human_edit(before.project.facts,'paper-a','title','Later independent wording')

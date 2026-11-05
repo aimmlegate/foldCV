@@ -6,12 +6,12 @@ from packages.resume_core.models.template_document import ManualScopeSpan, Prese
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_mutations import RichMutationFailure,apply_rich_mutation,mutation_sha256
-from packages.resume_core.template_authoring import split_block
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_mutations import HistoryAuthorization
-from packages.resume_core.template_preparation import prepare_text_edit
-from packages.resume_core.template_scope_occurrences import active_scope_cells,scope_occurrences
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation, mutation_sha256
+from packages.resume_core.editing.template_authoring import split_block
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_mutations import HistoryAuthorization
+from packages.resume_core.editing.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 from tests.templates.test_scope_displays import copied_workspace
@@ -144,8 +144,8 @@ def test_scope_insertion_after_an_unrelated_bound_link_preserves_link_authority(
 
 
 def test_two_selected_scopes_share_only_current_cell_union_and_replacement_text():
-    from packages.resume_core.template_preparation_cells import human_cell_steps
-    from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
+    from packages.resume_core.editing.template_preparation_cells import human_cell_steps
+    from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
     from tests.templates.test_scope_displays import command as mutation
     before,_=shared_workspace();block=before.project.document.regions[2].blocks[0].model_copy(deep=True)
     allocator=EditIdAllocator('template-project', 'separate-scopes','scope',existing_ids(before));steps=[];parts=[]
@@ -185,7 +185,7 @@ def test_repeat_undo_redo_archive_and_stale_result_have_exact_retained_authority
 
 
 def test_builtin_shared_repeat_keeps_null_values_and_exact_pending_input_without_reassignment():
-    from packages.resume_core.rich_fields import field_key,inline_groups
+    from packages.resume_core.editing.fields import field_key, inline_groups
     from tests.templates.test_builtin_scopes import scoped_workspace
     before,_=scoped_workspace();block=before.project.document.regions[2].blocks[0]
     length=sum(len(span.text.encode('utf-16-le'))//2 for _name,content in inline_groups(block) for span in content)

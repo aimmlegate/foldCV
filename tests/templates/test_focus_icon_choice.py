@@ -11,11 +11,11 @@ import pytest
 
 from packages.resume_core.repository import focus_icons
 from packages.resume_core.repository.focus_icons import FocusIconStore
-from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.storage import StorageFailure
 from packages.resume_core.importing.template_assembly import assemble_template
-from packages.resume_core.template_panel_focus import icon_changes, icon_choices
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.template_panel_focus import icon_changes, icon_choices
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.focus import catalog_for, remembered_catalog, remembered_icon
 from packages.resume_core.templates.presentation_plan import editor_plan
 from tests.templates.employment_fixtures import employment_source

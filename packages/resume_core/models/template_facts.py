@@ -138,7 +138,7 @@ class CanonicalItemIdentity(Wire):
         _unique(list(self.cell_ids.values()), 'allocated cell')
         if not self.canonical_fields and not self.period_ids:
             return self
-        from ..rich_fields import field_key
+        from ..editing.fields import field_key
         if set(self.canonical_fields) != set(self.cell_ids):
             raise ValueError('canonical field map must cover every allocated builtin cell')
         for key, value in self.canonical_fields.items():
@@ -191,7 +191,7 @@ class WorkingFactsV2(WorkingFacts):
 
     @model_validator(mode="after")
     def generic_identity(self):
-        from ..rich_fields import builtin_cell_values, field_key, working_field
+        from ..editing.fields import builtin_cell_values, field_key, working_field
         builtin_cells = builtin_cell_values(self.records)
         _unique([r.id for r in self.extensions], "extension record")
         _unique([r.item_handle for r in self.extensions], "extension item handle")

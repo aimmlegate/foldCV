@@ -3,7 +3,7 @@
 from ..models.template_document import RichDocumentV2
 from ..models.template_workspace import SpanCoverage
 from ..template_capture import item_identities
-from ..template_effective import builtin_effective_cells, effective_cells
+from ..editing.template_effective import builtin_effective_cells, effective_cells
 from ..importing.template_identity import _bound_root, capture_span, line_spans, source_slice
 from ..importing.template_import import digest
 from ..template_source_cleanup import without_contacts
@@ -12,7 +12,7 @@ from .focus import focus_durations
 from .materialize_nodes import (DisplayField, fallback_style, heading_style, literal, locale_text, reference, render_nodes,
     render_plain_fields, row_section, stable_id)
 from .operations import display_pointer, operation_value
-from ..rich_fields import field_key
+from ..editing.fields import field_key
 from .projection import pointer_tokens
 from .span_coverage import fallback_plan, overlaps, subtract_spans, union_spans, unit_key, without_line_break
 from .store import verify_package

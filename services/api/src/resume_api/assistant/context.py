@@ -13,10 +13,10 @@ from packages.resume_core.repository.assistant_compiler import container_text
 from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.rich_document import FactFieldSpan
 from packages.resume_core.models.template_document import BoundLink
-from packages.resume_core.rich_dependencies import placements
-from packages.resume_core.rich_fields import inline_groups
-from packages.resume_core.rich_mutations import inline_text
-from packages.resume_core.template_preparation import _fields
+from packages.resume_core.editing.dependencies import placements
+from packages.resume_core.editing.fields import inline_groups
+from packages.resume_core.editing.mutations import inline_text
+from packages.resume_core.editing.template_preparation import _fields
 
 from .skills import SKILLS
 

@@ -2,7 +2,7 @@
 
 from packages.resume_core.models.rich_facts import ClaimRecord, EmploymentRecord
 from packages.resume_core.models.template_facts import Relation, WorkingFactsV2
-from packages.resume_core.template_facts import delete_subject, move_owned
+from packages.resume_core.editing.template_facts import delete_subject, move_owned
 from tests.templates.storage_fixtures import papers
 
 

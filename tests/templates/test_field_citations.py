@@ -4,16 +4,16 @@ import pytest
 
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_mutations import cut_inline
+from packages.resume_core.editing.mutations import cut_inline
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.template_authoring import allocate_classified_inline,classify_fragment
+from packages.resume_core.editing.template_authoring import allocate_classified_inline, classify_fragment
 from packages.resume_core.importing.template_identity import capture_span
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_bound_links import linked_workspace
 from tests.templates.test_clipboard_retention import captured
 from tests.templates.test_template_preparation import command,response
-from packages.resume_core.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_preparation import prepare_text_edit
 
 
 def test_empty_authored_citations_preserve_existing_canonical_node_bytes():

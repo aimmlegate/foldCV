@@ -96,19 +96,19 @@ LINE = ('- Результат:  Сборка занимала 40 минут. П�
     'сбоев на приёмочных испытаниях не зафиксировано.',
 ])
 def test_a_value_made_of_the_cited_sentences_is_verbatim(value):
-    from packages.resume_core.template_wording import verbatim
+    from packages.resume_core.editing.template_wording import verbatim
     assert verbatim(value, LINE)
 
 
 @pytest.mark.parametrize('value', ['Сократил сборку с 40 до 12 минут.', 'Сбоев не зафиксировано', ''])
 def test_a_reworded_or_shortened_sentence_is_not_verbatim(value):
-    from packages.resume_core.template_wording import verbatim
+    from packages.resume_core.editing.template_wording import verbatim
     assert not verbatim(value, LINE)
     assert not verbatim('x', '')
 
 
 def test_verbatim_ignores_the_form_of_lines():
-    from packages.resume_core.template_wording import verbatim
+    from packages.resume_core.editing.template_wording import verbatim
     assert verbatim('создание веб-сервисов с нуля (REST, SOAP) в сфере здравоохранения',
         '- Создание веб-сервисов с нуля (REST, SOAP) в сфере здравоохранения;')
     assert verbatim('Первая часть\nвторая часть', 'Первая часть.\n- вторая часть.')

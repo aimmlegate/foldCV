@@ -3,9 +3,10 @@
 import pytest
 
 from packages.resume_core.models.template_document import BoundLink, FieldRef, PresentedText
-from packages.resume_core.rich_mutations import cut_inline
-from packages.resume_core.template_authoring import copy_blocks, copy_fragment, copy_inline, inserted_paragraph, split_block
-from packages.resume_core.template_preparation_ids import EditIdAllocator, existing_ids
+from packages.resume_core.editing.mutations import cut_inline
+from packages.resume_core.editing.template_authoring import (copy_blocks, copy_fragment, copy_inline,
+                                                             inserted_paragraph, split_block)
+from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 

@@ -2,12 +2,12 @@
 
 import pytest
 
-from packages.resume_core import template_authoring
+from packages.resume_core.editing import template_authoring
 from packages.resume_core.models.template_document import BoundLink,FieldOccurrence,ManualScopeSpan,PresentedText
-from packages.resume_core.rich_mutations import RichMutationFailure
-from packages.resume_core.template_authoring import (allocate_classified_blocks,classify_blocks,classify_fragment,
-    classify_inline,split_block)
-from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
+from packages.resume_core.editing.mutations import RichMutationFailure
+from packages.resume_core.editing.template_authoring import (allocate_classified_blocks, classify_blocks,
+                                                             classify_fragment, classify_inline, split_block)
+from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_manual_scope_occurrences import shared_workspace

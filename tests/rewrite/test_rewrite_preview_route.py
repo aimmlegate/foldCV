@@ -13,7 +13,7 @@ from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.reasoning import ModelReasoning
 from tests.settings.test_rewrite_reasoning import Adapter
 from packages.resume_core.templates.presentation import snapshot_identity
-from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
+from packages.resume_core.editing.text_rewrite import PlainTextReply, plain_prompt
 from resume_api.app import ProviderSlot
 from resume_api.providers.claude.profile import ClaudeCliProfile
 from resume_api.providers.base import Metadata, Quota

@@ -3,8 +3,8 @@
 import pytest
 
 from packages.resume_core.models.rich_mutations import RichMutation
-from packages.resume_core.rich_mutations import apply_rich_mutation, locate
-from packages.resume_core.template_inverse import inverse_mutation, semantic
+from packages.resume_core.editing.mutations import apply_rich_mutation, locate
+from packages.resume_core.editing.template_inverse import inverse_mutation, semantic
 from tests.support.rich import without_sources
 
 

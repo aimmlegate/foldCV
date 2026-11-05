@@ -5,7 +5,7 @@ import pytest
 from packages.resume_core.models.evidence import EvidenceSpan
 from packages.resume_core.models.rich_facts import EmploymentRecord
 from packages.resume_core.models.rich_mutations import PutRecord, RemoveRecord
-from packages.resume_core.rich_fact_mutations import apply_record_mutations
+from packages.resume_core.editing.fact_mutations import apply_record_mutations
 from tests.support.rich import fixture
 
 

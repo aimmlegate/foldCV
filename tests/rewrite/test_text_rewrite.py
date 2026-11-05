@@ -5,11 +5,10 @@ from pydantic import ValidationError
 
 from packages.resume_core.models.rich_document import CodeBlock, StyledText
 from packages.resume_core.models.rich_mutations import RichSelection
-from packages.resume_core.rich_mutations import apply_rich_mutation, inline_text
-from packages.resume_core.rich_sync import exact_completion
-from packages.resume_core.text_rewrite import (
-    PlainTextReply, edited_inline, plain_rewrite_steps, selection_targets, selection_text,
-)
+from packages.resume_core.editing.mutations import apply_rich_mutation, inline_text
+from packages.resume_core.editing.sync import exact_completion
+from packages.resume_core.editing.text_rewrite import (PlainTextReply, edited_inline, plain_rewrite_steps,
+                                                       selection_targets, selection_text)
 from tests.support.rich import capture, completion, image_asset, mutation, selection, without_sources
 
 

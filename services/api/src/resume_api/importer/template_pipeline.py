@@ -16,7 +16,7 @@ from packages.resume_core.models.template_import import (CleanupOutcome, ImportI
     ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.importing.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.importing.template_builtin_admission import current_handles
-from packages.resume_core.template_effective import effective_cells
+from packages.resume_core.editing.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
 from packages.resume_core.importing.template_identity import (capture_span, empty_value, evidence_options, line_spans,
                                                               offered_evidence, source_slice)

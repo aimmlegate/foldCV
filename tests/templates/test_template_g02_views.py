@@ -8,9 +8,9 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import BoundLink, FieldOccurrence, ManualScopeSpan
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical, compile_bytes
 from packages.resume_core.templates.presentation_plan import editor_plan
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

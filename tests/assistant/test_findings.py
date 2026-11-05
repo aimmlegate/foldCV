@@ -7,7 +7,7 @@ import pytest
 from packages.resume_core import agent_limits as limits
 from packages.resume_core.repository.assistant_compiler import target_text
 from packages.resume_core.models.assistant import PublishFindingsV1
-from packages.resume_core.rich_dependencies import dependencies_current
+from packages.resume_core.editing.dependencies import dependencies_current
 from tests.support.assistant_tools import Fetcher, tool_session
 from tests.templates.golden.corpus import fixtures
 

@@ -6,8 +6,8 @@ from packages.resume_core.models.template_document import PresentedText
 from packages.resume_core.models.rich_document import SourceWitness
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
-from packages.resume_core.template_preparation import prepare_text_edit
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
+from packages.resume_core.editing.template_preparation import prepare_text_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_template_preparation import command, response
@@ -23,7 +23,7 @@ def test_partial_field_range_has_exact_flanks_and_never_allocates_during_applica
         ('fragment-paper-a', 0, 3, 'prefix'), ('fragment-paper-a', 8, 12, 'suffix')}
     def forbidden():
         pytest.fail('a prepared range cannot allocate hidden engine IDs')
-    monkeypatch.setattr('packages.resume_core.rich_mutations.uuid.uuid4', forbidden)
+    monkeypatch.setattr('packages.resume_core.editing.mutations.uuid.uuid4', forbidden)
     one, _ = apply_rich_mutation(before, prepared.mutation)
     two, _ = apply_rich_mutation(before, prepared.mutation)
     assert canonical(one) == canonical(two) == canonical(prepared.preview.workspace)
@@ -73,7 +73,7 @@ def test_nested_link_cut_coordinates_are_local_and_preserve_whole_link_metadata(
     original = before.project.document.regions[2].blocks[0].content[0]
     def forbidden():
         pytest.fail('nested flank IDs must come from the prepared mapping')
-    monkeypatch.setattr('packages.resume_core.rich_mutations.uuid.uuid4', forbidden)
+    monkeypatch.setattr('packages.resume_core.editing.mutations.uuid.uuid4', forbidden)
     after, _ = apply_rich_mutation(before, prepared.mutation)
     links = after.project.document.regions[2].blocks[0].content
     assert len(links) == 1 and links[0].href == original.href

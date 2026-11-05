@@ -6,11 +6,11 @@ from pathlib import Path
 
 from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
-from packages.resume_core.rich_assembly import date_field, field
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import RichPanelRequest, panel_mutation
+from packages.resume_core.editing.assembly import date_field, field
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import RichPanelRequest, panel_mutation
 from packages.resume_core.technologies import resolve_technology
-from packages.resume_core.technology_focus import focus_candidates
+from packages.resume_core.editing.technology_focus import focus_candidates
 from tests.support.rich import capture, without_sources
 
 # The Focus section of the retired reference template's spec, as the V6 panel tests knew it.

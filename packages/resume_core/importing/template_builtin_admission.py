@@ -5,11 +5,11 @@ from pydantic import TypeAdapter
 from ..models.contracts import PartialDate
 from ..models.evidence import EvidenceSpan
 from ..models.rich_facts import RichFact, WorkingField, RecordTombstone
-from ..rich_fact_mutations import _revise
-from ..rich_fields import working_field
+from ..editing.fact_mutations import _revise
+from ..editing.fields import working_field
 from .template_identity import empty_value, payload_value, source_slice
 from .template_import import TemplateImportFailure
-from ..template_mutations import content
+from ..editing.template_mutations import content
 from ..templates.builtin_mapping import DATE_KEYS, bind_builtin_allocation
 
 

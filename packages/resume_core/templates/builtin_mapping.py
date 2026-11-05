@@ -108,7 +108,7 @@ def bind_builtin_allocation(allocation, declaration, id_factory, *, new):
     if not declaration.builtin_fields:
         return allocation
     from ..models.template_facts import CanonicalFieldBinding
-    from ..rich_fields import field_key
+    from ..editing.fields import field_key
     result = allocation.model_copy(deep=True)
     slots = {binding.period for binding in declaration.builtin_fields.values() if binding.period is not None}
     if new:

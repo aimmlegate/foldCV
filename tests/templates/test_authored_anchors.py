@@ -5,11 +5,11 @@ from copy import deepcopy
 import pytest
 
 from packages.resume_core.models.template_workspace import SpanCoverage
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.template_anchors import anchor_steps, coverage_address, coverage_target, issue_target
-from packages.resume_core.template_authoring import copy_blocks, merge_blocks, split_block
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_local_history import values
+from packages.resume_core.editing.template_authoring import copy_blocks, merge_blocks, split_block
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_local_history import values
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization, issue, request

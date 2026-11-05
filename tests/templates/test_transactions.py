@@ -6,10 +6,10 @@ import pytest
 
 from packages.resume_core.models.template_import import ImportIssue
 from packages.resume_core.models.template_mutations import TemplateMutationV1
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation, mutation_sha256
-from packages.resume_core.template_facts import ambiguous_edit, effective_extension_values, human_edit
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_mutations import HistoryAuthorization
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation, mutation_sha256
+from packages.resume_core.editing.template_facts import ambiguous_edit, effective_extension_values, human_edit
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_mutations import HistoryAuthorization
 from packages.resume_core.templates.compiler import sha256
 from tests.templates.storage_fixtures import workspace
 
@@ -154,7 +154,7 @@ def test_explicit_model_context_keeps_authoritative_raw_and_pending_scope_values
 
 
 def test_extension_only_inverse_obeys_the_existing_history_capacity(monkeypatch):
-    from packages.resume_core import template_inverse as module
+    from packages.resume_core.editing import template_inverse as module
     from packages.resume_core.repository.project_repository import RepositoryFailure
     before, _ = workspace()
     edited = human_edit(before.project.facts, 'paper-a', 'year', 'forthcoming')

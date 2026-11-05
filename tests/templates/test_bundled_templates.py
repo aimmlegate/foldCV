@@ -11,8 +11,8 @@ import zipfile
 
 import pytest
 
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.presentation import project_presentation
 from packages.resume_core.templates.projection import validate_payload

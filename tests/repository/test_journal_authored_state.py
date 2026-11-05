@@ -5,7 +5,7 @@ import pytest
 
 from packages.resume_core.models.projects import RenameRequestV1
 from packages.resume_core.repository.project_repository import RepositoryFailure
-from packages.resume_core.template_inverse import semantic
+from packages.resume_core.editing.template_inverse import semantic
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_materialize import fallback_edit, text
 from tests.templates.test_transactions import request
@@ -83,7 +83,7 @@ def test_a_rename_between_an_edit_and_its_undo_keeps_the_new_title(tmp_path):
 
 @pytest.mark.parametrize('case', ['joined_scope', 'owner_move', 'owner_delete'])
 def test_shared_scopes_ownership_moves_and_cascaded_deletion_undo_and_redo_exactly(case, tmp_path):
-    from packages.resume_core.template_authoring import move_occurrence_steps
+    from packages.resume_core.editing.template_authoring import move_occurrence_steps
     from tests.templates.test_builtin_scopes import joined_edit, scoped_workspace
     from tests.templates.test_relation_transactions import owner_sections, related_workspace
     before, sources = scoped_workspace() if case == 'joined_scope' else related_workspace()

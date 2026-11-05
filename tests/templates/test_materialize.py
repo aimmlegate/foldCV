@@ -142,7 +142,7 @@ def test_fallback_places_disconnected_evidence_added_by_suppression_once_without
 @pytest.mark.parametrize('owner', ['original', 'moved', 'missing'])
 def test_captured_nested_human_claim_without_sidecar_stays_with_current_owner_as_plain_text(owner):
     from packages.resume_core.template_capture import prepare_builtin_identities
-    from packages.resume_core.template_facts import move_owned
+    from packages.resume_core.editing.template_facts import move_owned
     from packages.resume_core.importing.template_import import start_operation
     from tests.templates.pipeline_fixtures import NOW, setup_operation
     from tests.templates.test_existing_capture import serial
@@ -228,7 +228,7 @@ def test_captured_human_classification_is_retained_in_facts_without_becoming_cv_
 
 
 def test_hidden_human_classification_does_not_prevent_visible_claim_source_fallback():
-    from packages.resume_core.template_facts import human_edit
+    from packages.resume_core.editing.template_facts import human_edit
     operation, facts, package, src, _raw = admitted(payload_edit=lambda value:
         value[0]['results'][0].update(value='Rewritten team result'))
     result = next(value for value in operation.allocations if value.key == 'results-entry')
@@ -303,8 +303,8 @@ def fallback_edit(before):
 
 
 def test_materialized_fallback_issue_edit_undo_redo_is_scoped_without_new_checks(monkeypatch):
-    from packages.resume_core.rich_mutations import apply_rich_mutation
-    from packages.resume_core.template_inverse import inverse_template_mutation
+    from packages.resume_core.editing.mutations import apply_rich_mutation
+    from packages.resume_core.editing.template_inverse import inverse_template_mutation
     from tests.templates.test_transactions import authorization
     before, _sources = issue_workspace()
     assert all(finding.block_ids for finding in before.project.import_issues)

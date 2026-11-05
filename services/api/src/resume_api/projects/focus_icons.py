@@ -1,6 +1,6 @@
 """The template icons a Focus row can take, for the facts panel's search (D122)."""
 
-from packages.resume_core.template_panel_focus import icon_choices
+from packages.resume_core.editing.template_panel_focus import icon_choices
 from packages.resume_core.templates.models import remember_asset
 
 from .errors import ProjectFailure

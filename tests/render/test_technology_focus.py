@@ -5,9 +5,9 @@ import hashlib
 import json
 
 from packages.resume_core.models.rich_facts import WorkingFacts
-from packages.resume_core.rich_fields import set_text
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import panel_mutation
+from packages.resume_core.editing.fields import set_text
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import panel_mutation
 from packages.resume_core.responses.presentation import presentation
 from packages.resume_core.technologies import BY_ID, CATALOG, is_technical, logo_path, technology_identity
 from packages.resume_core.technology_experience import technology_experience

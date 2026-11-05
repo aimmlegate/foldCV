@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 from resume_api.template_rewrite import TemplateRewrite

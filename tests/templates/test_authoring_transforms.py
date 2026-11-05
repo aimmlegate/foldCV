@@ -3,11 +3,11 @@
 import pytest
 
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText
-from packages.resume_core.rich_fields import occurrences
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_authoring import (copy_blocks, copy_fragment, duplicate_entity,
-    inserted_paragraph, merge_blocks, split_block)
-from packages.resume_core.template_facts import ambiguous_edit
+from packages.resume_core.editing.fields import occurrences
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.template_authoring import (copy_blocks, copy_fragment, duplicate_entity,
+                                                             inserted_paragraph, merge_blocks, split_block)
+from packages.resume_core.editing.template_facts import ambiguous_edit
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import request
 

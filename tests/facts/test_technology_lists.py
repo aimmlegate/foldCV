@@ -5,10 +5,10 @@ import pytest
 
 from packages.resume_core.models.rich_document import RichBlock, StyledText
 from packages.resume_core.models.rich_workspace import WorkspaceV6
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import field_block, panel_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import field_block, panel_mutation
 from packages.resume_core.responses.presentation import authored_text, presentation
-from packages.resume_core.template_inverse import inverse_mutation
+from packages.resume_core.editing.template_inverse import inverse_mutation
 from tests.facts.panel_fixtures import apply, edit, job, technology_facts, technology_workspace
 from tests.support.rich import without_sources
 

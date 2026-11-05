@@ -5,13 +5,13 @@ import pytest
 from packages.resume_core.models.template_document import ManualScopeSpan, PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
-from packages.resume_core.template_authoring import copy_blocks, split_block
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_mutations import HistoryAuthorization
-from packages.resume_core.template_preparation_cells import human_cell_steps
-from packages.resume_core.template_preparation_ids import EditIdAllocator, existing_ids
-from packages.resume_core.template_scope_displays import capture_source, inline_addresses, node_hash
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
+from packages.resume_core.editing.template_authoring import copy_blocks, split_block
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_mutations import HistoryAuthorization
+from packages.resume_core.editing.template_preparation_cells import human_cell_steps
+from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
+from packages.resume_core.editing.template_scope_displays import capture_source, inline_addresses, node_hash
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
 
@@ -56,7 +56,7 @@ def test_detaching_a_copy_preserves_exact_values_cells_and_issues_and_has_guarde
     assert result.project.facts == before.project.facts and result.project.import_issues == before.project.import_issues
     inverse = inverse_template_mutation(before,result,origin_action_id=mutation.action_id,mutation_id='undo-display',
         session_id='session',action_token=3)
-    from packages.resume_core.rich_mutations import mutation_sha256
+    from packages.resume_core.editing.mutations import mutation_sha256
     authority = HistoryAuthorization(result.project_id,result.document_revision,'session',3,mutation.action_id,mutation_sha256(inverse))
     restored,_ = apply_rich_mutation(result,inverse,history_authorization=authority)
     restored_span = next(block for block in restored.project.document.blocks() if block.id == copied_id).content[0]

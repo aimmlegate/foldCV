@@ -2,15 +2,15 @@
 
 import pytest
 
-from packages.resume_core.template_inverse import semantic
+from packages.resume_core.editing.template_inverse import semantic
 from packages.resume_core.models.template_document import BoundLink,FieldOccurrence,FieldRef,PresentedText
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_dependencies import dependencies_current
-from packages.resume_core.rich_mutations import apply_rich_mutation,RichMutationFailure
-from packages.resume_core.template_preparation import prepare_edit
-from packages.resume_core.template_synchronization import occurrence_blocks,row_hash
+from packages.resume_core.editing.dependencies import dependencies_current
+from packages.resume_core.editing.mutations import apply_rich_mutation, RichMutationFailure
+from packages.resume_core.editing.template_preparation import prepare_edit
+from packages.resume_core.editing.template_synchronization import occurrence_blocks, row_hash
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_structural_preparation import intent,selection,place

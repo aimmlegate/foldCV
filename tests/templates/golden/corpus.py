@@ -37,7 +37,7 @@ def with_capture(value, capture_id):
 def fixtures():
     """The starting projects the stored corpus was built from, one per shape the operations need; all synthetic."""
     from packages.resume_core.models.template_workspace import WorkspaceV7
-    from packages.resume_core.rich_mutations import apply_rich_mutation
+    from packages.resume_core.editing.mutations import apply_rich_mutation
     from tests.templates.storage_fixtures import workspace
     from tests.templates.test_authored_anchors import anchored
     from tests.templates.test_bound_links import linked_workspace

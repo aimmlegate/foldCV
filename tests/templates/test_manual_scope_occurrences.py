@@ -7,14 +7,15 @@ from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_dependencies import dependencies_current, dependency
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation, cut_inline
-from packages.resume_core.template_authoring import copy_blocks, copy_fragment, copy_inline, merge_blocks, split_block
-from packages.resume_core.template_dependencies import selector
-from packages.resume_core.template_preparation import prepare_text_edit
-from packages.resume_core.template_preparation_cells import human_cell_steps
-from packages.resume_core.template_preparation_ids import EditIdAllocator, existing_ids
-from packages.resume_core.template_scope_occurrences import active_scope_cells, scope_occurrences
+from packages.resume_core.editing.dependencies import dependencies_current, dependency
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation, cut_inline
+from packages.resume_core.editing.template_authoring import (copy_blocks, copy_fragment, copy_inline, merge_blocks,
+                                                             split_block)
+from packages.resume_core.editing.template_dependencies import selector
+from packages.resume_core.editing.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_preparation_cells import human_cell_steps
+from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
+from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_template_preparation import command, response

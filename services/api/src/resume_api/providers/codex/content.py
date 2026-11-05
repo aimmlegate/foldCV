@@ -20,7 +20,7 @@ from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.inference_admission import INFERENCE, AdmissionCancelled, AdmissionTimeout, AdmissionBlocked
 from resume_api.profile_ownership import native_profile
 from resume_api.rewrite_timing import add_phase, measure
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from packages.resume_core.storage import StorageFailure
 from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn, outcome_state,

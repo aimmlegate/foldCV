@@ -11,7 +11,7 @@ from packages.resume_core.models.rich_document import ImageBlock
 from packages.resume_core.models.rich_mutations import RichMutation, RichSelection
 from packages.resume_core.models.rich_workspace import WorkspaceV6
 from packages.resume_core.rich_images import normalize_image
-from packages.resume_core.rich_sync import RichCompletionRequest, selection_checksum, selection_parts
+from packages.resume_core.editing.sync import RichCompletionRequest, selection_checksum, selection_parts
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/rich_workspace.json"
 # The manifest the retired reference template loader built; V6 workspaces still carry it.

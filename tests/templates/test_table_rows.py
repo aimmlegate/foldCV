@@ -10,9 +10,9 @@ from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.importing.template_assembly import assemble_template
 from packages.resume_core.responses.template_export import capture_export, snapshot_identity
-from packages.resume_core.template_panel_creation import _rowed
-from packages.resume_core.template_panel_lines import line_container, row_start
-from packages.resume_core.template_preparation_panel import restore_view
+from packages.resume_core.editing.template_panel_creation import _rowed
+from packages.resume_core.editing.template_panel_lines import line_container, row_start
+from packages.resume_core.editing.template_preparation_panel import restore_view
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.presentation import project_presentation

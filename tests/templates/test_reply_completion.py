@@ -515,7 +515,7 @@ from types import SimpleNamespace
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.template_import import ReferenceTable
 from packages.resume_core.importing.template_completion import stated_text, stating
-from packages.resume_core.template_wording import display_raw_input
+from packages.resume_core.editing.template_wording import display_raw_input
 from packages.resume_core.templates.compiler import sha256
 
 TWO_JOBS = ('Example One — engineer, 2019–2020\nPython\nРазработка REST API\nExample Two — engineer, 2021–2022\nPython\n'

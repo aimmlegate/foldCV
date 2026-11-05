@@ -6,11 +6,12 @@ from packages.resume_core.models.template_facts import Relation
 from packages.resume_core.models.rich_document import FieldBinding
 from packages.resume_core.models.template_authoring import TemplateClipboardCaptureV1
 from packages.resume_core.models.template_document import BoundLink,FieldRef,PresentedText
-from packages.resume_core.template_authoring import split_block
-from packages.resume_core.template_clipboard import capture_clipboard
-from packages.resume_core.template_clipboard_witnesses import (captured_package_hash,field_witness,ownership_witness,scope_witness,
-    source_witness,verify_witness,verify_witnesses)
-from packages.resume_core.template_facts import human_edit
+from packages.resume_core.editing.template_authoring import split_block
+from packages.resume_core.editing.template_clipboard import capture_clipboard
+from packages.resume_core.editing.template_clipboard_witnesses import (captured_package_hash, field_witness,
+                                                                       ownership_witness, scope_witness,
+                                                                       source_witness, verify_witness, verify_witnesses)
+from packages.resume_core.editing.template_facts import human_edit
 from packages.resume_core.templates.compiler import canonical
 from packages.resume_core.templates.presentation import snapshot_identity
 from tests.templates.editor_fixtures import TemplateEditor

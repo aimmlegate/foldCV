@@ -6,9 +6,9 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_fields import occurrences
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.fields import occurrences
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_authored_anchors import anchored
@@ -195,7 +195,7 @@ def test_merge_moves_trailing_children_without_dropping_their_import_anchors():
 def test_moving_owned_occurrence_changes_only_effective_relation_and_retires_scoped_issue():
     from tests.templates.test_relation_transactions import owner_sections,related_workspace
     from tests.templates.test_transactions import authorization,issue
-    from packages.resume_core.template_inverse import inverse_template_mutation
+    from packages.resume_core.editing.template_inverse import inverse_template_mutation
     before,_=related_workspace();before=owner_sections(before)
     original=next(block for block in before.project.document.blocks() if block.id=='block-paper-a')
     warning=issue('owner-warning',before.project.facts.relations[0].id)
@@ -239,7 +239,7 @@ def test_copy_source_targets_use_original_document_order_even_when_the_request_l
 
 def test_ownership_move_with_an_outside_copy_creates_an_atomic_explicit_conflict():
     from tests.templates.test_relation_transactions import owner_sections,related_workspace
-    from packages.resume_core.template_authoring import copy_blocks
+    from packages.resume_core.editing.template_authoring import copy_blocks
     before,_=related_workspace();before=owner_sections(before)
     original=next(block for block in before.project.document.blocks() if block.id=='block-paper-a')
     before.project.document.regions[2].blocks[0].children.append(copy_blocks(before.project,[original])[0])

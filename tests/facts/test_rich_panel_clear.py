@@ -3,8 +3,8 @@
 import pytest
 
 from packages.resume_core.models.rich_document import ParagraphBlock, StyledText
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import panel_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import panel_mutation
 from tests.facts.panel_fixtures import apply, edit
 from tests.support.rich import without_sources
 

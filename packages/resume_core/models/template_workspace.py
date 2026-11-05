@@ -123,7 +123,7 @@ class ProjectV6(Wire):
     @model_validator(mode="after")
     def integrity(self):
         from ..importing.template_identity import source_slice
-        from ..template_scope_occurrences import validate_scope_occurrences
+        from ..editing.template_scope_occurrences import validate_scope_occurrences
         verify_package(self.template_package)
         validate_scope_occurrences(self)
         for name in ('evidence_records','assets','operations','renders','import_issues','template_operations','exports'):
@@ -143,7 +143,7 @@ class ProjectV6(Wire):
         builtins={r.id:r for r in self.facts.records}
         assets={a.id:a for a in self.assets};retained={}
         recipe=self.template_package.recipe
-        from ..rich_fields import working_field,field_key
+        from ..editing.fields import working_field, field_key
         from ..templates.compiler import canonical,sha256
         from ..templates.projection import reachable_schema,schema_at
         types={t.id:reachable_schema(t.data_schema,self.template_package.definition.content_definitions) for t in self.template_package.definition.fact_types}

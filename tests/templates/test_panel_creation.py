@@ -5,22 +5,22 @@ from copy import deepcopy
 
 import pytest
 
-from packages.resume_core.template_inverse import semantic
+from packages.resume_core.editing.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock
 from packages.resume_core.models.template_facts import WorkingFactsV2
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_fields import builtin_cell_values, field_key
-from packages.resume_core.rich_mutations import RichMutationFailure
+from packages.resume_core.editing.fields import builtin_cell_values, field_key
+from packages.resume_core.editing.mutations import RichMutationFailure
 from packages.resume_core.importing.template_assembly import assemble_template
-from packages.resume_core.template_authoring import copy_blocks, copy_inline
+from packages.resume_core.editing.template_authoring import copy_blocks, copy_inline
 from packages.resume_core.template_capture import prepare_builtin_identities
-from packages.resume_core.template_panel_creation import addable_kinds
-from packages.resume_core.template_panel_records import panel_plan
-from packages.resume_core.template_preparation import prepare_edit
-from packages.resume_core.template_preparation_ids import EditIdAllocator,existing_ids
+from packages.resume_core.editing.template_panel_creation import addable_kinds
+from packages.resume_core.editing.template_panel_records import panel_plan
+from packages.resume_core.editing.template_preparation import prepare_edit
+from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.templates.compiler import canonical, compile_bytes
 from packages.resume_core.templates.materialize_nodes import reference
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
@@ -464,7 +464,7 @@ def test_only_kinds_the_template_can_show_are_offered(two_column,monkeypatch):
     # The plan comes with every reply, so a binding the panel cannot follow never stops a project from opening.
     def unusable(*_args):
         raise ValueError('field has no unique compiled item binding')
-    monkeypatch.setattr('packages.resume_core.template_panel_creation.view_options',unusable)
+    monkeypatch.setattr('packages.resume_core.editing.template_panel_creation.view_options',unusable)
     assert addable_kinds(two_column.project)==[]
 
 

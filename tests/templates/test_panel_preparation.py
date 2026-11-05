@@ -2,17 +2,17 @@
 
 import pytest
 
-from packages.resume_core.template_inverse import semantic
+from packages.resume_core.editing.template_inverse import semantic
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
 from packages.resume_core.models.rich_facts import TechnologyRecord, TextField, WorkingPeriod
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.rich_fields import field_key, set_text
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.fields import field_key, set_text
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.editor_fixtures import TemplateEditor
 from tests.templates.test_builtin_scopes import scoped_workspace

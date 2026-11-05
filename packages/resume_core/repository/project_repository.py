@@ -503,7 +503,7 @@ class ProjectRepository:
 
     @staticmethod
     def _seeded(workspace):
-        from ..template_preparation_ids import existing_ids
+        from ..editing.template_preparation_ids import existing_ids
         replays = OrderedDict((row.client_mutation_id, EditOutcome(row.client_mutation_id, row.request_sha256,
             row.resulting_revision, 'edit', details={'created_ids': row.created_ids, 'created_blocks': row.created_blocks,
             'changed_block_ids': row.changed_block_ids}, replayed=True)) for row in workspace.mutation_replay[-REPLAY_WINDOW:])
@@ -717,7 +717,7 @@ class ProjectRepository:
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
         except OSError:
             raise RepositoryFailure('PROJECT_SAVE_FAILED') from None
-        from ..template_preparation_ids import existing_ids
+        from ..editing.template_preparation_ids import existing_ids
         session.workspace, session.file_key = after, key
         session.occupied_ids |= existing_ids(after) if kind != 'edit' else _created(details)
         session.registry_dirty = True

@@ -4,8 +4,8 @@ import pytest
 
 from packages.resume_core.models.rich_mutations import RichMutation
 from packages.resume_core.models.rich_workspace import WorkspaceV6
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import panel_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import panel_mutation
 from packages.resume_core.responses.presentation import authored_text, presentation
 from packages.resume_core.technology_experience import technology_years
 from tests.facts.panel_fixtures import edit, job, technology_facts, technology_workspace
@@ -68,7 +68,7 @@ def test_quick_year_edit_resorts_in_the_same_mutation_and_can_be_cleared_undone_
 
 
 def test_clearing_an_estimated_duration_hides_it_instead_of_restoring_the_estimate():
-    from packages.resume_core.rich_fields import set_text
+    from packages.resume_core.editing.fields import set_text
     facts, _ = technology_facts([job("2020-01", "2022-12"), {"kind": "technology", "display": "Python"}])
     assert technology_years(facts)["python"] == 3
     general = next(record for record in facts.records if record.kind == "technology" and record.job_id is None)

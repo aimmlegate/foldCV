@@ -5,7 +5,7 @@ from collections import OrderedDict
 import threading
 
 from packages.resume_core.repository.preferences import PreferencesFailure
-from packages.resume_core.text_rewrite import PlainTextReply, plain_prompt
+from packages.resume_core.editing.text_rewrite import PlainTextReply, plain_prompt
 from .inference_admission import AdmissionCancelled
 from .lifecycle import OperationFiles, SpikeError
 from .projects.errors import ProjectFailure

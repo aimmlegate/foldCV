@@ -3,9 +3,9 @@
 from datetime import datetime, timezone
 import json
 
-from packages.resume_core.rich_panel import RichPanelProposal
-from packages.resume_core.rich_sync import RichReconcileProposal, RichRewriteProposal
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.panel import RichPanelProposal
+from packages.resume_core.editing.sync import RichReconcileProposal, RichRewriteProposal
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api.providers.content import ContentFailure, ContentResult, ReportedUsage
 
 

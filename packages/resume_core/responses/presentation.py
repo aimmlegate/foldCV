@@ -8,7 +8,7 @@ from ..models.contracts import Id, Wire
 from ..models.rich_document import FactFieldSpan, Hyperlink
 from ..technologies import BY_ID, logo_path, resolve_technology, technology_identity
 from ..technology_experience import technology_experience, technology_years, whole_years_text
-from ..technology_focus import focus_entry_record, focus_logo, focus_choices
+from ..editing.technology_focus import focus_entry_record, focus_logo, focus_choices
 
 
 class BlockPresentation(Wire):

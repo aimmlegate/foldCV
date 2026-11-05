@@ -4,7 +4,7 @@ import pytest
 
 from packages.resume_core.repository.assistant_compiler import CompileFailure, compile_ops, preview, target_text
 from packages.resume_core.models.assistant import ProposeChangesV1
-from packages.resume_core.template_panel_records import technology_targets
+from packages.resume_core.editing.template_panel_records import technology_targets
 from resume_api.projects.service import response_for_workspace
 from tests.templates.test_focus_panel import applied
 from tests.templates.test_panel_records import before, imported, job_line, lines, record, request  # noqa: F401

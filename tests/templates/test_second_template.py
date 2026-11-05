@@ -161,7 +161,7 @@ def test_a_mounted_project_keeps_its_template_while_another_template_is_active(t
 
 def test_a_date_or_period_shows_its_stated_wording_and_other_objects_their_json():
     # A template-only type showed {"raw": ...} JSON for its year; built-in records already showed the wording.
-    from packages.resume_core.template_wording import display_text
+    from packages.resume_core.editing.template_wording import display_text
     assert display_text('As stated') == 'As stated'
     assert display_text({'raw': '2024', 'year': 2024, 'month': None}) == '2024'
     assert display_text({'raw': '2020–2023', 'start': None, 'end': None, 'ongoing': False}) == '2020–2023'

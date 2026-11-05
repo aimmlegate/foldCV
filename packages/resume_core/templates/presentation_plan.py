@@ -214,8 +214,8 @@ def editor_plan(project):
         'blocks': blocks, 'fonts': sorted(face for face in used if face is not None), 'icons': icons}
     if files:
         plan['iconFiles'] = files
-    from ..template_panel_focus import focus_full, focus_only
-    from ..template_panel_records import panel_plan, technology_targets
+    from ..editing.template_panel_focus import focus_full, focus_only
+    from ..editing.template_panel_records import panel_plan, technology_targets
     targets = [value.model_dump(mode='json', by_alias=True) for value in technology_targets(project)]
     if targets:
         plan['technologyTargets'] = targets

@@ -8,8 +8,8 @@ from packages.resume_core.repository.assistant_compiler import CompileFailure, c
 from packages.resume_core.models.assistant import ProposeChangesV1
 from packages.resume_core.repository.project_journal import snapshot
 from packages.resume_core.repository.project_repository import ProjectRepository
-from packages.resume_core.rich_fields import inline_groups
-from packages.resume_core.rich_mutations import inline_text
+from packages.resume_core.editing.fields import inline_groups
+from packages.resume_core.editing.mutations import inline_text
 from resume_api.projects.service import response_for_workspace
 from tests.assistant.fixtures import joined, tabled
 from tests.templates.golden.corpus import fixtures

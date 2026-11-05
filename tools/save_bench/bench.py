@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 def text_length(block):
-    from packages.resume_core.rich_mutations import inline_text
+    from packages.resume_core.editing.mutations import inline_text
     return sum(len(inline_text(span).encode('utf-16-le')) // 2 for span in block.content)
 
 
@@ -52,7 +52,7 @@ def main():
     if args.api == 'repository':
         from packages.resume_core.repository.project_repository import ProjectRepository
         from packages.resume_core.responses.template_api import TemplateProjectResponseV1
-        from packages.resume_core.template_preparation import prepare_edit
+        from packages.resume_core.editing.template_preparation import prepare_edit
         from packages.resume_core.templates.presentation import project_presentation, snapshot_identity
         repo = ProjectRepository(store / 'data')
         repo.create(workspace, blobs=[('sources', key, raw, hashlib.sha256(raw).hexdigest()) for key, raw in sources.items()])

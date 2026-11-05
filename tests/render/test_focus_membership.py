@@ -5,8 +5,8 @@ import pytest
 
 from packages.resume_core.models.rich_document import ParagraphBlock
 from packages.resume_core.models.rich_workspace import WorkspaceV6
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_panel import RichPanelRequest, field_block, panel_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.panel import RichPanelRequest, field_block, panel_mutation
 from packages.resume_core.responses.presentation import presentation
 from tests.facts.panel_fixtures import edit, job, technology_workspace
 

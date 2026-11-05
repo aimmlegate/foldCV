@@ -4,7 +4,7 @@ from ..models.template_facts import Observation, Relation
 from ..models.template_import import (ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation,
                                       DroppedValue)
 from ..repository.project_store import strict_json
-from ..rich_fields import field_key
+from ..editing.fields import field_key
 from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, offered_references, payload_value,
                                 resolve_fields, resolve_lineage, restore_evidence, source_slice)
 from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in

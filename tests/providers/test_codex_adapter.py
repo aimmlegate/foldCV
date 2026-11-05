@@ -472,7 +472,7 @@ def test_terminal_failure_releases_generation_for_another_instance(fake) -> None
 
 @pytest.mark.parametrize("reply", ["A short plain reply.", "Обычный текст 🚀\n\nВторой абзац."])
 def test_plain_rewrite_uses_stdin_without_schema_and_passes_selected_reasoning(fake, reply):
-    from packages.resume_core.text_rewrite import PlainTextReply
+    from packages.resume_core.editing.text_rewrite import PlainTextReply
     cli, root, keep, configure, starts = fake
     configure(plain_text=True, result_text=reply)
     provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
@@ -493,7 +493,7 @@ def test_plain_rewrite_uses_stdin_without_schema_and_passes_selected_reasoning(f
 
 
 def test_plain_rewrite_rejects_unsupported_effort_before_generation(fake):
-    from packages.resume_core.text_rewrite import PlainTextReply
+    from packages.resume_core.editing.text_rewrite import PlainTextReply
     cli, root, _, configure, starts = fake
     configure(plain_text=True, result_text="Reply")
     provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
@@ -505,7 +505,7 @@ def test_plain_rewrite_rejects_unsupported_effort_before_generation(fake):
 
 
 def test_plain_empty_reply_fails_once_without_repair(fake):
-    from packages.resume_core.text_rewrite import PlainTextReply
+    from packages.resume_core.editing.text_rewrite import PlainTextReply
     cli, root, _, configure, starts = fake
     configure(plain_text=True, result_text="  \n")
     provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))

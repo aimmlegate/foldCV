@@ -7,7 +7,7 @@ import pytest
 from packages.resume_core.models.template_import import HandleSelector, ProposalReply
 from packages.resume_core.templates.models import Binding
 from packages.resume_core.templates.projection import validate_payload
-from packages.resume_core.rich_fields import field_key
+from packages.resume_core.editing.fields import field_key
 from packages.resume_core.importing.template_identity import (allocate_discoveries, capture_span, codepoint_offset,
                                                               payload_value, resolve_fields, resolve_lineage,
                                                               source_slice)

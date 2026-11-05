@@ -28,7 +28,7 @@ from packages.resume_core.models.agent import AgentWebSource
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.storage import atomic_write
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api.agent.base import RuntimeResult, ScriptedAgentRuntime
 from resume_api.app import ProviderSlot, create_app
 from resume_api.cli.installation import ClaudeInstallation, MARKER

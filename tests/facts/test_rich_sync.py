@@ -3,9 +3,9 @@
 from packages.resume_core.models.rich_document import NarrativeCitation, ParagraphBlock, SectionBlock
 from packages.resume_core.models.rich_facts import ClaimRecord, TechnologyRecord
 from packages.resume_core.models.rich_mutations import RichSelection
-from packages.resume_core.rich_fields import occurrences
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.rich_sync import RichRewriteProposal, exact_completion, rewrite_steps, selection_parts
+from packages.resume_core.editing.fields import occurrences
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.sync import RichRewriteProposal, exact_completion, rewrite_steps, selection_parts
 from tests.support.rich import capture, completion, mutation, selection, without_sources
 
 

@@ -9,7 +9,7 @@ from .rich_document import Alignment, Color, Hyperlink, InlineStyles, StyledText
 from .rich_mutations import ActionCapture
 from .template_mutations import TemplateMutationV1
 from .template_render import TemplateSnapshotIdentity
-from ..rich_panel import RichPanelRequest
+from ..editing.panel import RichPanelRequest
 from ..responses.template_api import TemplateProjectResponseV1
 
 

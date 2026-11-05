@@ -13,7 +13,7 @@ from packages.resume_core.repository.preferences import PreferencesStore
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.rules import RulesStore
 from packages.resume_core.storage import atomic_write
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api import app as service
 from resume_api.app import ProviderSlot
 from resume_api.providers.claude.profile import ClaudeCliProfile

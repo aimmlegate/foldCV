@@ -1,10 +1,10 @@
 """New-version tree edits retain extension state and authored presentation."""
 
 from packages.resume_core.models.template_mutations import TemplateMutationV1
-from packages.resume_core.rich_fields import occurrences
-from packages.resume_core.rich_mutations import apply_rich_mutation
-from packages.resume_core.template_facts import human_edit
-from packages.resume_core.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.fields import occurrences
+from packages.resume_core.editing.mutations import apply_rich_mutation
+from packages.resume_core.editing.template_facts import human_edit
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization
 

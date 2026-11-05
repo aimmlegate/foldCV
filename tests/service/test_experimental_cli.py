@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/api/src"))
 
-from packages.resume_core.text_rewrite import PlainTextReply
+from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api import app as app_module
 from resume_api.app import create_app
 from resume_api.providers.codex import distribution

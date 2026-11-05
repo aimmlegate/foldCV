@@ -164,7 +164,7 @@ def test_disabled_rewriting_retains_source_display_even_if_review_accepts_a_para
     assert claim.value.value == paraphrase
     expected = paraphrase if rewrite else 'Implemented queue processing'
     assert claim.value.raw_text == expected
-    from packages.resume_core.template_effective import builtin_effective_cells
+    from packages.resume_core.editing.template_effective import builtin_effective_cells
     cell = next(cell for cell in builtin_effective_cells(after, [admitted]) if cell.id == allocation.cell_ids['value'])
     assert cell.raw_input == expected and cell.typed_value == paraphrase
     stored = admitted.review_inputs[0].value

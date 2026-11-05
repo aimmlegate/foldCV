@@ -6,7 +6,7 @@ import json
 import pytest
 
 from packages.resume_core.models.template_facts import WorkingFactsV2
-from packages.resume_core.template_effective import builtin_effective_cells, effective_cells
+from packages.resume_core.editing.template_effective import builtin_effective_cells, effective_cells
 from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.templates.compiler import canonical
@@ -16,7 +16,7 @@ from tests.templates.employment_fixtures import employment_package, employment_p
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, usage
 from tests.templates.test_builtin_admission import accept, proposed_from, proposal_ready
 from tests.templates.test_builtin_scopes import joined_edit, scoped_workspace
-from packages.resume_core.rich_mutations import apply_rich_mutation
+from packages.resume_core.editing.mutations import apply_rich_mutation
 
 
 def admitted_employment(*, invalid_metric=False):

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from packages.resume_core.models.projects import EditResultV1, digest_request
 from packages.resume_core.models.template_authoring import BuiltinPanel, PasteBlocks, PasteInline
-from packages.resume_core.rich_mutations import RichMutationFailure
-from packages.resume_core.template_preparation import prepare_edit
-from packages.resume_core.template_preparation_panel import PANEL_REFUSALS
+from packages.resume_core.editing.mutations import RichMutationFailure
+from packages.resume_core.editing.template_preparation import prepare_edit
+from packages.resume_core.editing.template_preparation_panel import PANEL_REFUSALS
 
 from .clipboard import for_paste
 from .errors import ProjectFailure

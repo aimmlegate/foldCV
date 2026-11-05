@@ -9,11 +9,11 @@ import pytest
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.models.template_document import FieldOccurrence
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_dependencies import placements
-from packages.resume_core.rich_fields import field_key
+from packages.resume_core.editing.dependencies import placements
+from packages.resume_core.editing.fields import field_key
 from packages.resume_core.templates.materialize_nodes import literal
-from packages.resume_core.template_panel_records import technology_targets
-from packages.resume_core.template_preparation import prepare_edit
+from packages.resume_core.editing.template_panel_records import technology_targets
+from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.presentation_plan import editor_plan
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

@@ -6,10 +6,10 @@ import pytest
 from packages.resume_core.models.rich_document import SourceWitness
 from packages.resume_core.models.template_document import PresentedText
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.rich_mutations import RichMutationFailure, apply_rich_mutation
-from packages.resume_core.template_block_patches import block_delta, block_hash, restore_payload
-from packages.resume_core.template_inverse import inverse_template_mutation
-from packages.resume_core.template_preparation import prepare_text_edit
+from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
+from packages.resume_core.editing.template_block_patches import block_delta, block_hash, restore_payload
+from packages.resume_core.editing.template_inverse import inverse_template_mutation
+from packages.resume_core.editing.template_preparation import prepare_text_edit
 from packages.resume_core.templates.compiler import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_template_preparation import command, response
