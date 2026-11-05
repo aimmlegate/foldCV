@@ -1,6 +1,6 @@
-import type { RegistryEntry } from "../contracts/generated/registry";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
-import type { TaskStatusV1 } from "../contracts/generated/task_status_v1";
+import type { RegistryEntry } from "../contracts/generated/contracts";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
+import type { TaskStatusV1 } from "../contracts/generated/contracts";
 import type { ReasoningEffort } from "../connection/reasoning";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
 import type { FocusIcon } from "../rich/v7-focus";

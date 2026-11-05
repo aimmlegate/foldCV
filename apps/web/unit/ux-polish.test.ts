@@ -4,7 +4,7 @@ import test from "node:test";
 import { changePrecision, datePrecision, dateText } from "../src/workbench/facts/dates";
 import { technologyCatalog, technologySuggestions } from "../src/workbench/facts/technology-catalog";
 import { technologyKey } from "../src/rich/panel-intents";
-import type { WorkingFieldPartialDate } from "../src/contracts/generated/working_facts";
+import type { WorkingFieldPartialDate } from "../src/contracts/generated/contracts";
 import { noticeText } from "../src/workbench/ui/notice-text";
 import { facts } from "./support/facts";
 const date = (value: WorkingFieldPartialDate["value"], rawText = "source date"): WorkingFieldPartialDate => ({

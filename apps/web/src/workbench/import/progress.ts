@@ -1,4 +1,4 @@
-import type { TemplateProjectResponseV1 } from "../../contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../../contracts/generated/contracts";
 import type { ImportPhase, ImportProgress, ProjectTask } from "../../projects/api";
 
 /** One followed import: the last task status the service sent and how the client follows it. */

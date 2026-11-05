@@ -1,14 +1,14 @@
-import type { AgentEvent } from "../contracts/generated/agent_event";
-import type { AgentFinding } from "../contracts/generated/agent_finding";
-import type { AgentMessage } from "../contracts/generated/agent_message";
-import type { AgentSettings } from "../contracts/generated/agent_settings";
-import type { AgentWebSource } from "../contracts/generated/agent_web_source";
-import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
-import type { AssistantCapabilitiesV1 } from "../contracts/generated/assistant_capabilities_v1";
-import type { AssistantConversationV1 } from "../contracts/generated/assistant_conversation_v1";
-import type { AssistantFileV1 } from "../contracts/generated/assistant_file_v1";
-import type { AssistantMessagesV1 } from "../contracts/generated/assistant_messages_v1";
-import type { AssistantRunRequestV2 } from "../contracts/generated/assistant_run_request_v2";
+import type { AgentEvent } from "../contracts/generated/contracts";
+import type { AgentFinding } from "../contracts/generated/contracts";
+import type { AgentMessage } from "../contracts/generated/contracts";
+import type { AgentSettings } from "../contracts/generated/contracts";
+import type { AgentWebSource } from "../contracts/generated/contracts";
+import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
+import type { AssistantCapabilitiesV1 } from "../contracts/generated/contracts";
+import type { AssistantConversationV1 } from "../contracts/generated/contracts";
+import type { AssistantFileV1 } from "../contracts/generated/contracts";
+import type { AssistantMessagesV1 } from "../contracts/generated/contracts";
+import type { AssistantRunRequestV2 } from "../contracts/generated/contracts";
 import { AgentApiFailure, type AgentFlags, type AssistantApi, type Proposal, type Run } from "./api";
 
 /** The assistant drawer's state on the /v2 routes (D109, plan 2.8): one long-poll loop per run, proposals that only

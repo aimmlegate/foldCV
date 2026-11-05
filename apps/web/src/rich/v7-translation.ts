@@ -1,6 +1,6 @@
-import type { TemplateClipboardCaptureV1 } from "../contracts/generated/template_clipboard_capture_v1";
-import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
+import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import { contentText, leafTarget, responseBlocks, responseLeaves, type ResponseLeaf } from "./v7-response";
 
 type Operation = TemplateEditPreparationV1["operations"][0];

@@ -4,8 +4,8 @@ import { register } from "node:module";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
-import type { WorkingFacts } from "../src/contracts/generated/working_facts";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
+import type { WorkingFacts } from "../src/contracts/generated/contracts";
 import { employment, facts as synthetic } from "./support/facts";
 
 register(`data:text/javascript,${encodeURIComponent('export async function load(url, context, next) { if (url.includes("/icons.svg")) return { format: "module", source: \'export default "icons.svg"\', shortCircuit: true }; return next(url, context); }')}`, import.meta.url);

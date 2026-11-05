@@ -1,14 +1,14 @@
-import type { AgentSettings } from "../contracts/generated/agent_settings";
-import type { AgentSettingsRequest } from "../contracts/generated/agent_settings_request";
-import type { AssistantCapabilitiesV1 } from "../contracts/generated/assistant_capabilities_v1";
-import type { AssistantChangeProposalListV1 } from "../contracts/generated/assistant_change_proposal_list_v1";
-import type { AssistantChangeProposalV1 } from "../contracts/generated/assistant_change_proposal_v1";
-import type { AssistantConversationListV1 } from "../contracts/generated/assistant_conversation_list_v1";
-import type { AssistantConversationV1 } from "../contracts/generated/assistant_conversation_v1";
-import type { AssistantEventsV1 } from "../contracts/generated/assistant_events_v1";
-import type { AssistantMessagesV1 } from "../contracts/generated/assistant_messages_v1";
-import type { AssistantRunRequestV2 } from "../contracts/generated/assistant_run_request_v2";
-import type { AssistantRunV1 } from "../contracts/generated/assistant_run_v1";
+import type { AgentSettings } from "../contracts/generated/contracts";
+import type { AgentSettingsRequest } from "../contracts/generated/contracts";
+import type { AssistantCapabilitiesV1 } from "../contracts/generated/contracts";
+import type { AssistantChangeProposalListV1 } from "../contracts/generated/contracts";
+import type { AssistantChangeProposalV1 } from "../contracts/generated/contracts";
+import type { AssistantConversationListV1 } from "../contracts/generated/contracts";
+import type { AssistantConversationV1 } from "../contracts/generated/contracts";
+import type { AssistantEventsV1 } from "../contracts/generated/contracts";
+import type { AssistantMessagesV1 } from "../contracts/generated/contracts";
+import type { AssistantRunRequestV2 } from "../contracts/generated/contracts";
+import type { AssistantRunV1 } from "../contracts/generated/contracts";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
 
 /** The /v2 assistant routes (D109, plan 2.8). Replies are parsed with JSON.parse and typed; the server validated them. */

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WorkingFacts } from "../src/contracts/generated/working_facts";
+import type { WorkingFacts } from "../src/contracts/generated/contracts";
 import { technologySuggestions } from "../src/workbench/facts/technology-catalog";
 
 function facts(display: string): WorkingFacts {

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { preferencesRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { ConnectionWorkflow, modelGroups, type ConnectionSnapshot } from "../../connection/workflow";
 import { isReasoningEffort } from "../../connection/reasoning";
-import type { Preferences } from "../../contracts/generated/preferences";
+import type { Preferences } from "../../contracts/generated/contracts";
 import { errorMessage } from "../../errors/messages";
 import { defaultReasoningLabel, reasoningLabels } from "../settings/ReasoningSelect";
 import { ModelOptions } from "../settings/ModelSelect";

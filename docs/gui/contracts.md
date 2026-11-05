@@ -2,8 +2,12 @@
 
 Python Pydantic models are the authority for every wire and file shape.
 `tools/generate_contracts.py` writes one JSON Schema per model into
-`contracts/json-schema/`; `json2ts` turns each schema into a TypeScript type in
-`apps/web/src/contracts/generated/`. Wire keys use camelCase, Python attributes
+`contracts/json-schema/`. With `--bundle` it also writes one merged schema (ignored
+`apps/web/.contracts-bundle.schema.json`: every contract root and every definition once,
+the two different `MoveBlock` definitions named after their first contract,
+`if`/`then` checks left out because TypeScript cannot type them), and `json2ts` turns it
+into the single `apps/web/src/contracts/generated/contracts.ts`; the client imports its
+types from there. Wire keys use camelCase, Python attributes
 snake_case. Models reject unknown fields. Each file and reply model carries its own
 `schemaVersion` (projects `WorkspaceV7`, archives `ArchiveManifestV7`); a changed
 field or meaning needs a new version, with no implicit fallback.
@@ -40,10 +44,11 @@ npm run contracts:generate
 npm run contracts:check
 ```
 
-`contracts:generate` empties both output folders, writes the schemas, runs `json2ts`
-on each schema and strips the generated banners, so a model that left the list leaves
-no file behind. `contracts:check` (`tools/check_contract_drift.py`) expects exactly
-`len(CONTRACTS)` schema/type pairs plus the template source schema, regenerates, and
+`contracts:generate` empties both output folders, writes the schemas and the bundle,
+runs `json2ts` once on the bundle and strips the generated banner, so a model that left
+the list leaves no file behind. `contracts:check` (`tools/check_contract_drift.py`)
+expects exactly `len(CONTRACTS)` schemas, the one TypeScript file and the template
+source schema, regenerates, and
 fails on any changed, new or missing file, restoring the previous files. Zero drift is
 required. `tests/foundation/test_contract_drift.py` covers the check itself.
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { MemoryPendingStore, ProjectApiFailure, ProjectEditorConnection, type EditResult, type Fetcher } from "../src/rich/v7-connection";
 import { templateSchema } from "../src/rich/template-schema";
 import { projectTemplateDocument } from "../src/rich/v7-projection";

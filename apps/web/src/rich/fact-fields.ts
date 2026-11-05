@@ -1,4 +1,4 @@
-import type { WorkingFacts, WorkingFieldPartialDate } from "../contracts/generated/working_facts";
+import type { WorkingFacts, WorkingFieldPartialDate } from "../contracts/generated/contracts";
 
 export type RecordValue = WorkingFacts["records"][number];
 export type Kind = "candidate" | "employment" | "technology" | "education" | "language" | "claim";

@@ -1,10 +1,10 @@
 import { knownErrorMessage } from "../../errors/messages";
-import type { Preferences } from "../../contracts/generated/preferences";
-import type { RulesSettings } from "../../contracts/generated/rules_settings";
-import type { AgentSettings } from "../../contracts/generated/agent_settings";
-import type { AgentSettingsRequest } from "../../contracts/generated/agent_settings_request";
-import type { SaveRulesRequest } from "../../contracts/generated/save_rules_request";
-import type { SaveLimitsPreference } from "../../contracts/generated/save_limits_preference";
+import type { Preferences } from "../../contracts/generated/contracts";
+import type { RulesSettings } from "../../contracts/generated/contracts";
+import type { AgentSettings } from "../../contracts/generated/contracts";
+import type { AgentSettingsRequest } from "../../contracts/generated/contracts";
+import type { SaveRulesRequest } from "../../contracts/generated/contracts";
+import type { SaveLimitsPreference } from "../../contracts/generated/contracts";
 import preferencesSchema from "../../../../../contracts/json-schema/preferences.schema.json" with { type: "json" };
 
 /** Defaults and ranges come from the Python preferences contract. */

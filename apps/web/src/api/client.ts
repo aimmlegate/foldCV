@@ -1,7 +1,7 @@
-import type { RulesSettings } from "../contracts/generated/rules_settings";
-import type { SaveRulesRequest } from "../contracts/generated/save_rules_request";
-import type { Preferences } from "../contracts/generated/preferences";
-import type { SaveLimitsPreference } from "../contracts/generated/save_limits_preference";
+import type { RulesSettings } from "../contracts/generated/contracts";
+import type { SaveRulesRequest } from "../contracts/generated/contracts";
+import type { Preferences } from "../contracts/generated/contracts";
+import type { SaveLimitsPreference } from "../contracts/generated/contracts";
 
 /** The session exchange and the /v1/settings calls; replies are parsed with JSON.parse and typed (plan 2.6). */
 export class ApiFailure extends Error {

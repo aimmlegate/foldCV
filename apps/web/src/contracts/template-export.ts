@@ -1,5 +1,5 @@
 import { sha256Hex } from "../api/hash";
-import type { TemplateSnapshotIdentity } from "./generated/template_snapshot_identity";
+import type { TemplateSnapshotIdentity } from "./generated/contracts";
 
 const snapshotFields = ["projectId", "projectRevision", "documentRevision", "documentHash", "factsHash", "packageHash", "presentationHash"] as const;
 const maximum = 32 * 1024 * 1024;

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { templateExportArtifact } from "../src/contracts/template-export";
-import type { TemplateSnapshotIdentity } from "../src/contracts/generated/template_snapshot_identity";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateSnapshotIdentity } from "../src/contracts/generated/contracts";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { ProjectApiFailure, ProjectEditorConnection } from "../src/rich/v7-connection";
 
 const expected: TemplateSnapshotIdentity = { projectId: "synthetic-project", projectRevision: 3, documentRevision: 2,

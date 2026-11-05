@@ -1,10 +1,10 @@
-import type { AgentEvent } from "../../src/contracts/generated/agent_event";
-import type { AgentMessage } from "../../src/contracts/generated/agent_message";
-import type { AgentSettings } from "../../src/contracts/generated/agent_settings";
-import type { AssistantCapabilitiesV1 } from "../../src/contracts/generated/assistant_capabilities_v1";
-import type { AssistantEventsV1 } from "../../src/contracts/generated/assistant_events_v1";
-import type { AssistantMessagesV1 } from "../../src/contracts/generated/assistant_messages_v1";
-import type { AssistantRunRequestV2 } from "../../src/contracts/generated/assistant_run_request_v2";
+import type { AgentEvent } from "../../src/contracts/generated/contracts";
+import type { AgentMessage } from "../../src/contracts/generated/contracts";
+import type { AgentSettings } from "../../src/contracts/generated/contracts";
+import type { AssistantCapabilitiesV1 } from "../../src/contracts/generated/contracts";
+import type { AssistantEventsV1 } from "../../src/contracts/generated/contracts";
+import type { AssistantMessagesV1 } from "../../src/contracts/generated/contracts";
+import type { AssistantRunRequestV2 } from "../../src/contracts/generated/contracts";
 import type { Port, AssistantView } from "../../src/assistant/controller";
 import type { Proposal, Run } from "../../src/assistant/api";
 

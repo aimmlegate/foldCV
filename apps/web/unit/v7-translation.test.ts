@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { containerKey, correctionRange, createdLocals, translateIntent, type LocalContainer, type V7Intent } from "../src/rich/v7-translation";
 
 const response = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;

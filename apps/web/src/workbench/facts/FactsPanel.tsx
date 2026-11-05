@@ -1,7 +1,7 @@
 import type { OrderDocument } from "../../rich/technology-order";
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState } from "react";
-import type { WorkingFacts } from "../../contracts/generated/working_facts";
+import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { panelSupport, type PanelCommand, type PanelPlan, type TechnologyTarget } from "../../rich/v7-panel";
 import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologyGroups } from "./TechnologyGroups";

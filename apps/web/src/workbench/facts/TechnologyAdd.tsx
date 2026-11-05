@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import type { WorkingFacts } from "../../contracts/generated/working_facts";
+import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import type { OrderDocument } from "../../rich/technology-order";
 import { Icon } from "../ui/Icon";

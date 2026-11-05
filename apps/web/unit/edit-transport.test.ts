@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { RichSaveQueue, type TemplateQueuedIntent } from "../src/rich/save-queue";
 import { ProjectApiFailure, ProjectEditorConnection, type EditResult, type Fetcher } from "../src/rich/v7-connection";
 import { containerKey, type V7Intent } from "../src/rich/v7-translation";

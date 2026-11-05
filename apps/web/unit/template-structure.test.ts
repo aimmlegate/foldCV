@@ -4,7 +4,7 @@ import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import type { Node } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { disabledExtensions, templateSchema } from "../src/rich/template-schema";
 import { selectedBlocks, textPosition } from "../src/rich/v7-extraction";
 import { projectTemplateDocument } from "../src/rich/v7-projection";

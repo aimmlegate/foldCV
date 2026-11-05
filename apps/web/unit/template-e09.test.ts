@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BlockNoteEditor } from "@blocknote/core";
 import { TextSelection } from "@tiptap/pm/state";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { MemoryPendingStore, type EditResult } from "../src/rich/v7-connection";
 import { contentText, responseBlocks } from "../src/rich/v7-response";
 import { templateSchema } from "../src/rich/template-schema";

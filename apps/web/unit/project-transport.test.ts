@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, shownTemplate, templateImportStatus } from "../src/projects/api";
 import { ProjectApiFailure, ProjectEditorConnection, type Fetcher } from "../src/rich/v7-connection";
 

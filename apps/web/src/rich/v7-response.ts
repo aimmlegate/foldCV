@@ -1,4 +1,4 @@
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 
 /** Read helpers over a verified V7 response parsed with JSON.parse: blocks, their text containers and inline leaves. */
 type Json = Record<string, unknown>;

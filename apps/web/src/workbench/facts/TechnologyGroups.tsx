@@ -1,5 +1,5 @@
 import { useId, useState, type DragEvent, type KeyboardEvent } from "react";
-import type { WorkingFacts } from "../../contracts/generated/working_facts";
+import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { title as recordTitle } from "../../rich/fact-fields";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
 import { adjacentTechnology, type OrderDocument } from "../../rich/technology-order";

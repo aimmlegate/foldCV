@@ -30,6 +30,8 @@ from resume_api.projects.imports import ImportCommand
 
 OUT = ROOT / "contracts" / "json-schema"
 TYPES = ROOT / "apps" / "web" / "src" / "contracts" / "generated"
+# Definitions with the same name and different JSON in different contracts; each copy gets the contract's name.
+NAMESPACED = {"MoveBlock"}
 # Route bodies and replies, the files a project writes, the worker inputs and outputs, and the models the client
 # types or kept tests read through contracts/examples.
 CONTRACTS = {
@@ -64,7 +66,63 @@ CONTRACTS = {
 }
 
 
+def schemas():
+    return {name: model.model_json_schema(mode="validation") for name, model in CONTRACTS.items()}
+
+
+def rewrite_refs(value, renames):
+    if isinstance(value, dict):
+        return {key: (renames.get(child, child) if key == "$ref" else rewrite_refs(child, renames))
+                for key, child in value.items()}
+    if isinstance(value, list):
+        return [rewrite_refs(child, renames) for child in value]
+    return value
+
+
+def without_conditionals(value):
+    """The schema without `allOf` entries that only hold `if`/`then` checks: TypeScript cannot type them, and json2ts
+    renders a referenced schema that has them as an open object. The per-contract schema files keep them."""
+    kept = [item for item in value.get("allOf", []) if set(item) - {"if", "then", "else"}]
+    if "allOf" not in value or len(kept) == len(value["allOf"]):
+        return value
+    value = {key: child for key, child in value.items() if key != "allOf"}
+    return {**value, "allOf": kept} if kept else value
+
+
+def bundle(contracts):
+    """One schema whose `$defs` hold every contract root under its title and every definition once, for a single
+    json2ts run; a definition name with different JSON in two contracts is an error unless NAMESPACED."""
+    merged, owners, properties, variants = {}, {}, {}, {}
+    # Each distinct JSON of a namespaced name is named after the first contract that has it, so contracts sharing a
+    # variant share every definition that refers to it.
+    for name, schema in contracts.items():
+        for key, value in schema.get("$defs", {}).items():
+            if key in NAMESPACED:
+                variants.setdefault((key, json.dumps(value, sort_keys=True)), name)
+    for name, schema in contracts.items():
+        schema = json.loads(json.dumps(schema))
+        definitions = schema.pop("$defs", {})
+        title = schema["title"]
+        definitions[title] = schema
+        renames = {f"#/$defs/{key}": f"#/$defs/{key}__{variants[key, json.dumps(definitions[key], sort_keys=True)]}"
+                   for key in definitions if key in NAMESPACED}
+        for key, value in definitions.items():
+            value = without_conditionals(rewrite_refs(value, renames))
+            target = renames[f"#/$defs/{key}"].removeprefix("#/$defs/") if key in NAMESPACED else key
+            if target in merged and merged[target] != value:
+                raise SystemExit(f"definition {key} differs between {owners[target]} and {name}")
+            merged.setdefault(target, value)
+            owners.setdefault(target, name)
+        properties[name] = {"$ref": renames.get(f"#/$defs/{title}", f"#/$defs/{title}")}
+    return {"title": "FoldCVContracts", "type": "object", "properties": properties, "required": sorted(properties),
+            "additionalProperties": False, "$defs": dict(sorted(merged.items()))}
+
+
 def main() -> None:
+    if sys.argv[1:2] == ["--bundle"]:
+        Path(sys.argv[2]).write_text(json.dumps(bundle(schemas()), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                                     encoding="utf-8")
+        return
     if sys.argv[1:] == ["--clean-types"]:
         for path in sorted(TYPES.glob("*.ts")):
             text = path.read_text(encoding="utf-8")
@@ -79,8 +137,7 @@ def main() -> None:
         path.unlink()
     OUT.mkdir(parents=True, exist_ok=True)
     TYPES.mkdir(parents=True, exist_ok=True)
-    for name, model in CONTRACTS.items():
-        schema = model.model_json_schema(mode="validation")
+    for name, schema in schemas().items():
         (OUT / f"{name}.schema.json").write_text(
             json.dumps(schema, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",

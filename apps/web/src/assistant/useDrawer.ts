@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ConnectionWorkflow } from "../connection/workflow";
-import type { AgentSettings } from "../contracts/generated/agent_settings";
+import type { AgentSettings } from "../contracts/generated/contracts";
 import { AgentApiFailure } from "./api";
 import type { AssistantRuns, AssistantView } from "./controller";
 import { drawerSize, rereadsCapabilities, type DrawerSize } from "./presentation";

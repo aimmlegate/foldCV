@@ -1,4 +1,4 @@
-import type { Preferences } from "../contracts/generated/preferences";
+import type { Preferences } from "../contracts/generated/contracts";
 
 export type ReasoningEffort = NonNullable<Preferences["rewriteReasoningEffort"]>;
 export type ModelReasoning = { supported: ReasoningEffort[]; default: ReasoningEffort | null };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { WorkingFieldPartialDate } from "../../contracts/generated/working_facts";
+import type { WorkingFieldPartialDate } from "../../contracts/generated/contracts";
 import { changePrecision, datePrecision, dateText, type DatePrecision } from "./dates";
 
 export function DateInput({ name, label, field, disabled }: {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { AssistantView } from "../src/assistant/controller";
 import { run as assistantRun, view as assistantView } from "./support/assistant";
-import type { AgentEvent } from "../src/contracts/generated/agent_event";
+import type { AgentEvent } from "../src/contracts/generated/contracts";
 import { activityItems, currentActivity } from "../src/workbench/assistant/activity";
 
 const run = assistantRun("running", "run", "conversation");

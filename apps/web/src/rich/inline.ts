@@ -1,5 +1,5 @@
 import { COLORS_DEFAULT } from "@blocknote/core";
-import type { InlineStyles } from "../contracts/generated/rich_document_v1";
+import type { InlineStyles } from "../contracts/generated/contracts";
 
 export type EditorMarks = { bold?: boolean; italic?: boolean; underline?: boolean; strike?: boolean; code?: boolean;
   textColor?: string; backgroundColor?: string };

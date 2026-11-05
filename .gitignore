@@ -30,3 +30,5 @@ apps/web/playwright-report/
 !/design/future-editor/visual/
 /.cursor/rules/development-orchestration.mdc
 /templates/local
+# The merged schema contracts:generate feeds to json2ts.
+/apps/web/.contracts-bundle.schema.json

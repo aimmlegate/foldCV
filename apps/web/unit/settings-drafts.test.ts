@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SettingsDrafts, type SettingsApi, type SettingsPart } from "../src/workbench/settings/drafts";
-import type { Preferences } from "../src/contracts/generated/preferences";
-import type { RulesSettings } from "../src/contracts/generated/rules_settings";
-import type { AgentSettings } from "../src/contracts/generated/agent_settings";
+import type { Preferences } from "../src/contracts/generated/contracts";
+import type { RulesSettings } from "../src/contracts/generated/contracts";
+import type { AgentSettings } from "../src/contracts/generated/contracts";
 import { projectFilename } from "../src/workbench/files/filename";
 import { settingsSections } from "../src/workbench/settings/sections";
 

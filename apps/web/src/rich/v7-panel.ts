@@ -1,5 +1,5 @@
-import type { RichPanelRequest } from "../contracts/generated/rich_panel_request";
-import type { EditorPlanV1, EditorTechnologyTarget } from "../contracts/generated/template_project_response_v1";
+import type { RichPanelRequest } from "../contracts/generated/contracts";
+import type { EditorPlanV1, EditorTechnologyTarget } from "../contracts/generated/contracts";
 import type { PanelCommandV7 } from "./v7-translation";
 
 /** The facts panel's command; the V7 session translates it below. A technology add names the line Python offered. */

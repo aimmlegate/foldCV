@@ -1,5 +1,5 @@
 import type { PartialBlock } from "@blocknote/core";
-import type { RichDocumentV2, TemplateSectionBlock } from "../contracts/generated/rich_document_v2";
+import type { RichDocumentV2, TemplateSectionBlock } from "../contracts/generated/contracts";
 import type { TableRowIdentity } from "./table-identity";
 import type { EditorMarks } from "./inline";
 import type { templateSchema } from "./template-schema";

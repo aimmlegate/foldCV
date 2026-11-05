@@ -1,5 +1,5 @@
-import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import { ProjectApiFailure, type EditResult } from "./v7-connection";
 import { createdLocals, translateIntent, type V7Intent } from "./v7-translation";
 

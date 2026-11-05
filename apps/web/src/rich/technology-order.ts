@@ -1,4 +1,4 @@
-import type { WorkingFacts } from "../contracts/generated/working_facts";
+import type { WorkingFacts } from "../contracts/generated/contracts";
 
 type Technology = Extract<WorkingFacts["records"][number], { kind: "technology" }>;
 type OrderBlock = { id: string; type: string; props?: unknown; content?: unknown; children: readonly OrderBlock[] };

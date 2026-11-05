@@ -1,7 +1,7 @@
 import { errorMessage } from "../errors/messages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TemplateEditorHandle } from "../rich/TemplateEditor";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import type { AssistantHandle } from "../assistant/Drawer";
 import { importBody } from "../rich/import-source";
 import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, projectTasks, resumeImport, startImport,

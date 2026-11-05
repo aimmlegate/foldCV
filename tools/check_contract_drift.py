@@ -11,7 +11,8 @@ sys.path.insert(0, str(ROOT))
 from tools.generate_contracts import CONTRACTS
 
 WEB = ROOT / "apps" / "web"
-PAIR_COUNT = len(CONTRACTS)
+# One schema per contract, the one TypeScript file and the template source schema.
+FILE_COUNT = len(CONTRACTS) + 2
 
 
 def generated_files() -> set[Path]:
@@ -31,8 +32,8 @@ def generated_directories() -> set[Path]:
 def main() -> None:
     before = {path: path.read_bytes() for path in generated_files()}
     directories = generated_directories()
-    if len(before) != PAIR_COUNT * 2 + 1:
-        raise SystemExit(f"expected {PAIR_COUNT} schema/type pairs and the template source schema")
+    if len(before) != FILE_COUNT:
+        raise SystemExit(f"expected {len(CONTRACTS)} schemas, one TypeScript file and the template source schema")
     try:
         subprocess.run(["npm", "run", "contracts:generate"], cwd=WEB, env=os.environ.copy(), check=True)
         after = {path: path.read_bytes() for path in generated_files()}
@@ -49,7 +50,7 @@ def main() -> None:
         for directory in sorted(generated_directories() - directories, key=lambda path: len(path.parts), reverse=True):
             directory.rmdir()
         raise
-    print(f"{PAIR_COUNT * 2 + 1} generated contract and template source files match Python models")
+    print(f"{FILE_COUNT} generated contract and template source files match Python models")
 
 
 if __name__ == "__main__":

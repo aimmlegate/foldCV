@@ -1,4 +1,4 @@
-import type { WorkingFacts } from "../../src/contracts/generated/working_facts";
+import type { WorkingFacts } from "../../src/contracts/generated/contracts";
 
 /** Minimal synthetic facts for the facts panel helpers; no project file is read. */
 type Records = WorkingFacts["records"][number];

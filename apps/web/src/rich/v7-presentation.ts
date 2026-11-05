@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { Node } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 
 type Presentation = NonNullable<TemplateProjectResponseV1["presentation"]>;
 type Asset = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["templatePackage"]["assets"][number];

@@ -1,9 +1,9 @@
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
-import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
+import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
 import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
-import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import { contentText, responseBlocks } from "./v7-response";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { projectRegionChildren } from "../workbench/editor/regions";

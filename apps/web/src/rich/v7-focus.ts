@@ -1,4 +1,4 @@
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import type { FocusEntry } from "../workbench/facts/FocusYears";
 import { technologyKey } from "./panel-intents";
 import { assetUrl } from "./v7-presentation";

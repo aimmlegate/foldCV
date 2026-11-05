@@ -1,5 +1,5 @@
 import type { OrderDocument } from "../../rich/technology-order";
-import type { WorkingFacts } from "../../contracts/generated/working_facts";
+import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { technologyKey } from "../../rich/panel-intents";
 
 const groups = [

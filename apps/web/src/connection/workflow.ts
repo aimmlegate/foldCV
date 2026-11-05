@@ -1,5 +1,5 @@
 import { validReasoning, type ModelReasoning } from "./reasoning";
-import type { CliInstallationPayload } from "../contracts/generated/cli_installation_payload";
+import type { CliInstallationPayload } from "../contracts/generated/contracts";
 
 export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launcher_unsupported" | "unsupported_version" |
   "login_required" | "api_key_mode" | "metadata_failed" | "quota_exhausted" |

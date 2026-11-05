@@ -1,13 +1,13 @@
-import type { TemplateClipboardCaptureV1 } from "../contracts/generated/template_clipboard_capture_v1";
-import type { TemplateEditPreparationV1 } from "../contracts/generated/template_edit_preparation_v1";
-import type { TemplateProjectResponseV1 } from "../contracts/generated/template_project_response_v1";
-import type { TemplateRewritePreviewV1 } from "../contracts/generated/template_rewrite_preview_v1";
+import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
+import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
+import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
+import type { TemplateRewritePreviewV1 } from "../contracts/generated/contracts";
 import type { V7Operation } from "./v7-translation";
-import type { EditResultV1 } from "../contracts/generated/edit_result_v1";
-import type { ProjectOpenResultV1 } from "../contracts/generated/project_open_result_v1";
-import type { HistoryStateV1 } from "../contracts/generated/history_state_v1";
-import type { AssistantApplyResultV1 } from "../contracts/generated/assistant_apply_result_v1";
-import type { TaskStatusV1 } from "../contracts/generated/task_status_v1";
+import type { EditResultV1 } from "../contracts/generated/contracts";
+import type { ProjectOpenResultV1 } from "../contracts/generated/contracts";
+import type { HistoryStateV1 } from "../contracts/generated/contracts";
+import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
+import type { TaskStatusV1 } from "../contracts/generated/contracts";
 import { templateExportArtifact } from "../contracts/template-export";
 import archiveSchema from "../../../../contracts/json-schema/archive_manifest_v7.schema.json" with { type: "json" };
 

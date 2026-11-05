@@ -3,7 +3,7 @@ import test from "node:test";
 import { Schema, type Node } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
 import { DecorationSet } from "@tiptap/pm/view";
-import type { TemplateProjectResponseV1 } from "../src/contracts/generated/template_project_response_v1";
+import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
 import { literalRuns, sheetColumns, templatePresentationPlugin, templateSheet, type TemplateSheet } from "../src/rich/v7-presentation";
 
 test("literal style ranges ignore field keys and reversed bounds", () => {

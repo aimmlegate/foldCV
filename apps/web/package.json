@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "contracts:generate": "../../.venv/bin/python ../../tools/generate_contracts.py && for schema in ../../contracts/json-schema/*.schema.json; do name=$(basename \"$schema\" .schema.json); json2ts -i \"$schema\" -o \"src/contracts/generated/$name.ts\" --no-banner || exit 1; done && ../../.venv/bin/python ../../tools/generate_contracts.py --clean-types",
+    "contracts:generate": "../../.venv/bin/python ../../tools/generate_contracts.py && ../../.venv/bin/python ../../tools/generate_contracts.py --bundle .contracts-bundle.schema.json && json2ts -i .contracts-bundle.schema.json -o src/contracts/generated/contracts.ts --no-banner && ../../.venv/bin/python ../../tools/generate_contracts.py --clean-types",
     "contracts:check": "../../.venv/bin/python ../../tools/check_contract_drift.py",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",

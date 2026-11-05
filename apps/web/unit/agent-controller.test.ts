@@ -3,7 +3,7 @@ import test from "node:test";
 import { AgentApiFailure } from "../src/assistant/api";
 import { AssistantController, lostLink, type AssistantEditor, type AssistantView } from "../src/assistant/controller";
 import { canSend, shownFailure } from "../src/assistant/presentation";
-import type { AssistantApplyResultV1 } from "../src/contracts/generated/assistant_apply_result_v1";
+import type { AssistantApplyResultV1 } from "../src/contracts/generated/contracts";
 import { event, fakeApi, message, proposal, run, settings } from "./support/assistant";
 
 const editor = (apply: AssistantEditor["applyProposal"] = () => Promise.reject(new Error("unexpected apply")),

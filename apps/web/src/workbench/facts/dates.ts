@@ -1,4 +1,4 @@
-import type { WorkingFieldPartialDate } from "../../contracts/generated/working_facts";
+import type { WorkingFieldPartialDate } from "../../contracts/generated/contracts";
 
 export type DatePrecision = "year" | "month" | "day" | "text";
 const pad = (value: number) => String(value).padStart(2, "0");

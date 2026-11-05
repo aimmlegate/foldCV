@@ -13,10 +13,11 @@ def generated_tree(tmp_path, monkeypatch):
     monkeypatch.setattr(drift, "ROOT", tmp_path)
     monkeypatch.setattr(drift, "WEB", tmp_path / "apps/web")
     paths = []
-    for folder, suffix in [("contracts/json-schema", ".json"), ("apps/web/src/contracts/generated", ".ts")]:
+    for folder, count, suffix in [("contracts/json-schema", drift.FILE_COUNT - 2, ".json"),
+                                  ("apps/web/src/contracts/generated", 1, ".ts")]:
         directory = tmp_path / folder
         directory.mkdir(parents=True)
-        for index in range(drift.PAIR_COUNT):
+        for index in range(count):
             path = directory / f"contract-{index}{suffix}"
             path.write_bytes(f"original {index}".encode())
             paths.append(path)
@@ -55,5 +56,5 @@ def test_drift_restores_changed_deleted_and_new_files(generated_tree, monkeypatc
 def test_matching_generation_succeeds_without_rewriting_files(generated_tree, monkeypatch, capsys):
     monkeypatch.setattr(drift.subprocess, "run", lambda *args, **kwargs: None)
     drift.main()
-    assert f"{drift.PAIR_COUNT * 2 + 1} generated" in capsys.readouterr().out
+    assert f"{drift.FILE_COUNT} generated" in capsys.readouterr().out
     assert {path: path.read_bytes() for path in drift.generated_files()} == generated_tree
