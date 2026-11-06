@@ -152,3 +152,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D147 Settings and Templates redesign
 - D148 Maintenance: delete, shrink, restructure
 - D149 Maintenance follow-up: finish the open items of D148
+- D150 Product licence: AGPL-3.0-or-later, PyMuPDF stays
