@@ -10,7 +10,7 @@
   "bundle": {
     "active": false,
     "publisher": "foldCV",
-    "copyright": "foldCV",
+    "copyright": "Copyright © 2026 FoldCV authors. GNU AGPL v3 or later.",
     "icon": ["../../assets/branding/foldcv/liquid-glass-v2/macos/FoldCV-native-olive.iconset/icon_512x512.png",
       "../../assets/branding/foldcv/liquid-glass-v2/windows/FoldCV.ico"]
   }

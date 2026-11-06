@@ -1,6 +1,7 @@
 {
   "name": "foldcv-web",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "contracts:generate": "../../.venv/bin/python ../../tools/generate_contracts.py && for schema in ../../contracts/json-schema/*.schema.json; do name=$(basename \"$schema\" .schema.json); json2ts -i \"$schema\" -o \"src/contracts/generated/$name.ts\" --no-banner || exit 1; done && ../../.venv/bin/python ../../tools/generate_contracts.py --clean-types",

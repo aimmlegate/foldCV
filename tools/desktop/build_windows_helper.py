@@ -41,7 +41,7 @@ WINDOWS_ONLY = ("pywin32==311",)
 # Read at run time; kept at their checkout paths (as in build_helper.py), next to the two source trees.
 DATA = ("apps/web/dist", "skills/format-resume/SKILL.md", "skills/format-resume/references",
         "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
-        "requirements.txt", "packaging/helper_entry.py")
+        "requirements.txt", "packaging/helper_entry.py", "LICENSE", "THIRD-PARTY-NOTICES.md")
 SOURCES = ("packages", "services/api/src/resume_api")
 # sys.path of the helper; the interpreter ignores PYTHONPATH and the registry when this file exists.
 PATHS = ("python313.zip", ".", r"..\app", r"..\app\services\api\src", r"..\site-packages",

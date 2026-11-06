@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Read at run time; kept at their checkout paths.
 DATA = ("apps/web/dist", "skills/format-resume/SKILL.md", "skills/format-resume/references",
         "skills/format-resume/assets", "assets/technology-library", "packages/resume_core/default_rules.md",
-        "requirements.txt")
+        "requirements.txt", "LICENSE", "THIRD-PARTY-NOTICES.md")
 # The captured DOCX renderer identity reads these installed versions.
 METADATA = ("fonttools", "python-docx", "lxml", "pydantic", "jsonschema", "PyYAML", "PyMuPDF", "Pillow")
 # uvicorn picks its protocol modules by name.

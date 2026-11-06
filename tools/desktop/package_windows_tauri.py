@@ -43,6 +43,8 @@ def package(shell: Path, helper: Path, output: Path) -> Path:
     archive = output / f"{name.replace(' ', '-')}-{version}-win-x64.zip"
     with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as bundle:
         bundle.write(shell, f"{name}/{name}.exe")
+        bundle.write(ROOT / "LICENSE", f"{name}/LICENSE.txt")
+        bundle.write(ROOT / "THIRD-PARTY-NOTICES.md", f"{name}/THIRD-PARTY-NOTICES.md")
         for path in sorted(helper.rglob("*")):
             bundle.write(path, f"{name}/helper/{path.relative_to(helper).as_posix()}")
     info = {"application": name, "version": version, "commit": git("rev-parse", "HEAD"),

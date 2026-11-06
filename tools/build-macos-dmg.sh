@@ -83,6 +83,9 @@ for key value in CFBundleDevelopmentRegion en CFBundleDisplayName "$NAME" CFBund
     LSApplicationCategoryType public.app-category.productivity LSMinimumSystemVersion "$MINIMUM_MACOS"; do
   plutil -insert "$key" -string "$value" "$PLIST"
 done
+plutil -insert NSHumanReadableCopyright -string "Copyright © 2026 FoldCV authors. GNU AGPL v3 or later." "$PLIST"
+cp LICENSE "$APP/Contents/Resources/LICENSE.txt"
+cp THIRD-PARTY-NOTICES.md "$APP/Contents/Resources/THIRD-PARTY-NOTICES.md"
 for key in NSHighResolutionCapable NSSupportsAutomaticGraphicsSwitching; do plutil -insert "$key" -bool YES "$PLIST"; done
 for key in NSQuitAlwaysKeepsWindows NSRequiresAquaSystemAppearance; do plutil -insert "$key" -bool NO "$PLIST"; done
 # With the ru and en folders, this list lets the system's own panels, such as the save dialog, speak the user's language.
@@ -96,6 +99,8 @@ VOLUME="$WORK/volume" MOUNT="$WORK/mount" DMG="$OUTPUT/$NAME $VERSION.dmg"
 mkdir "$VOLUME"
 ditto "$APP" "$VOLUME/$NAME.app"
 ln -s /Applications "$VOLUME/Applications"
+cp LICENSE "$VOLUME/LICENSE.txt"
+cp THIRD-PARTY-NOTICES.md "$VOLUME/THIRD-PARTY-NOTICES.md"
 hdiutil create -quiet -volname "$NAME $VERSION" -fs HFS+ -format UDZO -srcfolder "$VOLUME" "$DMG"
 hdiutil verify -quiet "$DMG"
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$MOUNT" "$DMG"
