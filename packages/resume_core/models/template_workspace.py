@@ -122,10 +122,18 @@ class ProjectV6(Wire):
 
     @model_validator(mode="after")
     def integrity(self):
-        from ..importing.template_identity import source_slice
+        # One check after another in this order; a failure raises the ValueError its caller reports.
         from ..editing.template_scope_occurrences import validate_scope_occurrences
         verify_package(self.template_package)
         validate_scope_occurrences(self)
+        self._check_ids_and_history()
+        self._check_fact_types()
+        self._check_document_references()
+        self._check_evidence()
+        self._check_coverage_receipts_and_exports()
+        return self
+
+    def _check_ids_and_history(self):
         for name in ('evidence_records','assets','operations','renders','import_issues','template_operations','exports'):
             _unique([item.id for item in getattr(self,name)],'project '+name)
         _unique([ref.operation_id for ref in self.import_history], 'project import history')
@@ -138,12 +146,10 @@ class ProjectV6(Wire):
         _unique([(source.id, source.revision) for source in self.sources], 'source revision')
         for source in self.sources:
             _unique([(unit.id, unit.revision) for unit in source.units], 'source unit revision')
-        records={r.id for r in self.facts.records}|{r.id for r in self.facts.extensions if r.active}
-        cells={c.id:(r.id,c.field_key) for r in self.facts.extensions for c in r.cells}
+
+    def _check_fact_types(self):
+        """Builtin identities, extension schemas and relations against the fact types of the captured package."""
         builtins={r.id:r for r in self.facts.records}
-        assets={a.id:a for a in self.assets};retained={}
-        recipe=self.template_package.recipe
-        from ..editing.fields import working_field, field_key
         from ..hashing import canonical, sha256
         from ..templates.projection import reachable_schema,schema_at
         types={t.id:reachable_schema(t.data_schema,self.template_package.definition.content_definitions) for t in self.template_package.definition.fact_types}
@@ -176,6 +182,15 @@ class ProjectV6(Wire):
                        for semantic_type in record_types.get(relation.subject_id, set())
                        for declaration in declarations[semantic_type].relations):
                 raise ValueError('undeclared or incompatible effective relationship')
+
+    def _check_document_references(self):
+        """Every block, span and image names a live record, field, captured presentation and asset."""
+        records={r.id for r in self.facts.records}|{r.id for r in self.facts.extensions if r.active}
+        cells={c.id:(r.id,c.field_key) for r in self.facts.extensions for c in r.cells}
+        builtins={r.id:r for r in self.facts.records}
+        assets={a.id:a for a in self.assets};retained={}
+        recipe=self.template_package.recipe
+        from ..editing.fields import working_field, field_key
         def field_reference(record_id,key,cell_id):
             if record_id not in records: raise ValueError('missing bound record')
             if record_id in builtins:
@@ -225,6 +240,10 @@ class ProjectV6(Wire):
                         if isinstance(part,FieldOccurrence):
                             field_reference(part.record_id,part.field_key,part.cell_id)
         if sum(retained.values())>20*1024*1024: raise ValueError('live image retention exceeds limit')
+
+    def _check_evidence(self):
+        """Every cited source span is a slice of a kept source; older evidence names a kept source unit."""
+        from ..importing.template_identity import source_slice
         checked_spans=set()
         def evidence(span):
             key=(span.source_id,span.source_revision,span.unit_id,span.unit_revision,span.start,span.end,span.slice_hash)
@@ -259,6 +278,8 @@ class ProjectV6(Wire):
             for provenance in block.provenance:
                 if isinstance(provenance, (SourceWitness, NarrativeCitation)):
                     legacy_evidence(provenance.evidence)
+
+    def _check_coverage_receipts_and_exports(self):
         block_ids = {block.id for block in self.document.blocks()}
         from ..template_capture import item_identities
         handles = ({r.item_handle for r in self.facts.extensions} | {value.item_handle for value in self.facts.builtin_identities}
@@ -288,7 +309,6 @@ class ProjectV6(Wire):
                     captured.request.presentation_hash, captured.request.package_hash):
                 raise ValueError('export input has no matching attempt')
             TemplateRenderRequestV1.model_validate({**captured.request.model_dump(by_alias=True), 'package': self.template_package})
-        return self
 
 
 class RichPreDraftV2(RichPreDraft):
