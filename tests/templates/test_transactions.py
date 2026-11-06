@@ -7,7 +7,7 @@ import pytest
 from packages.resume_core.models.template_import import ImportIssue
 from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation, mutation_sha256
-from packages.resume_core.editing.template_facts import ambiguous_edit, effective_extension_values, human_edit
+from packages.resume_core.fact_records import ambiguous_edit, effective_extension_values, human_edit
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_mutations import HistoryAuthorization
 from packages.resume_core.hashing import sha256

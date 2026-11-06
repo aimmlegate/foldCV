@@ -1,7 +1,7 @@
 """A bound link's URL edit changes its URL cell and target together; its label and other occurrences stay."""
 
 from ..models.template_document import BoundLink, FieldOccurrence
-from .fields import inline_groups
+from ..fields import inline_groups
 from ..template_anchors import anchor_steps
 from .template_preparation_blocks import changed_block_steps
 from .template_preparation_cells import human_cell_steps

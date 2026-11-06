@@ -10,7 +10,7 @@ from ..models.template_mutations import (PutExtension, RemoveExtension, PutRelat
                                          RestoreAuthoredBlockPatch, SetManualScopeDisplays, PutTemplateSync,
                                          RemoveTemplateSync)
 from .fact_mutations import apply_record_mutations
-from .template_facts import delete_subject_in_place
+from ..fact_records import delete_subject_in_place
 
 
 FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope)
@@ -200,7 +200,7 @@ def apply_fact_steps(original, request, replay=False):
             extraction=result.extraction, mode=result.mode)
         changed = apply_record_mutations(base, builtin_steps, request.action_id).facts
         result.records, result.tombstones = changed.records, changed.tombstones
-        from .fields import builtin_cell_values
+        from ..fields import builtin_cell_values
         remaining = builtin_cell_values(result.records)
         result.builtin_manual_scopes = {cell: scope for cell, scope in result.builtin_manual_scopes.items()
             if cell in remaining}
@@ -215,7 +215,7 @@ def apply_fact_steps(original, request, replay=False):
                 result.builtin_manual_scopes.pop(step.cell_id, None)
             else:
                 result.builtin_manual_scopes[step.cell_id] = step.after_scope_id
-    from .fields import builtin_cell_values
+    from ..fields import builtin_cell_values
     old_builtin = builtin_cell_values(original.records)
     new_builtin = builtin_cell_values(result.records)
     if not replay:

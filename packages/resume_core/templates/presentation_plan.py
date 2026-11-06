@@ -7,6 +7,7 @@ from ..hashing import canonical, sha256
 from .focus import catalog_for, row_icon
 from .materialize_nodes import locale_text
 from .models import remember_asset
+from .materialize_nodes import focus_row, node_of
 
 
 def hyperlink_target(href):
@@ -21,8 +22,6 @@ def hyperlink_target(href):
     return href if host or parts.scheme == 'mailto' and parts.path else None
 
 
-def node_of(recipe, ref):
-    return recipe.views[ref.view_key].nodes[ref.node_index] if ref is not None and ref.node_index is not None else None
 
 
 def is_band(block, recipe):
@@ -77,15 +76,6 @@ def table_rows(document, recipe, locale):
     return found
 
 
-def focus_row(block, recipe):
-    """The leading Focus paragraphs of an item section; they share one decorative icon row."""
-    row = []
-    for child in block.children if block.type == 'section' else []:
-        node = node_of(recipe, child.presentation)
-        if child.type != 'paragraph' or child.children or node is None or node.type != 'focus_entry':
-            break
-        row.append(child)
-    return row
 
 
 _RESOLVERS = {}

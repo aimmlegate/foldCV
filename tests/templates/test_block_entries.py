@@ -14,10 +14,13 @@ from packages.resume_core.models.contracts import Source
 from packages.resume_core.storage import ProjectStoreFailure
 from packages.resume_core.importing.template_entries import (line_options, ordered_entries, outline_scopes,
                                                              reorder_records, splits_entries)
-from packages.resume_core.importing.template_identity import capture_span, evidence_options, line_spans
-from packages.resume_core.importing.template_import import (TemplateImportFailure, add_entry_tasks, add_outline_review,
-                                                            admit_operation, capture_task_input, children_of, digest,
-                                                            entries_of, reserve_attempt, retain_operation, spent_calls)
+from packages.resume_core.sources import capture_span, line_spans
+from packages.resume_core.importing.template_identity import evidence_options
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.importing.template_import import (add_entry_tasks, add_outline_review, admit_operation,
+                                                            capture_task_input, children_of, entries_of,
+                                                            reserve_attempt, retain_operation, spent_calls)
+from packages.resume_core.hashing import digest
 from packages.resume_core.hashing import sha256
 from packages.resume_core.templates.replies import proposal_protocol
 from resume_api.importer.template_pipeline import Spawned

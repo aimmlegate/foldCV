@@ -3,7 +3,7 @@
 import pytest
 
 from packages.resume_core.models.rich_mutations import RichMutation
-from packages.resume_core.editing.fields import inline_groups, occurrences
+from packages.resume_core.fields import inline_groups, occurrences
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.panel import RichPanelProposal, narrative_steps, panel_mutation
 from tests.facts.panel_fixtures import apply, edit
@@ -152,7 +152,7 @@ def test_cited_focus_label_gets_exact_technology_update_without_matching_unlinke
 def test_closing_open_period_and_reopening_it_updates_the_existing_endpoint_span():
     from packages.resume_core.models.rich_document import ParagraphBlock
     workspace = without_sources(); job = workspace.project.facts.records[1]; period = job.periods[0]
-    from packages.resume_core.editing.fields import set_text
+    from packages.resume_core.fields import set_text
     set_text(job, f'period:{period.id}:present', 'по настоящее время')
     raw={'id':'date-endpoint','revision':1,'type':'paragraph','props':{},'children':[], 'provenance':[],
         'content':[{'type':'fact_field','bindingId':'endpoint','recordId':job.id,'fieldKey':f'period:{period.id}:present','text':'по настоящее время','styles':{'italic':True},'syncedFactRevision':1}]}

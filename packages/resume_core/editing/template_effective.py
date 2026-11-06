@@ -1,10 +1,10 @@
 """Project current builtin authority into shared cells without duplicating storage."""
 
 from ..models.template_facts import ExtensionCell
-from .fields import builtin_cell_values
+from ..fields import builtin_cell_values
 from ..importing.template_builtin_admission import admitted_field
-from ..importing.template_import import digest
-from ..importing.template_identity import payload_value
+from ..hashing import digest
+from ..templates.source_spans import payload_value
 from ..importing.template_review import decide_review
 from ..template_capture import item_identities
 from .template_wording import display_raw_input

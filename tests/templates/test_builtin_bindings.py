@@ -6,8 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from packages.resume_core.models.template_import import ProposalReply
-from packages.resume_core.editing.fields import field_key
-from packages.resume_core.importing.template_identity import allocate_discoveries, capture_span, resolve_fields
+from packages.resume_core.fields import field_key
+from packages.resume_core.importing.template_identity import allocate_discoveries, resolve_fields
+from packages.resume_core.sources import capture_span
 from packages.resume_core.importing.template_proposals import resolve_relations
 from packages.resume_core.templates.projection import reachable_schema
 from tests.templates.storage_fixtures import source

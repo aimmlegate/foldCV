@@ -4,13 +4,13 @@ from ..models.rich_document import FactFieldSpan, SectionBlock
 from ..models.rich_facts import EducationRecord, EmploymentRecord, LanguageRecord, WorkingPeriod
 from ..models.template_document import (BoundLink, FieldOccurrence, ManualScopeSpan, PresentedText,
                                         TemplateBulletBlock, TemplateParagraphBlock, TemplateSectionBlock)
-from .fields import builtin_cell_values, inline_groups, set_text, working_field, field_key
+from ..fields import builtin_cell_values, inline_groups, set_text, working_field, field_key
 from .mutations import locate, parent_items, subtree
 from ..importing.template_builtin_admission import unknown
-from ..importing.template_identity import _bound_root
+from ..templates.source_spans import _bound_root
 from .template_panel_lines import line_container, period_fields, period_words, row_start
 from .template_panel_values import written_dates
-from .template_preparation_panel import restore_view
+from .panel_views import restore_view
 from ..hashing import canonical
 from ..templates.materialize_nodes import fallback_style, locale_text, reference, styled
 from ..templates.projection import pointer_tokens

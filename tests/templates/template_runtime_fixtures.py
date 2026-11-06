@@ -7,8 +7,10 @@ from itertools import count
 
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.project_repository import ProjectRepository, decode_project
-from packages.resume_core.importing.template_identity import source_slice
-from packages.resume_core.importing.template_import import CleanupProof, TemplateImportFailure, digest
+from packages.resume_core.sources import source_slice
+from packages.resume_core.importing.template_import import CleanupProof
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.hashing import digest
 from tests.templates.pipeline_fixtures import NOW, owner, setup_operation, source_draft
 from tests.templates.storage_fixtures import presentation, workspace
 from tests.templates.test_semantic_admission import raw_proposal

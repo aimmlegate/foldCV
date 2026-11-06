@@ -7,7 +7,7 @@ from ..models.rich_document import RichBlock, FactFieldSpan, StyledText
 from ..models.rich_mutations import PutBlock, RemoveBlock
 from .assembly import identity
 from .dependencies import placements
-from .fields import inline_groups
+from ..fields import inline_groups
 from .mutations import cut_inline, inline_text
 from ..technologies import resolve_technology, technology_identity
 

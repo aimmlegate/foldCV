@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from ..models.rich_mutations import DependencyStamp
-from .fields import records_by_id, working_field
+from ..fields import records_by_id, working_field
 
 
 def fingerprint(value):

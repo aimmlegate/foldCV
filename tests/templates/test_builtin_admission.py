@@ -7,7 +7,7 @@ import pytest
 from packages.resume_core.importing.template_admission import admit_proposal
 from packages.resume_core.importing.template_builtin_admission import apply_builtin_records, make_builtin_candidate
 from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
-from packages.resume_core.importing.template_identity import capture_span
+from packages.resume_core.sources import capture_span
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.importing.template_review import record_review
 from packages.resume_core.hashing import sha256

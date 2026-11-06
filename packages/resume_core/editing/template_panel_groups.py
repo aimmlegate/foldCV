@@ -5,13 +5,13 @@ after them; it goes with its last technology, as an emptied group of the templat
 from ..models.rich_document import FactFieldSpan
 from ..models.template_document import TemplateHeadingBlock, TemplateSectionBlock
 from .dependencies import placements
-from .fields import inline_groups
+from ..fields import inline_groups
 from .template_panel_lines import node_labels
 from .template_panel_records import (VIEW_TARGET, _duplicate, _group_line, _group_nodes, _shown, group_heading,
                                      group_lines, line_blocks, line_entries, new_technology, put_entry, remove_records,
                                      restore_group_line, technology_targets)
-from .template_preparation_panel import (_join_technology_line, _split_technology_line, line_is_list, sibling_lists,
-                                         view_position)
+from .panel_views import _join_technology_line, _split_technology_line, line_is_list, view_position
+from .template_panel_lines import sibling_lists
 from ..templates.materialize_nodes import heading_style, literal, reference
 from ..technologies import normalize_name
 

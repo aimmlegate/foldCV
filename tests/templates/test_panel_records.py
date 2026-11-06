@@ -10,7 +10,7 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import FieldOccurrence
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.editing.dependencies import placements
-from packages.resume_core.editing.fields import field_key
+from packages.resume_core.fields import field_key
 from packages.resume_core.templates.materialize_nodes import literal
 from packages.resume_core.editing.template_panel_records import technology_targets
 from packages.resume_core.editing.template_preparation import prepare_edit

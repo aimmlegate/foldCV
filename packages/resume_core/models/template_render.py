@@ -7,7 +7,8 @@ from pydantic import Field, model_validator
 from .contracts import Id, Revision, Sha256, Wire, _safe_path
 from .template_document import RichDocumentV2
 from .template_facts import WorkingFactsV2
-from ..hashing import canonical, sha256
+from ..hashing import canonical, digest, sha256
+from ..import_failure import TemplateImportFailure
 from ..templates.models import TemplatePackage
 from ..templates.store import verify_package
 
@@ -94,3 +95,13 @@ class TemplateExportCapture(Wire):
                 (self.request.document_hash, self.request.facts_hash, self.request.presentation_hash, self.request.package_hash)):
             raise ValueError('export capture snapshot mismatch')
         return self
+
+
+def snapshot_identity(workspace):
+    project = workspace.project
+    if workspace.schema_version != 7 or project is None:
+        raise TemplateImportFailure('IMPORT_PROJECT_NOT_AUTHORED')
+    return TemplateSnapshotIdentity(projectId=workspace.project_id, projectRevision=workspace.project_revision,
+        documentRevision=workspace.document_revision, documentHash=digest(project.document), factsHash=digest(project.facts),
+        packageHash=project.template_package.package_hash,
+        presentationHash=digest(presentation_value(project.document, project.template_package)))

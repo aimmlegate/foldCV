@@ -6,7 +6,7 @@ from packages.resume_core.models.template_authoring import TemplateEditPreparati
 from packages.resume_core.models.template_document import FieldOccurrence, PresentedText
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.editing.fields import occurrences
+from packages.resume_core.fields import occurrences
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.hashing import canonical

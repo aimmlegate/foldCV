@@ -3,7 +3,7 @@
 import pytest
 
 from packages.resume_core.editing.dependencies import dependency, dependencies_current
-from packages.resume_core.editing.fields import field_key
+from packages.resume_core.fields import field_key
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from tests.support.rich import mutation, patch, without_sources
 

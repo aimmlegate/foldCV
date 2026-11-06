@@ -2,8 +2,9 @@
 
 from functools import cache
 
-from packages.resume_core.importing.template_identity import (_binding_instances, _bound_root, capture_span,
-                                                              empty_value, payload_value)
+from packages.resume_core.importing.template_identity import _binding_instances, empty_value
+from packages.resume_core.templates.source_spans import _bound_root, payload_value
+from packages.resume_core.sources import capture_span
 from packages.resume_core.templates.builtin_mapping import item_root
 from packages.resume_core.templates.compiler import compile_template
 from packages.resume_core.templates.projection import pointer_tokens
@@ -373,9 +374,9 @@ def direct_generic(name, blocks, *, rewrite=True, table=None, package=None):
     from packages.resume_core.models.template_import import ReviewInputRecord
     from packages.resume_core.importing.template_admission import admit_proposal
     from packages.resume_core.importing.template_assembly import assemble_template
-    from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, digest,
-                                                                dispatch_attempt, record_return, reserve_attempt,
-                                                                task_in)
+    from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, dispatch_attempt,
+                                                                record_return, reserve_attempt, task_in)
+    from packages.resume_core.hashing import digest
     from packages.resume_core.importing.template_proposals import parse_proposal
     from packages.resume_core.importing.template_review import make_review_input, record_review
     from tests.templates.evidence_references import by_reference

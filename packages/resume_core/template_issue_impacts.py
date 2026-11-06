@@ -3,7 +3,7 @@
 from .models.rich_document import Hyperlink
 from .models.rich_mutations import PutBlock, RemoveBlock
 from .models.template_document import BoundLink
-from .editing.fields import bound_link_fields, builtin_cell_values, field_key, inline_groups, occurrences
+from .fields import bound_link_fields, builtin_cell_values, field_key, inline_groups, occurrences
 
 
 def _semantic(value):

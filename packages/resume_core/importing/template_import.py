@@ -7,8 +7,10 @@ import uuid
 from ..models.template_import import (AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope,
                                       FinalizationCandidate, ImportAttempt, ImportAuthorization, ImportOperation,
                                       ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
-from ..hashing import canonical, sha256
+from ..hashing import sha256
 from ..templates.compiler import dependency_order
+from ..hashing import digest
+from ..import_failure import TemplateImportFailure
 
 
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
@@ -29,10 +31,6 @@ def processing_protocol(submission):
     return 'agent_import_v1' if 'save_import' in submission.tools else 'fixed_v1'
 
 
-class TemplateImportFailure(Exception):
-    def __init__(self, code):
-        self.code = code
-        super().__init__(code)
 
 
 def identity(prefix):
@@ -44,16 +42,6 @@ def same_captured_model(model, expected):
     return expected is not None and model == expected
 
 
-def digest(value):
-    def wire(item):
-        if hasattr(item, 'model_dump'):
-            return item.model_dump(mode='json', by_alias=True)
-        if isinstance(item, dict):
-            return {key: wire(child) for key, child in item.items()}
-        if isinstance(item, (list, tuple)):
-            return [wire(child) for child in item]
-        return item
-    return sha256(canonical(wire(value)))
 
 
 def instant(value):

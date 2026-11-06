@@ -190,7 +190,7 @@ class ProjectV6(Wire):
         builtins={r.id:r for r in self.facts.records}
         assets={a.id:a for a in self.assets};retained={}
         recipe=self.template_package.recipe
-        from ..editing.fields import working_field, field_key
+        from ..fields import working_field, field_key
         def field_reference(record_id,key,cell_id):
             if record_id not in records: raise ValueError('missing bound record')
             if record_id in builtins:
@@ -243,7 +243,7 @@ class ProjectV6(Wire):
 
     def _check_evidence(self):
         """Every cited source span is a slice of a kept source; older evidence names a kept source unit."""
-        from ..importing.template_identity import source_slice
+        from ..sources import source_slice
         checked_spans=set()
         def evidence(span):
             key=(span.source_id,span.source_revision,span.unit_id,span.unit_revision,span.start,span.end,span.slice_hash)
@@ -318,7 +318,7 @@ class RichPreDraftV2(RichPreDraft):
 
     @model_validator(mode='after')
     def captured_integrity(self):
-        from ..importing.template_identity import source_slice
+        from ..sources import source_slice
         from ..hashing import canonical, sha256
         from ..templates.projection import reachable_schema, schema_at
         _unique([(source.id, source.revision) for source in self.sources], 'pre-draft source revision')
@@ -370,7 +370,7 @@ class WorkspaceV7(WorkspaceV6):
         owner = self.project or self.pre_draft
         if any(operation.project_id != self.project_id for operation in owner.template_operations):
             raise ValueError('workspace template operation belongs to another project')
-        from ..importing.template_identity import source_slice
+        from ..sources import source_slice
         for operation in owner.template_operations:
             for result in operation.task_results:
                 for span in result.source_spans:

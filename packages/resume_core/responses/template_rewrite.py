@@ -1,7 +1,7 @@
 """Selected-text rewrite for V7: generation reads verified text; only an explicit Apply edits the document."""
 
 from ..editing.mutations import locate, utf16_slice
-from ..editing.template_preparation import _range_content
+from ..editing.template_preparation_text import _range_content
 from ..templates.presentation import snapshot_identity
 
 

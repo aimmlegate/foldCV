@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 from ..models.template_document import ManualScopeSpan
-from .fields import inline_groups
+from ..fields import inline_groups
 
 
 def active_scope_cells(facts):

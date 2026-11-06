@@ -1,7 +1,7 @@
 """Prepare new shared authority while preserving all untouched display wording."""
 
 from ..models.template_document import ManualScopeSpan
-from .fields import inline_groups
+from ..fields import inline_groups
 from .mutations import locate
 from .template_authoring import citation_spans
 from .template_preparation_cells import human_cell_steps
@@ -11,7 +11,7 @@ from .template_scope_occurrences import active_scope_cells, scope_occurrences
 
 
 def scope_edit_steps(workspace, operation, allocator, content, fields, scope_ranges, bound, action_id, *, replacement=None):
-    from .template_preparation import _identity, _leaves, _rewrite
+    from .template_preparation_text import _identity, _leaves, _rewrite
     selected, project = operation.range, workspace.project
     pairs = {(span.scope_id, span.occurrence_id) for span, _start, _end in scope_ranges}
     scope_ids = {key[0] for key in pairs}

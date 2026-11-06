@@ -14,3 +14,15 @@ def canonical(value) -> bytes:
 
 def sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def digest(value):
+    def wire(item):
+        if hasattr(item, 'model_dump'):
+            return item.model_dump(mode='json', by_alias=True)
+        if isinstance(item, dict):
+            return {key: wire(child) for key, child in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [wire(child) for child in item]
+        return item
+    return sha256(canonical(wire(value)))

@@ -1,8 +1,11 @@
 """Only complete coordinator receipts can promote a model's effective cells."""
 
 from ..models.template_facts import ExtensionCell, ExtensionRecord
-from .template_identity import empty_value, payload_value
-from .template_import import TemplateImportFailure, authorization, checked, digest, instant, task_in
+from .template_identity import empty_value
+from ..templates.source_spans import payload_value
+from ..import_failure import TemplateImportFailure
+from .template_import import authorization, checked, instant, task_in
+from ..hashing import digest
 from .template_replacements import apply_accepted_records
 from .template_builtin_admission import (apply_builtin_records, current_handles, human_authority,
                                          inferred_owner_relations, make_builtin_candidate)

@@ -6,9 +6,10 @@ import pytest
 
 from packages.resume_core.models.template_import import ReviewInputRecord
 from packages.resume_core.importing.template_admission import admit_proposal
-from packages.resume_core.importing.template_identity import capture_span
-from packages.resume_core.importing.template_import import (TemplateImportFailure, digest, dispatch_attempt,
-                                                            record_return, reserve_attempt)
+from packages.resume_core.sources import capture_span
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.hashing import digest
+from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.importing.template_review import (decide_review, make_review_input, record_review,
                                                             reusable_receipt)

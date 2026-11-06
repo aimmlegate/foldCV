@@ -122,7 +122,7 @@ def prepare_structure_edit(response, request, *, clipboard=None, occupied=None):
                 raise ValueError('copy selects both an ancestor and its descendant')
             copied = copy_blocks(before, [found[0][found[1]] for found in sources], id_factory=allocator)
         elif isinstance(operation, CopyFragment):
-            from .template_preparation import _range_content
+            from .template_preparation_text import _range_content
             selected = operation.source
             found = target(before.document, selected.block_id, selected.before_revision)
             block = found[0][found[1]]

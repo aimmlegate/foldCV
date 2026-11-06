@@ -5,42 +5,19 @@ from __future__ import annotations
 import uuid
 
 from ..models.contracts import _unique
-from ..models.template_facts import HandleAllocation, Lineage, SourceSpan
+from ..models.template_facts import HandleAllocation, Lineage
 from ..models.template_import import EvidenceOption, FieldSidecar, ProposalReply, ReferenceTable
-from .template_import import digest
+from ..hashing import digest
 from ..hashing import canonical, sha256
-from ..templates.builtin_mapping import item_root
 from ..templates.projection import SchemaFailure, pointer_tokens, schema_at, validate_payload
+from ..templates.source_spans import _bound_root, payload_value
+from ..sources import source_slice
 
 
-def source_slice(sources,span: SourceSpan) -> str:
-    matches = [s for s in sources if s.id == span.source_id and s.revision == span.source_revision]
-    if len(matches) != 1:
-        raise ValueError('source span has no unique captured source')
-    units = [u for u in matches[0].units if u.id == span.unit_id and u.revision == span.unit_revision]
-    unit = units[0] if len(units) == 1 else None
-    if unit is None or span.end>len(unit.text): raise ValueError("invalid captured source span")
-    text=unit.text[span.start:span.end]
-    if sha256(text.encode('utf-8'))!=span.slice_hash: raise ValueError("source slice hash mismatch")
-    return text
 
 
-def capture_span(source,unit,start=0,end=None):
-    end=len(unit.text) if end is None else end
-    span=SourceSpan(sourceId=source.id,sourceRevision=source.revision,unitId=unit.id,unitRevision=unit.revision,
-        start=start,end=end,sliceHash=sha256(unit.text[start:end].encode('utf-8')))
-    source_slice([source],span)
-    return span
 
 
-def line_spans(source, unit):
-    """Each non-blank line of a multi-line unit, with its line break, as one exact span."""
-    spans, start = [], 0
-    for line in unit.text.splitlines(keepends=True):
-        if line.strip():
-            spans.append(capture_span(source, unit, start, start + len(line)))
-        start += len(line)
-    return spans if len(spans) > 1 else []
 
 
 def evidence_options(spans, sources, *, base=()):
@@ -94,14 +71,6 @@ def codepoint_offset(text,utf16_offset):
     except UnicodeError: raise ValueError("UTF-16 offset splits a surrogate pair") from None
 
 
-def payload_value(payload,pointer):
-    value=payload
-    for token in pointer_tokens(pointer):
-        if isinstance(value,dict) and token in value: value=value[token]
-        elif isinstance(value,list) and token.isascii() and token.isdecimal() and (token=='0' or not token.startswith('0')) and int(token)<len(value):
-            value=value[int(token)]
-        else: raise ValueError("payload pointer does not resolve")
-    return value
 
 
 def empty_value(value):
@@ -175,14 +144,6 @@ def _binding_instances(payload, bindings):
     return result
 
 
-def _bound_root(pointer, semantic_type, field_key, bindings):
-    actual = pointer_tokens(pointer)
-    candidates = [binding for binding in bindings if binding.semantic_type == semantic_type and binding.field == field_key
-        and len(pointer_tokens(binding.pointer)) == len(actual)
-        and all(pattern == '*' or pattern == token for pattern, token in zip(pointer_tokens(binding.pointer), actual, strict=True))]
-    if len(candidates) != 1:
-        raise ValueError('field has no unique compiled item binding')
-    return actual[:len(item_root(candidates[0], bindings))]
 
 
 def allocate_discoveries(reply: ProposalReply,*,operation_id,task_id,attempt_id,existing,type_schemas,id_factory=None,bindings=None,cell_id_factory=None,type_declarations=None,reserved=()):

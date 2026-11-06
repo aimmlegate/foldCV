@@ -12,7 +12,7 @@ from ..models.rich_document import RichBlock
 from ..models.rich_facts import RichFact
 from ..models.rich_mutations import ActionCapture, RichSelection, PutRecord, RemoveRecord
 from .dependencies import dependency, placements
-from .fields import occurrences, set_text, working_field
+from ..fields import occurrences, set_text, working_field
 
 
 class FieldReference(Wire):
@@ -185,7 +185,7 @@ def linked_field_steps(workspace, record_ids, field_keys=()):
             for identifier in group.block_ids:
                 found = locate(workspace.project.document, identifier)
                 copy = copies.setdefault(identifier, found[0][found[1]].model_copy(deep=True))
-                from .fields import inline_groups
+                from ..fields import inline_groups
                 for _, content in inline_groups(copy):
                     for item in content:
                         if getattr(item, "binding_id", None) == span.binding_id:
@@ -285,7 +285,7 @@ def selection_checksum(parts):
 def rewrite_steps(workspace, selection, proposal):
     from ..models.rich_document import FactFieldSpan, ImageBlock, TableBlock
     from ..models.rich_mutations import PutBlock, ReplaceInlineRange
-    from .fields import inline_groups
+    from ..fields import inline_groups
     from .mutations import cut_inline, inline_text
     parts = selection_parts(workspace, selection)
     if [(replacement.block_id, replacement.cell_id) for replacement in proposal.replacements] != [(part[0].id, part[4].id if part[4] else None) for part in parts]:

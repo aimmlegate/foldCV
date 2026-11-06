@@ -4,12 +4,14 @@ stated experience, edited with the record, and its Focus line."""
 from ..models.rich_document import FactFieldSpan
 from ..models.template_document import BoundLink, TemplateParagraphBlock, TemplateSectionBlock
 from .dependencies import placements
-from .fields import inline_groups, working_field
+from ..fields import inline_groups, working_field
 from .template_panel_creation import _mapping
-from .template_preparation_panel import drop_empty_titles, field_occurrence, restore_view, sibling_lists, view_title
+from .panel_views import drop_empty_titles, restore_view, view_title
+from .template_panel_values import field_occurrence
+from .template_panel_lines import sibling_lists
 from ..templates.focus import catalog_for, focus_durations, remembered_icon, row_icon, row_name
 from ..templates.materialize_nodes import fallback_style, literal, locale_text, reference
-from ..templates.presentation_plan import focus_row
+from ..templates.materialize_nodes import focus_row
 from ..templates.projection import pointer_tokens
 from ..technology_experience import whole_years_text
 

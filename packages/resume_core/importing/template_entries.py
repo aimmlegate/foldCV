@@ -9,7 +9,8 @@ ended, the block closes with what they collected, its records in the entries' or
 """
 
 from ..models.template_import import OutlineReply, OutlineReviewReply
-from .template_import import digest, entries_of
+from ..hashing import digest
+from .template_import import entries_of
 from ..templates.compiler import splits_entries  # noqa: F401 (re-exported: the import pipeline and tests read it here)
 
 MAX_TITLE = 120

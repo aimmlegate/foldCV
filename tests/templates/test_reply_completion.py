@@ -6,8 +6,8 @@ import json
 import pytest
 
 from packages.resume_core.importing.template_completion import complete_reply
-from packages.resume_core.importing.template_identity import (capture_span, evidence_options, line_spans,
-                                                              offered_evidence, source_slice)
+from packages.resume_core.sources import capture_span, line_spans, source_slice
+from packages.resume_core.importing.template_identity import evidence_options, offered_evidence
 from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, dispatch_attempt,
                                                             record_return, reserve_attempt)
 from packages.resume_core.templates.projection import pointer_tokens

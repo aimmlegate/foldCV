@@ -4,7 +4,8 @@ import copy
 
 import pytest
 
-from packages.resume_core.importing.template_import import CleanupProof, digest, reconcile_cleanup, spent_calls
+from packages.resume_core.importing.template_import import CleanupProof, reconcile_cleanup, spent_calls
+from packages.resume_core.hashing import digest
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
 from tests.templates.generic_fixtures import span
 from tests.templates.pipeline_fixtures import resume_command
@@ -770,7 +771,7 @@ def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=(
     import asyncio
     import threading
     from types import SimpleNamespace
-    from packages.resume_core.importing.template_import import TemplateImportFailure
+    from packages.resume_core.import_failure import TemplateImportFailure
     events, state, cancel = [], {'now': 0, 'peak': 0}, threading.Event()
     async def execute(_project, _operation, identifier, _deadline, _cancel):
         events.append(('start', identifier))
@@ -811,7 +812,7 @@ async def test_a_task_waits_for_the_tasks_it_depends_on(tmp_path):
 
 @pytest.mark.asyncio
 async def test_a_failure_starts_nothing_new_lets_running_tasks_end_and_is_raised(tmp_path):
-    from packages.resume_core.importing.template_import import TemplateImportFailure
+    from packages.resume_core.import_failure import TemplateImportFailure
     run, events, _state = schedule(RuntimeFixture(tmp_path).pipeline, [('a', ()), ('b', ()), ('c', ())], 2, fail='a', slow={'b'})
     with pytest.raises(TemplateImportFailure, match='IMPORT_AUTHORITY_REVOKED'):
         await run
@@ -1007,7 +1008,7 @@ async def test_a_failure_of_one_call_still_falls_back_for_that_block(tmp_path):
 async def test_an_import_stopped_before_its_first_call_saves_nothing_and_recovers(tmp_path, monkeypatch):
     # The app closed during an import before any model call: recovery used to fill every task with a fallback and
     # failed to start the app on an operation task with no view; such an import now stays unsaved (D104).
-    from packages.resume_core.importing.template_import import TemplateImportFailure
+    from packages.resume_core.import_failure import TemplateImportFailure
     from resume_api.importer.template_pipeline import TemplatePipeline
     async def stopped(*_args, **_kwargs):
         raise TemplateImportFailure('IMPORT_PROCESSING_STOPPED')

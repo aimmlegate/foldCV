@@ -4,7 +4,8 @@ import contextvars
 import uuid
 
 from packages.resume_core.models.template_import import LaunchOwner
-from packages.resume_core.importing.template_import import CleanupProof, digest
+from packages.resume_core.importing.template_import import CleanupProof
+from packages.resume_core.hashing import digest
 from ..lifecycle import OperationFiles
 from ..providers.content import ContentFailure, outcome_state
 

@@ -13,7 +13,7 @@ from packages.resume_core.models.template_mutations import TemplateMutationV1
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.editing.fields import field_key, working_field
+from packages.resume_core.fields import field_key, working_field
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.hashing import canonical

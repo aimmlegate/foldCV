@@ -7,13 +7,13 @@ import json
 import re
 from typing import Literal
 
-from ..dates import source_date
-from ..models.rich_document import FactFieldSpan, ImageBlock, TableBlock
-from ..models.rich_facts import WorkingField
-from ..models.template_facts import ExtensionRecord
-from ..models.template_document import BoundLink, FieldRef
-from .template_facts import extension_cell, set_human_cell
-from ..technologies import resolve_technology
+from .dates import source_date
+from .models.rich_document import FactFieldSpan, ImageBlock, TableBlock
+from .models.rich_facts import WorkingField
+from .models.template_facts import ExtensionRecord
+from .models.template_document import BoundLink, FieldRef
+from .fact_records import extension_cell, set_human_cell
+from .technologies import resolve_technology
 
 
 def field_key(record_id, key):

@@ -7,7 +7,7 @@ from packages.resume_core.models.template_document import BoundLink
 from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
-from packages.resume_core.editing.fields import bound_link_fields
+from packages.resume_core.fields import bound_link_fields
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.hashing import canonical
 from tests.templates.editor_fixtures import TemplateEditor
@@ -112,7 +112,7 @@ def test_label_and_url_edits_have_independent_undo_through_the_journal_and_trans
 
 
 def test_a_url_cell_waiting_on_a_manual_scope_is_refused():
-    from packages.resume_core.editing.template_facts import ambiguous_edit
+    from packages.resume_core.fact_records import ambiguous_edit
     before, _ = linked_workspace()
     before.project.facts = ambiguous_edit(before.project.facts, ['a-journal', 'a-url'], 'Both', 'scoped', ['block-paper-a'])
     before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))

@@ -16,11 +16,12 @@ from ..models.rich_document import InlineStyles
 from ..models.template_authoring import TemplateEditPreparationV1
 from ..models.template_document import BoundLink, ManualScopeSpan
 from ..editing.dependencies import placements
-from ..editing.fields import inline_groups, working_field
+from ..fields import inline_groups, working_field
 from ..editing.mutations import RichMutationFailure, inline_text, utf16_slice
 from ..editing.panel import FIELDS
 from ..editing.template_panel_records import REMOVABLE, technology_targets
-from ..editing.template_preparation import _fields, _leaves, _length, prepare_edit
+from ..editing.template_preparation_text import _fields, _leaves, _length
+from ..editing.template_preparation import prepare_edit
 
 KINDS = {'paragraph': {'type': 'paragraph'}, 'bullet': {'type': 'bullet_list'},
     'numbered': {'type': 'numbered_list', 'start': None}}

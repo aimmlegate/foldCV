@@ -1,7 +1,7 @@
 """V02: F07 long project wording as one employment with 250 tasks through the real admission and assembly."""
 
 from packages.resume_core.importing.template_assembly import assemble_template
-from packages.resume_core.importing.template_identity import capture_span
+from packages.resume_core.sources import capture_span
 from tests.templates.employment_fixtures import employment_package, employment_source
 from tests.templates.pipeline_fixtures import source_draft
 from tests.templates.test_builtin_admission import accept, proposed_from

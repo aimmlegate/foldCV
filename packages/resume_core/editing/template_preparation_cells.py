@@ -1,6 +1,6 @@
 """Human raw cells and shared ambiguous input become one guarded fact patch."""
 
-from .fields import builtin_cell_values, set_text, working_field
+from ..fields import builtin_cell_values, set_text, working_field
 from .template_preparation_ids import allocate_id
 
 

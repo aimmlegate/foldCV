@@ -2,18 +2,12 @@
 
 from ..models.template_import import ExportAttempt
 from ..models.template_render import (CapturedTemplateRenderInputV1, TemplateExportCapture, TemplateRenderAsset,
-                                      TemplateRenderRequestV1, TemplateSnapshotIdentity, presentation_value)
-from ..importing.template_import import TemplateImportFailure, digest, identity
+                                      TemplateRenderRequestV1, snapshot_identity)
+from ..import_failure import TemplateImportFailure
+from ..hashing import digest
+from ..importing.template_import import identity
 
 
-def snapshot_identity(workspace):
-    project = workspace.project
-    if workspace.schema_version != 7 or project is None:
-        raise TemplateImportFailure('IMPORT_PROJECT_NOT_AUTHORED')
-    return TemplateSnapshotIdentity(projectId=workspace.project_id, projectRevision=workspace.project_revision,
-        documentRevision=workspace.document_revision, documentHash=digest(project.document), factsHash=digest(project.facts),
-        packageHash=project.template_package.package_hash,
-        presentationHash=digest(presentation_value(project.document, project.template_package)))
 
 
 def capture_export(workspace, expected, renderer, *, retry_capture=None, id_factory=identity):

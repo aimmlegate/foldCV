@@ -6,7 +6,8 @@ import json
 import pytest
 
 from packages.resume_core.models.template_import import ReviewInput, ReviewInputRecord
-from packages.resume_core.importing.template_import import digest, dispatch_attempt, record_return, reserve_attempt
+from packages.resume_core.hashing import digest
+from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.importing.template_review import (decide_review, make_review_input, record_review,
@@ -141,7 +142,7 @@ def test_a_category_is_left_to_the_model_even_when_its_word_stands_in_the_cited_
     # leaves categories with the model.
     from types import SimpleNamespace
     from packages.resume_core.models.contracts import Source
-    from packages.resume_core.importing.template_identity import capture_span
+    from packages.resume_core.sources import capture_span
     from packages.resume_core.importing.template_review import settled_checks
     from packages.resume_core.hashing import sha256
     text = 'Reliable Queues, Systems Notes, not published'

@@ -15,7 +15,7 @@ from packages.resume_core.models.rich_workspace import RichRenderSnapshot
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateSnapshotIdentity
 from packages.resume_core.rich_limits import DOCX_BYTES
 from packages.resume_core.responses.template_export import capture_export
-from packages.resume_core.importing.template_import import TemplateImportFailure
+from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.hashing import sha256
 
 from .errors import ProjectFailure

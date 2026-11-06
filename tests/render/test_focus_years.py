@@ -68,7 +68,7 @@ def test_quick_year_edit_resorts_in_the_same_mutation_and_can_be_cleared_undone_
 
 
 def test_clearing_an_estimated_duration_hides_it_instead_of_restoring_the_estimate():
-    from packages.resume_core.editing.fields import set_text
+    from packages.resume_core.fields import set_text
     facts, _ = technology_facts([job("2020-01", "2022-12"), {"kind": "technology", "display": "Python"}])
     assert technology_years(facts)["python"] == 3
     general = next(record for record in facts.records if record.kind == "technology" and record.job_id is None)

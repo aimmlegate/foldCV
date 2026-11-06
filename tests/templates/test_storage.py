@@ -10,7 +10,7 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.storage import ProjectStoreFailure
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7
 from packages.resume_core.repository.project_repository import ProjectRepository, decode_project
-from packages.resume_core.editing.template_facts import ambiguous_edit, human_edit
+from packages.resume_core.fact_records import ambiguous_edit, human_edit
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.hashing import canonical, sha256

@@ -9,7 +9,7 @@ from packages.resume_core.models.template_workspace import WorkspaceV7
 from packages.resume_core.editing.mutations import RichMutationFailure, apply_rich_mutation
 from packages.resume_core.editing.template_block_patches import block_delta, block_hash, restore_payload
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
-from packages.resume_core.editing.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_preparation_text import prepare_text_edit
 from packages.resume_core.hashing import canonical
 from tests.templates.storage_fixtures import workspace
 from tests.templates.test_template_preparation import command, response

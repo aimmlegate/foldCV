@@ -3,7 +3,7 @@ it, and a period line keeps the template's wording as its dates change. Authored
 
 from ..models.rich_document import FactFieldSpan
 from ..models.template_document import PresentedText, TemplateParagraphBlock, TemplateSectionBlock
-from .fields import field_key, occurrences, working_field
+from ..fields import field_key, occurrences, working_field
 from .template_panel_values import field_occurrence, period_endpoint, period_field_id
 from ..templates.materialize_nodes import fallback_style, literal, locale_text, period_format, reference, styled
 from ..templates.projection import pointer_tokens

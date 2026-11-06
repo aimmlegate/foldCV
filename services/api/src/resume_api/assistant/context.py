@@ -14,9 +14,9 @@ from packages.resume_core.repository.assistant_store import AgentFailure
 from packages.resume_core.models.rich_document import FactFieldSpan
 from packages.resume_core.models.template_document import BoundLink
 from packages.resume_core.editing.dependencies import placements
-from packages.resume_core.editing.fields import inline_groups
+from packages.resume_core.fields import inline_groups
 from packages.resume_core.editing.mutations import inline_text
-from packages.resume_core.editing.template_preparation import _fields
+from packages.resume_core.editing.template_preparation_text import _fields
 
 from .skills import SKILLS
 

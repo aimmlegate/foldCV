@@ -7,9 +7,9 @@ from ..models.rich_document import FactFieldSpan, Hyperlink, SectionBlock, Table
 from ..models.template_document import (BoundLink, ManualScopeSpan, PresentedHyperlink, PresentedText,
                                         TemplateParagraphBlock)
 from ..models.template_facts import ManualEditScope, Relation
-from .fields import bound_link_fields, inline_groups, occurrences
+from ..fields import bound_link_fields, inline_groups, occurrences
 from .mutations import cut_inline, inline_text, locate, subtree
-from ..importing.template_identity import capture_span
+from ..sources import capture_span
 from .template_preparation_ids import allocate_id
 
 
@@ -18,7 +18,7 @@ def identity(prefix):
 
 
 def _scope_fields(project, scopes):
-    from .fields import builtin_cell_values
+    from ..fields import builtin_cell_values
     from .template_scope_occurrences import active_scope_cells
     active = active_scope_cells(project.facts)
     cells = {cell for scope in scopes for cell in active.get(scope, set())}

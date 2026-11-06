@@ -133,7 +133,7 @@ def test_conflict_payload_must_match_actual_atomic_ownership_and_occurrences(dam
 
 
 def test_existing_row_update_keeps_index_and_current_dependencies_follow_final_fact_revision():
-    from packages.resume_core.editing.template_facts import human_edit
+    from packages.resume_core.fact_records import human_edit
     from tests.templates.test_transactions import extension_step
     before,_=workspace()
     for identifier,previous in [('first',None),('second','first')]:
@@ -155,7 +155,7 @@ def test_existing_row_update_keeps_index_and_current_dependencies_follow_final_f
 
 
 def test_stale_existing_dependencies_cannot_be_refreshed_into_new_authority():
-    from packages.resume_core.editing.template_facts import human_edit
+    from packages.resume_core.fact_records import human_edit
     from tests.templates.test_transactions import extension_step
     before,_=workspace();before,_=apply_rich_mutation(before,add(before));original=before.sync_records[0]
     facts=human_edit(before.project.facts,'paper-a','title','Later independent wording')

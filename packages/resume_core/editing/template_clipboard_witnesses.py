@@ -2,8 +2,8 @@
 
 from ..models.template_clipboard import (ClipboardActiveCell, ClipboardFieldWitness, ClipboardOwnershipWitness,
                                          ClipboardRecordOwnership, ClipboardScopeWitness, ClipboardSourceWitness)
-from .fields import builtin_cell_values, field_key, working_field
-from ..importing.template_identity import source_slice
+from ..fields import builtin_cell_values, field_key, working_field
+from ..sources import source_slice
 from .template_scope_occurrences import active_scope_cells
 from ..hashing import canonical, sha256
 

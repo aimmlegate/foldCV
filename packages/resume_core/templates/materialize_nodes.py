@@ -230,3 +230,18 @@ def render_nodes(package, declaration, instance, fields, scopes, shown_scopes, p
     # A row whose nodes show nothing is left out, as an empty line would be.
     empty = {id(row) for row in rows if not row['children']}
     return [item for item in blocks if id(item) not in empty], displayed
+
+
+def node_of(recipe, ref):
+    return recipe.views[ref.view_key].nodes[ref.node_index] if ref is not None and ref.node_index is not None else None
+
+
+def focus_row(block, recipe):
+    """The leading Focus paragraphs of an item section; they share one decorative icon row."""
+    row = []
+    for child in block.children if block.type == 'section' else []:
+        node = node_of(recipe, child.presentation)
+        if child.type != 'paragraph' or child.children or node is None or node.type != 'focus_entry':
+            break
+        row.append(child)
+    return row

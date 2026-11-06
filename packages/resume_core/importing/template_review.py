@@ -7,9 +7,12 @@ import re
 from ..models.template_import import (CheckTarget, ReferencedReviewReply, ReviewDisposition, ReviewInput,
                                       ReviewReceipt, ReviewReply, SettledCheck)
 from ..storage import strict_json
-from .template_identity import (capture_span, empty_value, evidence_options, offered_evidence, payload_value,
-                                restore_evidence, source_slice)
-from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
+from ..sources import capture_span, source_slice
+from ..templates.source_spans import payload_value
+from .template_identity import empty_value, evidence_options, offered_evidence, restore_evidence
+from ..import_failure import TemplateImportFailure
+from .template_import import attempt_in, checked, identity, task_in
+from ..hashing import digest
 from ..templates.models import Check
 from ..hashing import canonical, sha256
 from ..templates.projection import SchemaFailure, pointer_tokens, resolve, schema_at, validate_payload

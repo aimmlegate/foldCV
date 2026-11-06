@@ -19,7 +19,7 @@ from packages.resume_core.models.agent import AgentAnchor, AgentFetchRequest, Ag
 from packages.resume_core.models.assistant import ProposeChangesV1, PublishFindingsV1
 from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.editing.dependencies import dependency
-from packages.resume_core.editing.fields import inline_groups
+from packages.resume_core.fields import inline_groups
 from packages.resume_core.editing.mutations import inline_text, utf16_slice
 
 from resume_api.agent.mcp import PrivateMcp

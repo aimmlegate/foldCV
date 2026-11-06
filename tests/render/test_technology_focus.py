@@ -5,7 +5,7 @@ import hashlib
 import json
 
 from packages.resume_core.models.rich_facts import WorkingFacts
-from packages.resume_core.editing.fields import set_text
+from packages.resume_core.fields import set_text
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.panel import panel_mutation
 from packages.resume_core.responses.presentation import presentation

@@ -10,7 +10,7 @@ from ..models.rich_facts import RichFact, WorkingPeriod
 from ..models.rich_mutations import ActionCapture, RichMutation, PutRecord, RemoveRecord, PutBlock, RemoveBlock
 from .assembly import field, identity
 from .dependencies import placements
-from .fields import inline_groups, set_text
+from ..fields import inline_groups, set_text
 from .sync import linked_field_steps
 from .technology_focus import focus_order_steps, focus_membership_steps
 from .technology_lists import (additional_bindings, bind_edit_lists, insert_technology, list_parts, rebuild,
@@ -112,7 +112,7 @@ def new_record(kind, job_id=None):
 
 
 def field_block(record, key, kind="paragraph", level=1):
-    from .fields import working_field
+    from ..fields import working_field
     value = working_field(record, key)
     return {"id": identity("field"), "revision": 1, "type": kind,
         "props": {"level": level} if kind == "heading" else {}, "children": [],
@@ -394,7 +394,7 @@ def period_block(record, period):
 
 
 def endpoint_steps(project, record, steps, positions):
-    from .fields import occurrences
+    from ..fields import occurrences
     groups = occurrences(project.document)
     replacements = {step.block.id: step.block.model_copy(deep=True) for step in steps if isinstance(step, PutBlock)}
     touched = set()

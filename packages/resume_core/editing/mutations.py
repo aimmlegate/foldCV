@@ -9,7 +9,7 @@ from ..models.rich_mutations import MoveBlock, PutBlock, PutRecord, RemoveBlock,
 from ..models.rich_workspace import RichMutationReplay, WorkspaceV6
 from .fact_mutations import apply_record_mutations
 from .dependencies import dependencies_current
-from .fields import synchronize_binding_revisions
+from ..fields import synchronize_binding_revisions
 from ..models.template_mutations import RestoreAuthoredBlockPatch, TemplateMutationV1
 from .template_mutations import DOMAIN_STEPS, apply_fact_steps, apply_issue_steps, check_history, check_tree_targets
 from .template_preparation_ids import allocate_id

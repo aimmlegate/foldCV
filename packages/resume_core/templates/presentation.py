@@ -1,14 +1,13 @@
 """Presentation and snapshot identity come only from the project's captured package."""
 
-from ..models.template_render import presentation_value
-from ..responses.template_export import snapshot_identity as authored_snapshot_identity
+from ..models.template_render import presentation_value, snapshot_identity as authored_snapshot_identity
 
 
 SUPPORTED_AUTHORING = frozenset({'node_index'})
 
 
 def validate_presentation(document, package):
-    from ..editing.fields import inline_groups
+    from ..fields import inline_groups
     for block in document.blocks():
         if block.presentation is None:
             raise ValueError('template block has no authored presentation')

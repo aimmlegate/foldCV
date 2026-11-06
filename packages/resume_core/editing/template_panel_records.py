@@ -5,17 +5,18 @@ from ..models.rich_document import FactFieldSpan
 from ..models.rich_facts import TechnologyRecord
 from ..models.template_document import BoundLink, PresentedText, TemplateParagraphBlock, TemplateSectionBlock
 from .dependencies import placements
-from .fields import field_key, inline_groups, occurrences, set_text, working_field
+from ..fields import field_key, inline_groups, occurrences, set_text, working_field
 from .panel import FIELDS
-from ..responses.template_api import EditorPlacement, EditorTechnologyTarget
+from ..models.editor_targets import EditorPlacement, EditorTechnologyTarget
 from ..importing.template_builtin_admission import unknown
-from .template_facts import delete_subject_in_place
+from ..fact_records import delete_subject_in_place
 from .template_panel_creation import _report_cells, period_jobs
 from .template_panel_focus import experience_text, focus_only, focus_rows, focus_view, show_experience
 from .template_panel_lines import field_place, is_row, line_container, line_text, node_labels, period_text, show_fields
-from .template_preparation_panel import (_join_technology_line, _patch_displays, _split_technology_line,
-                                         drop_empty_titles, field_occurrence, line_is_list, restore_view,
-                                         sibling_lists, technology_lines, view_position, view_row, view_title)
+from .panel_views import (_join_technology_line, _patch_displays, _split_technology_line, drop_empty_titles,
+                          line_is_list, restore_view, technology_lines, view_position, view_row, view_title)
+from .template_panel_values import field_occurrence
+from .template_panel_lines import sibling_lists
 from ..templates.materialize_nodes import literal, locale_text, reference, styled
 from ..templates.operations import OperationContext, active, display_pointer, select_role_branch
 from ..templates.projection import pointer_tokens

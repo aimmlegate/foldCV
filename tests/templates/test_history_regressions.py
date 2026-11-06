@@ -5,7 +5,7 @@ from tests.templates.storage_fixtures import workspace
 from tests.templates.test_transactions import authorization, extension_step, request
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
-from packages.resume_core.editing.template_facts import ambiguous_edit
+from packages.resume_core.fact_records import ambiguous_edit
 from packages.resume_core.editing.template_authoring import duplicate_entity
 from packages.resume_core.repository.archive_zip import write_zip
 from packages.resume_core.repository.template_archive import archive_payload_v7, open_archive_v7

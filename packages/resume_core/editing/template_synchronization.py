@@ -2,7 +2,7 @@
 
 from ..models.template_mutations import PutTemplateSync, RemoveTemplateSync, TemplateSyncRecord
 from .dependencies import dependencies_current, dependency, fingerprint
-from .fields import bound_link_fields, occurrences, records_by_id
+from ..fields import bound_link_fields, occurrences, records_by_id
 from .template_dependencies import selector
 from ..hashing import canonical, sha256
 

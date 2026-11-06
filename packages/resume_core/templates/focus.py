@@ -10,7 +10,7 @@ import re
 import threading
 
 from ..dates import month_bounds, union_months
-from ..editing.fields import records_by_id, working_field
+from ..fields import records_by_id, working_field
 from ..technologies import BY_ID, normalize_name, resolve_technology, split_version, technology_identity
 from ..technology_experience import whole_years_text
 from .models import CapturedAsset

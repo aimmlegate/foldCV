@@ -6,12 +6,12 @@ from ..models.template_clipboard import (ClassifiedClipboardBlocks, ClassifiedCl
                                          RetainedTemplateClipboardV1)
 from ..models.template_document import BoundLink, ManualScopeSpan
 from ..models.rich_document import FactFieldSpan, Hyperlink
-from .fields import inline_groups
+from ..fields import inline_groups
 from .mutations import locate
 from .template_authoring import citation_spans, classify_blocks, classify_fragment
 from .template_clipboard_witnesses import (captured_package_hash, field_witness, fingerprint, scope_witness,
                                            source_witness, verify_witnesses)
-from ..importing.template_identity import capture_span
+from ..sources import capture_span
 from ..templates.presentation import snapshot_identity, validate_presentation
 from ..templates.store import verify_package
 

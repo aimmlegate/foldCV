@@ -18,21 +18,23 @@ from packages.resume_core.importing.template_admission import admit_proposal, ta
 from packages.resume_core.importing.template_builtin_admission import current_handles
 from packages.resume_core.editing.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
-from packages.resume_core.importing.template_identity import (capture_span, empty_value, evidence_options, line_spans,
-                                                              offered_evidence, source_slice)
+from packages.resume_core.sources import capture_span, line_spans, source_slice
+from packages.resume_core.importing.template_identity import empty_value, evidence_options, offered_evidence
 from packages.resume_core.importing.template_entries import (closed_state, entry_part, entry_records, grouped,
                                                              line_options, ordered_entries, outline_part,
                                                              parse_outline, parse_outline_review, reorder_records,
                                                              splits_entries)
 from packages.resume_core.importing.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
-                                                            TemplateImportFailure, add_entry_tasks, add_outline_review,
-                                                            admit_operation, attempt_in, authorization,
-                                                            cancel_operation, capture_finalization, capture_task_input,
-                                                            checked, children_of, digest, dispatch_attempt, entries_of,
-                                                            identity, observe_time, record_return, reconcile_cleanup,
+                                                            add_entry_tasks, add_outline_review, admit_operation,
+                                                            attempt_in, authorization, cancel_operation,
+                                                            capture_finalization, capture_task_input, checked,
+                                                            children_of, dispatch_attempt, entries_of, identity,
+                                                            observe_time, record_return, reconcile_cleanup,
                                                             recover_operation, reserve_attempt, resume_operation,
                                                             spent_calls, start_operation, stopped_call, stops_import,
                                                             task_in)
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.hashing import digest
 from packages.resume_core.importing.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.importing.template_review import (decide_review, make_review_input, record_review,
                                                             repair_wins, shown_values)

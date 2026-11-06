@@ -3,11 +3,11 @@
 from ..models.template_workspace import ProjectV6, validated_with_history
 from ..templates.focus import catalog_for, remembered_icon, row_name
 from ..templates.materialize import materialize
-from ..templates.presentation_plan import focus_row
+from ..templates.materialize_nodes import focus_row
 from ..templates.span_coverage import overlaps
 from ..template_capture import item_identities
 from ..editing.template_effective import effective_cells
-from .template_identity import payload_value
+from ..templates.source_spans import payload_value
 from .template_proposals import relation_evidence
 
 

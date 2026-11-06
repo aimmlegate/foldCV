@@ -12,7 +12,7 @@ from packages.resume_core.editing.mutations import RichMutationFailure, apply_ri
 from packages.resume_core.editing.template_authoring import (copy_blocks, copy_fragment, copy_inline, merge_blocks,
                                                              split_block)
 from packages.resume_core.editing.template_dependencies import selector
-from packages.resume_core.editing.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_preparation_text import prepare_text_edit
 from packages.resume_core.editing.template_preparation_cells import human_cell_steps
 from packages.resume_core.editing.template_preparation_ids import EditIdAllocator, existing_ids
 from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences

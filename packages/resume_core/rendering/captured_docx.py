@@ -20,7 +20,8 @@ from ..rich_limits import DOCX_BYTES
 from ..templates.compiler import ADDED_CAPABILITIES, CAPABILITIES
 from ..hashing import canonical
 from ..templates.focus import icon_catalog, row_icon
-from ..templates.presentation_plan import chip_background, focus_row, hyperlink_target, table_rows
+from ..templates.presentation_plan import chip_background, hyperlink_target, table_rows
+from ..templates.materialize_nodes import focus_row
 from ..templates.materialize_nodes import reference
 from .captured_assets import CapturedAssets, decode_logo, decode_png
 from .captured_embedding import embed_captured_fonts

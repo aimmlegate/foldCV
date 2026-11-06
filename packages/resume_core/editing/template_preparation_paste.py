@@ -41,7 +41,7 @@ class InlineReplacement:
         self.same_text=False
 
     def guard(self,content,selected,fields,scope_ranges,bound):
-        from .template_preparation import _leaves, _length
+        from .template_preparation_text import _leaves, _length
         owned=bool(fields or scope_ranges or bound is not None)
         if self.semantic and owned:
             raise ValueError('semantic paste cannot overlay destination field or scope authority')
@@ -69,7 +69,7 @@ class InlineReplacement:
                     if citation not in self.evidence:self.evidence.append(citation.model_copy(deep=True))
 
     def overlay(self,content,selected,path):
-        from .template_preparation import _length
+        from .template_preparation_text import _length
         selected_parts=cut_inline(content,selected.start,selected.end,id_factory=self.allocator,
             allocation_path=(*path,'paste-overlay'))
         runs=[];cursor=0
@@ -132,7 +132,7 @@ class InlineReplacement:
 
 
 def prepare_inline_paste(response,request,*,clipboard=None,occupied=None):
-    from .template_preparation import prepare_text_edit
+    from .template_preparation_text import prepare_text_edit
     operation=request.operations[0]
     content=source_content(response,operation,clipboard)
     replacement=InlineReplacement(content)

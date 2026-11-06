@@ -392,7 +392,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         # The capture records the selected import model with the effort the import start chose, else its catalog
         # default; a chosen effort the catalog does not offer for the model refuses the start.
         from packages.resume_core.models.template_import import ModelCapture
-        from packages.resume_core.importing.template_import import digest as capture_digest
+        from packages.resume_core.hashing import digest as capture_digest
         selected = import_selected_provider()
         if selected is None:
             raise ProjectFailure(unavailable_code("selected_import_model"), 409)
@@ -411,7 +411,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         # E07: the configured fallback with its catalog default effort, captured next to the primary. An unavailable
         # fallback refuses the start instead of being replaced or dropped.
         from packages.resume_core.models.template_import import ModelCapture
-        from packages.resume_core.importing.template_import import digest as capture_digest
+        from packages.resume_core.hashing import digest as capture_digest
         try:
             model = preferences_store.load().selected_fallback_model
         except PreferencesFailure as error:

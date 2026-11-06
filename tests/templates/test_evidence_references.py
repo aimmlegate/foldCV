@@ -6,9 +6,11 @@ import json
 import pytest
 
 from packages.resume_core.models.template_import import ReferenceTable, ReferencedProposalReply, ReviewInputRecord
-from packages.resume_core.importing.template_identity import capture_span, evidence_options
-from packages.resume_core.importing.template_import import (TemplateImportFailure, digest, dispatch_attempt,
-                                                            record_return, reserve_attempt)
+from packages.resume_core.sources import capture_span
+from packages.resume_core.importing.template_identity import evidence_options
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.hashing import digest
+from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.importing.template_proposals import parse_proposal, restore_reply
 from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.importing.template_review import (make_review_input, record_review, reusable_receipt,

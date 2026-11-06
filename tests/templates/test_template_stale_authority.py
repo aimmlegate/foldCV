@@ -7,7 +7,8 @@ import pytest
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.models.template_facts import ExtensionCell, ExtensionRecord
-from packages.resume_core.importing.template_import import TemplateImportFailure, digest
+from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.hashing import digest
 from packages.resume_core.templates.projection import reachable_schema
 from tests.templates.template_runtime_fixtures import RuntimeFixture
 from tests.templates.test_semantic_admission import raw_proposal

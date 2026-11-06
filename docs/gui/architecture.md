@@ -89,7 +89,8 @@ services/api/src/resume_api/{projects,assistant,importer,agent,cli,providers}/
 packages/resume_core/{models,extraction,templates,editing,importing,rendering,repository,responses}/ plus root utilities
 contracts/{json-schema,examples,error-messages.ru.json}
 templates/bundled/   generic-two-column.yaml, generic-one-column.yaml,
-                                                generic-skills-table.yaml, generic-questionnaire.yaml, generic-project-cards.yaml, shared assets/
+                                                generic-skills-table.yaml, generic-questionnaire.yaml, generic-project-cards.yaml,
+                                                _base.yaml (sections the table templates share), shared assets/
 templates/local/   ignored; private templates of a local build, each folder with its own assets/
 tests/  (layout in testing.md)
 tools/
@@ -130,7 +131,7 @@ assistant/<projectId>/{conversations,runs,proposals}/
 
 ### Repository
 
-`packages/resume_core/project_repository.py`. `ProjectRepository` keeps one
+`packages/resume_core/repository/project_repository.py`. `ProjectRepository` keeps one
 `ProjectSession` per project for the life of the service: the committed `WorkspaceV7`
 object (replaced on each commit, never changed in place), its `projectRevision`, one
 reentrant lock, the journal, the editor token, the replay window, the occupied ids
@@ -175,7 +176,7 @@ flags and at close or eviction, not per edit; the listing lays open sessions ove
 
 ### Undo journal
 
-`packages/resume_core/project_journal.py`, file `history.jsonl`. Line kinds: `edit`
+`packages/resume_core/repository/project_journal.py`, file `history.jsonl`. Line kinds: `edit`
 (action id, mutation id, revisions, full `before` and `after` payloads of the
 undoable keys that changed), `undo`, `redo`, `barrier` and `mark` (a commit without
 undoable changes, written only while there is history). Every line names the
@@ -300,7 +301,7 @@ Russian text in `contracts/error-messages.ru.json`.
 
 ### Tasks, import, export, rewrite
 
-`packages/resume_core/project_tasks.py` keeps an in-memory `TaskRegistry` of `{id,
+`packages/resume_core/repository/project_tasks.py` keeps an in-memory `TaskRegistry` of `{id,
 projectId, kind, state, stage, startedAt, elapsed, detail, error}` for import, export
 and rewrite, one running task per project and kind. `GET /tasks` feeds the import
 activity view (stage, elapsed time, saved discoveries, and `detail.progress` from

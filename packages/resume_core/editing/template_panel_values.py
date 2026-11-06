@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from ..dates import ISO_DATE, format_date, source_date
 from ..models.template_document import FieldOccurrence
-from .fields import field_key, working_field
+from ..fields import field_key, working_field
 
 
 def period_endpoint(period):

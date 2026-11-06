@@ -11,7 +11,7 @@ from packages.resume_core.editing.template_clipboard import capture_clipboard
 from packages.resume_core.editing.template_clipboard_witnesses import (captured_package_hash, field_witness,
                                                                        ownership_witness, scope_witness,
                                                                        source_witness, verify_witness, verify_witnesses)
-from packages.resume_core.editing.template_facts import human_edit
+from packages.resume_core.fact_records import human_edit
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.presentation import snapshot_identity
 from tests.templates.editor_fixtures import TemplateEditor

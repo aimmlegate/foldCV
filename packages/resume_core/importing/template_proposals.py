@@ -4,10 +4,14 @@ from ..models.template_facts import Observation, Relation
 from ..models.template_import import (ProposalRecord, ProposalReply, ReferencedProposalReply, RelationAllocation,
                                       DroppedValue)
 from ..storage import strict_json
-from ..editing.fields import field_key
-from .template_identity import (_bound_root, allocate_discoveries, offered_evidence, offered_references, payload_value,
-                                resolve_fields, resolve_lineage, restore_evidence, source_slice)
-from .template_import import TemplateImportFailure, attempt_in, checked, digest, identity, task_in
+from ..fields import field_key
+from ..templates.source_spans import _bound_root, payload_value
+from ..sources import source_slice
+from .template_identity import (allocate_discoveries, offered_evidence, offered_references, resolve_fields,
+                                resolve_lineage, restore_evidence)
+from ..import_failure import TemplateImportFailure
+from .template_import import attempt_in, checked, identity, task_in
+from ..hashing import digest
 from ..hashing import canonical, sha256
 from ..templates.projection import pointer_tokens, reachable_schema, validate_payload
 from ..templates.replies import proposal_schema, strip_unoffered_bookkeeping

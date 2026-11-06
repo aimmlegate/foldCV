@@ -3,7 +3,7 @@
 from ..models.rich_document import TableBlock
 from ..models.template_document import ManualScopeSpan, PresentedText
 from ..models.template_mutations import ScopeDisplaySource, SetManualScopeDisplays
-from .fields import inline_groups
+from ..fields import inline_groups
 from .template_scope_occurrences import active_scope_cells
 from ..hashing import canonical, sha256
 

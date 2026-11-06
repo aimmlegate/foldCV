@@ -4,7 +4,8 @@ import pytest
 
 from packages.resume_core.models.template_import import ReferenceTable
 from packages.resume_core.importing.template_completion import complete_reply
-from packages.resume_core.importing.template_identity import capture_span, evidence_options, line_spans
+from packages.resume_core.sources import capture_span, line_spans
+from packages.resume_core.importing.template_identity import evidence_options
 from packages.resume_core.importing.template_import import spent_calls
 from tests.templates.generic_fixtures import generic_package, job
 from tests.templates.storage_fixtures import source_fixture

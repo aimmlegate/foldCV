@@ -10,7 +10,7 @@ from packages.resume_core.editing.mutations import RichMutationFailure, apply_ri
 from packages.resume_core.editing.template_authoring import split_block
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
 from packages.resume_core.editing.template_mutations import HistoryAuthorization
-from packages.resume_core.editing.template_preparation import prepare_text_edit
+from packages.resume_core.editing.template_preparation_text import prepare_text_edit
 from packages.resume_core.editing.template_scope_occurrences import active_scope_cells, scope_occurrences
 from packages.resume_core.hashing import canonical
 from tests.templates.test_manual_scope_occurrences import shared_workspace
@@ -185,7 +185,7 @@ def test_repeat_undo_redo_archive_and_stale_result_have_exact_retained_authority
 
 
 def test_builtin_shared_repeat_keeps_null_values_and_exact_pending_input_without_reassignment():
-    from packages.resume_core.editing.fields import field_key, inline_groups
+    from packages.resume_core.fields import field_key, inline_groups
     from tests.templates.test_builtin_scopes import scoped_workspace
     before,_=scoped_workspace();block=before.project.document.regions[2].blocks[0]
     length=sum(len(span.text.encode('utf-16-le'))//2 for _name,content in inline_groups(block) for span in content)

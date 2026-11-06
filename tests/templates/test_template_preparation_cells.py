@@ -4,7 +4,7 @@ import pytest
 
 from packages.resume_core.models.rich_facts import TechnologyRecord, WorkingPeriod
 from packages.resume_core.models.template_workspace import WorkspaceV7
-from packages.resume_core.editing.fields import field_key, set_text
+from packages.resume_core.fields import field_key, set_text
 from packages.resume_core.editing.mutations import apply_rich_mutation
 from packages.resume_core.importing.template_builtin_admission import unknown
 from packages.resume_core.editing.template_inverse import inverse_template_mutation
@@ -89,7 +89,7 @@ def test_mixed_builtin_extension_input_has_one_scope_with_exact_replacement(text
     builtin = field_key('employer-a', 'employer')
     extension = before.project.facts.extensions[0].cells[0].id
     monkeypatch.setattr('packages.resume_core.templates.projection.validate_payload', forbidden)
-    monkeypatch.setattr('packages.resume_core.editing.fields.set_text', forbidden)
+    monkeypatch.setattr('packages.resume_core.fields.set_text', forbidden)
     first, retry = allocator(before), allocator(before)
     targets = [builtin, extension]
     steps = human_cell_steps(before, targets, text, 'human-edit', ['job-label'], first)

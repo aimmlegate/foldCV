@@ -2,7 +2,8 @@
 
 from packages.resume_core.models.template_render import TemplateRenderRequestV1
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
-from packages.resume_core.responses.template_export import capture_export, snapshot_identity
+from packages.resume_core.responses.template_export import capture_export
+from packages.resume_core.models.template_render import snapshot_identity
 from tests.templates.long_employment_fixtures import long_lines, long_workspace
 from tests.templates.test_captured_docx import emitted, xml
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import uuid
 
-from ..models.rich_facts import RecordTombstone
-from ..models.template_facts import EffectiveExtensionValue, ManualEditScope, Relation, WorkingFactsV2
+from .models.rich_facts import RecordTombstone
+from .models.template_facts import EffectiveExtensionValue, ManualEditScope, Relation, WorkingFactsV2
 
 
 def extension_record(facts,record_id,*,active=True):

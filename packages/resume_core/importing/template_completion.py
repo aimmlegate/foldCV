@@ -23,7 +23,8 @@ from copy import deepcopy
 import json
 import re
 
-from .template_identity import _binding_instances, _bound_root, empty_value, payload_value
+from .template_identity import _binding_instances, empty_value
+from ..templates.source_spans import _bound_root, payload_value
 from ..templates.projection import pointer_tokens
 
 # A derived value cites at most this many offered entries; each states it word for word.

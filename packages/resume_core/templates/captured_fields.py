@@ -1,6 +1,6 @@
 """Select captured human text without inventing a nested presentation slot."""
 
-from ..importing.template_identity import _bound_root
+from .source_spans import _bound_root
 from .materialize_nodes import DisplayField
 from .projection import pointer_tokens
 
