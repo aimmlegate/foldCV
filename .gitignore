@@ -23,6 +23,7 @@ apps/web/playwright-report/
 !/docs/gui/local-dependency-notices.md
 !/docs/gui/local-setup.md
 !/docs/gui/local-version-manifest.json
+!/docs/gui/pdf-extraction-plan.md
 !/docs/gui/testing.md
 /reports/
 /research_notes/
