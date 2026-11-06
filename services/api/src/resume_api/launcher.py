@@ -31,7 +31,7 @@ from . import release_checks
 ROOT = Path(__file__).resolve().parents[4]
 STARTUP_TIMEOUT_SECONDS = 5
 SHUTDOWN_TIMEOUT_SECONDS = 5
-# Template import is the default flow; the cap bounds one import's model calls (the CT06 live runs used 60; D117 adds
+# Template import is the default flow; the cap bounds one import's model calls (live imports used 60; D117 adds
 # an outline, its review and two calls per entry of a block extracted entry by entry).
 TEMPLATE_IMPORT_CALL_CAP = 150
 
@@ -58,7 +58,7 @@ def bind_claude(slot: ProviderSlot, executable: Path) -> ProviderSlot:
 
 
 def claude_slot(data_root: Path, temp_root: Path | None = None, *, managed_only: bool = False) -> ProviderSlot:
-    """Claude next to Codex; it stays unlisted until its parity matrix passes (MP07), so it runs nothing.
+    """Claude next to Codex; it stays unlisted until its parity matrix passes, so it runs nothing.
     FoldCV's managed runtime comes first, then a native install, else the managed path that Settings installs into;
     the desktop app passes managed_only. Without `temp_root` the slot has no assistant runtime."""
     profile_root = data_root / ("cli-profile-" + claude.KIND)

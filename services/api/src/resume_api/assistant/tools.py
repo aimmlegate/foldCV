@@ -1,4 +1,4 @@
-"""The ten run-bound tools (plan 2.8). Reads serve the pinned workspace; only `propose_changes` and
+"""The ten run-bound tools. Reads serve the pinned workspace; only `propose_changes` and
 `publish_findings` store anything, and neither writes the project."""
 
 from __future__ import annotations

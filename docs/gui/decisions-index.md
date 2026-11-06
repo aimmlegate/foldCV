@@ -1,0 +1,153 @@
+# Decisions index
+
+Number and title of each decision in the local log `docs/gui/automation/decisions.md`. Written by
+`tools/decisions_index.py`; checked by `tools/check_decisions_index.py`.
+
+- D001 Preserve the supported CLI boundary
+- D002 Commit only milestone scope
+- D003 Use file-backed handoffs
+- D004 Deliver local workflows with generation closed if needed
+- D005 Keep development tools local
+- D006 Preserve exact external review gaps
+- D007 Keep the first package a personal local developer run
+- D008 Use the verified editable font variant
+- D009 Use a separate local session for each launch
+- D010 Keep editor state and accepted edits explicit
+- D011 Keep rendering in one managed process group
+- D012 Separate preview limits from content-operation allowance
+- D013 Require complete render transport values
+- D014 Preserve known cleanup uncertainty across restart
+- D015 Bind synthetic presentation explicitly before preview
+- D016 Preserve source imports within one owned operation
+- D017 Keep the provider boundary narrow and production readiness separate
+- D018 Permit verified MCPmarket hooks in the external Grok reviewer
+- D019 Keep connection setup explicit and metadata-only
+- D020 Keep Python behind the future Electron host
+- D021 Retain failed external reviews without retry loops
+- D022 Bound external review completion tokens
+- D023 Keep imported facts complete until the archive migration
+- D024 Keep manual drafting data separate from source proposals
+- D025 Preserve explicit manual content during initial drafting
+- D026 Keep contact filtering visible for material facts
+- D027 Reject visible private metadata before document rendering
+- D028 Select rewrite context from complete working records
+- D029 Separate structural readiness from review warnings
+- D030 Version the portable workspace separately
+- D031 Separate preview from final factual export readiness
+- D032 Audit privacy by the intended data destination
+- D033 Recover only verified controller-owned metadata probes
+- D034 Prepare an explicitly accepted personal CLI experiment
+- D035 Retain local projects by default
+- D036 Use the clarified editor flow and editable editorial policy
+- D037 Measure the live CLI before extending its test allowance
+- D038 Defer live CLI evaluation to manual use after MVP
+- D039 Ship DOCX export only in MVP
+- D040 Run the recovery iteration with Sol only and deferred reviews
+- D041 Two-step block restore and evidence-only observation date
+- D042 Freeze recovery schema identities and test directories
+- D043 Retain bounded review packets and task revisions
+- D044 Store Rules metadata atomically with Markdown
+- D045 Namespace canonical source units before normalization
+- D046 Reuse calendar validation at the recovery wire boundary
+- D047 Preserve GUI fact spans and explicit ongoing periods
+- D048 Queue GUI creation and retain stages in memory
+- D049 Accept the pinned single-editor adapter and separate entry proof
+- D050 Keep initial annotations in noneditable field and section chrome
+- D051 Stamp source selections in Python and distinguish broader context
+- D052 Retain direct edits with serialized buffers and block sessions
+- D053 Persist one private workspace with verified blobs and explicit acknowledgments
+- D054 Refresh exact projections and preserve field intent during focus return
+- D055 Bound browser workers for retained renderer compatibility
+- D056 Apply scoped rewrites through the durable project guard
+- D057 Bind current DOCX exports and downloads to acknowledged input
+- D058 Read Settings without probing and persist only nonsecret choices
+- D059 Keep reconciliation eligibility in the durable operation context
+- D060 Apply assessed related replacements without reassessment
+- D061 Reload the editor at a project boundary after durable flush
+- D062 Validate portable data in Python and rebuild imported render caches
+- D063 Save shared Rules explicitly and preserve the Settings buffer
+- D064 Keep a rejected file choice inactive and show acknowledged progress
+- D065 Retry available stages and keep committed document rendering pure
+- D066 Keep editor navigation and contextual layout transient
+- D067 Make the recovery editor the default and retain explicit compatibility
+- D068 Bound complete native creation at 180 seconds
+- D069 Restore native references and verified literal claims
+- D070 Verify fresh real creation through the GUI
+- D071 Accept usable native input independently
+- D072 Provide full document editing and the supplied template
+- D073 Clarify the full-editor scope and acceptance
+- D074 Edit key facts on the left and offer bounded date cascades
+- D075 Bound the follow-up runs and close execution contracts
+- D076 Test useful behavior, edge cases and review defects
+- D077 Reconcile plan reviews and pin the remaining contracts
+- D078 Proceed without Sol review at the user's request
+- D079 Continue automatically after successful phase checkpoints
+- D080 Keep resume-content validation nonblocking during import
+- D081 Renew NE02 repair budget and continue autonomously
+- D082 Open original text after fact extraction
+- D083 Move history left and assess the input first
+- D084 Collapse panels and use contextual editor actions
+- D085 Review the assistant plan and defer independent AG reviews
+- D086 Allow the pinned Code Mode host only for the assistant runtime
+- D087 Plan parallel background work before further agentification
+- D088 Reconcile background contracts and conditional launch records
+- D089 Remove the Anthropic development-model ban
+- D090 Drop separate Sol review and Astra acceptance for the CT05 run
+- D091 Add M7e import wiring and allow five live attempts
+- D092 Pin the installed Codex plugin CLI for the live proof
+- D093 Require preview and Apply for every change requested through chat
+- D094 Make self-review by the current coding agent the review policy
+- D095 Allow two more live dispatches for the CT05 live proof
+- D096 Raise the import time and project size budgets and set them in Settings
+- D097 Allow live import runs with Sol and Luna on two supplied CVs
+- D100 Allow live import runs to finish CT06
+- D101 Model fit: probes outside the app, three imports, two assistant starts
+- D102 Remarks stay in the block; CT08 and CT10 run; parallel import by default
+- D103 Template import by default; YAML template editor in Settings
+- D104 Live check on Luna and Terra with several real CVs
+- D105 Focus durations from projects; a slim project format for speed
+- D106 Technology lists hold names only; a short template form
+- D107 A repair fixes what review found; a coverage remark after it is not shown
+- D098 Adopt the multi-provider plan with provider parity
+- D099 Keep Codex and Claude for now
+- D108 Save pipeline speed: GC tuning, shared read-only committed objects, measured order
+- D109 Replace the storage, transport and assistant protocols with one in-memory project
+- D110 UI feedback backlog of 2026-10-26: remarks move into Facts, imports run in the background
+- D111 `rules.md` holds only the presets; its editorial rules move into the local template
+- D112 A second bundled template «Одна колонка», a template choice and shorter interface text
+- D113 All Devicon icons, a letter placeholder, Focus back in Facts; Facts offers only what it saves
+- D114 The chosen effort applies to every block; a call has no time limit of its own
+- D115 The coordinator settles verbatim checks; a replacement review looks only at what changed
+- D116 Reviews run at low; one prompt opening and one working directory for every call
+- D117 A long block is outlined and its entries run in parallel groups beside one outline review
+- D118 Build the Claude provider core before the MP01 wiring
+- D119 Both providers at once, as in T3
+- D120 Remarks leave Facts and are marked in the text; no explicit check
+- D121 Model work runs in parallel
+- D122 A Focus row's icon is chosen from the template's icons and remembered for later rows
+- D123 Tester feedback of 2026-10-30: fixes without the translation
+- D124 foldCV Beta desktop builds without company branding
+- D125 Any CLI version works; only what it cannot do refuses it
+- D126 A gap the review finds gets fixed: no list limit, a refused repair tries again
+- D127 Tester feedback of 2026-11-02: lists, chips, marks, the connection message, readability settings, the right margin
+- D128 The macOS app is a Tauri window; Windows keeps Electron until it is tested
+- D129 List lines in the DOCX keep the text's height; the marker no longer sets them
+- D130 A mark's tip names the value it is on; its «Открыть в фактах» button works
+- D131 Technology lines change only in Facts; the page shows them read-only
+- D132 A deleted letter leaves no empty field fragment
+- D133 PDF export prints the shown sheet through the system print window
+- D134 Without rewriting the model's structure stays; the source line shows only for a paraphrase
+- D135 The import prompts follow the unified resume rules
+- D136 Facts lists technologies by skill group; a group of one's own follows the template's
+- D137 The import screen shows no logo and keeps its events in a fixed box
+- D138 The unclear-group remark marks the group line, not the job chips
+- D139 The empty chat asks a question instead of offering ready prompts
+- D140 Themes like T3: scheme, a theme per side, contrast and glass
+- D141 A «Шаблоны» screen, a template catalog and a template assistant without resume access
+- D142 DOCX lines are multiples of the font's single line, which Google Docs reads as Word does
+- D143 Three table templates and key-value table rows in the template language
+- D144 The import screen stays still, the default effort is high on long scales, Facts opens painted in WebKit
+- D145 Remarks on their own value and line, light plates for icons, a two-column template with an own logo and email
+- D146 Managed CLIs install the newest release; Settings checks for updates and offers them
+- D147 Settings and Templates redesign
+- D148 Maintenance: delete, shrink, restructure

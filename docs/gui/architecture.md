@@ -11,6 +11,31 @@
 > Storage and transport follow D109; see [Storage and transport](#storage-and-transport).
 > Later sections that conflict with it describe the first-release design; D109 wins.
 
+## Glossary
+
+Words the code and these notes use in one fixed sense.
+
+- **Captured**: fixed when an import or export starts and kept with it: the template package, schemas and prompts of
+  an import, the render request of an export. Later steps read the captured copy, never the current template.
+- **Package hash**: the SHA-256 of a compiled template package. Projects and the template store name a template by it,
+  so a template edit changes it and a refactor must not (`tools/check_template_hashes.py`).
+- **Renderer identity**: the hash of the core code a capture records; an export retry under other code is refused.
+- **Authored**: the user's document and its edits. An authored operation is one undoable edit the repository commits.
+- **Builtin record**: a fact of a kind the core models itself (employment, technology, education, …). A template-only
+  type is an extension record; its field values are cells.
+- **Cell**: one field value of an extension record, with its evidence spans and admission receipts.
+- **Admitted**: a model value the coordinator accepted after its review; only admitted values become records and cells.
+- **Receipt**: a review's record of every check and its result; admission needs a complete receipt, and a later review
+  may reuse the result of a check it settles (D115).
+- **Witness**: a key or hash kept with a copy or a provenance so a later step can prove its source has not changed
+  (clipboard paste, source witnesses of a block).
+- **Manual scope**: the cells and blocks one user edit set from one typed text, kept together so the text shows and
+  changes as one piece.
+- **Sidecar**: the file a running import saves its operation steps to; the next commit folds it into the project.
+- **Pinned read**: the workspace copy an assistant run reads; its proposals are built on it and applied only by the user.
+- **Presentation plan**: what `project_presentation` decides from the captured package for both the editor and the
+  DOCX writer: rows, chips, bands, icons.
+
 ## Runtime boundaries
 
 Use React and TypeScript for the browser interface, a Python FastAPI service for

@@ -1,4 +1,4 @@
-"""Assistant runs on the repository (D109, plan 2.8): one run per project, a pinned read snapshot, events in a ring
+"""Assistant runs on the repository (D109): one run per project, a pinned read snapshot, events in a ring
 buffer and a JSON-lines file, and proposals that only the user applies.
 
 The project stays editable during a run: the run pins the committed workspace object at its start and reads only

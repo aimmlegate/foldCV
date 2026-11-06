@@ -458,7 +458,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     intake.configure(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
         fallback=template_fallback_model if template_import_call_cap is not None else None,
-        # CT10 (LIVE-15): three blocks at once imported CV-B in 155 s against 389 s sequentially, with no transport errors.
+        # Measured live: three blocks at once imported a QA resume in 155 s against 389 s sequentially, with no
+        # transport errors.
         concurrency=template_import_concurrency)
     intake.ready = v2_pipeline is not None
 

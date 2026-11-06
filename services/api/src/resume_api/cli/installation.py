@@ -358,7 +358,7 @@ class CliInstallation:
 
 
 class ClaudeInstallation(CliInstallation):
-    """One Claude Code binary of the newest release, named by Anthropic's signed manifest (MP02b, D146)."""
+    """One Claude Code binary of the newest release, named by Anthropic's signed manifest (D146)."""
 
     download_name = "claude"
     # The binary is about twice the Codex archive.

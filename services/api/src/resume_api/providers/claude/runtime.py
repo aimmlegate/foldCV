@@ -1,8 +1,8 @@
-"""Claude assistant runtime (MP06a, plan section 8): one `claude -p` stream-json run per assistant run.
+"""Claude assistant runtime: one `claude -p` stream-json run per assistant run.
 
 The same contract as `CodexAgentRuntime`: the inference permit and the profile lock, the FoldCV MCP tools only, the
 same events and limits. The CLI reports its tool set and MCP status in `system/init`; until that matches, nothing
-the run sends is trusted. Cancellation is SIGINT, which still ends the turn with a `result` (MP00 finding 15).
+the run sends is trusted. Cancellation is SIGINT, which still ends the turn with a `result`.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ MAX_LINE = 2 * 1024 * 1024
 
 
 class Renewal(Exception):
-    """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it (MP05 finding 3)."""
+    """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it."""
 
 
 def public_id(value: str) -> str:
@@ -58,7 +58,7 @@ def public_id(value: str) -> str:
 
 
 class MessagesStreamSession:
-    """Strict reader of one assistant run's `stream-json` output, normalized to the FoldCV events (plan 8.3)."""
+    """Strict reader of one assistant run's `stream-json` output, normalized to the FoldCV events."""
 
     def __init__(self, value, cancel, emit, *, startup, active, interrupt_grace, clock=time.monotonic,
                  renew=False, announced=False):

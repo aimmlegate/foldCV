@@ -4,7 +4,7 @@ import type { Preferences } from "../contracts/generated/contracts";
 import type { SaveLimitsPreference } from "../contracts/generated/contracts";
 import { errorCodeOf } from "./errors";
 
-/** The session exchange and the /v1/settings calls; replies are parsed with JSON.parse and typed (plan 2.6). */
+/** The session exchange and the /v1/settings calls; replies are parsed with JSON.parse and typed. */
 export class ApiFailure extends Error {
   constructor(readonly code: string) { super(code); }
 }

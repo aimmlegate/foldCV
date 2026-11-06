@@ -8,7 +8,7 @@ form or order cites the few narrowest entries that state them all, and the revie
 be derived stays missing, and the existing checks refuse it with the binding named: a value with no evidence, a
 selection the request did not offer, an explicit split or merge that names unknown items.
 
-Repairs (LIVE-05..07) also showed bookkeeping the payload contradicts: an entry for a position the payload no longer
+Repairs in live imports also showed bookkeeping the payload contradicts: an entry for a position the payload no longer
 has, or that no binding holds, carries no fact and is dropped; an entry inside a bound value cites that value, and
 the raw wording of a date or period cites the values read from it; a foreign field name at a pointer with one bound
 field names that field; an item reference of a type no binding at that pointer holds cannot name that value's item,
@@ -34,7 +34,7 @@ STEM_THRESHOLD_NEAR, STEM_THRESHOLD_FAR = 0.5, 0.8
 # Lines around an item's own cited lines that may state its reworded values. An item's header is cited first and its
 # content follows, so the window reaches a few lines up and further down; the lines above belong to the previous item.
 STEM_WINDOW_BEFORE, STEM_WINDOW_AFTER = 2, 12
-# A reworded value may gather its stems from this many lines: a merged technology list (LIVE-12) spans employer,
+# A reworded value may gather its stems from this many lines: a merged technology list spans employer,
 # project and two technology lines.
 STEM_LIMIT = 4
 
@@ -126,7 +126,7 @@ def _stems(text):
 
 
 def stating_stems(text, table, anchors=()):
-    """Refs of the narrowest entries whose words share stems with the text (LIVE-12: 'Создание и развитие
+    """Refs of the narrowest entries whose words share stems with the text (a live import: 'Создание и развитие
     микросервисов' states 'Создавал и развивал микросервисы'), when they state enough of its stems. A value of up to
     three stems cites one line, one more line per four further stems, at most STEM_LIMIT.
 
@@ -317,7 +317,7 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
-    relation outside it carries no fact (LIVE-11: one job owned by another) and is dropped.
+    relation outside it carries no fact (a live repair: one job owned by another) and is dropped.
 
     dropped, when a list, collects the values no entry can cite as {pointer, fieldKey, text}; they leave the payload
     (I4: a repair that still states a value no source line states) and the reduced reply is completed instead. None
@@ -347,14 +347,14 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
         if not _resolves(payload, pointer):
             continue
         if isinstance(pointer, str) and pointer not in instances:
-            # An entry inside one bound value (LIVE-06: /0/period/raw of a bound period) cites that value.
+            # An entry inside one bound value (seen live: /0/period/raw of a bound period) cites that value.
             holders = [candidate for candidate in instances if under(pointer, candidate)]
             parent = pointer_of(pointer_tokens(pointer)[:-1])
             if holders:
                 entry['pointer'] = pointer = max(holders, key=len)
                 moved.append(entry)
             elif pointer_tokens(pointer)[-1:] == ['raw'] and any(under(candidate, parent) for candidate in instances):
-                # The raw wording of a date or period (LIVE-06: /0/period/raw) is the evidence of the values read from it.
+                # The raw wording of a date or period (/0/period/raw) is the evidence of the values read from it.
                 providers[parent] = list(entry.get('evidence') or [])
                 continue
         matches = instances.get(pointer, [])
@@ -365,7 +365,7 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
             entry['item'] = None
         fields = {field for _semantic, field in matches}
         if len(fields) == 1 and entry.get('fieldKey') not in fields:
-            # A missing or foreign field name (LIVE-07: the role family's 'family' on a tool) names the one bound field.
+            # A missing or foreign field name (live: the role family's 'family' on a tool) names the one bound field.
             if entry.get('fieldKey') is not None:
                 moved.append(entry)
             entry['fieldKey'] = next(iter(fields))
@@ -373,7 +373,7 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
             providers[pointer] = list(entry.get('evidence') or [])
             continue
         if not matches and isinstance(pointer, str):
-            # No binding holds this pointer, above or below (LIVE-07: /0/project, a null project): no fact to cite.
+            # No binding holds this pointer, above or below (seen live: /0/project, a null project): no fact to cite.
             continue
         if entry.get('effectiveCells') is None:
             entry['effectiveCells'] = []
@@ -542,7 +542,7 @@ def _relations(reply, entries, roots, keys, handles, instances, bindings, refere
         chosen = value.get('relation') or {}
         captured = captured_relations.get(chosen.get('ref')) if chosen.get('kind') == 'relation' else None
         if captured is not None and (captured.kind != value.get('kind') or subject != ('handle', captured.subject)):
-            # A captured relation keeps its subject and kind (LIVE-11: a repair named one for another subject); a
+            # A captured relation keeps its subject and kind (seen live: a repair named one for another subject); a
             # relation of another subject or kind is a new one.
             value = {**value, 'relation': {'kind': 'new', 'key': 'link-' + str(subject[1]) + '-' + str(value.get('kind'))}}
         kept.append(value)

@@ -11,7 +11,7 @@ import type { AssistantRunRequestV2 } from "../contracts/generated/contracts";
 import type { AssistantRunV1 } from "../contracts/generated/contracts";
 import { ProjectApiFailure, v2Request, type Fetcher } from "../rich/v7-connection";
 
-/** The /v2 assistant routes (D109, plan 2.8). Replies are parsed with JSON.parse and typed; the server validated them. */
+/** The /v2 assistant routes (D109). Replies are parsed with JSON.parse and typed; the server validated them. */
 export type AgentFlags = { allowEdits: boolean; allowWeb: boolean };
 export { ProjectApiFailure as AgentApiFailure };
 export type Proposal = AssistantChangeProposalV1;

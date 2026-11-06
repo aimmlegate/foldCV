@@ -88,10 +88,10 @@ PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-5', 'rules': [
     'A request with feedback repairs this block: previousReply is the reply under repair (fields: the pointer of each value, its item H ref when it has one, and its evidence refs), and each feedback entry names a rule, its target (pointer: its place in previousReply) and the defect. Return the whole corrected reply: keep every value of previousReply that no entry names, in the same item and with its evidence, fix each named defect and add what an entry names as missing.']}
 
 # Application-owned reply rules sent with every review; the checks and rules come from the coordinator.
-# Protocol 3 (LIVE-05..07): one entry per check made a 477-check review too long to write in 90 s; a list of satisfied
+# Protocol 3 (live imports): one entry per check made a 477-check review too long to write in 90 s; a list of satisfied
 # refs was cut short and a "the rest holds" flag was read as "all checks hold". A reply now lists the checks that fail,
-# and a check it does not list holds. LIVE-12 listed all 349 satisfied checks of one review (73 s); the wording now says
-# never to list them and that [] is a valid answer (probe P5: 1 entry, 5–12 s).
+# and a check it does not list holds. A live review listed all 349 satisfied checks (73 s); the wording now says
+# never to list them and that [] is a valid answer (a probe: 1 entry, 5–12 s).
 # Protocol 4 (D115): the coordinator settles the checks of a value it found word for word in its cited line and, in a
 # replacement review, of a value the repair left as it was; the model sees and answers only the remaining checks.
 # Protocol 5 (D117): a review of one entry of a block checks coverage of that entry's lines only.
@@ -122,7 +122,7 @@ ENTRY_RULE = ('entry names the part of the source this reply extracts: entry.lin
 
 
 # The same protocol for a request that offers no captured items or relations: nothing can be updated, split or merged,
-# so the reply needs no lineage or relations and the coordinator derives them (LIVE-12: a first projects reply was
+# so the reply needs no lineage or relations and the coordinator derives them (a live import: a first projects reply was
 # refused for relations that named a handle nobody offered). The schema keeps the keys so a model that still sends them
 # decodes; selections of unoffered handles are dropped before completion, relations by discovery key stay.
 CONTENT_ONLY_RULES = [
@@ -150,7 +150,7 @@ def proposal_protocol(references, *, entry=False):
 
 def strip_unoffered_bookkeeping(payload, references):
     """A reply to a request without offers keeps only the bookkeeping it can mean: lineage adds, relations and items named
-    by discovery keys. A handle, cell or relation ref nobody offered (LIVE-12: target {kind: handle, ref: item-/0}) is
+    by discovery keys. A handle, cell or relation ref nobody offered (live: target {kind: handle, ref: item-/0}) is
     dropped and the coordinator derives the fact instead of refusing the whole reply."""
     if not offers_nothing(references) or not isinstance(payload, dict):
         return payload

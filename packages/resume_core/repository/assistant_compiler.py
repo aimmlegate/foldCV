@@ -1,4 +1,4 @@
-"""Assistant change ops to authored operations (D109, plan 2.8 table).
+"""Assistant change ops to authored operations (D109).
 
 Every op becomes one or more `AuthoredOperation` values, prepared one by one with `prepare_edit` against the
 workspace the previous step produced. The editor and the assistant therefore share one preparation path, and the

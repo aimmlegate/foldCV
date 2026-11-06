@@ -1,4 +1,4 @@
-"""Assistant wire models on the repository (D109, plan 2.8): conversations, runs, proposals and the change ops."""
+"""Assistant wire models on the repository (D109): conversations, runs, proposals and the change ops."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ class AssistantEventsV1(Wire):
     next: int = Field(ge=0)
 
 
-# Change ops: the model writes these; the compiler turns them into authored operations (plan 2.8 table).
+# Change ops: the model writes these; the compiler turns them into authored operations.
 
 class SetBlockTextOp(Wire):
     op: Literal['set_block_text']
@@ -234,7 +234,7 @@ class AssistantChangeProposalListV1(Wire):
 class AssistantApplyRequestV1(Wire):
     editor_token: str = Field(min_length=1, max_length=256)
     client_mutation_id: Id
-    # The panel's edits flag now; Apply is refused while it is off (G8).
+    # The panel's edits flag now; Apply is refused while it is off.
     allow_edits: bool
 
 

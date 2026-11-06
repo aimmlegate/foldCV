@@ -1,4 +1,4 @@
-"""FoldCV-owned Claude Code profile: config directory, environment, sandbox and argv (MP00).
+"""FoldCV-owned Claude Code profile: config directory, environment, sandbox and argv.
 
 On Windows a Job Object takes sandbox-exec's place: no other programs, but no file or network rules."""
 
@@ -253,7 +253,7 @@ def structured_arguments(schema: str | None, model: str, effort: str | None, *,
 
 def agent_arguments(mcp_config: Path, model: str, effort: str | None, tools: tuple[str, ...], system_prompt: str, *,
                     max_turns: int) -> tuple[str, ...]:
-    """One assistant run (plan 8.1): only the FoldCV MCP tools, the bearer token expanded from the environment."""
+    """One assistant run: only the FoldCV MCP tools, the bearer token expanded from the environment."""
     return (
         "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
         "--model", model, *(("--effort", effort) if effort else ()),

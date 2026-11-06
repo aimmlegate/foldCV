@@ -184,7 +184,7 @@ def admit_operation(operation, now):
 
 def observe_time(operation, now, *, elapsed_remaining=None):
     # Only top-level time and state fields change, which no operation validator reads, so a shallow copy is safe;
-    # a deep copy and full check per observation were most of the local time between calls (LIVE-08 replay).
+    # a deep copy and full check per observation were most of the local time between calls (a replayed live import).
     current = instant(now)
     change = {}
     if operation.last_observed_at is not None and current < instant(operation.last_observed_at):
@@ -324,7 +324,7 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     if task.state in TERMINAL_TASKS or not any(record.task_id == task_id for record in result.task_inputs):
         raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
     # A finished attempt without cleanup proof fences new work. Attempts still in flight share the captured
-    # concurrency (CT10), and one task never has two in flight; concurrency 1 keeps the sequential rule.
+    # concurrency, and one task never has two in flight; concurrency 1 keeps the sequential rule.
     in_flight = [attempt for attempt in result.attempts if attempt.state in IN_FLIGHT]
     if (any(attempt.state not in {'released', *IN_FLIGHT} and attempt.cleanup.state != 'verified' for attempt in result.attempts)
             or len(in_flight) >= result.capture.policy.concurrency or any(attempt.task_id == task_id for attempt in in_flight)):

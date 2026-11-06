@@ -1,4 +1,4 @@
-"""Assistant files of one project: conversations with their runs, run events and change proposals (D109, plan 2.8).
+"""Assistant files of one project: conversations with their runs, run events and change proposals (D109).
 
 Layout under the data root: `assistant/<project>/conversations/<id>.json`, `runs/<id>.jsonl` and
 `proposals/<id>.json`. The project file is never written here; Apply goes through the repository.

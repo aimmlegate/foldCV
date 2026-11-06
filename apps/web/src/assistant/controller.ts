@@ -11,7 +11,7 @@ import type { AssistantMessagesV1 } from "../contracts/generated/contracts";
 import type { AssistantRunRequestV2 } from "../contracts/generated/contracts";
 import { AgentApiFailure, type AgentFlags, type AssistantApi, type Proposal, type Run } from "./api";
 
-/** The assistant drawer's state on the /v2 routes (D109, plan 2.8): one long-poll loop per run, proposals that only
+/** The assistant drawer's state on the /v2 routes (D109): one long-poll loop per run, proposals that only
  * the user applies through the open editor, and the transcript of the selected conversation. */
 // The message, source, finding and event models are shared with the run files; their own generated types keep the
 // fields that the combined reply schema's conditional parts drop.

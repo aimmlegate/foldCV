@@ -1,5 +1,5 @@
 """The template import coordinator: proposals, reviews and publication through the project repository, with the
-running steps in the operation sidecar (S7e, D109)."""
+running steps in the operation sidecar (D109)."""
 
 import asyncio
 from collections import OrderedDict
@@ -222,7 +222,7 @@ def other_blocks(operation, task, package):
 
 def implicit_dependencies(package, operation):
     """A block or operation that selects a fact type waits for the earlier blocks that produce it: its input reads
-    their admitted records, as it did when every task ran in declaration order (CT10)."""
+    their admitted records, as it did when every task ran in declaration order."""
     blocks = {block.id: block for block in package.definition.blocks}
     operations = {item.id: item for item in package.definition.operations}
     produced, result = {}, {}
@@ -257,7 +257,7 @@ def scope_units(offered, sources):
 
 
 def cited_spans(operation, task_id, offered):
-    """The source lines the task's latest citing reply selected; a failed block shows only these (R05)."""
+    """The source lines the task's latest citing reply selected; a failed block shows only these."""
     for proposal in reversed(operation.proposals):
         if attempt_in(operation, proposal.attempt_id).task_id != task_id:
             continue
@@ -478,7 +478,7 @@ class TemplatePipeline:
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
-        at once (CT10); concurrency 1 awaits each task in place. A block that extracts its entries on their own
+        at once; concurrency 1 awaits each task in place. A block that extracts its entries on their own
         (D117) adds them while it runs, stays open until they all ended and then closes. After a failure or a
         cancel nothing new starts, the running tasks end, and the first failure is raised."""
         # The children a block added before (a resumed import) are reported by the block when it runs again.
@@ -733,7 +733,7 @@ class TemplatePipeline:
             task_input = next(value.value for value in operation.task_inputs if value.task_id == task_id)
             review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,
                 # Only the cells the proposal reads: the reviewer sees no others and wording restores from these
-                # (LIVE-08: every effective cell was 250 KB of each 320 KB review input).
+                # (a live import: every effective cell was 250 KB of each 320 KB review input).
                 effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
                     if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
                 semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
@@ -969,7 +969,7 @@ class TemplatePipeline:
                 observed = observe_time(result, self.wall(), elapsed_remaining=remaining)
                 if observed.inference_closed:
                     return observed
-            # A review's request is its review input record; storing it twice doubled the operation (LIVE-06: 5.3 MB).
+            # A review's request is its review input record; storing it twice doubled the operation (5.3 MB, live).
             result, identifier = reserve_attempt(result, task_id, slot, digest(value), policy, launch_owner, self.wall(),
                 request_value=None if review is not None else value, id_factory=self.id_factory)
             if review is not None:
@@ -1099,8 +1099,8 @@ class TemplatePipeline:
             # A request without references predates cited fallback and keeps its whole captured scope.
             spans, scope = [SourceSpan.model_validate(value) for value in stored.value['sourceSpans']], 'cited'
         elif failures:
-            # A review named what fails, so its findings are the smallest reliable scope (R05): a rejected value shows
-            # its own evidence, a coverage gap the lines the reviewer cites as missing; accepted values stay. LIVE-08:
+            # A review named what fails, so its findings are the smallest reliable scope: a rejected value shows
+            # its own evidence, a coverage gap the lines the reviewer cites as missing; accepted values stay. Live,
             # showing every line the reply cited repeated the accepted values as raw text.
             rejected = {result.target_id for result in failures}
             proposal = next((value for value in reversed(operation.proposals) if value.applied_receipt_id == receipt.id), None)
@@ -1135,12 +1135,12 @@ class TemplatePipeline:
             scope = 'cited' if spans else 'uncited'
             if not spans:
                 # No reply is not evidence of absence: a block offers its scope and the materializer places only the
-                # lines no other block shows. A scope of the whole CV identifies nothing (LIVE-08: an empty open
+                # lines no other block shows. A scope of the whole CV identifies nothing (a live import: an empty open
                 # source reply put every unshown line, contacts included, into the sidebar), so it places none.
                 units = scope_units(offered, sources)
                 whole = {(source.id, unit.id) for source in sources for unit in source.units if unit.text.strip()}
                 spans = [] if whole <= {(span.source_id, span.unit_id) for span in units} else units
-        # One notice per block (LIVE-07: 79 failing checks of one tools block were 79 notices): its first violation,
+        # One notice per block (live: 79 failing checks of one tools block were 79 notices): its first violation,
         # else its first uncertainty, names the rule and reason; every failing target stays a target.
         first = next((result for result in failures if result.disposition == 'violation'), failures[0] if failures else None)
         if kept and first is None:

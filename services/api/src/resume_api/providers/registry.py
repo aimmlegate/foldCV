@@ -27,13 +27,13 @@ class Descriptor:
     managed_install: bool
     # Without a terminal the CLI may ask for the code shown after the browser sign-in.
     login_code: bool
-    # Only MP07 sets this for a new provider, after its whole parity matrix passes.
+    # True for a provider only after its whole parity matrix passes.
     complete: bool
 
 
 CODEX = Descriptor("codex_cli", "Codex", "ChatGPT", "OpenAI", "codex", codex.TEAM_ID, codex.IDENTIFIER, codex.COMPATIBILITY,
                    ("chatgpt",), "cli", True, False, True)
-# Complete since MP07.
+# Complete: its parity matrix passed.
 CLAUDE = Descriptor("claude_cli", "Claude", "Claude", "Anthropic", "claude", claude.TEAM_ID, claude.IDENTIFIER,
                     claude.COMPATIBILITY, (claude.ACCEPTED_AUTH,), "not_provided", True, True, True)
 DESCRIPTORS: dict[str, Descriptor] = {item.kind: item for item in (CODEX, CLAUDE)}

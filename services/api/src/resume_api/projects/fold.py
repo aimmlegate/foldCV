@@ -1,4 +1,4 @@
-"""Fold an import sidecar into the commit that shares its revision (plan 2.7).
+"""Fold an import sidecar into the commit that shares its revision.
 
 A checkpoint that already carried the sidecar forward is left as it is. A document edit at that
 revision keeps its document and takes the sidecar's operation and facts. The sidecar file is removed

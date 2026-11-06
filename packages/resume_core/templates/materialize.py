@@ -66,7 +66,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         tasks = {task.id: task for task in operation.tasks}
         attempts = {attempt.id: attempt for attempt in operation.attempts}
         allocated = {value.item_handle: value for value in item_identities(operation)}
-        # Blocks run in parallel finish in any order (CT10); a stable sort reads them in declaration order.
+        # Blocks run in parallel finish in any order; a stable sort reads them in declaration order.
         order = {task.id: index for index, task in enumerate(operation.tasks)}
         for proposal in sorted(operation.proposals, key=lambda value: order[attempts[value.attempt_id].task_id]):
             task = tasks[attempts[proposal.attempt_id].task_id]
@@ -121,7 +121,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
         *[span for spans in placements.values() for span in spans]]
     # A coverage gap's lines go to the block's own view, once, unless an accepted value or another fallback shows them
-    # (LIVE-09: courses repeated the education lines, open source the portfolio items).
+    # (a live import: courses repeated the education lines, open source the portfolio items).
     for view in [declaration.id for declaration in ordered if missing_by_view.get(declaration.id)]:
         lines = [line for line in scope_lines(sources, missing_by_view[view]) if not any(overlaps(line, other) for other in occupied)]
         if lines:
@@ -255,7 +255,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             paragraphs.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
                 'children': [], 'provenance': [], 'presentation': ref})
             add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
-        # A block that shows only source lines keeps its own title (LIVE-09: projects text without "ПРОЕКТЫ").
+        # A block that shows only source lines keeps its own title (a live import: projects text without "ПРОЕКТЫ").
         if sections or paragraphs:
             title = locale_text(declaration.view.title, package.definition.template.default_locale)
             if declaration.view.heading != 'none' and title:

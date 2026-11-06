@@ -1,4 +1,4 @@
-"""Where the managed Claude Code comes from: Anthropic's release bucket and its signed manifest (MP02b, D146).
+"""Where the managed Claude Code comes from: Anthropic's release bucket and its signed manifest (D146).
 
 An install takes the newest release, as Anthropic's own installer does (`latest`). The manifest must carry a good
 signature of the release key 31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE, and the binary must have the size and

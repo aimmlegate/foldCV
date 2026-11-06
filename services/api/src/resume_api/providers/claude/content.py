@@ -1,4 +1,4 @@
-"""Claude Code CLI adapter for structured generation (MP02); same boundary and repair rule as Codex."""
+"""Claude Code CLI adapter for structured generation; same boundary and repair rule as Codex."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHA
           "rate_limit": "RATE_LIMITED", "model_not_found": "MODEL_DENIED", "invalid_request": "CLI_FAILED",
           "overloaded": "CLI_FAILED", "server_error": "CLI_FAILED"}
 # Notices that carry no model output; compaction and permission denials are never expected.
-# `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while (MP05-2).
+# `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while.
 NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
 FORBIDDEN = {"compact_boundary", "permission_denied"}
 MODEL_EVENTS = {"assistant", "user", "result"}
@@ -90,7 +90,7 @@ class ClaudeEvents:
 
     @property
     def renewal(self) -> bool:
-        """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it (MP05)."""
+        """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it."""
         return self.error == "authentication_failed" and not self.output
 
     def accept(self, raw: bytes) -> None:
@@ -496,7 +496,7 @@ class ClaudeCliProvider:
                 raise ContentFailure("TEMP_FAILED")
             attempt_limit = 2 if policy.allow_repair and not plain else 1
             # The run that renews an expired sign-in ends "Not logged in" before any model call, and the
-            # renewal is saved (MP05 finding 3): one more run follows, never counted as a repair.
+            # renewal is saved: one more run follows, never counted as a repair.
             renew, index = True, 0
             while index < attempt_limit:
                 self.process._check(deadline, cancel)

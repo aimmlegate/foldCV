@@ -11,7 +11,7 @@ from ..hashing import canonical
 
 def display_text(raw):
     """The text a reader sees: a date or period shows its stated wording, any other object its canonical JSON.
-    Built-in records already map dates this way; a template-only type (CT08) showed the JSON."""
+    Built-in records already map dates this way; a template-only type of a second template showed the JSON."""
     if isinstance(raw, str):
         return raw
     if isinstance(raw, dict) and isinstance(raw.get('raw'), str) and raw['raw'].strip():

@@ -17,7 +17,7 @@ from ..editing.template_wording import display_raw_input
 def task_facts_digest(operation, task_id, facts):
     """The facts one task's review reads: the records, observations and relations of its own item handles.
 
-    Blocks that run in parallel (CT10) add other items between one block's review and its admission; those changes
+    Blocks that run in parallel add other items between one block's review and its admission; those changes
     do not touch this digest, while a change to this block's own items still makes its review stale."""
     handles = set(task_in(operation, task_id).allowed_handles)
     owned = {value.record_id for value in item_identities(operation) if value.item_handle in handles}
@@ -51,7 +51,8 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
         task_id = next(value.task_id for value in operation.attempts if value.id == proposal.attempt_id)
         if context['taskFactsHash'] != task_facts_digest(result, task_id, facts):
             raise TemplateImportFailure('IMPORT_ADMISSION_FACTS_STALE')
-    # A review input stored before CT10 names the whole facts; it was made and admitted with no other block between.
+    # A review input stored before parallel blocks names the whole facts; it was made and admitted with no other block
+    # between.
     elif context.get('effectiveFactsHash', digest(facts)) != digest(facts):
         raise TemplateImportFailure('IMPORT_ADMISSION_FACTS_STALE')
     if package.package_hash != operation.capture.package_hash or review.value.package_hash != package.package_hash or (

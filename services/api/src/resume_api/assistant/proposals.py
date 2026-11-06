@@ -1,4 +1,4 @@
-"""Proposals: built from the run's pinned read, applied only by the user through the repository (D093, plan 2.8).
+"""Proposals: built from the run's pinned read, applied only by the user through the repository (D093).
 
 `propose` compiles the ops against the pinned workspace to check them and to show a preview; it never writes the
 project. `apply` runs inside one `repository.mutate`: under the project lock it compares the hash of every touched
@@ -97,7 +97,7 @@ def within_bounds(hashes, shown):
 
 
 def propose(service, run, pinned, request):
-    """A draft proposal from the pinned read; edits off still allows a draft (G8). The tool stores it once the run's
+    """A draft proposal from the pinned read; edits off still allows a draft. The tool stores it once the run's
     reply limits admit its reply. Blocking: it may wait for the project lock."""
     project_id, first = run.project_id, request.ops[0]
     proposal_id = identity('proposal')

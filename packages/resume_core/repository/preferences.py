@@ -13,7 +13,7 @@ MODEL = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}\Z')
 
 
 def migrated(raw):
-    """Files of the one-active-provider design (MP01 to MP07): the active provider's choices stay, the kept choices of
+    """Files of the one-active-provider design (before D119): the active provider's choices stay, the kept choices of
     the other one are dropped, and a Claude choice turns Claude on next to Codex (D119)."""
     if not isinstance(raw, dict) or 'enabledProviders' in raw or not {'selectedProvider', 'providerSelections'} & raw.keys():
         return raw

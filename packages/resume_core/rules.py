@@ -16,7 +16,8 @@ MAX_RULE_BYTES = 32_768
 HEADER = re.compile(r"<!-- foldcv-rules:v1 revision=([1-9][0-9]*) sha256=([a-f0-9]{64}) -->\n")
 DEFAULT_RULES = Path(__file__).with_name("default_rules.md").read_text(encoding="utf-8")
 FIRST_PRESET = re.compile(r"^## Preset: (?:shorten|clarify)$", re.M)
-# SHA-256 of the editorial text that earlier defaults put before the presets (49b4c406, its NE01 form, 4cc6523e).
+# SHA-256 of the editorial text that earlier defaults put before the presets (49b4c406, its form without the contact
+# exclusion, 4cc6523e).
 # Nothing reads it since V7; the template holds those rules (D111). Text a user wrote stays.
 LEGACY_EDITORIAL = {
     "107deec7a56114463d04b764cdbbaee12b4d30baa5ffdf712e4c4fbd6a4c7cd0",

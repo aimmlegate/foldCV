@@ -97,7 +97,7 @@ export function templateSheet(response: TemplateProjectResponseV1): TemplateShee
     "--fcv-band-height": pt(band.height), "--fcv-band-inset": pt(band.text_inset), "--fcv-band-color": style.colors[band.background] ?? "transparent",
     "--fcv-focus-text": pt(focus.text_x), "--fcv-focus-icon-x": pt(focus.icon_x), "--fcv-focus-icon-width": pt(focus.icon_width),
     "--fcv-focus-icon-height": pt(focus.icon_height), "--fcv-focus-row": pt(focus.minimum_row_height),
-    // The template's bullet glyph, as the DOCX numbering uses it (CT08: a second template draws "–").
+    // The template's bullet glyph, as the DOCX numbering uses it (a second template draws "–").
     "--fcv-bullet": JSON.stringify(style.bullets.marker),
   } as CSSProperties;
   // A logo place without an asset stays empty (D145).

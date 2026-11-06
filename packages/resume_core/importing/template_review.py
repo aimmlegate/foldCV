@@ -97,8 +97,9 @@ def review_checks(task, proposal, allocations, targets, refs):
 def grouped_checks(checks):
     """Each target once with its value and evidence, then {check ref: rule} for every check of it.
 
-    LIVE-05: 477 per-check entries repeated each value, internal id and rule name (130k characters per review input,
-    stored again with every attempt); a field is checked by up to seven rules, so grouping states each value once.
+    In a live import 477 per-check entries repeated each value, internal id and rule name (130k characters per review
+    input, stored again with every attempt); a field is checked by up to seven rules, so grouping states each value
+    once.
     The coordinator restores rules and targets from the captured targets by check ref, never from these entries."""
     groups = {}
     for check in checks:
@@ -277,7 +278,7 @@ def validate_review_reply(value, expected, sources):
     referenced = ReferencedReviewReply.model_validate(value, strict=True)
     if review_protocol(expected) in FAILING_ONLY_PROTOCOLS:
         # Protocol 3 lists failing checks only; a check the reply does not list holds. Restored in check order, so a
-        # receipt lists every check as protocol 2 did. A check listed twice (LIVE-11/12 summary: a violation and an
+        # receipt lists every check as protocol 2 did. A check listed twice (seen in live imports: a violation and an
         # uncertain entry for the same target) merges into the worse disposition; an unknown check is refused by the
         # schema's enum.
         merged = {}
@@ -429,9 +430,9 @@ def _same_value(left, right):
 
 def repair_wins(first, first_failed, repair, repair_failed, named=()):
     """Whether a repair replaces the admitted reply: what shows after it (repair) keeps every admitted value, it adds
-    no failing value, and it fixes a finding or adds a value. LIVE-09: a repair failed 142 checks where the first
-    reply failed 7. D107: a repair that added ZeroMQ tied on one coverage finding and was dropped; one that fixed a
-    claim wrote over another.
+    no failing value, and it fixes a finding or adds a value. In a live import a repair failed 142 checks where the
+    first reply failed 7. D107: a repair that added ZeroMQ tied on one coverage finding and was dropped; one that fixed
+    a claim wrote over another.
 
     named lists the items the repair sends; a value of such an item must stay on it, an equal value elsewhere does not
     keep it. A value of any other item may stand on any item, as when a split carries it to new ones."""

@@ -19,6 +19,7 @@ apps/web/playwright-report/
 /docs/gui/*
 !/docs/gui/architecture.md
 !/docs/gui/contracts.md
+!/docs/gui/decisions-index.md
 !/docs/gui/git-data-policy.md
 !/docs/gui/local-dependency-notices.md
 !/docs/gui/local-setup.md

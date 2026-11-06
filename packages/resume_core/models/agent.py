@@ -96,7 +96,7 @@ class AgentSettings(AgentWire):
     revision: Revision
     enabled: bool
     selected_agent_model: ModelId | None
-    # Null runs the model's catalog default (decision 17); files written before MP01b load as null.
+    # Null runs the model's catalog default (decision 17); older files without the field load as null.
     reasoning_effort: ReasoningEffort | None = None
 
 

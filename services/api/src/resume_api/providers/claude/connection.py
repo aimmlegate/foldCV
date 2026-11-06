@@ -1,4 +1,4 @@
-"""Metadata-only Claude connection with the same surface as the Codex ConnectionAdapter (MP02)."""
+"""Metadata-only Claude connection with the same surface as the Codex ConnectionAdapter."""
 
 from __future__ import annotations
 

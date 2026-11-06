@@ -56,7 +56,7 @@ class ProviderTemplateTransport:
                 # Admission refused before any process started: nothing was dispatched.
                 raise ContentFailure('BUSY', cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None
             # A provider sets its witness as it starts a process, so without one the request was refused before any
-            # (LIVE-04: an oversized review). A reply or a failed cleanup says otherwise.
+            # (a live import: an oversized review). A reply or a failed cleanup says otherwise.
             if (error.dispatch_witness is None and error.raw_return is None and files.process is None
                     and not files.cleanup_failed and outcome_state(error.code) in UNDISPATCHED_OUTCOMES):
                 raise ContentFailure(error.code, cleanup_verified=True, dispatch_witness={'neverDispatched': True}) from None

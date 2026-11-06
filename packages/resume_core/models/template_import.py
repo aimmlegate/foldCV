@@ -92,7 +92,7 @@ class ProposalReply(Wire):
     relations: list[ProposalRelation] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
-# A provider reply selects request-local choices; the coordinator restores the captured identities (plan 3.3).
+# A provider reply selects request-local choices; the coordinator restores the captured identities.
 EvidenceRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'EvidenceRef'})]
 CheckRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'CheckRef'})]
 ItemRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'ItemRef'})]
@@ -336,7 +336,7 @@ MAX_IMPORT_CONCURRENCY = 4
 
 class RuntimePolicy(Wire):
     call_cap: int = Field(gt=0)
-    # Independent blocks in flight at once (CT10); 1 is the sequential mode every older operation captured.
+    # Independent blocks in flight at once; 1 is the sequential mode every older operation captured.
     concurrency: int = Field(ge=1, le=MAX_IMPORT_CONCURRENCY)
     # Captured from Settings at the start; operations captured at 300 s and 30 s stay valid.
     processing_seconds: int = Field(ge=IMPORT_MINUTES[1] * 60, le=IMPORT_MINUTES[2] * 60)

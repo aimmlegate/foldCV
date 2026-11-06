@@ -28,7 +28,7 @@ def lean_cell(cell):
 
 def read_cells(request):
     """The cells a review's proposal reads. A review input keeps every effective cell for its identity (receipt
-    reuse), but the reviewer needs only these (LIVE-04: 250k characters of cells refused as INPUT_TOO_LARGE)."""
+    reuse), but the reviewer needs only these (a live import: 250k characters of cells refused as INPUT_TOO_LARGE)."""
     proposal = (request.get('semanticContext') or {}).get('proposal') or {}
     return {cell for field in proposal.get('fields', []) for cell in field.get('effectiveCellIds', [])}
 
@@ -42,7 +42,7 @@ def lean_dependency(result):
 
 
 def lean_checks(checks):
-    """Review checks grouped by target; inputs stored before grouping hold one entry per check (LIVE-05)."""
+    """Review checks grouped by target; inputs stored before grouping hold one entry per check."""
     if all(isinstance(check, dict) and 'check' in check for check in checks):
         from .template_review import grouped_checks
         return grouped_checks(checks)

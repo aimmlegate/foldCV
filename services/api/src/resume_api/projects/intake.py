@@ -50,7 +50,7 @@ class TemplateIntake:
         """`model(effort=None)` returns the ModelCapture for the selected import model with that effort, else its
         catalog default, or raises ProjectFailure (also for an effort the catalog does not offer). `fallback`, given
         that capture, returns the configured fallback model's capture, None when there is none, or raises.
-        `concurrency` is how many independent blocks one import runs at once (CT10); 1 is sequential."""
+        `concurrency` is how many independent blocks one import runs at once; 1 is sequential."""
         if call_cap is not None and (not isinstance(call_cap, int) or call_cap < 1):
             raise ValueError('template import call cap must be an explicit positive integer')
         if not isinstance(concurrency, int) or not 1 <= concurrency <= MAX_IMPORT_CONCURRENCY:

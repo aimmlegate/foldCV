@@ -204,7 +204,7 @@ async function fileBody(response: Response, mime: string, maximum: number): Prom
   return blob;
 }
 
-/** Unacknowledged intents of one project, kept in IndexedDB until the server confirms them (plan 2.6). */
+/** Unacknowledged intents of one project, kept in IndexedDB until the server confirms them. */
 export type PendingIntent = { localId: string; clientMutationId: string; baseRevision: number; actionId: string; actionToken: number;
   operation: V7Operation; prior: [string, string][]; text: string; issued: TemplateEditPreparationV1 | null };
 export type PendingNavigation = { direction: "undo" | "redo"; clientMutationId: string; expectedActionId: string; baseRevision: number };

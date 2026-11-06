@@ -66,7 +66,7 @@ export function leafTarget(leaf: ResponseLeaf): InsertionTarget | null {
   return leaf.owner && text(leaf.owner, "type") === "bound_link" ? null : { kind: "literal" };
 }
 
-/** The ids of the last 200 applied client mutations, as the project file keeps them (plan 2.1). */
+/** The ids of the last 200 applied client mutations, as the project file keeps them. */
 export function appliedMutations(response: TemplateProjectResponseV1): Set<string> {
   return new Set((response.workspace.mutationReplay ?? []).map(row => row.clientMutationId));
 }

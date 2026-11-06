@@ -26,6 +26,7 @@ jobs:
       - run: .venv/bin/pip install -r requirements-dev.txt
       - run: .venv/bin/pip install -e .
       - run: .venv/bin/ruff check .
+      - run: .venv/bin/python tools/check_decisions_index.py
       - run: npm ci
         working-directory: apps/web
       - run: .venv/bin/python -m pytest -q -p no:cacheprovider

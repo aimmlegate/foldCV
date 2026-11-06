@@ -1,4 +1,4 @@
-"""Reads over the run's pinned workspace: pages, search, the deterministic check and the run prompt (plan 2.8).
+"""Reads over the run's pinned workspace: pages, search, the deterministic check and the run prompt.
 
 Every read serves the workspace the run pinned at its start, so the model sees one consistent state while the user
 keeps editing. Pages hold whole entries up to `PAGE_BYTES`; an entry that alone is larger is clipped and marked.

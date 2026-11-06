@@ -282,7 +282,7 @@ class ImportService:
             if base > workspace.project_revision or base < workspace.project_revision and ahead(session, operation):
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
             if base < workspace.project_revision:
-                # A commit folded it and stopped before removing the file; the next commit removes it (plan 2.7).
+                # A commit folded it and stopped before removing the file; the next commit removes it.
                 return None
             copied = workspace.model_copy(deep=True)
             owner = copied.project or copied.pre_draft

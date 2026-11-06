@@ -1,4 +1,4 @@
-"""One request per edit: prepare the authored operation on the committed workspace and commit it (D109, plan 2.3)."""
+"""One request per edit: prepare the authored operation on the committed workspace and commit it (D109)."""
 
 from __future__ import annotations
 

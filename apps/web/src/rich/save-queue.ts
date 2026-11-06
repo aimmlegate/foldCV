@@ -63,7 +63,7 @@ export class TemplateIntentStrategy {
   private readonly locals = new Map<string, string>();
   private readonly actions = new Map<string, ActionRecord>();
   // Intents queued before a lost acknowledgment: an issued one is checked against the saved state before it is sent again,
-  // and one the current state cannot take is reported with its text instead of blocking the queue (plan 2.6).
+  // and one the current state cannot take is reported with its text instead of blocking the queue.
   private readonly recoveryRequired = new Set<string>();
   private block: { kind: "conflict" | "rejected" | "replaced"; reason: string } | null = null;
   readonly sessionId: string;
@@ -204,7 +204,7 @@ export class TemplateIntentStrategy {
     this.ports.adopted({ item: entry, noOp, response, result });
     this.ports.pending?.(this.pending);
   }
-  /** The lost-acknowledgment rule (plan 2.6) for the head: an applied id is done; an issued intent is sent again at the same
+  /** The lost-acknowledgment rule for the head: an applied id is done; an issued intent is sent again at the same
    * revision; any other issued one is reported with its text and dropped. An unsent intent is never dropped here: it is
    * translated against the current state at its turn. */
   private async reconcile(entry: TemplateQueuedIntent): Promise<void> {

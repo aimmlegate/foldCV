@@ -1,4 +1,4 @@
-"""The /v2 assistant routes (plan 2.8) and the assistant settings on /v1. Handlers run file work in worker threads
+"""The /v2 assistant routes and the assistant settings on /v1. Handlers run file work in worker threads
 and never hold a project lock across an await."""
 
 from __future__ import annotations

@@ -318,7 +318,7 @@ class ProjectRepository:
         self.open_limit = open_limit
         self.sessions: OrderedDict[str, ProjectSession] = OrderedDict()
         self.mutex = threading.RLock()
-        # Registered by the import task (2.7): fold a current operation sidecar into every commit, discard it after.
+        # Registered by the import task: fold a current operation sidecar into every commit, discard it after.
         self.fold_hooks, self.committed_hooks = [], []
         self.started = False
 

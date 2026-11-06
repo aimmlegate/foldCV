@@ -1,5 +1,5 @@
 """The /v2 project routes. Handlers run the synchronous repository work in a worker thread and never hold a project lock
-across an await (D109, plan 2.4).
+across an await (D109).
 
 .foldcv owns POST /archive (download) and POST /v2/projects/archive (upload). Catalog flags are
 POST /catalog/archive and POST /catalog/restore. POST /restore stays catalog restore.

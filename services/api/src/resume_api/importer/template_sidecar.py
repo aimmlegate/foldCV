@@ -1,4 +1,4 @@
-"""Operation-only steps of a running template import are saved in one sidecar file, not the whole project (S7e).
+"""Operation-only steps of a running template import are saved in one sidecar file, not the whole project.
 
 A processing step (task input, reservation, dispatch, return, parse, review, admission, finish, fallback) replaces
 `imports/<operation>.json` in the project folder atomically: the operation and the facts after the step and the

@@ -1,5 +1,5 @@
 """Template routes the workbench keeps on /v1: captured assets, the Settings template editor, the templates offered for
-import and the upload that creates a V7 project with one of them (plan 2.4)."""
+import and the upload that creates a V7 project with one of them."""
 
 import asyncio
 import base64
