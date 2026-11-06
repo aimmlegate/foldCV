@@ -176,3 +176,23 @@ async def test_a_worker_past_the_deadline_is_stopped_with_its_own_code_and_frees
         assert reply.status_code == 201
         assert reply.json()["workspace"]["preDraft"]["warnings"] == ["EXTRACT_TIMEOUT", "NO_USABLE_TEXT"]
     assert operations(tmp_path) == []
+
+
+@pytest.mark.asyncio
+async def test_an_unread_memory_sample_waits_and_a_blind_monitor_stops_the_worker(tmp_path, monkeypatch):
+    # A busy machine answered one `ps` too late and the upload kept no text (CI run 42210817806).
+    original_rss, calls = extracting._rss_kb, []
+
+    def late_first(process):
+        calls.append(process.pid)
+        return None if len(calls) <= 3 else original_rss(process)
+
+    monkeypatch.setattr(extracting, "_rss_kb", late_first)
+    result = await extract(tmp_path / "late", (FIXTURES / "rich.docx").read_bytes(), "rich.docx")
+    assert result.source_kind == "docx" and len(calls) > 3
+    monkeypatch.setattr(extracting, "_rss_kb", lambda _process: None)
+    monkeypatch.setattr(extracting, "MONITOR_GRACE_SECONDS", 0)
+    with pytest.raises(extracting.UploadFailure) as failure:
+        await extract(tmp_path / "blind", (FIXTURES / "rich.docx").read_bytes(), "rich.docx")
+    assert failure.value.code == "EXTRACT_MONITOR_UNAVAILABLE"
+    assert list((tmp_path / "blind" / "operations").iterdir()) == []

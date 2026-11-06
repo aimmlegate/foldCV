@@ -19,6 +19,8 @@ MAX_BODY = MAX_SOURCE + 8192
 MAX_RESULT = 4 * 1024 * 1024
 MAX_RSS_KB = 512 * 1024
 MAX_SECONDS = 120
+# A busy machine can leave one `ps` sample unanswered; only a monitor blind this long stops the worker.
+MONITOR_GRACE_SECONDS = 5
 # Windows has no RLIMIT_AS for the worker to set; its job caps the committed memory instead.
 COMMIT_LIMIT = 768 * 1024 * 1024
 BOUNDARY = re.compile(rb"^[A-Za-z0-9'()+_,./:=?-]{1,70}$")
@@ -86,13 +88,16 @@ async def run_extract(data: bytes, name: str, pasted: bool, files: OperationFile
     process = files.spawn(host.Confined(executable, memory=COMMIT_LIMIT) if host.WINDOWS else executable, arguments,
                           capture=False)
     deadline = time.monotonic() + MAX_SECONDS
+    seen = time.monotonic()
     try:
         while process.poll() is None:
             if time.monotonic() > deadline:
                 files.stop_worker()
                 raise UploadFailure("EXTRACT_TIMEOUT")
             rss = await asyncio.to_thread(_rss_kb, process)
-            if rss is None and process.poll() is None:
+            if rss is not None:
+                seen = time.monotonic()
+            elif process.poll() is None and time.monotonic() - seen > MONITOR_GRACE_SECONDS:
                 files.stop_worker()
                 raise UploadFailure("EXTRACT_MONITOR_UNAVAILABLE")
             if rss is not None and rss > MAX_RSS_KB:
