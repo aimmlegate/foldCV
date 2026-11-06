@@ -10,7 +10,7 @@ from packages.resume_core.editing.template_effective import builtin_effective_ce
 from packages.resume_core.importing.template_import import dispatch_attempt, record_return, reserve_attempt
 from packages.resume_core.importing.template_proposals import parse_proposal
 from packages.resume_core.hashing import canonical
-from packages.resume_core.templates.models import InputRef
+from packages.resume_core.models.template_package import InputRef
 from resume_api.importer.template_pipeline import TemplatePipeline
 from tests.templates.employment_fixtures import employment_package, employment_proposal, employment_source
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, usage

@@ -11,7 +11,7 @@ import yaml
 
 from packages.resume_core.templates import focus
 from packages.resume_core.templates.compiler import compile_bytes, compile_template
-from packages.resume_core.templates.models import StoredTemplatePackage
+from packages.resume_core.models.template_package import StoredTemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, TemplateStore
 from resume_api.template_config import ID_CHANGED, REVISION_TAKEN, TemplateConfig

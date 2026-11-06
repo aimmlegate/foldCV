@@ -9,7 +9,7 @@ from packages.resume_core.sources import capture_span
 from packages.resume_core.importing.template_import import spent_calls
 from packages.resume_core.templates.compiler import compile_bytes
 from packages.resume_core.templates.loading import load_definition
-from packages.resume_core.templates.models import RoleOperation
+from packages.resume_core.models.template_package import RoleOperation
 from packages.resume_core.templates.operations import OperationContext, derive_task, select_role_branch
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE

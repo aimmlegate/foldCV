@@ -9,7 +9,7 @@ from pydantic import Field, JsonValue, model_validator
 from ..project_limits import FINALIZATION_BASE_SECONDS, FINALIZATION_CEILING_SECONDS, IMPORT_MINUTES
 from .contracts import Id, PartialDate, Revision, Sha256, Wire, _unique
 from .template_facts import CapturedItemIdentity, ExtensionCell, HandleAllocation, Lineage, Relation, SourceSpan
-from ..templates.models import Check, JsonObject
+from .template_package import Check, JsonObject
 
 
 class Discovery(Wire):

@@ -6,7 +6,7 @@ from pydantic import JsonValue, model_validator
 
 from packages.resume_core.models.contracts import Wire
 from packages.resume_core.templates.compiler import PROJECTION_VERSION
-from packages.resume_core.templates.models import JsonObject
+from packages.resume_core.models.template_package import JsonObject
 from packages.resume_core.templates.projection import PROFILE_ID, project_payload, validate_payload, validate_schema
 
 

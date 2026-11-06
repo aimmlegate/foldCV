@@ -11,7 +11,7 @@ from ..rich_images import ImageFailure, verify_image_bytes
 from ..hashing import canonical
 from ..models.template_import import ImportOperation
 from ..models.template_workspace import history_bytes, history_text
-from ..templates.models import TemplatePackage, remember_asset
+from ..models.template_package import TemplatePackage, remember_asset
 from ..templates.store import verify_package
 
 

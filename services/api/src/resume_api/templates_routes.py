@@ -9,7 +9,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.storage import StorageFailure
-from packages.resume_core.templates.models import asset_text, asset_type
+from packages.resume_core.models.template_package import asset_text, asset_type
 from packages.resume_core.templates.store import TemplateRefused, UnknownTemplate
 
 from .extracting import UploadFailure, parse_one_part

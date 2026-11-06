@@ -110,7 +110,7 @@ def renamed(workspace, names):
 
 @pytest.mark.asyncio
 async def test_focus_rows_show_synonym_icons_in_the_plan_and_embed_the_same_bytes_in_docx(tmp_path):
-    from packages.resume_core.templates.models import asset_text
+    from packages.resume_core.models.template_package import asset_text
     from packages.resume_core.templates.presentation_plan import editor_plan
     _fixture, workspace, _originals = await published(tmp_path)
     workspace = renamed(workspace, ['k8s', 'GitLab CI/CD', 'UnknownTool'])

@@ -21,7 +21,7 @@ from .template_document import BoundLink, FieldOccurrence, RichDocumentV2
 from .template_facts import SourceSpan, WorkingFactsV2
 from .template_import import ExportAttempt, ImportIssue, ImportOperation
 from .template_render import TemplateExportCapture, TemplateRenderRequestV1
-from ..templates.models import StoredTemplatePackage
+from .template_package import StoredTemplatePackage
 from ..templates.store import verify_package
 
 

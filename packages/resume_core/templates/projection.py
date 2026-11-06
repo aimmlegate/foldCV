@@ -15,7 +15,7 @@ from pydantic import JsonValue
 from referencing import Registry
 from referencing.exceptions import NoSuchResource, Unresolvable
 
-from .models import JsonObject
+from ..models.template_package import JsonObject
 
 PROFILE_ID = "closed-json-v1"
 PROFILE_VERSION = "1"

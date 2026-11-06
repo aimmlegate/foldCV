@@ -10,7 +10,7 @@ from ..project_limits import REWRITE_INSTRUCTION_CHARS
 from .contracts import Id, Revision, Sha256, Wire
 from .template_authoring import AuthoredRange, ClipboardSelection, TemplateEditPreparationV1
 from .template_render import TemplateSnapshotIdentity
-from ..responses.template_api import TemplateProjectResponseV1
+from .template_response import TemplateProjectResponseV1
 
 
 class HistoryActionV1(Wire):

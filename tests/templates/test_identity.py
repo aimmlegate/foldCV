@@ -5,7 +5,7 @@ from itertools import count
 import pytest
 
 from packages.resume_core.models.template_import import HandleSelector, ProposalReply
-from packages.resume_core.templates.models import Binding
+from packages.resume_core.models.template_package import Binding
 from packages.resume_core.templates.projection import validate_payload
 from packages.resume_core.fields import field_key
 from packages.resume_core.importing.template_identity import (allocate_discoveries, codepoint_offset, resolve_fields,

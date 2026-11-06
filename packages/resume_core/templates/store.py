@@ -19,7 +19,7 @@ from .compiler import (ADDED_CAPABILITIES, CAPABILITIES, COMPILER_VERSION, COMPI
                        OPERATION_VERSION, PACKAGE_BYTES, PROJECTION_VERSION, compile_bytes, compile_definition)
 from ..hashing import canonical, sha256
 from .loading import load_declared_definition,load_definition
-from .models import TemplateDefinition, TemplatePackage
+from ..models.template_package import TemplateDefinition, TemplatePackage
 from .projection import SchemaFailure, validate_schema
 
 BUNDLED_DIR = Path(__file__).resolve().parents[3] / "templates/bundled"

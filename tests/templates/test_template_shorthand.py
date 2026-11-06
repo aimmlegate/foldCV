@@ -11,7 +11,7 @@ import yaml
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.compiler import compile_bytes, compile_template
 from packages.resume_core.templates.loading import load_declared_definition, load_definition
-from packages.resume_core.templates.models import TemplateDefinition
+from packages.resume_core.models.template_package import TemplateDefinition
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.shorthand import STANDARD_SUPPORT, expand
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE, BUNDLED_TEMPLATES, TemplateStore, bundled_source

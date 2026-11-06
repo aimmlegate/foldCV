@@ -8,7 +8,7 @@ import pytest
 from packages.resume_core.sources import capture_span
 from packages.resume_core.importing.template_import import spent_calls
 from packages.resume_core.templates.compiler import compile_bytes
-from packages.resume_core.templates.models import SkillsOperation
+from packages.resume_core.models.template_package import SkillsOperation
 from packages.resume_core.templates.operations import OperationContext, assign_skills, derive_task, runnable
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import TEXT, employment_package, employment_source, object_schema

@@ -10,7 +10,7 @@ from packages.resume_core.models.template_import import ImportCapture
 from packages.resume_core.sources import capture_span
 from packages.resume_core.importing.template_import import spent_calls
 from packages.resume_core.templates.compiler import compile_bytes
-from packages.resume_core.templates.models import PartitionOperation
+from packages.resume_core.models.template_package import PartitionOperation
 from packages.resume_core.templates.operations import OperationContext, derive_task, partition_employment
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.employment_fixtures import employment_package, employment_source

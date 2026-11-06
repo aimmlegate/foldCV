@@ -9,8 +9,8 @@ from pathlib import Path, PurePosixPath
 from pydantic import ValidationError
 
 from .loading import load_declared_definition
-from .models import (CapturedAsset, CompilationManifest, CompiledBlock, CompiledRecipe,
-                     TemplateDefinition, TemplatePackage)
+from ..models.template_package import (CapturedAsset, CompilationManifest, CompiledBlock, CompiledRecipe,
+                                       TemplateDefinition, TemplatePackage)
 from .projection import (FORMATS, PROFILE_ID, PROFILE_VERSION, SchemaFailure,
                          binding_shape, project_payload, reachable_schema, schema_at, validate_schema)
 from .builtin_mapping import check_item_roots, types_at, validate_builtin_mapping, validate_item_pointer

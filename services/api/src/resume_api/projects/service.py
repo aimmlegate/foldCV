@@ -13,7 +13,7 @@ from packages.resume_core.storage import ProjectStoreFailure
 from packages.resume_core.repository.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
 from packages.resume_core.storage import StorageFailure
-from packages.resume_core.responses.template_api import TemplateProjectResponseV1, verify_response, verifying
+from packages.resume_core.models.template_response import TemplateProjectResponseV1, verify_response, verifying
 from packages.resume_core.editing.template_panel_focus import icon_changes
 from packages.resume_core.templates.focus import remembered_catalog
 from packages.resume_core.templates.presentation import project_presentation, snapshot_identity

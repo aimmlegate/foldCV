@@ -8,7 +8,8 @@ from packages.resume_core.models.rich_document import RichDocumentV1
 from packages.resume_core.models.rich_facts import WorkingFacts
 from packages.resume_core.editing.assembly import date_field, field
 from packages.resume_core.editing.mutations import apply_rich_mutation
-from packages.resume_core.editing.panel import RichPanelRequest, panel_mutation
+from packages.resume_core.models.panel_request import RichPanelRequest
+from packages.resume_core.editing.panel import panel_mutation
 from packages.resume_core.technologies import resolve_technology
 from packages.resume_core.editing.technology_focus import focus_candidates
 from tests.support.rich import capture, without_sources

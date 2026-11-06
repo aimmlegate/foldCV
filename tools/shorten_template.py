@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.loading import load_declared_definition
-from packages.resume_core.templates.models import TemplateDefinition
+from packages.resume_core.models.template_package import TemplateDefinition
 from packages.resume_core.templates import shorthand as short
 
 HEADER = '# yaml-language-server: $schema=../../contracts/template-source.schema.json\n'

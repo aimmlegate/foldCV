@@ -13,7 +13,7 @@ from .template_identity import empty_value, evidence_options, offered_evidence, 
 from ..import_failure import TemplateImportFailure
 from .template_import import attempt_in, checked, identity, task_in
 from ..hashing import digest
-from ..templates.models import Check
+from ..models.template_package import Check
 from ..hashing import canonical, sha256
 from ..templates.projection import SchemaFailure, pointer_tokens, resolve, schema_at, validate_payload
 from ..templates.replies import (FAILING_ONLY_PROTOCOLS, REVIEW_PROTOCOL, check_references, review_protocol,

@@ -9,8 +9,8 @@ from .rich_document import Alignment, Color, Hyperlink, InlineStyles, StyledText
 from .rich_mutations import ActionCapture
 from .template_mutations import TemplateMutationV1
 from .template_render import TemplateSnapshotIdentity
-from ..editing.panel import RichPanelRequest
-from ..responses.template_api import TemplateProjectResponseV1
+from .panel_request import RichPanelRequest
+from .template_response import TemplateProjectResponseV1
 
 
 class FieldInsertionTarget(Wire):

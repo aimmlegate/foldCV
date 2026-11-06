@@ -20,7 +20,7 @@ def loaded(entry):
     Assets template 2.5.0 replaced are kept by hash in retained-assets.json: the old alias catalog, and the icons the
     frozen Devicon folder still holds byte for byte."""
     from packages.resume_core.models.template_workspace import WorkspaceV7
-    from packages.resume_core.templates.models import remember_asset
+    from packages.resume_core.models.template_package import remember_asset
     from tests.templates.storage_fixtures import package
     for asset in package().assets:
         remember_asset(asset.sha256, asset.bytes_base64, asset.mime_type)

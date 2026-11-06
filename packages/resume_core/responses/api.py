@@ -7,14 +7,9 @@ from ..models.contracts import Id, Revision, Wire
 from ..models.rich_workspace import WorkspaceV6
 from .presentation import RichPresentation
 from ..rich_identity import ResumeIdentity
+from ..models.template_response import RichGenerationState
 
 
-class RichGenerationState(Wire):
-    id: Id
-    status: Literal["queued", "running", "completed", "failed", "cancelled", "interrupted"]
-    stage: Literal["assess_resume", "normalize_semantics", "draft_prose", "assemble", "render"]
-    error_code: Id | None
-    started_at: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RichProjectResponse(Wire):

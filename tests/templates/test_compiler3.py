@@ -16,7 +16,7 @@ from packages.resume_core.repository.project_repository import ProjectRepository
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.compiler import compile_bytes, compile_definition, compile_template
 from packages.resume_core.templates.loading import load_declared_definition,load_definition
-from packages.resume_core.templates.models import TemplatePackage
+from packages.resume_core.models.template_package import TemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import verify_package
 from tests.templates.editor_fixtures import source_blobs

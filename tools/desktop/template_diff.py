@@ -4,7 +4,7 @@ sys.path[:0] = [".", "services/api/src"]
 from tests.templates.golden.corpus import corpus
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.loading import load_declared_definition, load_definition
-from packages.resume_core.templates.models import TemplateDefinition
+from packages.resume_core.models.template_package import TemplateDefinition
 
 
 def walk(a, b, path=""):

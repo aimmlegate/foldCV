@@ -20,9 +20,9 @@ from packages.resume_core.models.template_document import RichDocumentV2
 from packages.resume_core.models.template_import import ImportOperation
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateSnapshotIdentity
 from packages.resume_core.models.template_workspace import ArchiveManifestV7, WorkspaceV7
-from packages.resume_core.editing.panel import RichPanelRequest
-from packages.resume_core.responses.template_api import TemplateProjectResponseV1
-from packages.resume_core.templates.models import TemplateDefinition, TemplatePackage
+from packages.resume_core.models.panel_request import RichPanelRequest
+from packages.resume_core.models.template_response import TemplateProjectResponseV1
+from packages.resume_core.models.template_package import TemplateDefinition, TemplatePackage
 from packages.resume_core.templates.shorthand import source_schema
 from resume_api.projects.archive import ArchiveDownload
 from resume_api.projects.exports import ExportCommand, ExportRetry

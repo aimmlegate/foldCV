@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from ..models.template_facts import ExtensionCell
 from ..models.template_document import BoundLink, FieldOccurrence, FieldRef, ManualScopeSpan, PresentedText
-from .models import AuthoredPresentation
+from ..models.template_package import AuthoredPresentation
 from .projection import pointer_tokens
 from ..hashing import canonical, sha256
 

@@ -8,7 +8,7 @@ import pytest
 from packages.resume_core.templates import store
 from packages.resume_core.templates.compiler import compile_bytes, compile_template
 from packages.resume_core.templates.loading import load_definition
-from packages.resume_core.templates.models import TemplateDefinition
+from packages.resume_core.models.template_package import TemplateDefinition
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.projection import SchemaFailure
 

@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from ..models.contracts import Id, Sha256, Wire
+from .contracts import Id, Sha256, Wire
 
 JsonObject = dict[str, JsonValue]
 RegionId = Literal["header", "sidebar", "main"]

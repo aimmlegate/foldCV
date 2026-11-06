@@ -5,7 +5,7 @@ import json
 import pytest
 
 from packages.resume_core.templates.compiler import compile_bytes, compile_definition, compiler_version
-from packages.resume_core.templates.models import TemplateDefinition
+from packages.resume_core.models.template_package import TemplateDefinition
 from packages.resume_core.templates.projection import SchemaFailure, reachable_schema
 from packages.resume_core.templates.store import BUNDLED_TEMPLATE
 from tests.templates.generic_fixtures import generic_package

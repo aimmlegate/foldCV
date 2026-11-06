@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from packages.resume_core.models.template_authoring import TemplateEditPreparationV1
 from packages.resume_core.fields import field_key
-from packages.resume_core.editing.panel import RichPanelRequest
+from packages.resume_core.models.panel_request import RichPanelRequest
 from packages.resume_core.editing.template_panel_records import technology_targets
 from packages.resume_core.editing.template_preparation import prepare_edit
 from packages.resume_core.templates.materialize_nodes import literal

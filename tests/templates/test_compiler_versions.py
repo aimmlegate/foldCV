@@ -9,7 +9,7 @@ import pytest
 
 from packages.resume_core.hashing import canonical
 from packages.resume_core.templates.compiler import compile_bytes, compile_definition_v1
-from packages.resume_core.templates.models import TemplatePackage
+from packages.resume_core.models.template_package import TemplatePackage
 from packages.resume_core.templates.projection import SchemaFailure
 from packages.resume_core.templates.store import verify_package
 

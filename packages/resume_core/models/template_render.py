@@ -9,7 +9,7 @@ from .template_document import RichDocumentV2
 from .template_facts import WorkingFactsV2
 from ..hashing import canonical, digest, sha256
 from ..import_failure import TemplateImportFailure
-from ..templates.models import TemplatePackage
+from .template_package import TemplatePackage
 from ..templates.store import verify_package
 
 

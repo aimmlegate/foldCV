@@ -140,7 +140,7 @@ def read_history_file(directory, digest):
 def load_stored_data(directory, raw, *, history=False):
     """The JSON of a project file with its asset bytes remembered from the project's asset files and, when asked for,
     its import records read from its history files (D104)."""
-    from ..templates.models import asset_text, remember_asset
+    from ..models.template_package import asset_text, remember_asset
     data = strict_json(raw)
     for owner in stored_owners(data):
         for asset in stored_assets(owner):

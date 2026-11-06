@@ -11,7 +11,7 @@ from .rich_document import (BlockIdentity, ParagraphBlock, HeadingBlock, BulletB
     ChecklistBlock, ToggleBlock, QuoteBlock, CodeBlock, DividerBlock, TableBlock, ImageBlock,
     SectionBlock, FactFieldSpan, StyledText, Hyperlink, ImageProps, TableCell, TableRow, TableContent,
     RichRegion, RichDocumentV1)
-from ..templates.models import AuthoredPresentation
+from .template_package import AuthoredPresentation
 from .template_facts import SourceSpan
 
 

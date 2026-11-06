@@ -6,7 +6,7 @@ from ..rendering.captured_styles import authored_spans
 from ..hashing import canonical, sha256
 from .focus import catalog_for, row_icon
 from .materialize_nodes import locale_text
-from .models import remember_asset
+from ..models.template_package import remember_asset
 from .materialize_nodes import focus_row, node_of
 
 
