@@ -171,9 +171,9 @@ def ended(pid):
 def test_a_corrupt_worker_record_is_quarantined(tmp_path, record):
     stale = stale_directory(tmp_path / "ops", "f" * 32)
     (stale / ".worker").write_bytes(record)
-    (stale / "canary").write_text(CANARY)
+    (stale / "canary").write_text(CANARY, encoding="utf-8")
     reap_owned(tmp_path / "ops")
-    assert (stale / ".worker").read_bytes() == record and (stale / "canary").read_text() == CANARY
+    assert (stale / ".worker").read_bytes() == record and (stale / "canary").read_text(encoding="utf-8") == CANARY
     assert (stale / ".cleanup-blocked").exists()
 
 
@@ -189,10 +189,10 @@ def test_a_failed_process_cleanup_keeps_its_quarantined_directory(tmp_path):
     root = tmp_path / "ops"
     with pytest.raises(SpikeError, match="PROCESS_CLEANUP_FAILED"):
         with operation(root, owner=OWNER) as directory:
-            (directory / "synthetic-content").write_text(CANARY)
+            (directory / "synthetic-content").write_text(CANARY, encoding="utf-8")
             raise SpikeError("PROCESS_CLEANUP_FAILED")
     reap_owned(root)
-    assert (directory / "synthetic-content").read_text() == CANARY and (directory / ".cleanup-blocked").exists()
+    assert (directory / "synthetic-content").read_text(encoding="utf-8") == CANARY and (directory / ".cleanup-blocked").exists()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX symlinks")
@@ -206,7 +206,7 @@ def test_a_restart_reaps_only_owned_inactive_directories(tmp_path):
     unrelated = root / "keep.txt"
     unrelated.write_text("unrelated")
     with operation(root, owner=OWNER) as active:
-        (active / "canary").write_text(CANARY)
+        (active / "canary").write_text(CANARY, encoding="utf-8")
         assert reap_owned(root) == 1 and active.exists()
     assert not stale.exists() and other.exists() and link.is_symlink() and unrelated.exists() and outside.exists()
 
@@ -216,11 +216,11 @@ def test_a_crash_during_spawn_with_a_live_worker_is_quarantined(tmp_path):
     import subprocess
     stale = stale_directory(tmp_path / "ops", "6" * 32)
     (stale / ".worker").write_text('{"state":"spawning"}')
-    (stale / "canary").write_text(CANARY)
+    (stale / "canary").write_text(CANARY, encoding="utf-8")
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], cwd=stale, start_new_session=True)
     try:
         reap_owned(tmp_path / "ops")
-        assert child.poll() is None and (stale / "canary").read_text() == CANARY
+        assert child.poll() is None and (stale / "canary").read_text(encoding="utf-8") == CANARY
         assert (stale / ".cleanup-blocked").exists()
         assert json.loads((stale / ".worker").read_text()) == {"state": "spawning"}
     finally:
@@ -235,11 +235,11 @@ def test_a_malformed_owner_does_not_block_independent_cleanup(tmp_path):
     for path in (bad, good):
         path.mkdir(parents=True)
         (path / ".lock").touch()
-        (path / "canary").write_text(CANARY)
+        (path / "canary").write_text(CANARY, encoding="utf-8")
     (bad / ".owner").write_text("{bad")
     (good / ".owner").write_text(json.dumps({"owner": OWNER, "id": good_id}))
     reap_owned(root)
-    assert (bad / "canary").read_text() == CANARY and not good.exists()
+    assert (bad / "canary").read_text(encoding="utf-8") == CANARY and not good.exists()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
