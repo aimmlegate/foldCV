@@ -1,6 +1,7 @@
 {
   "name": "foldcv-web",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "contracts:generate": "../../.venv/bin/python ../../tools/generate_contracts.py && ../../.venv/bin/python ../../tools/generate_contracts.py --bundle .contracts-bundle.schema.json && json2ts -i .contracts-bundle.schema.json -o src/contracts/generated/contracts.ts --no-banner && ../../.venv/bin/python ../../tools/generate_contracts.py --clean-types",

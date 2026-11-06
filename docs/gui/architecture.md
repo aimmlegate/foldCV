@@ -633,8 +633,8 @@ never writes to disk. Candidate data must not enter shared caches or backups.
 
 ## PDF extraction licence
 
-The existing parser uses PyMuPDF. Its published license options are AGPL and
-commercial; resolve licensing or use a suitable alternative before distribution.
-Keep the extraction interface independent of that choice. This is a dependency
-decision, not an assumption that local deployment removes license obligations.
-[PyMuPDF licensing](https://pymupdf.io/licensing)
+The parser uses PyMuPDF under the AGPL, and FoldCV itself is licensed under the
+AGPL-3.0-or-later since D150 (2026-11-06), so the combination is in order. A
+replacement path (pypdfium2) is kept in `docs/gui/pdf-extraction-plan.md` for the
+case the product licence ever changes. Keep the extraction interface independent
+of that choice. [PyMuPDF licensing](https://pymupdf.io/licensing)

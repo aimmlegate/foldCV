@@ -22,7 +22,8 @@ const firstKeys: Partial<Record<SettingsPart, keyof SettingsValues>> = { model: 
   import: "importModel", fallback: "fallbackModel", assistant: "agentEnabled" };
 const leads: Record<SettingsSection, string> = { connection: "Модели включённых провайдеров доступны во всех списках моделей.",
   models: "Каждый выбор сохраняется сразу.", assistant: "Чат по резюме и по шаблонам. Каждый выбор сохраняется сразу.",
-  rules: "Тексты команд «Сократить» и «Сделать яснее» в правке текста.", appearance: "Сохраняется сразу. Страница резюме остаётся светлой при любой теме." };
+  rules: "Тексты команд «Сократить» и «Сделать яснее» в правке текста.", appearance: "Сохраняется сразу. Страница резюме остаётся светлой при любой теме.",
+  about: "Лицензия, исходный код и сторонние компоненты." };
 
 /** Settings (D147): five sections in a column of at most 720 px; each section is groups of rows. `request` opens a
  * section from elsewhere, for example the assistant's link to its model. */
@@ -90,6 +91,20 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
       <h2 className="settings-section-title">{shownLabel}</h2>
       {section !== "limits" && <p className="settings-lead">{leads[section]}</p>}
       {section === "connection" && <Connections view={view} workflow={workflow} disabled={current.saving} />}
+      {section === "about" && <>
+        {/* The legal notices the AGPL asks an interactive program to show (D150): copyright, licence, no warranty, source. */}
+        <SettingsGroup title="Лицензия">
+          <p className="settings-lead">FoldCV © 2026 авторы FoldCV. Свободная программа: её можно использовать, изменять и распространять на условиях
+            GNU Affero General Public License версии 3 или любой более поздней. Программа поставляется без каких-либо гарантий.</p>
+          <p className="settings-lead"><a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">Текст лицензии</a>
+            {" · "}<a href="https://github.com/aimmlegate/foldCV" target="_blank" rel="noopener noreferrer">Исходный код</a>. Тег каждого выпуска на странице
+            релизов указывает на исходники этого выпуска.</p>
+        </SettingsGroup>
+        <SettingsGroup title="Сторонние компоненты">
+          <p className="settings-lead">Текст из PDF извлекает PyMuPDF с библиотекой MuPDF © Artifex Software, Inc., лицензия GNU AGPL v3. Остальные компоненты
+            и их лицензии перечислены в файле THIRD-PARTY-NOTICES.md в составе приложения и в репозитории.</p>
+        </SettingsGroup>
+      </>}
       {section === "models" && <><SettingsGroup title="Обработка и правка">
         <SettingsRow label="Модель обработки" hint="Импорт и правки, если ниже не выбрано другое." htmlFor="model-select" note={rowNote("model")}>
           {rowState("model")}<ModelSelect id="model-select" label="Модель обработки" labelled={false} value={current.draft.model} groups={groups} disabled={modelsOff}

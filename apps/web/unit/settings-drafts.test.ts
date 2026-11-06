@@ -261,7 +261,7 @@ test("reopened Settings shows rewrite choices saved in the popover and keeps its
 
 test("Settings lists five sections in nav order; limits have no item (D147)", () => {
   assert.deepEqual(settingsSections.map(item => `${item.id}:${item.label}`),
-    ["connection:Подключение", "models:Модели", "assistant:Помощник", "rules:Команды", "appearance:Оформление"]);
+    ["connection:Подключение", "models:Модели", "assistant:Помощник", "rules:Команды", "appearance:Оформление", "about:О программе"]);
 });
 
 test("a committed choice saves its own part at once and marks its row; nothing else is sent (D147)", async () => {

@@ -3,6 +3,7 @@ name = "foldcv-desktop-tauri"
 # The app version is the one in tauri.conf.json.
 version = "0.0.0"
 edition = "2024"
+license = "AGPL-3.0-or-later"
 publish = false
 
 [[bin]]
