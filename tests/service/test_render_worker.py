@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 from contextlib import contextmanager
 
@@ -268,7 +269,7 @@ async def test_a_cleanup_failure_blocks_new_work_in_the_running_service(tmp_path
         raise SpikeError("UNSAFE_TEMP_ROOT")
         yield self
 
-    original_remove = cli_runner.shutil.rmtree
+    original_remove = shutil.rmtree
 
     def failed_remove(path, *args, **kwargs):
         if Path(path).name.startswith("op-"):
@@ -282,7 +283,7 @@ async def test_a_cleanup_failure_blocks_new_work_in_the_running_service(tmp_path
         if source == "unsafe_root":
             monkeypatch.setattr(lifecycle.OperationFiles, "open", unsafe_open)
         if source == "removal":
-            monkeypatch.setattr(cli_runner.shutil, "rmtree", failed_remove)
+            monkeypatch.setattr(shutil, "rmtree", failed_remove)
         failed = await export(client, editor)
         assert failed.status_code == 503
         assert failed.json()["error"]["code"] == {"renderer": "PROCESS_CLEANUP_FAILED", "unsafe_root": "UNSAFE_TEMP_ROOT",
@@ -327,7 +328,7 @@ async def test_a_partial_removal_keeps_the_intent_and_blocks_a_restart(tmp_path,
     unrelated.mkdir(parents=True)
     (unrelated / ".owner").write_text(json.dumps({"owner": "another-app", "id": "a" * 32}))
     (unrelated / ".lock").touch()
-    original_remove = cli_runner.shutil.rmtree
+    original_remove = shutil.rmtree
 
     def partial_remove(path, *args, **kwargs):
         if Path(path).name.startswith("op-"):
@@ -340,10 +341,10 @@ async def test_a_partial_removal_keeps_the_intent_and_blocks_a_restart(tmp_path,
     app = service(tmp_path)
     async with signed_in(app) as client:
         editor = await open_project(client)
-        monkeypatch.setattr(cli_runner.shutil, "rmtree", partial_remove)
+        monkeypatch.setattr(shutil, "rmtree", partial_remove)
         failed = await export(client, editor)
         assert failed.status_code == 503 and failed.json()["error"]["code"] == "CLEANUP_FAILED"
-    monkeypatch.setattr(cli_runner.shutil, "rmtree", original_remove)
+    monkeypatch.setattr(shutil, "rmtree", original_remove)
     root = tmp_path / "operations"
     intents = list(root.glob(".cleanup-intent-op-*.json"))
     assert len(intents) == 1
@@ -361,7 +362,7 @@ async def test_an_intent_write_failure_never_starts_deletion(tmp_path, monkeypat
     def failed_intent(root, identifier, owner):
         raise OSError("synthetic intent failure")
 
-    original_remove = cli_runner.shutil.rmtree
+    original_remove = shutil.rmtree
     attempts = []
 
     def tracked_remove(path, *args, **kwargs):
@@ -374,7 +375,7 @@ async def test_an_intent_write_failure_never_starts_deletion(tmp_path, monkeypat
     async with signed_in(app) as client:
         editor = await open_project(client)
         monkeypatch.setattr(cli_runner, "_write_cleanup_intent", failed_intent)
-        monkeypatch.setattr(cli_runner.shutil, "rmtree", tracked_remove)
+        monkeypatch.setattr(shutil, "rmtree", tracked_remove)
         failed = await export(client, editor)
         assert failed.status_code == 503 and failed.json()["error"]["code"] == "CLEANUP_FAILED"
     assert attempts == []

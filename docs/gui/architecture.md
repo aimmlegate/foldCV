@@ -478,7 +478,7 @@ Compile compact runtime prompts from the skill rules. Configure and test a CLI
 profile without shell, browser, filesystem exploration, MCP, plugins, hooks,
 personal memory, skill discovery or delegation. A prompt asking for no tools is
 not enforcement; read-only sandboxing alone still permits reads and tool loops.
-Prove the restricted profile in T00B before sending real resumes. Keep model
+Prove the restricted profile over a fake CLI before sending real resumes. Keep model
 responses task-specific and schema-constrained. Archive bookkeeping, evidence,
 duration labels and all other deterministic work run in code.
 

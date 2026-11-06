@@ -96,7 +96,6 @@
  "services/api/src/resume_api/assistant/template_tools.py": 6,
  "services/api/src/resume_api/assistant/tools.py": 11,
  "services/api/src/resume_api/cli/process_runner.py": 8,
- "services/api/src/resume_api/cli/runner.py": 12,
  "services/api/src/resume_api/desktop.py": 1,
  "services/api/src/resume_api/host/connections.py": 19,
  "services/api/src/resume_api/importer/template_pipeline.py": 108,

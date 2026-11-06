@@ -1,6 +1,5 @@
 """Pinned controls and explicit gaps; these are not a production provider profile."""
 
-from dataclasses import dataclass
 from pathlib import Path
 import json
 import re
@@ -61,17 +60,6 @@ def check_features(listing: str) -> None:
             effective[match.group(1)] = match.group(2) == "true"
     if not effective or any(effective.get(name) for name in REQUIRED_OFF):
         raise QualificationError("CLI_PROFILE_UNSAFE")
-
-
-@dataclass(frozen=True)
-class Profile:
-    version: str
-    generation_verified: bool
-
-
-REAL_PROFILE = Profile(VERSION, False)
-# The fake advertises a different version and checks its own restrictions.
-FIXTURE_PROFILE = Profile(FIXTURE_VERSION, True)
 
 
 def overrides(directory: Path) -> list[str]:
