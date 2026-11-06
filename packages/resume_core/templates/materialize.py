@@ -32,21 +32,8 @@ def shows_employer(cell):
     return cell is not None and bool(cell.raw_input or cell.manual_scope_id is not None)
 
 
-def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
-    verify_package(package)
-    declarations = {value.id: value for value in package.definition.blocks}
-    operation_ids = {value.id for value in package.definition.operations}
-    current = {cell.id: cell for cell in effective_cells(facts, operations)}
-    current.update({cell.id: cell for cell in builtin_effective_cells(facts, operations, include_raw=True)})
-    active_records = {record.id for record in [*facts.records, *facts.extensions] if getattr(record, 'active', True)}
-    record_order = {record.id: index for index, record in enumerate([*facts.records, *facts.extensions]) if record.id in active_records}
-    fields, roots, unassigned = capture_fields(declarations, operations, current, record_order)
-    # One declared period format applies to every period view.
-    period_format = next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
-        for value in package.definition.operations if value.kind == 'format_period'), None)
-    # Focus durations need the formatting date that ends an ongoing job; without it nothing is computed.
-    durations = focus_durations(facts, as_of, package.definition.template.default_locale) if as_of is not None else {}
-    # Stored operation results hide records in some views and list records of other blocks in others.
+def _stored_views(package, operations, current):
+    """Stored operation results hide records in some views and list records of other blocks in others."""
     hidden, compact, assigned = {}, {}, {}
     for value in package.definition.operations:
         stored = operation_value(operations, value.id)
@@ -62,6 +49,56 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 hidden.setdefault(group, set()).update(records)
             if stored['added']:
                 assigned.setdefault(stored['uncertainGroup'], []).extend(stored['added'])
+    return hidden, compact, assigned
+
+
+def _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view):
+    """Lines of an uncited scope that no accepted value or cited fallback shows go once to the last such block on the
+    page; a coverage gap's lines go to the block's own view, once (`placements` is updated in place)."""
+    occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
+        *[span for spans in placements.values() for span in spans]]
+    # A coverage gap's lines go to the block's own view, once, unless an accepted value or another fallback shows them
+    # (a live import: courses repeated the education lines, open source the portfolio items).
+    for view in [declaration.id for declaration in ordered if missing_by_view.get(declaration.id)]:
+        lines = [line for line in scope_lines(sources, missing_by_view[view]) if not any(overlaps(line, other) for other in occupied)]
+        if lines:
+            placements[view] = union_spans(sources, [*placements.get(view, []), *lines])
+            occupied.extend(lines)
+    leftover = [line for spans in uncited_by_view.values() for line in scope_lines(sources, spans)
+        if not any(overlaps(line, other) for other in occupied)]
+    if leftover:
+        last = [declaration.id for declaration in ordered if declaration.id in uncited_by_view][-1]
+        placements[last] = union_spans(sources, [*placements.get(last, []), *leftover])
+
+
+def _retained_coverage(sources, coverage, add_coverage):
+    """Source text outside every configured field view is recorded as retained source only."""
+    covered = union_spans(sources, [value.span for value in coverage])
+    for source in sources:
+        for unit in source.units:
+            cursor = 0
+            spans = [span for span in covered if unit_key(span) == (source.id, source.revision, unit.id, unit.revision)]
+            for span in [*spans, capture_span(source, unit, len(unit.text), len(unit.text))]:
+                if cursor < span.start:
+                    add_coverage(capture_span(source, unit, cursor, span.start), None, [], 'source_only', 'retained outside configured field views')
+                cursor = span.end
+
+
+def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
+    verify_package(package)
+    declarations = {value.id: value for value in package.definition.blocks}
+    operation_ids = {value.id for value in package.definition.operations}
+    current = {cell.id: cell for cell in effective_cells(facts, operations)}
+    current.update({cell.id: cell for cell in builtin_effective_cells(facts, operations, include_raw=True)})
+    active_records = {record.id for record in [*facts.records, *facts.extensions] if getattr(record, 'active', True)}
+    record_order = {record.id: index for index, record in enumerate([*facts.records, *facts.extensions]) if record.id in active_records}
+    fields, roots, unassigned = capture_fields(declarations, operations, current, record_order)
+    # One declared period format applies to every period view.
+    period_format = next(({'separator': value.parameters.separator, 'ongoingLabel': dict(value.parameters.ongoing_label)}
+        for value in package.definition.operations if value.kind == 'format_period'), None)
+    # Focus durations need the formatting date that ends an ongoing job; without it nothing is computed.
+    durations = focus_durations(facts, as_of, package.definition.template.default_locale) if as_of is not None else {}
+    hidden, compact, assigned = _stored_views(package, operations, current)
     fallbacks_by_view, uncited_by_view, missing_by_view, human_scopes = {}, {}, {}, []
     for operation in operations:
         tasks = {task.id: task for task in operation.tasks}
@@ -118,21 +155,7 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     _fallback, suppressed, placements = fallback_plan(sources, fallbacks_by_view,
         {view: list(cells.values()) for view, cells in visible_by_view.items()}, protected_spans=human_scopes)
     ordered = sorted(declarations.values(), key=lambda value: (['header', 'sidebar', 'main'].index(value.placement.region), value.placement.order, value.id))
-    # Lines of an uncited scope that no accepted value or cited fallback shows go once to the last such block on the page.
-    occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
-        *[span for spans in placements.values() for span in spans]]
-    # A coverage gap's lines go to the block's own view, once, unless an accepted value or another fallback shows them
-    # (a live import: courses repeated the education lines, open source the portfolio items).
-    for view in [declaration.id for declaration in ordered if missing_by_view.get(declaration.id)]:
-        lines = [line for line in scope_lines(sources, missing_by_view[view]) if not any(overlaps(line, other) for other in occupied)]
-        if lines:
-            placements[view] = union_spans(sources, [*placements.get(view, []), *lines])
-            occupied.extend(lines)
-    leftover = [line for spans in uncited_by_view.values() for line in scope_lines(sources, spans)
-        if not any(overlaps(line, other) for other in occupied)]
-    if leftover:
-        last = [declaration.id for declaration in ordered if declaration.id in uncited_by_view][-1]
-        placements[last] = union_spans(sources, [*placements.get(last, []), *leftover])
+    _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view)
     regions = {role: {'id': stable_id(operation_id, role), 'role': role, 'revision': revision, 'blocks': []}
         for role in ['header', 'sidebar', 'main']}
     coverage, displayed, owned, shown_scopes, shown_fallback = [], {}, set(), set(), []
@@ -278,14 +301,6 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         record, handle = cell_owners[identifier]
         for span in current[identifier].evidence:
             add_coverage(span, handle, blocks, 'multiple_views' if len(blocks) > 1 else 'accepted', 'configured field presentation')
-    covered = union_spans(sources, [value.span for value in coverage])
-    for source in sources:
-        for unit in source.units:
-            cursor = 0
-            spans = [span for span in covered if unit_key(span) == (source.id, source.revision, unit.id, unit.revision)]
-            for span in [*spans, capture_span(source, unit, len(unit.text), len(unit.text))]:
-                if cursor < span.start:
-                    add_coverage(capture_span(source, unit, cursor, span.start), None, [], 'source_only', 'retained outside configured field views')
-                cursor = span.end
+    _retained_coverage(sources, coverage, add_coverage)
     document = RichDocumentV2(schemaVersion=2, revision=revision, regions=list(regions.values()))
     return document, coverage
