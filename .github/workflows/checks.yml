@@ -29,7 +29,11 @@ jobs:
       - run: .venv/bin/python tools/check_decisions_index.py
       - run: npm ci
         working-directory: apps/web
-      - run: .venv/bin/python -m pytest -q -p no:cacheprovider
+      # Tests that drive fake CLI processes under short deadlines run alone; the rest in parallel.
+      - run: .venv/bin/python -m pytest -q -p no:cacheprovider -n auto --ignore=tests/providers
+          --ignore=tests/service --ignore=tests/settings --ignore=tests/assistant
+      - run: .venv/bin/python -m pytest -q -p no:cacheprovider tests/providers tests/service tests/settings
+          tests/assistant
       - run: npm run test:state
         working-directory: apps/web
       - run: npm run typecheck

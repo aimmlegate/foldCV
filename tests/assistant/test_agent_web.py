@@ -93,7 +93,7 @@ def test_mixed_dns_and_rebinding_redirect_are_denied_before_connecting_private_a
     (b"text", {"Content-Type": "text/plain", "Content-Encoding": "gzip"}, "AGENT_SOURCE_UNAVAILABLE"),
     (b"text", {"Content-Type": "text/plain", "Content-Length": str(BODY_BYTES + 1)}, "AGENT_SOURCE_LIMIT"),
     (b"a" * (BODY_BYTES + 1), {"Content-Type": "text/plain"}, "AGENT_SOURCE_LIMIT"),
-    (gzip.compress(b"a" * (BODY_BYTES + 1)), {"Content-Type": "text/plain", "Content-Encoding": "gzip"}, "AGENT_SOURCE_LIMIT"),
+    (gzip.compress(b"a" * (BODY_BYTES + 1), mtime=0), {"Content-Type": "text/plain", "Content-Encoding": "gzip"}, "AGENT_SOURCE_LIMIT"),
 ])
 def test_media_decode_wire_and_expansion_failures_are_explicit(data, headers, code):
     transport = Transport([Response(data, headers=headers)])
