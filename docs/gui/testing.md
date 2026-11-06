@@ -39,8 +39,10 @@ npm run contracts:check
   `PROCESS_CLEANUP_FAILED`, run 42118819384); locally 419 s serial plus 272 s at `-n 3`. Test ids must
   not change between collections (xdist compares them): no timestamps or random bytes in parameters.
   The slow suite stays serial. Add `--durations=25` to see the slowest tests; pass paths for a focused run.
-- `pyright` (pinned, basic mode, `[tool.pyright]` in `pyproject.toml`; needs Node 22 on `PATH`) is report-only:
-  1 621 errors on 2026-11-05, most of them pydantic constructor calls by field alias. It is no CI gate.
+- `pyright` (pinned, basic mode, `[tool.pyright]` in `pyproject.toml`; needs Node 22 on `PATH`) runs as a ratchet:
+  `tools/check_pyright.py` fails when a file has more errors than `tools/pyright-baseline.json` records (1 620 in
+  130 files on 2026-11-06, most of them pydantic constructor calls by field alias). After fixing errors, record the
+  lower counts with `--write`. The fast CI job runs it.
 - No product path converts a document (the PDF is printed, D133). The slow conversion test
   (`tests/render/test_captured_conversion.py`, helpers in `tests/support/convert.py`) and manual
   PDF checks use the pinned LibreOffice of `tools/install-local-renderer.sh` (macOS arm64,

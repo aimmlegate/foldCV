@@ -27,6 +27,7 @@ jobs:
       - run: .venv/bin/pip install -e .
       - run: .venv/bin/ruff check .
       - run: .venv/bin/python tools/check_decisions_index.py
+      - run: .venv/bin/python tools/check_pyright.py
       - run: npm ci
         working-directory: apps/web
       # Tests that drive fake CLI processes under short deadlines run alone; the rest in parallel.
