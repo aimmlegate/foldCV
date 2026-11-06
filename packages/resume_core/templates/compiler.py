@@ -218,19 +218,13 @@ def compile_definition_v1(definition: TemplateDefinition):
     return compile_definition(definition, COMPILER_VERSION)
 
 
-def compile_definition(definition: TemplateDefinition, version):
-    additions = added_capabilities(definition)
-    if version not in {COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3} or version == COMPILER_VERSION and additions:
-        raise SchemaFailure('/compiler', 'unsupported configuration for captured compiler version')
-    capabilities = [*CAPABILITIES, *additions]
-    assets = unique([a.id for a in definition.assets], "/assets")
-    unique([a.path for a in definition.assets], "/assets/path")
-    blocks = unique([b.id for b in definition.blocks], "/blocks")
-    operations = unique([o.id for o in definition.operations], "/operations")
-    types = unique([f.id for f in definition.fact_types], "/fact_types")
+def require(value, choices, location):
+    if value not in choices: raise SchemaFailure(location, "unknown reference: " + str(value))
+
+
+def check_style(definition, assets):
+    """Every font, text style, color and asset a style names is declared."""
     style = definition.style
-    def require(value, choices, location):
-        if value not in choices: raise SchemaFailure(location, "unknown reference: " + str(value))
     for name, asset in style.fonts.items():
         require(asset, assets, "/style/fonts/" + name)
         if next(a for a in definition.assets if a.id == asset).role != "font":
@@ -249,6 +243,10 @@ def compile_definition(definition: TemplateDefinition, version):
         if table.border_width > 0: require(table.border_color, style.colors, "/style/tables/" + name + "/border_color")
         for key in ("label_background", "background"):
             if getattr(table, key) is not None: require(getattr(table, key), style.colors, "/style/tables/" + name + "/" + key)
+
+
+def check_layout(definition, style):
+    """Header, an optional sidebar and main, in reading order, inside the page; the body columns do not overlap."""
     regions = definition.layout.regions
     region_ids = [r.id for r in regions]
     # A one-column layout declares no sidebar; documents keep all three regions and its sidebar stays empty.
@@ -263,6 +261,47 @@ def compile_definition(definition: TemplateDefinition, version):
         sidebar, main = regions[1:]
         if max(sidebar.x, main.x) < min(sidebar.x + sidebar.width, main.x + main.width):
             raise SchemaFailure("/layout/regions", "body columns overlap")
+    return region_ids
+
+
+def check_view_fields(block, node, full, base):
+    """The fields a view node shows have the types the node can show."""
+    pointers = [*node.fields, *[p for p in (node.field, node.name_field, node.url_field, node.experience_field) if p is not None]]
+    view_schema = {**base, "$defs": full.get("$defs", {})}
+    for pointer in pointers:
+        shape = schema_at(view_schema, pointer)
+        kind = shape.get("type")
+        kinds = set(kind if isinstance(kind,list) else [kind])
+        expected = {"array"} if node.type in {"join_items","bullets","tags"} else {"object","null"} if node.type == "period" else {"string","number","integer","boolean","null"}
+        if node.type in {"text", "join_fields"} and is_date(shape):
+            continue
+        if not kinds or not kinds <= expected:
+            raise SchemaFailure("/view/" + block.id + pointer, "incompatible view field type")
+        if node.type in {"join_items","bullets","tags"}:
+            child = schema_at({**shape, "$defs":full.get("$defs",{})}, "/*")
+            if node.item_field is not None:
+                child = schema_at({**child, '$defs': full.get('$defs', {})}, node.item_field)
+            child_kind = child.get("type")
+            child_types = set(child_kind if isinstance(child_kind,list) else [child_kind])
+            if not child_types <= {"string","number","integer","boolean","null"}:
+                raise SchemaFailure("/view/" + block.id + pointer, "collection items must be scalar")
+        if node.type == "period" and not {"raw","start","end","ongoing"} <= set(shape.get("properties",{})):
+            raise SchemaFailure("/view/" + block.id + pointer, "period fields must declare raw/start/end/ongoing")
+
+
+def compile_definition(definition: TemplateDefinition, version):
+    additions = added_capabilities(definition)
+    if version not in {COMPILER_VERSION, COMPILER_VERSION_2, COMPILER_VERSION_3} or version == COMPILER_VERSION and additions:
+        raise SchemaFailure('/compiler', 'unsupported configuration for captured compiler version')
+    capabilities = [*CAPABILITIES, *additions]
+    assets = unique([a.id for a in definition.assets], "/assets")
+    unique([a.path for a in definition.assets], "/assets/path")
+    blocks = unique([b.id for b in definition.blocks], "/blocks")
+    operations = unique([o.id for o in definition.operations], "/operations")
+    types = unique([f.id for f in definition.fact_types], "/fact_types")
+    style = definition.style
+    check_style(definition, assets)
+    region_ids = check_layout(definition, style)
     fact_schemas = {}
     for fact in definition.fact_types:
         fact_schemas[fact.id] = reachable_schema(fact.data_schema, definition.content_definitions)
@@ -372,27 +411,7 @@ def compile_definition(definition: TemplateDefinition, version):
             for key in ("prefix_style", "label_style"):
                 if getattr(node, key) is not None: require(getattr(node, key), style.text, "/blocks/" + block.id + "/view/" + key)
             if node.background: require(node.background, style.colors, "/view/background")
-            pointers = [*node.fields, *[p for p in (node.field, node.name_field, node.url_field, node.experience_field) if p is not None]]
-            view_schema = {**base, "$defs": full.get("$defs", {})}
-            for pointer in pointers:
-                shape = schema_at(view_schema, pointer)
-                kind = shape.get("type")
-                kinds = set(kind if isinstance(kind,list) else [kind])
-                expected = {"array"} if node.type in {"join_items","bullets","tags"} else {"object","null"} if node.type == "period" else {"string","number","integer","boolean","null"}
-                if node.type in {"text", "join_fields"} and is_date(shape):
-                    continue
-                if not kinds or not kinds <= expected:
-                    raise SchemaFailure("/view/" + block.id + pointer, "incompatible view field type")
-                if node.type in {"join_items","bullets","tags"}:
-                    child = schema_at({**shape, "$defs":full.get("$defs",{})}, "/*")
-                    if node.item_field is not None:
-                        child = schema_at({**child, '$defs': full.get('$defs', {})}, node.item_field)
-                    child_kind = child.get("type")
-                    child_types = set(child_kind if isinstance(child_kind,list) else [child_kind])
-                    if not child_types <= {"string","number","integer","boolean","null"}:
-                        raise SchemaFailure("/view/" + block.id + pointer, "collection items must be scalar")
-                if node.type == "period" and not {"raw","start","end","ongoing"} <= set(shape.get("properties",{})):
-                    raise SchemaFailure("/view/" + block.id + pointer, "period fields must declare raw/start/end/ongoing")
+            check_view_fields(block, node, full, base)
         if block.placement.region not in region_ids:
             raise SchemaFailure("/blocks/" + block.id + "/placement", "block region is not in the layout")
         key = (block.placement.region, block.placement.order)
