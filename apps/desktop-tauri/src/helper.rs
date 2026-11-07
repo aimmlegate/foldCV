@@ -59,8 +59,12 @@ fn open_log(path: &Path) -> io::Result<File> {
     system::private_file(OpenOptions::new().create(true).append(true)).open(path)
 }
 
-/// One line of the shell's own in the helper log, beside the service's error output; a failed write is dropped.
+/// One line of the shell's own in the helper log, beside the service's error output; a failed write is dropped. The
+/// first line comes before the helper's start has made the folder.
 pub fn note(path: &Path, message: &str) {
+    if let Some(folder) = path.parent() {
+        let _ = system::private_folder(folder);
+    }
     if let Ok(mut file) = system::private_file(OpenOptions::new().create(true).append(true)).open(path) {
         let _ = writeln!(file, "{} shell: {message}", utc(SystemTime::now()));
     }
@@ -253,7 +257,6 @@ mod tests {
         assert_eq!(utc(UNIX_EPOCH + Duration::from_secs(951_782_400)), "2000-02-29T00:00:00Z");
         let folder = temporary("note");
         let log = folder.join("logs/helper.log");
-        fs::create_dir_all(log.parent().unwrap()).unwrap();
         note(&log, "service ready");
         note(&log, "window shown");
         let text = fs::read_to_string(&log).unwrap();
