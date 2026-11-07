@@ -24,7 +24,7 @@ class CatalogAdapter:
         return Metadata('fixture', ('assistant-model', 'processing-model'), 'plus', Quota('available', 10),
             {name: ModelReasoning(supported=['medium'], default='medium') for name in ('assistant-model', 'processing-model')})
 
-    def login(self, _files, _cancel):
+    def login(self, _files, _cancel, output=None):
         raise AssertionError('native login')
 
 

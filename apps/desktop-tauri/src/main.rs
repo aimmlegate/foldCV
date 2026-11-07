@@ -16,14 +16,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::SeqCst};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tauri::webview::{DownloadEvent, NewWindowResponse, PageLoadEvent, PageLoadPayload, PermissionKind, PermissionResponse};
 use tauri::window::Color;
 use tauri::{AppHandle, Manager, RunEvent, Url, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
-use helper::{Endpoint, Helper};
+use helper::{note, Endpoint, Helper};
 
 const WINDOW: &str = "main";
 const PRELOAD: &str = include_str!("preload.js");
@@ -135,6 +135,7 @@ fn page_loaded(shell: &Shell, window: &WebviewWindow, payload: PageLoadPayload<'
     } else if !shell.shown.swap(true, SeqCst) {
         let _ = window.show();
         let _ = window.set_focus();
+        note(&shell.log, "window shown");
     }
 }
 
@@ -196,6 +197,7 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
         thread::sleep(Duration::from_secs(10));
         if !late.stopping.load(SeqCst) && !late.shown.swap(true, SeqCst) {
             let _ = shown.show();
+            note(&late.log, "window shown before its page loaded");
         }
     });
     Ok(window)
@@ -203,28 +205,38 @@ fn open_window(app: &AppHandle, shell: &Arc<Shell>, endpoint: &Endpoint) -> taur
 
 fn start(app: AppHandle, shell: Arc<Shell>) {
     let name = app.package_info().name.clone();
+    let webview = tauri::webview_version();
+    note(&shell.log, &format!("{name} {} starting on {} {}, webview {}", app.package_info().version, std::env::consts::OS,
+        std::env::consts::ARCH, webview.as_deref().unwrap_or("missing")));
     // Windows 11 has the WebView2 runtime; an old Windows 10 may not.
     #[cfg(windows)]
-    if tauri::webview_version().is_err() {
+    if webview.is_err() {
         system::alert(&name, format!("Для {name} нужен Microsoft Edge WebView2 Runtime."),
             "Установите его с сайта Microsoft и запустите приложение снова.".into());
         return shutdown(&app, &shell);
     }
     let command = policy::helper_command(&app.path().resource_dir().unwrap_or_default(), &shell.root);
     let environment = policy::helper_environment(|key| std::env::var_os(key), &app.path().home_dir().unwrap_or_default());
+    let started = Instant::now();
     let helper = match Helper::start(&command, &environment, &shell.log, Duration::from_secs(120)) {
         Ok(helper) => helper,
-        Err(_) => return fatal(&app, &shell, format!("Не удалось запустить {name}.")),
+        Err(failure) => {
+            note(&shell.log, &format!("service did not start: {failure:?} after {} ms", started.elapsed().as_millis()));
+            return fatal(&app, &shell, format!("Не удалось запустить {name}."));
+        }
     };
+    note(&shell.log, &format!("service ready after {} ms", started.elapsed().as_millis()));
     let _ = shell.helper.set(helper.clone());
     let (watcher, watched, ended) = (app.clone(), shell.clone(), helper.clone());
     thread::spawn(move || {
-        ended.wait();
+        let status = ended.wait();
+        note(&watched.log, &format!("service ended: {status}"));
         if !watched.stopping.load(SeqCst) {
             fatal(&watcher, &watched, format!("Сервис {name} остановился. Приложение будет закрыто."));
         }
     });
-    if !shell.stopping.load(SeqCst) && open_window(&app, &shell, &helper.endpoint).is_err() {
+    if !shell.stopping.load(SeqCst) && let Err(error) = open_window(&app, &shell, &helper.endpoint) {
+        note(&shell.log, &format!("window not opened: {error}"));
         fatal(&app, &shell, format!("Не удалось открыть окно {}.", app.package_info().name));
     }
 }

@@ -13,7 +13,8 @@ export type Quota = { state: QuotaState; usedPercent: number | null; resetsAt: n
 /** One provider with its own connection (D119: every provider that is on stays connected at the same time). */
 export type ProviderEntry = {
   kind: ProviderKind; display: string; subscription: string; publisher: string; loginCode: boolean; installed: boolean;
-  enabled: boolean; state: ConnectionState; version: string | null; versionStatus: "supported" | "graceful" | null;
+  // The sign-in page the CLI printed, while its sign-in runs.
+  loginUrl?: string | null; enabled: boolean; state: ConnectionState; version: string | null; versionStatus: "supported" | "graceful" | null;
   plan: string | null; models: string[]; modelReasoning?: Record<string, ModelReasoning>; quota: Quota;
   metadataReady: boolean; installation?: CliInstallation | null;
 };
@@ -131,10 +132,16 @@ function validState(value: Record<string, unknown>): boolean {
     validQuota(value.quota) && (value.installation === undefined || value.installation === null || validInstallation(value.installation));
 }
 
+function validLoginUrl(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "string" || value.length > 4096) return false;
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
+}
+
 function validProvider(item: unknown): item is ProviderEntry {
   const name = (entry: unknown) => typeof entry === "string" && entry.length > 0 && entry.length <= 40;
   return record(item) && kinds.includes(String(item.kind)) && name(item.display) && name(item.subscription) && name(item.publisher) &&
-    typeof item.loginCode === "boolean" && typeof item.installed === "boolean" && typeof item.enabled === "boolean" &&
+    typeof item.loginCode === "boolean" && validLoginUrl(item.loginUrl) && typeof item.installed === "boolean" && typeof item.enabled === "boolean" &&
     validState(item) && validModels(item.models) && typeof item.metadataReady === "boolean" &&
     (item.modelReasoning === undefined || validReasoning(item.modelReasoning, item.models));
 }
@@ -188,8 +195,9 @@ export class ConnectionWorkflow {
       error: all.find(item => item?.error)?.error ?? null, readFailed: this.readFailed };
     this.onChange(this.view);
     const installing = snapshot.providers.some(item => item.installation && installingStates.includes(item.installation.state));
-    // A sign-in found by a read has no request of its own to end it: only further reads show that it finished.
-    const signingIn = snapshot.providers.some(item => item.state === "login_pending" && !activity[item.kind]?.pending);
+    // A sign-in found by a read has no request of its own to end it: only further reads show that it finished. Its own
+    // request is followed until the sign-in page shows up.
+    const signingIn = snapshot.providers.some(item => item.state === "login_pending" && (!activity[item.kind]?.pending || !item.loginUrl));
     const follow = (installing || signingIn) && !this.view.detaching;
     if (follow && this.poll === null) {
       this.poll = setInterval(() => { void this.pollProviders(); }, installing ? 300 : this.loginPollMs);
@@ -232,10 +240,13 @@ export class ConnectionWorkflow {
     try {
       const snapshot = await this.post("peek", {}, null);
       const before = this.view.snapshot.providers;
-      // A provider still waiting for its install reply keeps its activity; only the progress is taken.
+      // A provider still waiting for its install or sign-in reply keeps its activity; only the progress and the sign-in
+      // page are taken.
       const providers = before.map(item => {
         const fresh = snapshot.providers.find(value => value.kind === item.kind);
-        return fresh && this.activityOf(item.kind).pending ? { ...item, installation: fresh.installation ?? null } : fresh ?? item;
+        return fresh && this.activityOf(item.kind).pending
+          ? { ...item, installation: fresh.installation ?? null, loginUrl: item.state === "login_pending" ? fresh.loginUrl ?? null : null }
+          : fresh ?? item;
       });
       this.publish({ ...snapshot, providers }, this.view.activity);
       // An install that finished while Settings was away is followed by the check it would have run.

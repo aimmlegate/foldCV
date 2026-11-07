@@ -23,6 +23,8 @@ from ..lifecycle import OperationFiles, SpikeError
 from ..profile_ownership import native_profile
 from ..projects.errors import ProjectFailure
 from ..providers.registry import DESCRIPTORS, discovered
+from ..providers.sign_in import LOG_NAME, SignInOutput
+from ..app_log import EVENTS, failure
 
 from fastapi.responses import JSONResponse
 
@@ -57,6 +59,8 @@ class HostConnections:
         self.install_tasks: dict[str, asyncio.Task] = {}
         self.login_codes: dict[str, list[str]] = {}
         self.login_code_lock = threading.Lock()
+        self.sign_ins: dict[str, SignInOutput] = {}
+        self.sign_in_log = rules_store.root / "logs" / LOG_NAME
         self.release_lookups: dict[str, asyncio.Task] = {}
         self.enabled = set()
         self.intake = self.rewrite = self.projects = self.assistant = self.template_assistant = None
@@ -277,9 +281,12 @@ class HostConnections:
             installed = (state.state not in {"cli_missing", "launcher_unsupported"} if self.on(item.kind)
                          else executable is not None and executable.is_file() if getattr(slot.profile, "managed", False)
                          else discovered(item, executable))
+            sign_in = self.sign_ins.get(item.kind)
             summaries.append(ProviderSummary(**state.model_dump(), kind=item.kind, display=item.display,
                                              subscription=item.subscription, publisher=item.publisher,
-                                             loginCode=item.login_code, installed=installed, enabled=self.on(item.kind),
+                                             loginCode=item.login_code,
+                                             loginUrl=sign_in.url if sign_in and state.state == "login_pending" else None,
+                                             installed=installed, enabled=self.on(item.kind),
                                              installation=slot.installation.snapshot() if slot.installation else None))
         return summaries
 
@@ -297,7 +304,7 @@ class HostConnections:
                                     experimentalMode=any(self.slots[item].profile is not None for item in self.kinds()))
         return JSONResponse(payload.model_dump(), headers={"Cache-Control": "no-store"})
 
-    async def connection_job(self, job: str, kind: str, work):
+    async def connection_job(self, job: str, kind: str, work, sign_in: SignInOutput | None = None):
         slot = self.slots[kind]
         installation = slot.installation
         async with self.gate:
@@ -338,6 +345,18 @@ class HostConnections:
                 return work(files, cancel)
 
             def execute():
+                started = time.monotonic()
+                try:
+                    result = attempt()
+                except BaseException as error:
+                    EVENTS.info("%s %s: %s after %.1f s", job, kind, failure(error), time.monotonic() - started)
+                    raise
+                found = (f", {result.version}, plan {result.plan}, {len(result.models)} models"
+                         if isinstance(result, Metadata) else "")
+                EVENTS.info("%s %s: done in %.1f s%s", job, kind, time.monotonic() - started, found)
+                return result
+
+            def attempt():
                 if job == "install":
                     with admitted(), files.open():
                         return run()
@@ -370,6 +389,8 @@ class HostConnections:
                     self.install_tasks[kind] = task
                 else:
                     self.login_tasks[kind] = task
+                    if sign_in is not None:
+                        self.sign_ins[kind] = sign_in
                     self.states[kind] = ProviderState(state="login_pending", version=self.states[kind].version)
         try:
             result = await asyncio.shield(task)
@@ -456,6 +477,7 @@ class HostConnections:
         finally:
             if self.login_tasks.get(kind) is task:
                 del self.login_tasks[kind]
+                self.sign_ins.pop(kind, None)
                 with self.login_code_lock:
                     self.login_codes.pop(kind, None)
             if self.install_tasks.get(kind) is task:
@@ -492,13 +514,20 @@ class HostConnections:
         with self.login_code_lock:
             self.login_codes[kind] = []
         adapter = self.slots[kind].connection
+        # The CLI's output gives Settings the sign-in page and the local log its record (Windows lost the browser).
+        sign_in = SignInOutput(kind, self.sign_in_log)
+        options: dict[str, object] = {"output": sign_in}
         if DESCRIPTORS[kind].login_code:
             def take_login_code() -> str | None:
                 with self.login_code_lock:
                     codes = self.login_codes.get(kind)
                     return codes.pop() if codes else None
-            return await self.connection_job("login", kind, lambda files, cancel: adapter.login(files, cancel, code=take_login_code))
-        return await self.connection_job("login", kind, adapter.login)
+            options["code"] = take_login_code
+
+        def work(files, cancel):
+            with sign_in.recording():
+                return adapter.login(files, cancel, **options)
+        return await self.connection_job("login", kind, work, sign_in)
 
     async def send_login_code(self, payload: LoginCodeRequest):
         kind, refused = self.target(payload)

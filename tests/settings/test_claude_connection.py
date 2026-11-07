@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 import sys
 
@@ -89,7 +90,8 @@ async def test_missing_claude_cli_is_reported_without_a_process(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_sign_in_takes_the_pasted_code_once_and_never_logs_out(tmp_path, claude):
+async def test_sign_in_takes_the_pasted_code_once_and_never_logs_out(tmp_path, claude, caplog):
+    caplog.set_level(logging.INFO, logger="foldcv")
     cli, configure, audit = claude
     configure("login_code")
     app = app_with(tmp_path, ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)))
@@ -105,10 +107,27 @@ async def test_sign_in_takes_the_pasted_code_once_and_never_logs_out(tmp_path, c
             await asyncio.sleep(0.01)
         pending = (await client.get("/v1/settings/connection")).json()
         assert pending["providers"][1]["state"] == "login_pending" and pending["providers"][0]["state"] == "unchecked"
+        url = "https://claude.com/cai/oauth/authorize?code=true&state=synthetic-state"
+        for _ in range(400):
+            if pending["providers"][1]["loginUrl"] == url:
+                break
+            await asyncio.sleep(0.01)
+            pending = (await client.get("/v1/settings/connection")).json()
+        assert pending["providers"][1]["loginUrl"] == url and pending["providers"][0]["loginUrl"] is None
         assert (await client.post("/v1/host/login-code", json={"code": "bad code"})).status_code == 422
         assert (await client.post("/v1/host/login-code", json={"provider": "codex_cli", "code": "x"})).status_code == 409
         sent = await client.post("/v1/host/login-code", json={"provider": "claude_cli", "code": "synthetic-code"})
         assert sent.status_code == 200
         assert (await asyncio.wait_for(login, 10)).json()["state"] == "login_required"
-        assert (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()["state"] == "connected"
+        connected = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
+        assert connected["state"] == "connected" and connected["providers"][1]["loginUrl"] is None
     assert ["auth", "logout"] not in audit() and "synthetic-code" not in json.dumps(audit())
+    log = (tmp_path / "store" / "logs" / "sign-in.log").read_text()
+    assert "claude_cli sign-in: OK" in log and "Paste code here" in log and "page address found: yes" in log
+    assert "synthetic-state" not in log and "synthetic-code" not in log
+    jobs = [record.getMessage() for record in caplog.records if record.name == "foldcv"]
+    assert any(line.startswith("login claude_cli: done in ") for line in jobs)
+    assert any(line.startswith("status claude_cli: LOGIN_REQUIRED") for line in jobs)
+    assert any(line.startswith("status claude_cli: done in ") and "2.1.308, plan max" in line for line in jobs)
+    runs = [record.getMessage() for record in caplog.records if record.name == "foldcv.cli"]
+    assert any(line.startswith("claude auth login: ok in ") for line in runs)

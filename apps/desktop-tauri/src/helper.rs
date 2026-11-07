@@ -1,13 +1,13 @@
 use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::policy::HelperCommand;
 use crate::system;
@@ -57,6 +57,28 @@ fn open_log(path: &Path) -> io::Result<File> {
         let _ = fs::rename(path, rotated);
     }
     system::private_file(OpenOptions::new().create(true).append(true)).open(path)
+}
+
+/// One line of the shell's own in the helper log, beside the service's error output; a failed write is dropped.
+pub fn note(path: &Path, message: &str) {
+    if let Ok(mut file) = system::private_file(OpenOptions::new().create(true).append(true)).open(path) {
+        let _ = writeln!(file, "{} shell: {message}", utc(SystemTime::now()));
+    }
+}
+
+/// The UTC time as 2026-11-07T09:30:00Z (days to a civil date after Howard Hinnant).
+fn utc(time: SystemTime) -> String {
+    let seconds = time.duration_since(UNIX_EPOCH).map_or(0, |elapsed| elapsed.as_secs());
+    let (days, rest) = ((seconds / 86_400) as i64 + 719_468, seconds % 86_400);
+    let era = days.div_euclid(146_097);
+    let day_of_era = days - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted + 2) / 5 + 1;
+    let month = if shifted < 10 { shifted + 3 } else { shifted - 9 };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!("{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z", rest / 3_600, rest / 60 % 60, rest % 60)
 }
 
 /// Reports the first stdout line, then drains the rest so the service never blocks on a full pipe.
@@ -222,6 +244,21 @@ mod tests {
             r#"{"origin": "http://127.0.0.1:4321", "secret": "short"}"#, "[]", "nonsense"] {
             assert_eq!(ready_line(line), Err(Failure::Protocol), "{line}");
         }
+    }
+
+    #[test]
+    fn notes_carry_the_utc_time() {
+        assert_eq!(utc(UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        assert_eq!(utc(UNIX_EPOCH + Duration::from_secs(1_794_043_845)), "2026-11-07T09:30:45Z");
+        assert_eq!(utc(UNIX_EPOCH + Duration::from_secs(951_782_400)), "2000-02-29T00:00:00Z");
+        let folder = temporary("note");
+        let log = folder.join("logs/helper.log");
+        fs::create_dir_all(log.parent().unwrap()).unwrap();
+        note(&log, "service ready");
+        note(&log, "window shown");
+        let text = fs::read_to_string(&log).unwrap();
+        assert_eq!(text.lines().map(|line| line.split_once(' ').unwrap().1).collect::<Vec<_>>(),
+            ["shell: service ready", "shell: window shown"]);
     }
 
     #[cfg(unix)]

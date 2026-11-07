@@ -28,6 +28,7 @@ from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.templates.presentation import snapshot_identity
 
 from resume_api.agent.base import BASE_INSTRUCTIONS, RuntimeInput, RuntimeResult
+from resume_api.app_log import EVENTS
 from resume_api.inference_admission import INFERENCE
 from resume_api.projects.errors import ProjectFailure
 
@@ -343,6 +344,7 @@ class AssistantService:
     async def _drive(self, control, request, required=None):
         result = RuntimeResult(error='AGENT_RUNTIME_UNSUPPORTED')
         tools = None
+        started = time.monotonic()
         loop = asyncio.get_running_loop()
         pin = ExitStack()
         runtime = self.runtime_for(control.run.model)
@@ -381,6 +383,9 @@ class AssistantService:
                     result.state, result.error = 'failed', 'AGENT_CLEANUP_FAILED'
             if control.cancel.is_set() and result.state != 'completed':
                 result.state, result.error = 'cancelled', 'AGENT_CANCELLED'
+            EVENTS.info('assistant run %s on project %s with %s: %s%s after %.1f s', control.run_id, control.project_id,
+                        control.run.model, result.state, f' {result.error}' if result.error else '',
+                        time.monotonic() - started)
             terminal = None
             try:
                 # The answer and the final run state follow the run's pending lines on the writer, then the terminal

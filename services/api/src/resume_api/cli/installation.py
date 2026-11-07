@@ -17,6 +17,7 @@ import time
 import uuid
 
 from packages.resume_core import host
+from ..app_log import EVENTS, failure
 from ..providers.claude import distribution as claude_distribution
 from ..providers.codex import distribution as release
 from .process_runner import ProcessExit, ProcessRunner
@@ -279,6 +280,12 @@ class CliInstallation:
             except OSError:
                 pass
 
+    def log(self, outcome, target):
+        version = target.version if target is not None else "unknown version"
+        with self.lock:
+            stage = self.value["state"]
+        EVENTS.info("install %s %s at stage %s: %s", self.root.name, version, stage, outcome)
+
     def install(self, files):
         staging = None
         previous = None
@@ -338,17 +345,21 @@ class CliInstallation:
                 committed = True
                 self.prune(target.version)
                 self.update(state="ready")
+                self.log("ready", target)
                 return executable
         except InstallationFailure as error:
             if error.code == "incompatible_release" and target is not None:
                 self.refused.add(target.version)
+            self.log(failure(error), target)
             self.update(state="cancelled" if error.code == "cancelled" else "failed", error=error.code)
         except SpikeError as error:
+            self.log(failure(error), target)
             if error.code in {"PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"}:
                 raise
             self.update(state="cancelled" if self.cancel.is_set() else "failed",
                         error="cancelled" if self.cancel.is_set() else "download_failed")
-        except (OSError, tarfile.TarError, ValueError):
+        except (OSError, tarfile.TarError, ValueError) as error:
+            self.log(f"install_failed: {failure(error)}", target)
             self.update(state="failed", error="install_failed")
         finally:
             for path in (staging, previous if committed else None):

@@ -10,12 +10,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import itertools
+import logging
 import threading
 import time
 
 KINDS = frozenset({'import', 'export', 'rewrite'})
 STATES = frozenset({'running', 'succeeded', 'failed', 'cancelled'})
 FINISHED_KEPT = 50
+# The app log's task lines: kind, project, outcome and time, never content.
+LOG = logging.getLogger('foldcv.tasks')
 
 
 class TaskFailure(Exception):
@@ -65,7 +68,8 @@ class TaskRegistry:
             identifier = '%s_%d' % (kind, next(self.counter))
             task = Task(identifier, project_id, kind, 'running', stage, self.wall(), self.clock(), dict(detail or {}))
             self.tasks[identifier] = task
-            return task
+        LOG.info('%s started on project %s', identifier, project_id)
+        return task
 
     def update(self, task_id, *, stage=None, detail=None):
         with self.lock:
@@ -83,12 +87,17 @@ class TaskRegistry:
             raise ValueError('a finished task needs a final state')
         with self.lock:
             task = self._get(task_id)
-            if task.state == 'running':
+            ended = task.state == 'running'
+            if ended:
+                stage = task.stage
                 task.state, task.error, task.finished = state, error, self.clock()
                 if detail is not None:
                     task.detail = {**task.detail, **detail}
             self._trim()
-            return task
+        if ended:
+            LOG.info('%s on project %s: %s%s at stage %s after %.1f s', task.id, task.project_id, state,
+                     f' {error}' if error else '', stage, task.finished - task.started)
+        return task
 
     def cancel(self, task_id):
         with self.lock:

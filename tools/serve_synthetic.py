@@ -71,8 +71,12 @@ class ScriptedClaude(ScriptedConnection):
         # Set with --claude-missing: no CLI until the scripted install puts one there.
         self.installation = installation
 
-    def login(self, _files, cancel, code=None):
+    def login(self, _files, cancel, code=None, output=None):
         self.calls.append('scripted_login')
+        if output is not None:
+            # As the real CLI prints it; Settings offers the page when the browser does not open.
+            output.feed('stdout', b"Opening browser to sign in...\nIf the browser didn't open, visit: "
+                        b'https://claude.com/cai/oauth/authorize?code=true&state=synthetic\nPaste code here if prompted > ')
         while not cancel.wait(0.05):
             if code is not None and code():
                 self.signed_in = True

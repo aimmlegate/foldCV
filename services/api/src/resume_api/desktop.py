@@ -19,6 +19,7 @@ import uvicorn
 
 from packages.resume_core import host
 from packages.resume_core.storage import atomic_write, private_directory
+from . import app_log
 from .app import create_app
 from .providers.codex.profile import installed_profile, use_system_certificates
 from .launcher import TEMPLATE_IMPORT_CALL_CAP, claude_slot
@@ -68,6 +69,7 @@ async def serve(root: Path, control=None, output=None) -> None:
     if not (frontend() / "index.html").is_file():
         raise RuntimeError("Frontend build is missing")
     private_directory(root)
+    app_log.configure(root)
     use_system_certificates()
     profile = installed_profile(root / "cli-profile", managed_only=True)
     with listen(root) as listener:

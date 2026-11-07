@@ -55,6 +55,8 @@ if args[:2] == ["login", "--config"]:
     assert len(args) == 3 and args[2].startswith('log_dir="')
     assert Path(args[2].split('"')[1]).is_relative_to(Path.cwd())
     assert not any(name.startswith(("OPENAI_", "CODEX_")) for name in os.environ)
+    print("If your browser did not open, navigate to this URL to authenticate:\n\n"
+          "https://auth.openai.com/oauth/authorize?state=synthetic\n", file=sys.stderr, flush=True)
     (base / "login_ready").touch()
     if case == "slow_login":
         while not (base / "login_release").exists(): time.sleep(0.01)
@@ -274,9 +276,15 @@ async def test_explicit_login_and_detach_cancel_owned_process(cli, tmp_path):
             if (tmp_path / "login_ready").exists(): break
             await asyncio.sleep(0.01)
         assert (tmp_path / "login_ready").exists()
+        for _ in range(200):
+            entry = (await client.get("/v1/settings/connection")).json()["providers"][0]
+            if entry["loginUrl"]: break
+            await asyncio.sleep(0.01)
+        assert entry["state"] == "login_pending" and entry["loginUrl"] == "https://auth.openai.com/oauth/authorize?state=synthetic"
         detached = (await post(client, "detach")).json()
         assert detached["state"] == "detached"
         assert (await pending).json()["state"] == "detached"
+        assert detached["providers"][0]["loginUrl"] is None
         assert not list((tmp_path / "service-operations").iterdir())
         audit = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
         login_args = [entry["args"] for entry in audit if entry["args"][:2] == ["login", "--config"]]
@@ -442,7 +450,7 @@ async def test_a_refresh_during_sign_in_starts_no_process_and_cancel_closes_spaw
             self.inspections += 1
             raise ConnectionFailure("LOGIN_REQUIRED")
 
-        def login(self, files, cancel):
+        def login(self, files, cancel, output=None):
             started.set()
             assert cancel.wait(5)
             try:

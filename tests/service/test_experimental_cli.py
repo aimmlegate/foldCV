@@ -87,7 +87,7 @@ async def test_connection_refresh_login_detach_and_cancel_invalidate_content_pre
             if self.missing:
                 raise ConnectionFailure("LOGIN_REQUIRED")
             return super().inspect(files, cancel) if full else Metadata(VERSION, (), None, Quota("unknown"))
-        def login(self, _files, cancel):
+        def login(self, _files, cancel, output=None):
             self.started.set()
             if cancel.wait(3):
                 raise ConnectionFailure("CANCELLED")

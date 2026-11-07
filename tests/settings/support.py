@@ -25,7 +25,7 @@ class MetadataAdapter:
         reasoning = {model: ModelReasoning(default='medium', supported=['low', 'medium', 'high']) for model in ('model-a', 'model-b')}
         return Metadata('fixture-cli', ('model-a', 'model-b'), 'plus', Quota('available', 25), reasoning)
 
-    def login(self, _files, _cancel):
+    def login(self, _files, _cancel, output=None):
         self.logins += 1
         raise AssertionError('native login')
 

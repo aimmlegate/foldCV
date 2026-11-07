@@ -186,7 +186,7 @@ class SignedOut(ClaudeAdapter):
             raise ConnectionFailure("LOGIN_REQUIRED", "2.1.320")
         return super().inspect(files, cancel, full=full)
 
-    def login(self, _files, _cancel, code=None):
+    def login(self, _files, _cancel, code=None, output=None):
         self.logins += 1
         self.signed_in, self.permit_at_login = True, (INFERENCE.shared, INFERENCE.exclusive)
 

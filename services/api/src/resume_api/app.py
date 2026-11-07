@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import ValidationError
 
+from .app_log import EVENTS, failure, where
 from .host_models import ErrorEnvelope, ErrorPayload, ProviderState
 from .lifecycle import has_blocked_owned, reap_owned
 from .providers.codex.connection import ConnectionAdapter
@@ -482,7 +483,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         return problem("INVALID_RESULT", 500, "service")
 
     @app.exception_handler(Exception)
-    async def unexpected(_request: Request, _error: Exception):
+    async def unexpected(request: Request, error: Exception):
+        EVENTS.error("%s %s failed: %s\n%s", request.method, request.url.path, failure(error), where(error))
         return problem("INTERNAL_ERROR", 500, "service")
 
     @app.exception_handler(StarletteHTTPException)

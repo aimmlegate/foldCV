@@ -16,6 +16,7 @@ from resume_api.providers.codex.profile import ExperimentalCliProfile, Experimen
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex.content import ACTION_METHODS
 from resume_api.providers.shared import MODEL, PLAN, strict_json
+from resume_api.providers.sign_in import SignInOutput
 from resume_api.providers.codex.pins import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
 from ..base import ConnectionFailure, Metadata, Quota
@@ -259,7 +260,7 @@ class ConnectionAdapter:
         except ConnectionFailure as error:
             raise ConnectionFailure(error.code, version) from None
 
-    def login(self, files: OperationFiles, cancel: threading.Event) -> None:
+    def login(self, files: OperationFiles, cancel: threading.Event, output: SignInOutput | None = None) -> None:
         if files.path is None:
             raise ConnectionFailure("TEMP_FAILED")
         deadline = time.monotonic() + 120
@@ -274,4 +275,4 @@ class ConnectionAdapter:
         logs.mkdir(mode=0o700, exist_ok=True)
         # The CLI owns the browser flow and credential storage; only diagnostics are local.
         self._run(files, ("login", "--config", "log_dir=" + json.dumps(str(logs))), cancel,
-                  deadline, max_output=65_536)
+                  deadline, max_output=65_536, on_output=output.feed if output is not None else None)

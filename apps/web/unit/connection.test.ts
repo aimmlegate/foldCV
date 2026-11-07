@@ -191,6 +191,31 @@ test("a sign-in found by a read is followed until it ends", async () => {
   } finally { workflow.close(); }
 });
 
+test("a running sign-in shows the page its CLI printed, and only an https address", async () => {
+  const page = "https://claude.com/cai/oauth/authorize?state=x";
+  const pending = { ...claude, state: "login_required" };
+  let reads = 0, release: (() => void) | undefined, shown: (() => void) | undefined;
+  const seen = new Promise<void>(resolve => { shown = resolve; });
+  const workflow = new ConnectionWorkflow(view => { if (view.snapshot.providers[1]?.loginUrl === page) shown?.(); }, input => {
+    if (String(input).endsWith("/login")) return new Promise<Response>(resolve => { release = () => resolve(response(reply([codex, pending], "claude_cli"))); });
+    reads += 1;
+    const signingIn = reads > 1 ? { ...claude, state: "login_pending", loginUrl: reads > 2 ? page : null } : pending;
+    return Promise.resolve(response(reply([codex, signingIn], "claude_cli")));
+  }, 1);
+  try {
+    await workflow.peek(false);
+    const login = workflow.login("claude_cli");
+    await seen;
+    assert.equal(workflow.entry("claude_cli")?.state, "login_pending");
+    release?.();
+    await login;
+  } finally { workflow.close(); }
+  for (const loginUrl of ["http://claude.com/x", "javascript:alert(1)", "not a url", "https://claude.com/" + "a".repeat(4096)]) {
+    assert.equal(validConnection(reply([codex, { ...claude, state: "login_pending", loginUrl }], "claude_cli")), false, loginUrl);
+  }
+  assert.equal(validConnection(reply([codex, { ...claude, state: "login_pending", loginUrl: page }], "claude_cli")), true);
+});
+
 test("a failed read of the state is reported and can be repeated", async () => {
   for (const failure of [() => Promise.reject(new TypeError("fetch failed")), () => Promise.resolve(response({ ...ready, plan: "team-premium" }))]) {
     let down = true;

@@ -41,7 +41,8 @@ if args == ["--help"]:
     sys.exit(0)
 if args == ["auth", "login", "--claudeai"]:
     if case == "login_code":
-        sys.stdout.write("Opening browser to sign in…\nPaste code here if prompted > ")
+        sys.stdout.write("Opening browser to sign in…\nIf the browser didn't open, visit: https://claude.com/cai/oauth/"
+                         "authorize?code=true&state=synthetic-state\nPaste code here if prompted > ")
         sys.stdout.flush()
         if sys.stdin.readline().strip() != "synthetic-code":
             print("Login failed: invalid code")

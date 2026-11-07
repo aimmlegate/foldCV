@@ -12,6 +12,7 @@ from resume_api.providers.base import ConnectionFailure, Metadata, Quota
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure
+from resume_api.providers.sign_in import SignInOutput
 
 
 # Provider codes in the connection vocabulary the Settings state machine already knows.
@@ -56,9 +57,9 @@ class ClaudeConnectionAdapter:
         return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning), probe.status)
 
     def login(self, files: OperationFiles, cancel: threading.Event,
-              code: Callable[[], str | None] | None = None) -> None:
+              code: Callable[[], str | None] | None = None, output: SignInOutput | None = None) -> None:
         """Without a terminal the CLI waits for the code shown after the browser sign-in;
-        `code` returns it once the user pastes it, else None."""
+        `code` returns it once the user pastes it, else None. `output` reads the sign-in page address it prints."""
         try:
             self.inspect(files, cancel, full=False)
             return
@@ -79,7 +80,8 @@ class ClaudeConnectionAdapter:
         # The CLI owns the browser flow and the keychain entry of the FoldCV config directory.
         try:
             provider.process.run(files, ("auth", "login", "--claudeai"), deadline=time.monotonic() + LOGIN_SECONDS,
-                                 cancel=cancel, max_output=65_536, interactive=True, poll_input=pasted)
+                                 cancel=cancel, max_output=65_536, interactive=True, poll_input=pasted,
+                                 on_output=output.feed if output is not None else None)
         except ProcessExit:
             raise ConnectionFailure("CLI_FAILED") from None
         except SpikeError as error:

@@ -16,6 +16,7 @@ from pydantic import Field
 import uvicorn
 
 from .providers.claude.runtime import ClaudeAgentRuntime
+from . import app_log
 from .app import ProviderSlot, create_app
 from .host_models import Transport
 from .lifecycle import require_supported_host, tune_garbage_collector
@@ -86,6 +87,7 @@ async def launch(*, port: int = 0, open_browser: bool = True,
         secret = secrets.token_urlsafe(32)
         profile = (installed_profile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
                    if experimental_cli else None)
+        app_log.configure(Path.home() / "Library/Application Support/FoldCV")
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
                          experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP,

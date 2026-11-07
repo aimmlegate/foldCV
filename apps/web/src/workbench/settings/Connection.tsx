@@ -78,6 +78,8 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
           && <p className="provider-line">Установлена последняя версия {display}.</p>}
       {installation && <Installation value={installation} display={display} />}
       {canInstall && <p className="provider-line">{installNote}</p>}
+      {entry.state === "login_pending" && entry.loginUrl && <p className="provider-line" role="status">Если страница входа не открылась,{" "}
+        <a href={entry.loginUrl} target="_blank" rel="noopener noreferrer">откройте её здесь</a>.</p>}
       {entry.state === "login_pending" && loginCode && <form className="login-code provider-line" onSubmit={event => {
         event.preventDefault();
         void workflow.sendLoginCode(kind, code).then(sent => { if (sent) { setCode(""); setCodeSent(true); } });

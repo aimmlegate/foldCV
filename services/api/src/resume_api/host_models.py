@@ -82,6 +82,8 @@ class ProviderSummary(ProviderState):
     subscription: str = Field(min_length=1, max_length=40)
     publisher: str = Field(min_length=1, max_length=40)
     loginCode: bool = False
+    # The sign-in page the CLI printed, while its sign-in runs.
+    loginUrl: str | None = Field(default=None, max_length=4096)
     # A provider that is off: binary and publisher signature only, never a CLI process.
     installed: bool
     enabled: bool = False
