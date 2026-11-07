@@ -1,6 +1,7 @@
 """Install the newest Codex and Claude releases into an empty data root, with the capability checks the desktop service
-runs before a release goes in place, then check each connection as Settings does; prints a JSON report. No sign-in, no
-model call, so a working CLI must stop at sign-in. Exits 1 otherwise.
+runs before a release goes in place, then check each connection as Settings does; prints a JSON report. No model call,
+so a working CLI must stop at sign-in; its sign-in then starts as in Settings and must print the sign-in page that
+Settings offers (D151) before it is cancelled. Exits 1 otherwise.
 
 Usage (check_helper.py --cli runs it): `<helper>/python/python.exe -X utf8 cli_probe.py <empty data root>`.
 """
@@ -21,6 +22,7 @@ from resume_api.providers.claude import profile as claude
 from resume_api.providers.codex.connection import ConnectionAdapter
 from resume_api.providers.base import ConnectionFailure
 from resume_api.providers.claude.connection import ClaudeConnectionAdapter
+from resume_api.providers.sign_in import SignInOutput
 from resume_api.lifecycle import OperationFiles, SpikeError
 
 # Signed out, a CLI that passes every check stops here (D146: a codesign-only check had refused every Windows binary).
@@ -52,6 +54,27 @@ def connection(adapter, operations: Path) -> str:
             return error.code
 
 
+def sign_in_page(kind: str, adapter, operations: Path) -> str | None:
+    """The address Settings would offer: the sign-in runs until the CLI printed it, at most a minute, then is cancelled."""
+    output, cancel = SignInOutput(kind), threading.Event()
+
+    def login():
+        with OperationFiles(operations).open() as files:
+            try:
+                adapter.login(files, cancel, output=output)
+            except (ConnectionFailure, SpikeError):
+                pass
+
+    worker = threading.Thread(target=login)
+    worker.start()
+    deadline = time.monotonic() + 60
+    while output.url is None and worker.is_alive() and time.monotonic() < deadline:
+        time.sleep(0.2)
+    cancel.set()
+    worker.join(60)
+    return output.url.split("?", 1)[0] if output.url else None
+
+
 def main(root: Path) -> int:
     operations = root / "operations"
     codex_root, claude_root = root / "cli-profile", root / ("cli-profile-" + claude.KIND)
@@ -79,7 +102,9 @@ def main(root: Path) -> int:
                 label = "features list" if callable(arguments) else " ".join(arguments)
                 entry[label] = run(profile, executable, operations, arguments)
             entry["connection"] = connection(adapter_for(profile), operations)
-        passed = passed and entry.get("connection") == SIGNED_OUT
+            if entry["connection"] == SIGNED_OUT:
+                entry["sign-in page"] = sign_in_page(name + "_cli", adapter_for(profile), operations)
+        passed = passed and entry.get("connection") == SIGNED_OUT and entry.get("sign-in page") is not None
         report[name] = entry
     print(json.dumps(report))
     return 0 if passed else 1

@@ -1,5 +1,9 @@
 """The sign-in page address taken from a CLI's output, and the local sign-in log."""
 
+import json
+from pathlib import Path
+import sys
+
 import pytest
 
 from resume_api.lifecycle import SpikeError
@@ -57,3 +61,22 @@ def test_a_full_log_moves_aside_and_an_unwritable_one_is_skipped(tmp_path):
     blocked = tmp_path / "file"
     blocked.write_text("")
     SignInOutput("codex_cli", blocked / "sign-in.log").write("OK")
+
+
+def test_the_windows_probe_stops_a_sign_in_once_its_page_is_printed(tmp_path):
+    from resume_api.providers.claude.connection import ClaudeConnectionAdapter
+    from resume_api.providers.claude.content import FixtureTransport
+    from tools.desktop import cli_probe
+
+    directory = tmp_path / "stand-in"
+    directory.mkdir()
+    cli = directory / "claude"
+    source = (Path(__file__).parent / "fake_claude.py").read_text().split("\n", 1)[1]
+    # The stand-in waits for a code that never comes: only the cancel ends this sign-in.
+    cli.write_text("#!" + sys.executable + "\n" + source)
+    cli.chmod(0o700)
+    (directory / "fixture.json").write_text(json.dumps({"case": "login_code"}))
+    (tmp_path / "operations").mkdir()
+    adapter = ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli))
+    assert cli_probe.sign_in_page("claude_cli", adapter, tmp_path / "operations") == "https://claude.com/cai/oauth/authorize"
+    assert not (directory / "signed-in").exists()
