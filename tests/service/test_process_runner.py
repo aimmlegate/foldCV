@@ -36,3 +36,33 @@ def test_each_stream_has_its_own_byte_boundary(tmp_path, descriptor, option):
     with pytest.raises(SpikeError, match="OUTPUT_TOO_LARGE"):
         run(tmp_path / "over", f"import os;os.write({descriptor},b'x'*1025)",
             max_output=10000, **{option: 1024})
+
+
+def test_a_windows_cleanup_does_not_wait_for_a_pipe_another_program_holds(monkeypatch, tmp_path):
+    from resume_api import lifecycle
+
+    release = threading.Event()
+
+    class Held:
+        closed = False
+
+        def close(self):
+            release.wait(5)
+            self.closed = True
+
+    class Worker:
+        stdin, stdout, stderr = Held(), Held(), Held()
+
+    monkeypatch.setattr(lifecycle.host, "WINDOWS", True)
+    monkeypatch.setattr(lifecycle, "stop_group", lambda _process: None)
+    files = OperationFiles(tmp_path)
+    files.process = Worker()
+    started = time.monotonic()
+    files.stop_worker(final=False)
+    assert time.monotonic() - started < 1 and files.process is None
+    release.set()
+    for _ in range(100):
+        if all(stream.closed for stream in (Worker.stdin, Worker.stdout, Worker.stderr)):
+            break
+        time.sleep(0.01)
+    assert all(stream.closed for stream in (Worker.stdin, Worker.stdout, Worker.stderr))

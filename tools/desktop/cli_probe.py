@@ -8,13 +8,17 @@ Usage (check_helper.py --cli runs it): `<helper>/python/python.exe -X utf8 cli_p
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import threading
 import time
 
 from resume_api import release_checks
+from resume_api.app_log import masked
 from resume_api.providers.codex.profile import ExperimentalCliProfile
 from resume_api.cli.installation import ClaudeInstallation, CliInstallation
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
@@ -54,9 +58,19 @@ def connection(adapter, operations: Path) -> str:
             return error.code
 
 
-def sign_in_page(kind: str, adapter, operations: Path) -> str | None:
-    """The address Settings would offer: the sign-in runs until the CLI printed it, at most a minute, then is cancelled."""
-    output, cancel = SignInOutput(kind), threading.Event()
+def processes() -> dict[int, str]:
+    """Running programs by id (Windows): what a sign-in leaves behind shows how the CLI opened the browser."""
+    if sys.platform != "win32":
+        return {}
+    listing = subprocess.run(["tasklist", "/fo", "csv", "/nh"], capture_output=True, text=True, timeout=30).stdout
+    return {int(row[1]): row[0] for row in csv.reader(io.StringIO(listing)) if len(row) > 1 and row[1].isdigit()}
+
+
+def sign_in(kind: str, adapter, operations: Path) -> dict:
+    """The address Settings would offer: the sign-in runs until the CLI printed it, at most a minute, then is cancelled
+    and must stop within a minute."""
+    output, cancel, before = SignInOutput(kind), threading.Event(), processes()
+    started = time.monotonic()
 
     def login():
         with OperationFiles(operations).open() as files:
@@ -65,14 +79,19 @@ def sign_in_page(kind: str, adapter, operations: Path) -> str | None:
             except (ConnectionFailure, SpikeError):
                 pass
 
-    worker = threading.Thread(target=login)
+    # A worker stuck in cleanup must not keep the probe from reporting.
+    worker = threading.Thread(target=login, daemon=True)
     worker.start()
     deadline = time.monotonic() + 60
     while output.url is None and worker.is_alive() and time.monotonic() < deadline:
         time.sleep(0.2)
     cancel.set()
     worker.join(60)
-    return output.url.split("?", 1)[0] if output.url else None
+    time.sleep(1)
+    left = sorted({name for pid, name in processes().items() if pid not in before})
+    return {"page": output.url.split("?", 1)[0] if output.url else None, "stopped": not worker.is_alive(),
+            "seconds": round(time.monotonic() - started), "started programs left": left,
+            "output": {name: masked(bytes(buffer).decode("utf-8", "replace"))[-400:] for name, buffer in output.streams.items()}}
 
 
 def main(root: Path) -> int:
@@ -103,8 +122,9 @@ def main(root: Path) -> int:
                 entry[label] = run(profile, executable, operations, arguments)
             entry["connection"] = connection(adapter_for(profile), operations)
             if entry["connection"] == SIGNED_OUT:
-                entry["sign-in page"] = sign_in_page(name + "_cli", adapter_for(profile), operations)
-        passed = passed and entry.get("connection") == SIGNED_OUT and entry.get("sign-in page") is not None
+                entry["sign-in"] = sign_in(name + "_cli", adapter_for(profile), operations)
+        signed = entry.get("sign-in", {})
+        passed = passed and entry.get("connection") == SIGNED_OUT and signed.get("page") is not None and signed["stopped"]
         report[name] = entry
     print(json.dumps(report))
     return 0 if passed else 1

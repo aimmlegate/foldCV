@@ -25,6 +25,19 @@ def free_inference_permit():
         INFERENCE._notify()
 
 
+@pytest.fixture(autouse=True)
+def no_app_log():
+    # A desktop service started in a test turns on the app log for the whole process; the next test starts without it.
+    yield
+    import logging
+    from resume_api import app_log
+    root = logging.getLogger()
+    for handler in [handler for handler in root.handlers if getattr(handler, "foldcv_log", False)]:
+        root.removeHandler(handler)
+        handler.close()
+    app_log.EVENTS.setLevel(logging.NOTSET)
+
+
 @pytest.fixture
 def frozen_clock() -> FrozenClock:
     return FrozenClock()

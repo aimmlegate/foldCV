@@ -110,7 +110,6 @@ def test_configure_writes_the_file_once_and_keeps_other_info_out(tmp_path):
         for handler in [handler for handler in root.handlers if handler not in before]:
             root.removeHandler(handler)
             handler.close()
-        app_log.EVENTS.setLevel(logging.NOTSET)
 
 
 def test_an_unopenable_log_leaves_the_service_without_it(tmp_path):

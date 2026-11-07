@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import threading
 
 from packages.resume_core import host
 from resume_api.cli.runner import SpikeError, cleanup_intent_ids, operation, reap_owned as spike_reap_owned, safe_environment, stop_group, strict_json
@@ -70,6 +71,13 @@ def has_blocked_owned(root: Path) -> bool:
     except OSError:
         raise SpikeError("TEMP_FAILED") from None
     return False
+
+
+def _close(stream) -> None:
+    try:
+        stream.close()
+    except OSError:
+        pass
 
 
 class OperationFiles:
@@ -139,10 +147,12 @@ class OperationFiles:
         finally:
             for stream in (process.stdin, process.stdout, process.stderr):
                 if stream is not None and not stream.closed:
-                    try:
-                        stream.close()
-                    except OSError:
-                        pass
+                    if host.WINDOWS:
+                        # A program the worker started outside its job (a sign-in's browser helper) can hold a pipe; the
+                        # C runtime then blocks the close behind a pending read or write, so it must not hold this thread.
+                        threading.Thread(target=_close, args=(stream,), daemon=True).start()
+                    else:
+                        _close(stream)
 
     @contextmanager
     def open(self):

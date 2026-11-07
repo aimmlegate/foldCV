@@ -78,5 +78,7 @@ def test_the_windows_probe_stops_a_sign_in_once_its_page_is_printed(tmp_path):
     (directory / "fixture.json").write_text(json.dumps({"case": "login_code"}))
     (tmp_path / "operations").mkdir()
     adapter = ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli))
-    assert cli_probe.sign_in_page("claude_cli", adapter, tmp_path / "operations") == "https://claude.com/cai/oauth/authorize"
+    report = cli_probe.sign_in("claude_cli", adapter, tmp_path / "operations")
+    assert report["page"] == "https://claude.com/cai/oauth/authorize" and report["stopped"]
+    assert "state=…" in report["output"]["stdout"] and "synthetic-state" not in report["output"]["stdout"]
     assert not (directory / "signed-in").exists()
