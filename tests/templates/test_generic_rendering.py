@@ -76,7 +76,8 @@ async def test_the_full_generic_export_takes_text_and_styles_from_the_compiled_p
     assert styles(header, 'Alex Example') == [STYLES['name']] and styles(header, 'Backend engineer') == [STYLES['profession']]
     assert styles(tree, 'ФОКУС') == styles(tree, 'ПРОЕКТЫ') == styles(tree, 'О СЕБЕ') == [STYLES['section']]
     assert styles(tree, 'Example Labs') == styles(tree, 'Queue Platform') == [STYLES['project']]
-    assert styles(tree, 'Implemented queue processing.') == styles(tree, F10_LINE) == [STYLES['body']]
+    # A list item's closing mark is a run of its own after the text (D152).
+    assert styles(tree, 'Implemented queue processing') == styles(tree, F10_LINE) == [STYLES['body']]
     assert STYLES['emphasis'] in styles(tree, 'Python') and styles(tree, '3 years') == [STYLES['body']]
     # Bands come from the compiled heading kind: the projects and skill headings, not the plain ones.
     assert shaded(tree) == ['ПРОЕКТЫ', 'ЯП, ФРЕЙМВОРКИ, БИБЛИОТЕКИ', 'СУБД, ИНСТРУМЕНТЫ', 'ИНФРАСТРУКТУРА, ТАСК-МЕНЕДЖЕРЫ']
@@ -96,8 +97,8 @@ async def test_renamed_headings_and_opaque_block_ids_keep_the_same_presentation(
     renamed = xml(render_captured_docx(recapture(request, document=document), tmp_path))
     original = xml(content)
     assert shaded(renamed) == ['ОПЫТ РАБОТЫ', *shaded(original)[1:]] and styles(renamed, 'ОПЫТ РАБОТЫ') == [STYLES['section']]
-    assert [styles(renamed, value) for value in ['Example Labs', 'Implemented queue processing.', '3 years']] == [
-        styles(original, value) for value in ['Example Labs', 'Implemented queue processing.', '3 years']]
+    assert [styles(renamed, value) for value in ['Example Labs', 'Implemented queue processing', '3 years']] == [
+        styles(original, value) for value in ['Example Labs', 'Implemented queue processing', '3 years']]
 
 
 @pytest.mark.asyncio
@@ -139,7 +140,7 @@ async def test_export_after_manual_text_and_format_edits_uses_the_authored_docum
     # V03: edited wording, a manual bold mark and a corrected duration survive transfer into the actual export.
     from tests.templates.test_template_g02_views import edit, find, text_range, transferred
     _fixture, _result, workspace, originals = await shared(tmp_path_factory, 'F10-on')
-    task = find(workspace, 'Implemented queue processing.', 'bullet_list')
+    task = find(workspace, 'Implemented queue processing', 'bullet_list')
     typed = edit(workspace, {'kind': 'replace_text', 'range': text_range(task, 0, len('Implemented')), 'text': 'Built',
         'styles': {}}, 'wording')
     summary = find(typed, 'Backend engineer focused on reliable queue systems.')
@@ -170,7 +171,8 @@ def test_long_generic_content_flows_whole_and_in_order_through_the_actual_worker
     content = (tmp_path / 'resume.docx').read_bytes()
     tree, body = xml(content), emitted(xml(content))
     for prefix, count in [('PROJECT-MARKER-', 250), ('SIDEBAR-MARKER-', 100)]:
-        markers = [line for line in lines if line.startswith(prefix)]
+        # The DOCX writes a list item's closing mark as a run of its own (D152).
+        markers = [line.rstrip('.') for line in lines if line.startswith(prefix)]
         positions = [body.index(marker) for marker in markers]
         assert len(markers) == count and all(body.count(marker) == 1 for marker in markers) and positions == sorted(positions)
     assert emitted(xml(content, 'word/header1.xml')) == lines[0] + lines[1]
@@ -185,7 +187,8 @@ async def test_long_generic_content_exports_through_the_service(tmp_path):
     # S4-7 under the default Settings limits (D096); the durable F07 import exports in test_generic_import.
     workspace, originals = direct_generic('F07', ['identity', 'projects', 'courses', 'portfolio'])
     body = emitted(xml(await exported(tmp_path, workspace, originals)))
-    markers = [line for line in source_fixture('F07')[0].units[0].text.splitlines() if line.startswith('PROJECT-MARKER-')]
+    markers = [line.rstrip('.') for line in source_fixture('F07')[0].units[0].text.splitlines()
+        if line.startswith('PROJECT-MARKER-')]
     assert [body.index(marker) for marker in markers] == sorted(body.index(marker) for marker in markers)
 
 
@@ -256,7 +259,7 @@ async def test_a_refused_identity_reply_keeps_its_cited_lines_in_the_header_and_
     # The two cited lines are adjacent in the source, so they stay one paragraph with its line break.
     assert shown['identity'] == ['Alex Example\nBackend engineer']
     assert shown['summary'][1] == 'Backend engineer who implemented queue processing.'
-    assert 'Implemented queue processing.' in shown['projects'] and shown['programming'][1] == 'Python'
+    assert 'Implemented queue processing' in shown['projects'] and shown['programming'][1] == 'Python'
     [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
     assert issue.message == 'Показан исходный текст: проверку извлечённых данных не удалось завершить.'
     # The notice points at the identity view's own fallback paragraph, not at every block of the page.
@@ -283,8 +286,8 @@ async def test_an_identity_block_without_a_usable_reply_places_no_lines_of_its_w
     assert next(task for task in result.tasks if task.block_id == 'identity').state == 'source_fallback'
     shown = views(workspace)
     assert 'identity' not in shown and shown['summary'][1] == 'Backend engineer who implemented queue processing.'
-    assert 'Implemented queue processing.' in shown['projects']
-    assert body(workspace).count('Our team reduced median latency from 800 ms to 500 ms.') == 1
+    assert 'Implemented queue processing' in shown['projects']
+    assert body(workspace).count('Our team reduced median latency from 800 ms to 500 ms') == 1
     [issue] = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
     assert issue.message.startswith('Блок не заполнен') and issue.block_ids
     content = await exported(tmp_path / 'export', workspace, originals)

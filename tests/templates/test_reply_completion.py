@@ -248,7 +248,7 @@ async def test_an_generic_import_with_lean_first_replies_publishes_the_same_bloc
     assert shown['location'] == ['ЛОКАЦИЯ', 'Example City, Example Country, UTC+1']
     assert shown['opensource'] == ['OPEN SOURCE', 'Queue Tools'] and shown['programming'] == ['ЯП, ФРЕЙМВОРКИ, БИБЛИОТЕКИ', 'Python, Perl']
     projects = shown['projects']
-    assert projects.count('Implemented queue processing.') == 1 and projects[-1] == F10_RESULT
+    assert projects.count('Implemented queue processing') == 1 and projects[-1] == F10_RESULT
     assert F10_REJECTED not in '\n'.join(value for values in shown.values() for value in values)
     fallback = [issue for issue in workspace.project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
     assert [(issue.category, issue.rule_id) for issue in fallback] == [('content_violation', 'projects-support')]

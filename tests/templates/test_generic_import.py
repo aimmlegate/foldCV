@@ -105,8 +105,9 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     assert shown['opensource'] == ['OPEN SOURCE', 'Queue Tools'] and 'portfolio' not in shown
     # The accepted task shows once; only the rejected result's own source line falls back, without its line break.
     projects = shown['projects']
-    # Without rewriting a list item keeps the source's wording and loses only its closing punctuation.
-    task = 'Implemented queue processing' + ('.' if rewrite else '')
+    # A list item keeps the source's wording without rewriting and shows without its closing mark either way: the
+    # list draws its own (D152).
+    task = 'Implemented queue processing'
     assert projects.count(task) == 1 and projects[-1] == F10_RESULT
     text_all = body(workspace)
     assert text_all.count(F10_RESULT) == 1 and F10_REJECTED not in text_all and 'Результаты:' not in text_all
@@ -130,8 +131,7 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
         assert shown['summary'][1] == 'Backend engineer focused on reliable queue systems.'
         assert 'Message queue platform for internal services.' in projects and 'Old Systems' in projects
     # The career-wide highlight has no owner; both employment records and the old job's technology stay facts.
-    assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', 'Mentored five engineers across teams.' if rewrite
-        else 'Mentored five engineers across teams']
+    assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', 'Mentored five engineers across teams']
     highlight = next(record for record in workspace.project.facts.extensions if record.semantic_type == 'foldcv:career_highlights')
     assert not highlight.relations and not any(relation.subject_id == highlight.id for relation in workspace.project.facts.relations)
     assert sorted(record.employer.raw_text for record in records(workspace, 'employment')) == ['Example Labs', 'Old Systems']
@@ -156,7 +156,7 @@ async def test_missing_data_keeps_year_precision_and_adds_no_block_or_placeholde
     shown = views(workspace)
     assert order(workspace) == ['identity', 'projects', 'programming']
     assert shown['projects'] == ['ПРОЕКТЫ', 'Example Labs', '2020 – 2023', 'Python', 'Роль: backend engineer', 'Задачи:',
-        'Implemented queue processing' + ('.' if rewrite else '')]
+        'Implemented queue processing']
     [job] = records(workspace, 'employment')
     assert [(period.start.value.precision, period.end.value.precision, period.end.raw_text) for period in job.periods] == [
         ('year', 'year', '2023')]
@@ -172,7 +172,7 @@ async def test_an_unsupported_individual_metric_never_shows_and_the_team_result_
     [issue] = workspace.project.import_issues
     assert (issue.code, issue.category, issue.rule_id) == ('IMPORT_SOURCE_FALLBACK', 'content_violation', 'projects-attribution')
     assert issue.block_ids
-    assert sorted(record.value.raw_text for record in records(workspace, 'claim')) == ['Implemented queue processing.']
+    assert sorted(record.value.raw_text for record in records(workspace, 'claim')) == ['Implemented queue processing']
 
 
 @pytest.mark.asyncio
@@ -293,8 +293,9 @@ async def test_a_long_document_keeps_every_marker_once_and_in_order_and_exports(
     lines = source_fixture('F07')[0].units[0].text.splitlines()
     shown = views(workspace)
     for view, prefix, count in [('projects', 'PROJECT-MARKER-', 250), ('courses', 'SIDEBAR-MARKER-', 100)]:
-        expected = [line for line in lines if line.startswith(prefix)]
-        values = [value for value in shown[view] if value.startswith(prefix)]
+        # A list item shows without the closing mark of its source line (D152).
+        expected = [line.rstrip('.') for line in lines if line.startswith(prefix)]
+        values = [value.rstrip('.') for value in shown[view] if value.startswith(prefix)]
         assert len(expected) == count and values == expected
     assert shown['identity'] == lines[:2] and shown['portfolio'] == ['ПОРТФОЛИО', lines[-1]]
     [link] = [part for block in workspace.project.document.blocks() for part in block.content if isinstance(part, BoundLink)]
@@ -302,7 +303,8 @@ async def test_a_long_document_keeps_every_marker_once_and_in_order_and_exports(
     assert len(records(workspace, 'claim')) == 250 and len(records(workspace, 'certification')) == 100
     assert not workspace.project.import_issues
     body = emitted(xml(await export_through_service(tmp_path_factory.mktemp('f07-export'), workspace, originals)))
-    markers = [line for line in lines if line.startswith(('SIDEBAR-MARKER-', 'PROJECT-MARKER-'))]
+    # The DOCX writes a list item's closing mark as a run of its own (D152).
+    markers = [line.rstrip('.') for line in lines if line.startswith(('SIDEBAR-MARKER-', 'PROJECT-MARKER-'))]
     assert all(body.count(marker) == 1 for marker in markers)
     for prefix in ('SIDEBAR-MARKER-', 'PROJECT-MARKER-'):
         positions = [body.index(marker) for marker in markers if marker.startswith(prefix)]
