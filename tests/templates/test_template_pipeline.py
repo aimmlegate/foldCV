@@ -766,7 +766,7 @@ async def test_independent_blocks_overlap_within_the_captured_concurrency_and_ma
     assert outcomes[2][1] == 'published' and outcomes[2][2] == ['accepted'] * 3 and outcomes[2][4] == 6 and outcomes[2][5] == 6
 
 
-def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=()):
+def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=(), kinds=None):
     """Runs pipeline.run_tasks over fake tasks; returns the start and end events and the peak in flight."""
     import asyncio
     import threading
@@ -787,7 +787,8 @@ def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=(
             state['now'] -= 1
             events.append(('end', identifier))
     pipeline.execute_task = execute
-    operation = SimpleNamespace(id='operation', tasks=[SimpleNamespace(id=name, dependencies=list(after)) for name, after in dependencies],
+    operation = SimpleNamespace(id='operation', tasks=[SimpleNamespace(id=name, dependencies=list(after),
+        kind=(kinds or {}).get(name, 'extract')) for name, after in dependencies],
         capture=SimpleNamespace(policy=SimpleNamespace(concurrency=width)))
     return pipeline.run_tasks('project', operation, None, cancel), events, state
 
@@ -832,6 +833,30 @@ async def test_a_dependency_cycle_runs_in_declaration_order_instead_of_waiting_f
     await run
     starts = [name for kind, name in events if kind == 'start']
     assert sorted(starts) == ['a', 'b', 'c'] and starts[0] in {'a', 'c'}
+
+
+@pytest.mark.asyncio
+async def test_a_task_without_a_model_call_starts_while_the_width_is_full_of_model_tasks(tmp_path):
+    # D154: role-branch, an operation, waited from 45 s to 177 s behind the entry groups for a slot it does not use.
+    tasks = [('a', ()), ('b', ()), ('c', ()), ('d', ('a',)), ('e', ()), ('f', ('d',))]
+    kinds = {'d': 'derive', 'e': 'source_copy'}
+    run, events, _state = schedule(RuntimeFixture(tmp_path / 'wide').pipeline, tasks, 2, slow={'b', 'c'}, kinds=kinds)
+    await run
+    assert [name for kind, name in events if kind == 'start'] == ['a', 'b', 'e', 'c', 'd', 'f']
+    # e starts beside a and b; d starts once a ended, while b and c fill the width.
+    assert events.index(('start', 'e')) < events.index(('end', 'a'))
+    assert events.index(('start', 'c')) < events.index(('start', 'd')) < events.index(('end', 'b'))
+    # A model task still waits for a place: f, ready once d ended, starts after b.
+    assert events.index(('end', 'b')) < events.index(('start', 'f'))
+    flight, peak = set(), 0
+    for kind, name in events:
+        flight = flight | {name} if kind == 'start' else flight - {name}
+        peak = max(peak, len(flight - kinds.keys()))
+    assert peak == 2
+    # One call at a time still runs every task in place, in declaration order.
+    run, events, state = schedule(RuntimeFixture(tmp_path / 'sequential').pipeline, tasks, 1, kinds=kinds)
+    await run
+    assert [name for kind, name in events if kind == 'start'] == ['a', 'b', 'c', 'd', 'e', 'f'] and state['peak'] == 1
 
 
 @pytest.mark.asyncio

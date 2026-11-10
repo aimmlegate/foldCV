@@ -416,8 +416,8 @@ def scheduled(pipeline, tasks, width, spawns):
         events.append('close-' + parent)
         closed.append(parent)
     pipeline.execute_task, pipeline.close_entries = execute, close
-    operation = SimpleNamespace(id='operation', tasks=[SimpleNamespace(id=name, dependencies=list(after), parent_task_id=None)
-        for name, after in tasks], capture=SimpleNamespace(policy=SimpleNamespace(concurrency=width)))
+    operation = SimpleNamespace(id='operation', tasks=[SimpleNamespace(id=name, dependencies=list(after), parent_task_id=None,
+        kind='extract') for name, after in tasks], capture=SimpleNamespace(policy=SimpleNamespace(concurrency=width)))
     return pipeline.run_tasks('project', operation, None, threading.Event()), events, closed
 
 

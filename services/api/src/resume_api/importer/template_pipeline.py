@@ -480,12 +480,15 @@ class TemplatePipeline:
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
-        at once; concurrency 1 awaits each task in place. A block that extracts its entries on their own
-        (D117) adds them while it runs, stays open until they all ended and then closes. After a failure or a
-        cancel nothing new starts, the running tasks end, and the first failure is raised."""
+        at once, and tasks without a model call take no place of it (D154); concurrency 1 awaits each task in place.
+        A block that extracts its entries on their own (D117) adds them while it runs, stays open until they all
+        ended and then closes. After a failure or a cancel nothing new starts, the running tasks end, and the first
+        failure is raised."""
         # The children a block added before (a resumed import) are reported by the block when it runs again.
         order = [task.id for task in operation.tasks if getattr(task, 'parent_task_id', None) is None]
         width = operation.capture.policy.concurrency
+        # The entries and outline reviews a block adds always call a model: every free task is known here.
+        free = {task.id for task in operation.tasks if task.kind in {'derive', 'source_copy'}}
         waits = {task.id: (set(task.dependencies) | (implicit or {}).get(task.id, set())) & set(order) for task in operation.tasks}
         pending, running, ended, failure = list(order), {}, set(), None
         parents, children = {}, {}
@@ -523,7 +526,12 @@ class TemplatePipeline:
         try:
             while pending or running:
                 if failure is None and not cancel.is_set():
-                    for identifier in ready_tasks()[:max(width - len(running), 0)]:
+                    slots = width - sum(identifier not in free for identifier in running.values())
+                    for identifier in ready_tasks():
+                        if identifier not in free:
+                            if slots <= 0:
+                                continue
+                            slots -= 1
                         pending.remove(identifier)
                         running[asyncio.ensure_future(self.execute_task(project, operation.id, identifier, deadline, cancel))] = identifier
                 if not running:
