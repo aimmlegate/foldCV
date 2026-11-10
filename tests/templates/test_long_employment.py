@@ -14,7 +14,8 @@ def test_two_hundred_fifty_long_tasks_are_emitted_once_in_order_without_truncati
     _attempt, capture = capture_export(workspace, snapshot_identity(workspace), renderer_identity())
     request = TemplateRenderRequestV1(**capture.request.model_dump(by_alias=True), package=project.template_package)
     text = emitted(xml(render_captured_docx(request, tmp_path)))
-    markers = long_lines(project.sources[0])
+    # A list item shows without the closing mark of its source line; the list draws its own (D152).
+    markers = [line.rstrip('.') for line in long_lines(project.sources[0])]
     assert len(markers) == 250
     assert all(text.count(marker) == 1 for marker in markers)
     positions = [text.index(marker) for marker in markers]

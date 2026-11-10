@@ -10,7 +10,7 @@ from lxml import etree
 import pytest
 
 from packages.resume_core.models.template_document import (PresentedText, ManualScopeSpan, TemplateParagraphBlock,
-    TemplateNumberedBlock, PresentedHyperlink)
+    TemplateBulletBlock, TemplateNumberedBlock, PresentedHyperlink)
 from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateRenderAsset, presentation_value
 from packages.resume_core.rendering.captured_docx import render_captured_docx, renderer_identity
 from packages.resume_core.rendering.captured_fonts import FontRequest
@@ -506,6 +506,32 @@ def test_a_marker_is_never_bigger_than_its_text(captured_request, tmp_path, size
     assert paragraph.xpath('string(w:pPr/w:spacing/@w:line)', namespaces=NS) == '240'
     numbering = xml(content, 'word/numbering.xml')
     assert numbering.xpath('//w:abstractNum[@w:abstractNumId="6000"]/w:lvl/w:rPr/w:sz/@w:val', namespaces=NS) == [drawn]
+
+
+def test_list_items_close_with_a_semicolon_and_the_last_with_a_full_stop(captured_request, tmp_path):
+    """D152: the mark is a run of its own after the text; an item closing itself keeps its own mark and still ends its
+    list; a paragraph ends a list, and bullets and numbers are separate lists, as on the screen."""
+    document = captured_request.document.model_copy(deep=True)
+    bullet = next(block for block in document.blocks() if block.type == 'bullet_list')
+    paragraph = next(block for block in document.blocks() if block.type == 'paragraph' and block.content)
+
+    def listed(identifier, text, kind='bullet_list'):
+        data = bullet.model_dump(by_alias=True)
+        data.update(id=identifier, type=kind, content=[{'type': 'text', 'text': text, 'styles': {}}], children=[])
+        if kind == 'numbered_list':
+            data['props'] = {'start': None}
+        return (TemplateNumberedBlock if kind == 'numbered_list' else TemplateBulletBlock).model_validate(data)
+    between = paragraph.model_dump(by_alias=True)
+    between.update(id='between', content=[{'type': 'text', 'text': 'Между списками', 'styles': {}}], children=[])
+    document.regions[2].blocks = [listed('first', 'Первая задача'), listed('second', 'Стек:'), listed('third', 'Третья'),
+        TemplateParagraphBlock.model_validate(between), listed('one', 'Один', 'numbered_list'),
+        listed('two', 'Два.', 'numbered_list'), listed('alone', 'Одна в списке')]
+    content = render_captured_docx(recapture(captured_request, document=document), tmp_path)
+    shown = {emitted(node): len(node.findall(qn('w:r'))) for node in xml(content).iter(qn('w:p'))}
+    assert {text: shown.get(text) for text in ['Первая задача;', 'Стек:', 'Третья.', 'Между списками', 'Один;', 'Два.',
+        'Одна в списке.']} == {'Первая задача;': 2, 'Стек:': 1, 'Третья.': 2, 'Между списками': 1, 'Один;': 2, 'Два.': 1,
+        'Одна в списке.': 2}
+    assert not any(text.endswith(('Первая задача', 'Третья', 'Один', 'Одна в списке')) for text in shown)
 
 
 def test_logo_containment_uses_actual_native_page_size(captured_request, tmp_path):

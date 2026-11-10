@@ -56,7 +56,7 @@ def test_one_employment_materializes_stable_editable_cells_and_optional_sections
     assert canonical(facts) == before
     rendered = text(document)
     assert 'Example Labs' in rendered and 'Role: backend engineer' in rendered and 'Python' in rendered
-    assert rendered.count('Implemented queue processing.') == 1
+    assert rendered.count('Implemented queue processing') == 1
     assert ('Results:' in rendered) == (fixture == 'F01')
     assert ('03.2020–11.2023' if fixture == 'F01' else '2020–2023') in rendered
     occurrences = [part for block in document.blocks() for part in block.content if isinstance(part, FieldOccurrence)]
@@ -88,8 +88,8 @@ def test_rejected_metric_falls_back_once_without_duplicating_accepted_task_or_pr
     document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
     rendered = text(document)
     assert '80%' not in rendered
-    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms.') == 1
-    assert rendered.count('Implemented queue processing.') == 1
+    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms') == 1
+    assert rendered.count('Implemented queue processing') == 1
     assert 'Example Labs' in rendered
     raw = [value for value in coverage if value.disposition == 'fallback']
     accepted = [value for value in coverage if value.disposition in {'accepted', 'multiple_views'}]
@@ -128,8 +128,8 @@ def test_fallback_places_disconnected_evidence_added_by_suppression_once_without
     before = canonical(facts)
     document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
     rendered = text(document)
-    assert rendered.count('Implemented queue processing.') == 1
-    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms.') == 1
+    assert rendered.count('Implemented queue processing') == 1
+    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms') == 1
     assert '80%' not in rendered and 'Tasks:' not in rendered and 'Results:' not in rendered
     assert 'Example Labs' in rendered and canonical(facts) == before
     spans = [value for value in coverage if value.disposition == 'fallback']
@@ -241,8 +241,8 @@ def test_hidden_human_classification_does_not_prevent_visible_claim_source_fallb
     document, coverage = materialize(package, facts, [operation], [src], operation_id=operation.id)
     rendered = text(document)
     assert 'Rewritten team result' not in rendered and 'private category' not in rendered
-    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms.') == 1
-    assert rendered.count('Implemented queue processing.') == 1
+    assert rendered.count('Our team reduced median latency from 800 ms to 500 ms') == 1
+    assert rendered.count('Implemented queue processing') == 1
     assert canonical(facts) == before
     assert len([span for span in coverage if span.disposition == 'fallback']) == 1
 

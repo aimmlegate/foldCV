@@ -28,6 +28,7 @@ from .captured_embedding import embed_captured_fonts
 from .captured_layout import BodyGeometry, CapturedMetrics, half_points, native_units
 from .captured_styles import CapturedStyleResolver, authored_spans, resize_run, visible_text
 from .docx_writer import Writer, element, fill
+from .list_ends import list_end, list_runs
 from .template import RenderFailure
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -194,6 +195,7 @@ class CapturedWriter:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             if not actual and emitted:
                 self.remember(self.generated(block, ''))
+        self.list_ends()
         self.block = None
         # Table rows (D143): each row's label in the table's label style, checked like any text before writing.
         self.table_rows = table_rows(request.document, self.recipe, request.package.definition.template.default_locale)
@@ -236,6 +238,25 @@ class CapturedWriter:
         self.selections[style.selection.font.sha256] = style.selection
         if style.slanted:
             self.slanted.add(style.selection.font.family)
+
+    def list_ends(self):
+        """D152: the closing mark after each list item, a run in the style of the text before it, so the layout
+        measures what the screen draws."""
+        def visit(blocks):
+            for run in list_runs(blocks):
+                filled = [block for block in run if self.runs[block.id]]
+                for block in filled:
+                    mark = list_end(''.join(text for text, _style in self.runs[block.id]), block is filled[-1])
+                    if mark is None:
+                        continue
+                    style = replace(self.runs[block.id][-1][1], chip=False, gap=0, background=None)
+                    self.remember(style)
+                    self.runs[block.id].append((mark, style))
+                    self.links[block.id].append(None)
+            for block in blocks:
+                visit(block.children)
+        for region in self.request.document.regions:
+            visit(region.blocks)
 
     def generated(self, block, text):
         span = PresentedText(type='text', text=text, styles={}, presentation=None)

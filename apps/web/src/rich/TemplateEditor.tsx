@@ -32,6 +32,7 @@ import { focusFacts } from "./v7-focus";
 import { focusIconChoices } from "../projects/api";
 import { remarkMarks, remarkMarksMeta, remarkMarksPlugin, type RemarkMarks } from "./remarks";
 import { listIndexPlugin } from "./list-index";
+import { listEndsPlugin } from "./list-ends";
 import { technologyLockPlugin } from "./technology-lock";
 import { groupAnchors } from "./outline";
 import { readRemarkMarks, saveRemarkMarks } from "../workbench/settings/interface";
@@ -129,6 +130,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   marked.current = marking ? marks : null;
   const remarkPlugin = useMemo(() => remarkMarksPlugin(() => marked.current), []);
   const listIndex = useMemo(() => listIndexPlugin(), []);
+  const listEnds = useMemo(() => listEndsPlugin(), []);
   // Technologies change only in Facts: a click on one in the page opens its row there.
   const technologyLock = useMemo(() => technologyLockPlugin(recordId => { setFactsVisible(true); setFactFocus({ recordId }); }), []);
   const session = useMemo(() => new TemplateEditorSession(connection, {
@@ -141,7 +143,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // Copy, cut and paste must run before BlockNote's own clipboard handlers, which would otherwise end the event.
   const extension = useMemo(() => createExtension({ key: "foldcv-v7-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes,
     Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
-    prosemirrorPlugins: [session.plugin, presentation, remarkPlugin, listIndex, technologyLock] }), [session, presentation, remarkPlugin, listIndex, technologyLock]);
+    prosemirrorPlugins: [session.plugin, presentation, remarkPlugin, listIndex, listEnds, technologyLock] }), [session, presentation, remarkPlugin, listIndex, listEnds, technologyLock]);
   const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
     disableExtensions: disabledExtensions,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },

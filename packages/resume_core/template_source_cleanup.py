@@ -13,7 +13,9 @@ _LABELS = (r'задачи|задача|обязанности|функции|р�
     r'цель|tasks?|responsibilities|duties|results?|achievements?|outcomes?|project|description|summary|problem|'
     r'solution|tools|technologies|tech stack|stack|role|goal')
 _LABEL = re.compile(rf'^\s*(?:{_LABELS})\s*:\s*', re.I)
-_ABBREVIATION = re.compile(r'(?:^|[\s(])(?:и\s+т\.\s?[дп]|т\.\s?[дпе]|и\s+др|и\s+пр|см|гг?|etc|inc|ltd|llc|corp|co)\.$', re.I)
+# A dotted abbreviation keeps its last dot: "и т.д.", "к.т.н.", "M.Sc.", "etc.".
+_ABBREVIATION = re.compile(r'(?:^|[\s(])(?:и\s+т\.\s?[дп]|т\.\s?[дпе]|и\s+др|и\s+пр|см|гг?|etc|inc|ltd|llc|corp|co)\.$'
+    r'|(?:^|[\s(])(?:[^\W\d_]{1,2}\.){2,}$', re.I)
 
 _EMAIL = r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+'
 _PHONE = r'(?<![\w.,/-])(?:\+\s?\d[\d\s().\-–]{8,}\d|[78][\s(\-]*\d{3}[\s)\-]*\d{3}[\s\-]*\d{2}[\s\-]*\d{2})(?![\w/])'
@@ -46,8 +48,14 @@ def without_form(text):
     return result if result.strip() else text
 
 
+def listed(pointer):
+    """Whether a pointer names an item of a list (`/0/tasks/1/value`, `/items/1`) rather than a text field."""
+    return any(token.isdecimal() for token in pointer.strip('/').split('/')[1:])
+
+
 def list_item_text(text):
-    """A list item without its source marker and closing punctuation; the template draws its own bullets."""
+    """A list item without its source marker and closing punctuation; the template draws its own bullets and closing
+    marks (D152)."""
     lines = without_form(text).split('\n')
     last = lines[-1].rstrip()
     if not last.endswith(('...', '…')) and not _ABBREVIATION.search(last):
@@ -76,5 +84,4 @@ def clean_source_wording(text, pointer):
     cleaned = without_contacts(text)
     if not cleaned.strip():
         return cleaned
-    listed = any(token.isdecimal() for token in pointer.strip('/').split('/')[1:])
-    return list_item_text(cleaned) if listed else without_form(cleaned)
+    return list_item_text(cleaned) if listed(pointer) else without_form(cleaned)

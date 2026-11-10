@@ -162,7 +162,8 @@ def test_disabled_rewriting_retains_source_display_even_if_review_accepts_a_para
     allocation = next(value for value in admitted.allocations if value.key == 'tasks-entry')
     claim = next(record for record in after.records if record.id == allocation.record_id)
     assert claim.value.value == paraphrase
-    expected = paraphrase if rewrite else 'Implemented queue processing'
+    # Either way the list item shows without its closing mark; the list draws it (D152).
+    expected = paraphrase.rstrip('.') if rewrite else 'Implemented queue processing'
     assert claim.value.raw_text == expected
     from packages.resume_core.editing.template_effective import builtin_effective_cells
     cell = next(cell for cell in builtin_effective_cells(after, [admitted]) if cell.id == allocation.cell_ids['value'])

@@ -20,13 +20,26 @@ def test_a_list_item_loses_its_marker_and_closing_punctuation(source, shown):
 
 
 @pytest.mark.parametrize('kept', ['-5% затрат', '3D-моделирование', '.NET и C#', 'Работа с БД и т.д.', 'Перенос данных и др.',
-    'Ожидание результата...', 'Рост в 2 раза', 'Node.js', 'Этап 1: анализ:'])
+    'Ожидание результата...', 'Рост в 2 раза', 'Node.js', 'Этап 1: анализ:', 'Степень к.т.н.', 'Защитил M.Sc.'])
 def test_wording_that_only_looks_like_punctuation_stays(kept):
     assert list_item_text(kept) == kept
 
 
 def test_a_list_item_of_nothing_but_marks_keeps_its_text():
     assert list_item_text('- .') == '- .'
+
+
+def test_a_rewritten_list_item_loses_its_closing_mark_and_a_rewritten_text_field_keeps_it():
+    """The list draws its own closing marks (D152), so a rewritten item ends like a verbatim one."""
+    from types import SimpleNamespace
+    from packages.resume_core.editing.template_wording import display_raw_input
+    review = SimpleNamespace(allow_text_rewrite=True, semantic_context={})
+    shown = lambda pointer, raw: display_raw_input(review, SimpleNamespace(pointer=pointer), raw)
+    assert shown('/0/tasks/1/value', 'Разработал модуль оплаты.') == 'Разработал модуль оплаты'
+    assert shown('/0/results/0/value', 'Результат: сократил сборку на 40 %;') == 'сократил сборку на 40 %'
+    assert shown('/0/tasks/1/value', 'Поддержка и т.д.') == 'Поддержка и т.д.'
+    assert shown('/0/project/description', 'Сервис оплаты для клиник.') == 'Сервис оплаты для клиник.'
+    assert shown('/0/period/start', {'raw': '06.2024', 'year': 2024, 'month': 6}) == '06.2024'
 
 
 @pytest.mark.parametrize(('source', 'shown'), [

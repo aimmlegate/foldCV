@@ -21,10 +21,10 @@ async def test_real_materializer_publishes_current_employment_and_exact_fallback
     assert operation.state == 'published'
     assert spent_calls(operation) == len(fixture.transport.calls) == (4 if unsupported else 2)
     assert len([record for record in current.project.facts.records if record.kind == 'employment']) == 1
-    assert fixture.text().count('Implemented queue processing.') == 1
+    assert fixture.text().count('Implemented queue processing') == 1
     assert '80%' not in fixture.text()
     if unsupported:
-        assert fixture.text().count('Our team reduced median latency from 800 ms to 500 ms.') == 1
+        assert fixture.text().count('Our team reduced median latency from 800 ms to 500 ms') == 1
         assert current.project.import_issues and all(finding.block_ids for finding in current.project.import_issues)
         assert not any('80%' in str(record.value.value) for record in current.project.facts.records if record.kind == 'claim')
         assert operation.task_results[0].disposition == 'source_fallback'

@@ -70,6 +70,9 @@
 .fcv-sheet .fcv-link,
 .fcv-sheet .bn-editor a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 .fcv-sheet .bn-block-content[data-content-type="bulletListItem"]::before { content: var(--fcv-bullet, "•") !important; }
+/* D152: list items close with a semicolon, the last item of a list with a full stop (a widget after the text, as the
+   DOCX writes the same marks); the mark is not text, so it is neither selected nor copied. */
+.fcv-sheet .fcv-list-end { user-select: none; }
 .fcv-logo { position: absolute; object-fit: contain; pointer-events: none; }
 /* D145: the template's footer line, an optional email. On screen it closes the sheet at its center line; on paper it sits at
    its baseline on every page (export.css). */

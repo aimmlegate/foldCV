@@ -5,7 +5,7 @@ import re
 from ..models.template_import import EvidenceOption
 from ..importing.template_completion import stating, stating_words
 from ..hashing import digest
-from ..template_source_cleanup import clean_source_wording, without_form
+from ..template_source_cleanup import clean_source_wording, list_item_text, listed, without_form
 from ..hashing import canonical
 
 
@@ -39,9 +39,13 @@ def own_evidence(raw, evidence, units, captured):
 def display_raw_input(review, field, raw):
     """What a field shows. Without rewriting a value keeps the words of its cited lines: the model's value stays when
     every sentence of it is in them word for word (it may split a line into claims, drop the label and the marker, or
-    assign a claim to its field), and the cited lines themselves show when it is not (a paraphrase)."""
-    if (review.allow_text_rewrite or not isinstance(raw, str) or not raw.strip()
-            or field.pointer not in review.semantic_context.get('sourceWordingPointers', [])):
+    assign a claim to its field), and the cited lines themselves show when it is not (a paraphrase). A rewritten list
+    item loses its closing mark: the list draws its own (D152)."""
+    if not isinstance(raw, str) or not raw.strip():
+        return display_text(raw)
+    if review.allow_text_rewrite:
+        return list_item_text(raw) if listed(field.pointer) else raw
+    if field.pointer not in review.semantic_context.get('sourceWordingPointers', []):
         return display_text(raw)
     wording = source_wording(review, field, raw)
     return clean_source_wording(raw if verbatim(raw, wording) else wording, field.pointer)
