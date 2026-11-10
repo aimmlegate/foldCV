@@ -26,7 +26,7 @@ from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers.claude import catalog as claude_catalog
 from resume_api.providers.shared import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
-from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
+from resume_api.providers.content import (STALL_SECONDS, ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp
@@ -367,11 +367,18 @@ class ClaudeCliProvider:
         if cached is not None:
             self.check_effort(cached, model, effort)
             return cached
-        probe = self.probe(files, cancel, deadline=min(deadline, self.clock() + QUALIFICATION_SECONDS))
-        if model not in probe.reasoning:
-            raise ContentFailure("MODEL_DENIED")
-        if key == self._key():
-            self.preflight_cache.remember(epoch, key, probe, tuple(probe.reasoning))
+        # One qualification at a time (D153); the calls that wait take the first one's result.
+        with self.preflight_cache.qualifying:
+            epoch, cached = self.preflight_cache.read(key, model)
+            if cached is not None:
+                self.check_effort(cached, model, effort)
+                return cached
+            self.process._check(deadline, cancel)
+            probe = self.probe(files, cancel, deadline=min(deadline, self.clock() + QUALIFICATION_SECONDS))
+            if model not in probe.reasoning:
+                raise ContentFailure("MODEL_DENIED")
+            if key == self._key():
+                self.preflight_cache.remember(epoch, key, probe, tuple(probe.reasoning))
         self.check_effort(probe, model, effort)
         return probe
 
@@ -537,6 +544,7 @@ class ClaudeCliProvider:
                             try:
                                 _, errors = self._run(files, args, deadline, cancel, data=prompt,
                                                       on_line=accept, on_spawn=spawned, max_line=remaining,
+                                                      idle_seconds=STALL_SECONDS,
                                                       max_output=STREAM_MULTIPLE * remaining)
                             except ProcessExit as error:
                                 if events.complete or not events.started:

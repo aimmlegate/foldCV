@@ -23,8 +23,8 @@ from resume_api.rewrite_timing import add_phase, measure
 from packages.resume_core.editing.text_rewrite import PlainTextReply
 from packages.resume_core.reasoning import ModelReasoning, model_reasoning
 from packages.resume_core.storage import StorageFailure
-from resume_api.providers.content import (ContentFailure, ContentInput, ContentResult, ContentTransportReturn, outcome_state,
-                                          ReportedUsage, ResultT)
+from resume_api.providers.content import (STALL_SECONDS, ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
+                                          outcome_state, ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, preflight_key
@@ -188,17 +188,25 @@ class CodexCliProvider:
         if cached is not None:
             self.check_effort(cached, model, effort)
             return cached
-        bound = min(deadline, self.clock() + QUALIFICATION_SECONDS)
-        probe = self.probe(files, cancel, deadline=bound)
-        if not probe.generation_ready:
-            raise ContentFailure("CLI_PROFILE_UNSAFE")
-        metadata = {}
-        models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
-        probe = replace(probe, reasoning=metadata)
-        if model not in models:
-            raise ContentFailure("MODEL_DENIED")
-        if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
-            self.preflight_cache.remember(epoch, key, probe, models)
+        # One qualification at a time (D153): calls starting together each ran the five probe processes inside the
+        # same 15 s and timed out on each other; the ones that wait take the first one's result.
+        with self.preflight_cache.qualifying:
+            epoch, cached = self.preflight_cache.read(key, model)
+            if cached is not None:
+                self.check_effort(cached, model, effort)
+                return cached
+            self.process._check(deadline, cancel)
+            bound = min(deadline, self.clock() + QUALIFICATION_SECONDS)
+            probe = self.probe(files, cancel, deadline=bound)
+            if not probe.generation_ready:
+                raise ContentFailure("CLI_PROFILE_UNSAFE")
+            metadata = {}
+            models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
+            probe = replace(probe, reasoning=metadata)
+            if model not in models:
+                raise ContentFailure("MODEL_DENIED")
+            if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
+                self.preflight_cache.remember(epoch, key, probe, models)
         self.check_effort(probe, model, effort)
         return probe
 
@@ -470,7 +478,7 @@ class CodexCliProvider:
                         with measure("cli_process"):
                             output, errors = self._run(files, args, deadline, cancel,
                                                        data=prompt, on_line=accept,
-                                                       on_spawn=spawned,
+                                                       on_spawn=spawned, idle_seconds=STALL_SECONDS,
                                                        max_line=policy.max_total_output_bytes - consumed_output,
                                                        max_output=policy.max_total_output_bytes - consumed_output)
                     finally:

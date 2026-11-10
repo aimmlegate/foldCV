@@ -89,7 +89,12 @@ class ProcessRunner:
             poll_input: Callable[[], bytes | None] | None = None,
             before_cleanup: Callable[[], None] | None = None,
             on_spawn: Callable[[], None] | None = None,
-            on_output: Callable[[str, bytes], None] | None = None) -> tuple[bytes, bytes]:
+            on_output: Callable[[str, bytes], None] | None = None,
+            idle_seconds: float | None = None) -> tuple[bytes, bytes]:
+        """`idle_seconds`: the longest silence the child may keep (no byte on either stream) before the run ends
+        as STALLED; a model call that hangs on its connection stops here, not at the operation's deadline."""
+        if idle_seconds is not None and (not math.isfinite(idle_seconds) or idle_seconds <= 0):
+            raise SpikeError("INVALID_LIMIT")
         if (not math.isfinite(deadline) or any(type(value) is not int or value <= 0
                 for value in (max_output, max_line, max_stdout, max_stderr) if value is not None)):
             raise SpikeError("INVALID_LIMIT")
@@ -115,8 +120,11 @@ class ProcessRunner:
                 for stream, kind in ((process.stdin, "stdin"), (process.stdout, "stdout"), (process.stderr, "stderr")):
                     os.set_blocking(stream.fileno(), False)
                     selector.register(stream, selectors.EVENT_WRITE if kind == "stdin" else selectors.EVENT_READ, kind)
+                heard = self.clock()
                 while selector.get_map() or process.poll() is None:
                     self._check(deadline, cancel)
+                    if idle_seconds is not None and self.clock() - heard >= idle_seconds:
+                        raise SpikeError("STALLED")
                     if poll_input is not None:
                         reply = poll_input()
                         if reply is not None:
@@ -148,6 +156,7 @@ class ProcessRunner:
                             continue
                         target = output if kind == "stdout" else errors
                         target.extend(chunk)
+                        heard = self.clock()
                         if len(output) + len(errors) > max_output:
                             raise SpikeError("OUTPUT_TOO_LARGE")
                         if ((max_stdout is not None and len(output) > max_stdout)

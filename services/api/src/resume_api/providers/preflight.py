@@ -10,8 +10,9 @@ from typing import Callable, Generic, TypeVar
 
 ResultT = TypeVar("ResultT")
 TTL_SECONDS = 300
-# A model call has the import's remaining time (D114); qualifying the CLI stays as short as in a connection check.
-QUALIFICATION_SECONDS = 15
+# A model call has the import's remaining time (D114); qualifying the CLI inside one is bounded on its own. One
+# qualification runs at a time (D153), and on a loaded machine its five probe processes took over 15 s together.
+QUALIFICATION_SECONDS = 60
 
 
 def _stamp(path):
@@ -49,6 +50,8 @@ class PreflightCache(Generic[ResultT]):
     def __init__(self, clock: Callable[[], float] = time.monotonic):
         self.clock, self.epoch, self.snapshot = clock, 0, None
         self.lock = threading.Lock()
+        # Held by the one call that qualifies the CLI while the snapshot is empty or stale; the others wait for it.
+        self.qualifying = threading.Lock()
 
     def invalidate(self):
         with self.lock:

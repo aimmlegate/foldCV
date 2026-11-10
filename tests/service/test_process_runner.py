@@ -66,3 +66,20 @@ def test_a_windows_cleanup_does_not_wait_for_a_pipe_another_program_holds(monkey
             break
         time.sleep(0.01)
     assert all(stream.closed for stream in (Worker.stdin, Worker.stdout, Worker.stderr))
+
+
+def test_a_child_silent_for_the_idle_limit_ends_as_stalled_and_a_talking_one_runs_on(tmp_path):
+    """A model call that hangs on its connection ends at the idle limit, long before the operation's deadline."""
+    started = time.monotonic()
+    with pytest.raises(SpikeError, match="STALLED"):
+        run(tmp_path / "silent", "import time;time.sleep(4)", idle_seconds=0.5)
+    assert time.monotonic() - started < 3
+    result, _ = run(tmp_path / "talking", "import sys,time\nfor _ in range(4):\n sys.stdout.write('tick\\n');sys.stdout.flush();time.sleep(0.2)",
+                    idle_seconds=0.5)
+    assert result == b"tick\n" * 4
+
+
+def test_the_idle_limit_must_be_a_positive_finite_number(tmp_path):
+    for value in (0, -1, float("inf"), float("nan")):
+        with pytest.raises(SpikeError, match="INVALID_LIMIT"):
+            run(tmp_path / "limit", "print(1)", idle_seconds=value)

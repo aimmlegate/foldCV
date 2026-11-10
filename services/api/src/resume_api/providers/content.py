@@ -115,11 +115,16 @@ class ContentProvider(Protocol):
                  cancel: threading.Event) -> ContentResult[ResultT]: ...
 
 
+# A model call that sends nothing for this long is dead, not thinking: a hung connection once held two calls for 44
+# minutes with the operation's hour as the only limit (2026-11-10). The attempt ends as timed out and repairs.
+STALL_SECONDS = 300
+
+
 def outcome_state(code: str) -> str:
     if code in {"INVALID_RESULT", "INVALID_PAYLOAD"}: return "invalid_payload"
     if code in {"REFUSED", "REFUSAL"}: return "refused"
     if code in {"INCOMPLETE_STREAM", "INCOMPLETE"}: return "incomplete"
-    if code in {"DEADLINE", "DEADLINE_EXCEEDED", "TIMEOUT"}: return "timed_out"
+    if code in {"DEADLINE", "DEADLINE_EXCEEDED", "TIMEOUT", "STALLED"}: return "timed_out"
     if code == "CANCELLED": return "cancelled"
     if code in {"CLEANUP_FAILED", "PROCESS_CLEANUP_FAILED"}: return "cleanup_failure"
     return "transport_failure"

@@ -155,3 +155,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D150 Product licence: AGPL-3.0-or-later, PyMuPDF stays
 - D151 Sign-in page link, local logs, no «О программе»
 - D152 List items close with a semicolon, the last one with a full stop
+- D153 A model call that sends nothing for five minutes ends as stalled

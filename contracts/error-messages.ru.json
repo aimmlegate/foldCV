@@ -521,6 +521,7 @@
     "DATE_RANGE_EXCEEDED": "date_range_exceeded",
     "DEADLINE": "deadline",
     "DEADLINE_EXCEEDED": "timeout",
+    "STALLED": "timeout",
     "DELETED_RECORD_MENTIONS": "fact",
     "DEPENDENCY_CHANGED": "stale",
     "DEPENDENCY_MISSING": "stale",

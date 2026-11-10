@@ -359,3 +359,15 @@ def test_the_spawning_marker_precedes_the_launch_and_a_failed_launch_removes_it(
                 files.spawn(Path(sys.executable), ("-c", "pass"), capture=False)
         assert not (files.path / ".worker").exists()
     assert list((tmp_path / "ops").iterdir()) == []
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+def test_a_group_that_already_ended_is_not_listed(tmp_path):
+    """D153: a probe command exits on its own; listing every process for it took seconds on a loaded machine."""
+    import subprocess
+    from unittest.mock import patch
+    leader = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
+    leader.wait(10)
+    with patch("resume_api.cli.runner.group_members", side_effect=AssertionError("listed a gone group")):
+        cli_runner.stop_group(leader)
+    assert leader.poll() is not None

@@ -278,11 +278,12 @@ def stop_group(process):
             raise SpikeError("PROCESS_CLEANUP_FAILED") from None
         return
     try:
+        gone = 0
         for sig in (signal.SIGTERM, signal.SIGKILL):
             try:
                 os.killpg(process.pid, sig)
             except ProcessLookupError:
-                pass
+                gone += 1
             except PermissionError:
                 # macOS may deny group signals after the leader exits. Check
                 # only this operation's group, without inspecting command text.
@@ -295,6 +296,10 @@ def stop_group(process):
                         raise SpikeError("PROCESS_CLEANUP_FAILED") from None
             if sig == signal.SIGTERM:
                 time.sleep(0.05)
+        # A group both signals found gone has no member left to list (D153): a probe command that exited on its
+        # own costs no process listing, which takes seconds on a loaded machine.
+        if gone == 2:
+            return
         # A fallback PID snapshot can miss a same-group fork. Reinspect after
         # signaling until no live member can create another child.
         limit = time.monotonic() + 1.5

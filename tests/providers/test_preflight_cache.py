@@ -166,3 +166,33 @@ def test_qualification_inside_a_model_call_stays_bounded_on_claude(fake, seconds
     with OperationFiles(root).open() as files:
         provider.preflight(files, threading.Event(), "claude-sonnet-5-5", deadline=100.0 + seconds)
     assert reached == [100.0 + min(seconds, QUALIFICATION_SECONDS)]
+
+
+def test_calls_starting_together_qualify_the_cli_once_and_share_the_result(fake):
+    """D153: the five probe processes of a qualification ran once per concurrent call and timed out on each other."""
+    cli, root, *_rest = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    probes, gate = [], threading.Event()
+    original = provider.probe
+
+    def slow_probe(files, cancel, *, deadline):
+        probes.append(deadline)
+        gate.wait(5)
+        return original(files, cancel, deadline=deadline)
+    provider.probe = slow_probe
+    results, errors = [], []
+
+    def call(index):
+        try:
+            with OperationFiles(root / f"call-{index}").open() as files:
+                results.append(provider.preflight(files, threading.Event(), "gpt-6-luna", deadline=provider.clock() + 30))
+        except Exception as error:  # noqa: BLE001 - the test reports what a thread raised
+            errors.append(error)
+    threads = [threading.Thread(target=call, args=(index,)) for index in range(3)]
+    for thread in threads:
+        thread.start()
+    gate.set()
+    for thread in threads:
+        thread.join(10)
+    assert not errors and len(results) == 3 and len(probes) == 1
+    assert all(result == results[0] for result in results)
