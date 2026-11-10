@@ -766,6 +766,49 @@ async def test_independent_blocks_overlap_within_the_captured_concurrency_and_ma
     assert outcomes[2][1] == 'published' and outcomes[2][2] == ['accepted'] * 3 and outcomes[2][4] == 6 and outcomes[2][5] == 6
 
 
+@pytest.mark.asyncio
+async def test_model_calls_run_on_the_pipelines_own_threads_and_leave_the_default_pool_to_views(tmp_path):
+    # D154: a call holds its thread for its whole time; on the loop's default pool (eight threads on a four-core
+    # machine) eight calls left none to the steps and views. Here two calls are held while a pool of two serves a view.
+    import asyncio
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from resume_api.importer.template_transport import JOB_PERMIT
+    from tests.templates.pipeline_fixtures import blocks_package
+    fixture = RuntimeFixture(tmp_path, captured=blocks_package(2), concurrency=2, cap=20)
+    lock, held, seen, release = threading.Lock(), [], [], threading.Event()
+    def script(_request, value):
+        with lock:
+            seen.append((threading.current_thread().name, JOB_PERMIT.get()))
+        if 'targets' in value:
+            return satisfied_review(value)
+        with lock:
+            held.append(value['declaration']['id'])
+        release.wait(10)
+        return raw_proposal(fixture.source)
+    fixture.transport.scripted = script
+    default = ThreadPoolExecutor(max_workers=2)
+    asyncio.get_running_loop().set_default_executor(default)
+    token = JOB_PERMIT.set('import-permit')
+    try:
+        running = asyncio.ensure_future(fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted))
+        for _ in range(500):
+            if len(held) == 2 or running.done():
+                break
+            await asyncio.sleep(0.01)
+        assert len(held) == 2
+        await asyncio.wait_for(fixture.pipeline.view(fixture.project), timeout=5)
+        release.set()
+        result = await running
+    finally:
+        release.set()
+        JOB_PERMIT.reset(token)
+        fixture.pipeline.close()
+    assert result.state == 'published' and [task.state for task in result.tasks] == ['accepted'] * 2
+    # Every call ran on the pipeline's pool and kept the import's context, whose permit the transport reads.
+    assert len(seen) == 4 and all(name.startswith('foldcv-import-call') and permit == 'import-permit' for name, permit in seen)
+
+
 def schedule(pipeline, dependencies, width, *, fail=None, cancel_at=None, slow=(), kinds=None):
     """Runs pipeline.run_tasks over fake tasks; returns the start and end events and the peak in flight."""
     import asyncio

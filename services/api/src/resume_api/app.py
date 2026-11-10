@@ -271,6 +271,8 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
                 await stopping()
             except ProjectFailure:
                 pass
+        if v2_pipeline is not None:
+            v2_pipeline.close()
         for identifier in list(project_repository.sessions):
             await asyncio.to_thread(project_repository.close, identifier)
         render_executor.shutdown(wait=True, cancel_futures=True)

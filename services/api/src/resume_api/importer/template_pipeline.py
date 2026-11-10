@@ -3,6 +3,8 @@ running steps in the operation sidecar (D109)."""
 
 import asyncio
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+import contextvars
 from dataclasses import dataclass, replace
 import hashlib
 import json
@@ -121,6 +123,9 @@ def reply_feedback(task_id, errors):
 # took 84-127 s where a 90 s call limit stood and spent the repair slot). Only the import limit ends a silent call.
 # Import reads kept, one per project; a running import hits its own between sidecar steps.
 CACHED_READS = 4
+# A model call holds its thread for its whole time, so calls get their own pool (D154): on the loop's default pool
+# (eight threads on a four-core machine) eight calls left none to steps and views. Room for four imports at width 8.
+CALL_THREADS = 32
 
 
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
@@ -299,6 +304,11 @@ class TemplatePipeline:
         self.wall, self.elapsed, self.id_factory = wall, elapsed, id_factory
         self.locks, self.cancels = {}, {}
         self.read_cache, self.cache_lock = OrderedDict(), threading.Lock()
+        self.calls = ThreadPoolExecutor(max_workers=CALL_THREADS, thread_name_prefix='foldcv-import-call')
+
+    def close(self):
+        """Release the call threads at shutdown; a call still running ends on its own thread."""
+        self.calls.shutdown(wait=False, cancel_futures=True)
 
     def read(self, project):
         session = self.repository.open(project)
@@ -1033,7 +1043,8 @@ class TemplatePipeline:
             bounded = replace(request, policy=replace(request.policy, timeout_seconds=remaining))
             return self.transport.generate(bounded, cancel)
         try:
-            response = await asyncio.to_thread(launch)
+            # As asyncio.to_thread does, the call keeps its context: the transport reads the import's permit from it.
+            response = await asyncio.get_running_loop().run_in_executor(self.calls, contextvars.copy_context().run, launch)
         except ContentFailure as error:
             operation = operation_in(await self.view(project), operation_id)
             attempt = attempt_in(operation, attempt_id)
