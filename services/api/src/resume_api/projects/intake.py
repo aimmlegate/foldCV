@@ -38,6 +38,16 @@ def _now():
 # Reviews read a finished reply against its evidence; low is enough and keeps them short (D116: at the proposal's
 # effort the projects review took 67-81 s on Sol).
 REVIEW_EFFORT = 'low'
+# Calls one new import runs at once, by the adapter of its models (D154): a stand ran up to nine Claude calls at once
+# without a rate-limit reply; Codex calls timed out when several started together. Another adapter gets Codex's.
+IMPORT_WIDTHS = {'claude_cli': 8, 'codex_cli': 3}
+
+
+def import_width(primary, fallback):
+    """The width of the import model's adapter; the smaller one when the fallback runs on another adapter."""
+    return min(IMPORT_WIDTHS.get(model.adapter, IMPORT_WIDTHS['codex_cli']) for model in (primary, fallback)
+        if model is not None)
+
 
 class TemplateIntake:
     def __init__(self, repository, *, temp_root, worker_slot, cleanup_error, clock=_now):
@@ -52,10 +62,11 @@ class TemplateIntake:
         """`model(effort=None)` returns the ModelCapture for the selected import model with that effort, else its
         catalog default, or raises ProjectFailure (also for an effort the catalog does not offer). `fallback`, given
         that capture, returns the configured fallback model's capture, None when there is none, or raises.
-        `concurrency` is how many independent blocks one import runs at once; 1 is sequential."""
+        `concurrency` is how many independent blocks one import runs at once; 1 is sequential; None takes the width
+        of the import's models (import_width)."""
         if call_cap is not None and (not isinstance(call_cap, int) or call_cap < 1):
             raise ValueError('template import call cap must be an explicit positive integer')
-        if not isinstance(concurrency, int) or not 1 <= concurrency <= MAX_IMPORT_CONCURRENCY:
+        if concurrency is not None and (not isinstance(concurrency, int) or not 1 <= concurrency <= MAX_IMPORT_CONCURRENCY):
             raise ValueError('template import concurrency must be an integer from 1 to ' + str(MAX_IMPORT_CONCURRENCY))
         self.call_cap, self.model, self.fallback, self.concurrency = call_cap, model, fallback, concurrency
 
@@ -189,7 +200,8 @@ class TemplateIntake:
             authorityHash=digest({'project': workspace.project_id, **models}),
             dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
             primary=primary, fallback=fallback, review=review, formattingAsOf=workspace.formatting_as_of,
-            policy=RuntimePolicy(callCap=self.call_cap, concurrency=self.concurrency,
+            policy=RuntimePolicy(callCap=self.call_cap,
+                concurrency=import_width(primary, fallback) if self.concurrency is None else self.concurrency,
                 processingSeconds=import_seconds(), cleanupSeconds=5,
                 finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
 

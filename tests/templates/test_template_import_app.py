@@ -33,9 +33,11 @@ def application(tmp_path, adapter, *, provider=None, call_cap, concurrency=1):
     dist = tmp_path / 'dist'
     dist.mkdir(exist_ok=True)
     (dist / 'index.html').write_text('Synthetic template import boundary')
+    # concurrency None keeps create_app's default: each import takes its provider's width (D154).
+    width = {} if concurrency is None else {'template_import_concurrency': concurrency}
     wrapped = create_app(origin=ORIGIN, secret=SECRET, temp_root=tmp_path / 'operations', dist=dist,
         data_root=tmp_path / 'data', connection_adapter=adapter, content_provider=provider,
-        template_import_call_cap=call_cap, template_import_concurrency=concurrency)
+        template_import_call_cap=call_cap, **width)
     TemplateStore(wrapped.app.state.projects.repository.root).activate(employment_package())
     return wrapped
 
@@ -150,7 +152,36 @@ async def test_an_import_captures_the_configured_concurrency_and_a_stored_one_ke
         intake.validate(operation, workspace)
         assert intake.capture(workspace, True).policy.concurrency == 1
         with pytest.raises(ValueError, match='concurrency'):
-            intake.configure(call_cap=4, model=None, concurrency=5)
+            intake.configure(call_cap=4, model=None, concurrency=9)
+
+
+@pytest.mark.asyncio
+async def test_a_new_import_takes_the_width_of_its_models_provider_and_a_stored_one_keeps_its_own(tmp_path):
+    # D154: by default Claude runs eight calls at once and Codex, like any other adapter, three; a fallback on another
+    # provider gives the smaller width.
+    provider = ScriptedTemplateProvider()
+    provider.template_adapter = 'claude_cli'
+    async with app_client(tmp_path, call_cap=4, provider=provider, concurrency=None) as (client, app):
+        intake = app.state.intake
+        project = (await upload(client)).json()['workspace']['projectId']
+        assert (await run_import(client, app, project, 'import-1'))['state'] == 'succeeded'
+        operation, workspace = operation_of(app, project), saved(app, project)
+        claude = operation.capture.primary
+        assert claude.adapter == 'claude_cli' and operation.capture.policy.concurrency == 8
+        other = claude.model_copy(update={'model': 'claude-other'})
+        codex = claude.model_copy(update={'adapter': 'codex_cli', 'model': 'codex-model'})
+        scripted = claude.model_copy(update={'adapter': 'scripted', 'model': 'scripted-model'})
+        def width(primary, fallback=None):
+            return intake.capture(workspace, True, models=(primary, fallback, None)).policy.concurrency
+        assert [width(claude), width(claude, other), width(codex), width(scripted)] == [8, 8, 3, 3]
+        assert width(claude, codex) == width(codex, claude) == 3
+        provider.template_adapter = 'codex_cli'
+        assert intake.capture(workspace, True).policy.concurrency == 3
+        # A fixed width serves every provider, and the stored import keeps the width it captured.
+        intake.concurrency = 2
+        assert width(claude) == 2
+        intake.validate(operation, workspace)
+        assert operation_of(app, project).capture.policy.concurrency == 8
 
 
 @pytest.mark.asyncio

@@ -239,7 +239,7 @@ class LocalBoundary:
 def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_executable: Path | None = None,
                connection_adapter: ConnectionAdapter | None = None, experimental_profile: ExperimentalCliProfile | None = None,
                data_root: Path | None = None, content_provider=None, clock=None, agent_runtime=None,
-               template_import_call_cap: int | None = None, template_import_concurrency: int = 3,
+               template_import_call_cap: int | None = None, template_import_concurrency: int | None = None,
                provider_registry: ProviderRegistry | None = None, provider_slots: dict[str, ProviderSlot] | None = None):
     if not origin.startswith("http://127.0.0.1:") or not origin.rsplit(":", 1)[-1].isdigit():
         raise ValueError("A concrete IPv4 loopback origin is required")
@@ -461,8 +461,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     intake.configure(call_cap=template_import_call_cap,
         model=template_import_model if template_import_call_cap is not None else None,
         fallback=template_fallback_model if template_import_call_cap is not None else None,
-        # Measured live: three blocks at once imported a QA resume in 155 s against 389 s sequentially, with no
-        # transport errors.
+        # None: each import takes the width of its models' provider (D154); a number fixes it for every import.
         concurrency=template_import_concurrency)
     intake.ready = v2_pipeline is not None
 

@@ -331,7 +331,7 @@ class ImportIssue(Wire):
         return self
 
 
-MAX_IMPORT_CONCURRENCY = 4
+MAX_IMPORT_CONCURRENCY = 8
 
 
 class RuntimePolicy(Wire):

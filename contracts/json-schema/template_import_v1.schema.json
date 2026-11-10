@@ -2682,7 +2682,7 @@
           "type": "integer"
         },
         "concurrency": {
-          "maximum": 4,
+          "maximum": 8,
           "minimum": 1,
           "title": "Concurrency",
           "type": "integer"

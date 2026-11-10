@@ -152,7 +152,7 @@ def test_a_restart_fences_every_parallel_attempt_still_in_flight():
         resume_operation(recovered, resume_command(recovered), NOW)
 
 
-@pytest.mark.parametrize('value', [0, 5, True])
+@pytest.mark.parametrize('value', [0, 9, True])
 def test_the_captured_concurrency_is_a_bounded_integer(value):
     from pydantic import ValidationError
     from packages.resume_core.models.template_import import RuntimePolicy

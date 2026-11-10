@@ -555,6 +555,23 @@ async def test_a_value_every_entry_states_is_cited_from_each_entrys_own_line(tmp
 
 
 @pytest.mark.asyncio
+async def test_a_wide_import_splits_a_block_into_at_most_three_groups(tmp_path):
+    # D154: Claude imports run eight calls at once, but more groups would add calls and reviews, not save time.
+    fixture = entries_fixture(tmp_path, count=4, concurrency=8)
+    fixture.transport.scripted = entries_script(
+        outline=lambda value: outline_answer(value, ('paper-a', 'paper-b', 'paper-c', 'paper-d')))
+    result = await run_import(fixture)
+    assert result.state == 'published' and not result.issues
+    entries = entries_of(result, result.tasks[0].id)
+    assert [[part.title for part in task.entry.parts] for task in entries] == [
+        [TITLES['paper-a'], TITLES['paper-b']], [TITLES['paper-c']], [TITLES['paper-d']]]
+    # The outline and its review, then a call and a review per group.
+    assert spent_calls(result) == 2 + 2 * 3
+    journals = [cell.raw_input for record in fixture.current().project.facts.extensions for cell in record.cells if cell.field_key == 'journal']
+    assert journals == [TITLES[key] for key in ('paper-a', 'paper-b', 'paper-c', 'paper-d')]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('overlap', ['part', 'whole'])
 async def test_a_missed_entry_that_overlaps_an_entry_keeps_its_free_lines_and_is_named_in_the_notice(tmp_path, overlap):
     # A missed entry sharing any line with a running entry was dropped without a word, its free lines unseen.
