@@ -4,7 +4,7 @@ from ..models.template_facts import ExtensionCell, ExtensionRecord
 from .template_identity import empty_value
 from ..templates.source_spans import payload_value
 from ..import_failure import TemplateImportFailure
-from .template_import import authorization, checked, instant, task_in
+from .template_import import authorization, checked, fork, instant, task_in
 from ..hashing import digest
 from .template_replacements import apply_accepted_records
 from .template_builtin_admission import (apply_builtin_records, current_handles, human_authority,
@@ -35,8 +35,11 @@ def task_facts_digest(operation, task_id, facts):
 
 
 def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, *, expected_revisions,
-                   expected_relation_revisions):
-    result, working = operation.model_copy(deep=True), facts.model_copy(deep=True)
+                   expected_relation_revisions, check=True):
+    # Of the operation only the proposal and its task change; the facts change throughout and are copied whole.
+    owners = {attempt.task_id for value in operation.proposals if value.id == proposal_id
+        for attempt in operation.attempts if attempt.id == value.attempt_id}
+    result, working = fork(operation, tasks=owners, proposals={proposal_id}), facts.model_copy(deep=True)
     proposal = next((value for value in result.proposals if value.id == proposal_id), None)
     receipt = next((value for value in result.receipts if value.id == receipt_id), None)
     review = next((value for value in result.review_inputs if receipt is not None and value.attempt_id == receipt.attempt_id), None)
@@ -238,4 +241,4 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
         if before_relations.get(relation.id) != relation.revision}
     proposal.state = 'accepted' if applied or proposal.admitted_relation_ids else 'rejected'
     task.expected_checks = review.value.targets
-    return checked(result), type(facts).model_validate(working.model_dump(by_alias=True))
+    return (checked(result) if check else result), type(facts).model_validate(working.model_dump(by_alias=True))

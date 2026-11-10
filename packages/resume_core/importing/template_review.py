@@ -11,7 +11,7 @@ from ..sources import capture_span, source_slice
 from ..templates.source_spans import payload_value
 from .template_identity import empty_value, evidence_options, offered_evidence, restore_evidence
 from ..import_failure import TemplateImportFailure
-from .template_import import attempt_in, checked, identity, task_in
+from .template_import import attempt_in, checked, fork, identity, task_in
 from ..hashing import digest
 from ..models.template_package import Check
 from ..hashing import canonical, sha256
@@ -324,8 +324,8 @@ def reusable_receipt(operation, value, sources):
     return None
 
 
-def record_review(operation, attempt_id, sources, now, *, id_factory=identity):
-    result = operation.model_copy(deep=True)
+def record_review(operation, attempt_id, sources, now, *, id_factory=identity, check=True):
+    result = fork(operation, attempts={attempt_id}, tasks={attempt_in(operation, attempt_id).task_id}, lists=('receipts',))
     attempt = attempt_in(result, attempt_id)
     stored = next((record for record in result.review_inputs if record.attempt_id == attempt_id), None)
     if (attempt.slot not in {'review', 'replacement_review'} or stored is None or stored.input_hash != attempt.input_hash
@@ -349,7 +349,7 @@ def record_review(operation, attempt_id, sources, now, *, id_factory=identity):
     attempt.review_receipt_id, attempt.state = receipt.id, 'reconciled'
     task = task_in(result, attempt.task_id)
     task.receipt_ids.append(receipt.id)
-    return checked(result), receipt
+    return (checked(result) if check else result), receipt
 
 
 @dataclass(frozen=True)

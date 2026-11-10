@@ -56,20 +56,25 @@ def expiry(value, seconds):
 
 
 def checked(operation):
-    # The JSON round trip validates the same model about a quarter faster than through Python objects.
+    # The JSON round trip validates the same model about a quarter faster than through Python objects. A pipeline step
+    # validates once after all its changes, so the transitions it calls take check=False (D154).
     return ImportOperation.model_validate_json(operation.model_dump_json(by_alias=True))
 
 
-def fork(operation, *, attempts=(), tasks=(), lists=()):
-    """A working copy for a step that changes only the given attempts and tasks and appends only to the given lists:
-    those are copied, everything else is shared with the input, which stays as it was. The step ends in checked(),
-    which builds a separate operation; a deep copy of the whole operation per step was most of the local import time."""
+def fork(operation, *, attempts=(), tasks=(), proposals=(), lists=()):
+    """A working copy for a step that changes only the given attempts, tasks and proposals and appends only to the given
+    lists: those are copied, everything else is shared with the input, which stays as it was. The step ends in
+    checked(), which builds a separate operation; a deep copy of the whole operation per step was most of the local
+    import time."""
     update = {name: list(getattr(operation, name)) for name in lists}
     if attempts:
         update['attempts'] = [value.model_copy(deep=True) if value.id in attempts else value
             for value in update.get('attempts', operation.attempts)]
     if tasks:
         update['tasks'] = [value.model_copy(deep=True) if value.id in tasks else value for value in operation.tasks]
+    if proposals:
+        update['proposals'] = [value.model_copy(deep=True) if value.id in proposals else value
+            for value in update.get('proposals', operation.proposals)]
     return operation.model_copy(update=update)
 
 
@@ -208,8 +213,8 @@ class ProcessingDeadline:
             (instant(operation.expires_at) - instant(wall_now)).total_seconds()))
 
 
-def capture_task_input(operation, task_id, value, handles, now, *, id_factory=identity):
-    result = operation.model_copy(deep=True)
+def capture_task_input(operation, task_id, value, handles, now, *, id_factory=identity, check=True):
+    result = fork(operation, tasks={task_id}, lists=('task_inputs',))
     task = task_in(result, task_id)
     checksum = digest(value)
     existing = next((record for record in result.task_inputs if record.task_id == task_id), None)
@@ -223,13 +228,13 @@ def capture_task_input(operation, task_id, value, handles, now, *, id_factory=id
     task.input_hash, task.allowed_handles = checksum, list(handles)
     result.task_inputs.append(TaskInputRecord(id=id_factory('input'), taskId=task_id, inputHash=checksum,
         value=value, capturedAt=now))
-    return checked(result)
+    return checked(result) if check else result
 
 
 ENTRY_TITLE = 120
 
 
-def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity):
+def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity, check=True):
     """The entry tasks of a block task (D117), one per group of consecutive outline entries ((title, spans) each),
     after the entries it has, in this order. An entry task extracts as its block does, under the same dependencies,
     and reads the block's captured input."""
@@ -248,10 +253,10 @@ def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity
             dependencies=list(parent.dependencies), inputHash=digest({'parent': parent.input_hash, 'entry': scope}),
             allowedHandles=[], expectedChecks=[], state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[],
             parentTaskId=parent_id, entry=scope))
-    return checked(result)
+    return checked(result) if check else result
 
 
-def add_outline_review(operation, parent_id, *, id_factory=identity):
+def add_outline_review(operation, parent_id, *, id_factory=identity, check=True):
     """The one review of a block's outline (D117), added with the block's entries."""
     result = fork(operation, lists=('tasks',))
     parent = task_in(result, parent_id)
@@ -262,7 +267,7 @@ def add_outline_review(operation, parent_id, *, id_factory=identity):
         dependencies=list(parent.dependencies), inputHash=digest({'parent': parent.input_hash, 'outline': 'review'}),
         allowedHandles=[], expectedChecks=[], state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[],
         parentTaskId=parent_id))
-    return checked(result)
+    return checked(result) if check else result
 
 
 def spent_calls(operation):
@@ -303,7 +308,8 @@ def cleanup_verified(operation):
     return all(attempt.cleanup.state == 'verified' for attempt in operation.attempts)
 
 
-def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, request_value=None, id_factory=identity):
+def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, request_value=None, id_factory=identity,
+                    check=True):
     result = fork(observe_time(operation, now), tasks={task_id}, lists=('attempts',))
     authority = authorization(result)
     if result.state != 'processing' or result.inference_closed or result.admitted_at is None:
@@ -373,10 +379,10 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     task.attempt_ids.append(attempt.id)
     task.state = ('checking' if slot in {'review', 'replacement_review'}
         else 'running' if slot == 'initial' or slot in OUTLINE_SLOTS else 'repairing')
-    return checked(result), attempt.id
+    return (checked(result) if check else result), attempt.id
 
 
-def dispatch_attempt(operation, attempt_id, now):
+def dispatch_attempt(operation, attempt_id, now, *, check=True):
     result = fork(observe_time(operation, now), attempts={attempt_id})
     authority = authorization(result)
     attempt = attempt_in(result, attempt_id)
@@ -384,10 +390,11 @@ def dispatch_attempt(operation, attempt_id, now):
             or attempt.authorization_id != authority.id):
         raise TemplateImportFailure('IMPORT_DISPATCH_DENIED')
     attempt.state, attempt.dispatched_at = 'dispatch_started', now
-    return checked(result)
+    return checked(result) if check else result
 
 
-def record_return(operation, attempt_id, raw_return, outcome, usage, cleanup, *, error_code=None, returned_at=None):
+def record_return(operation, attempt_id, raw_return, outcome, usage, cleanup, *, error_code=None, returned_at=None,
+                  check=True):
     result = fork(observe_time(operation, returned_at) if returned_at is not None else operation, attempts={attempt_id})
     attempt = attempt_in(result, attempt_id)
     checksum = sha256(raw_return.encode()) if raw_return is not None else None
@@ -406,7 +413,7 @@ def record_return(operation, attempt_id, raw_return, outcome, usage, cleanup, *,
             if attempt.error_code is not None and attempt.error_code != error_code:
                 raise TemplateImportFailure('IMPORT_RETURN_CONFLICT')
             attempt.error_code = error_code
-        return checked(result)
+        return checked(result) if check else result
     if attempt.state not in {'dispatch_started', 'outcome_unknown'}:
         raise TemplateImportFailure('IMPORT_RETURN_WITHOUT_DISPATCH')
     attempt.state, attempt.outcome, attempt.error_code = 'returned', outcome, error_code
@@ -415,7 +422,7 @@ def record_return(operation, attempt_id, raw_return, outcome, usage, cleanup, *,
     attempt.usage, attempt.cleanup = usage, cleanup
     if cleanup.state != 'verified':
         result.state = 'fenced'
-    return checked(result)
+    return checked(result) if check else result
 
 
 @dataclass(frozen=True)
@@ -427,7 +434,7 @@ class CleanupProof:
     never_dispatched: bool = False
 
 
-def reconcile_cleanup(operation, proof, now):
+def reconcile_cleanup(operation, proof, now, *, check=True):
     result = fork(operation, attempts={proof.attempt_id}, lists=('cleanup_records',))
     attempt = attempt_in(result, proof.attempt_id)
     if (proof.owner_hash != digest(attempt.owner) or not proof.witness
@@ -447,7 +454,7 @@ def reconcile_cleanup(operation, proof, now):
         attempt.state = 'released'
     elif attempt.state in {'reserved', 'dispatch_started'}:
         attempt.state = 'outcome_unknown'
-    return checked(result)
+    return checked(result) if check else result
 
 
 def recover_operation(operation):

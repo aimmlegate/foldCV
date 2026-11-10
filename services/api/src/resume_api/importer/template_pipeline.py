@@ -14,8 +14,8 @@ import time
 from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.repository.project_repository import decode_project, rich_snapshot_bytes, verifying
 from packages.resume_core.storage import strict_json
-from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ObservedUsage, PublicationOutcome,
-    ReferenceTable, ReviewInputRecord, TaskResultRecord)
+from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ImportOperation, ObservedUsage,
+    PublicationOutcome, ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.importing.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.importing.template_builtin_admission import current_handles
 from packages.resume_core.editing.template_effective import effective_cells
@@ -30,7 +30,7 @@ from packages.resume_core.importing.template_import import (GENERATION_SLOTS, Cl
                                                             add_entry_tasks, add_outline_review, admit_operation,
                                                             attempt_in, authorization, cancel_operation,
                                                             capture_finalization, capture_task_input, checked,
-                                                            children_of, dispatch_attempt, entries_of, identity,
+                                                            children_of, dispatch_attempt, entries_of, fork, identity,
                                                             observe_time, record_return, reconcile_cleanup,
                                                             recover_operation, reserve_attempt, resume_operation,
                                                             spent_calls, start_operation, stopped_call, stops_import,
@@ -97,6 +97,11 @@ def reference_table(captured, cells, relations):
 
 def owner(workspace):
     return workspace.project or workspace.pre_draft
+
+
+def with_holder(workspace, holder):
+    """A shallow copy of the workspace with another project or pre-draft."""
+    return workspace.model_copy(update={'project' if workspace.project is not None else 'pre_draft': holder})
 
 
 def reply_refs(raw):
@@ -342,12 +347,15 @@ class TemplatePipeline:
                 if cached[2] != view:
                     raise RuntimeError('Import read cache changed')
                 return cached[2]
-            with self.cache_lock:
-                self.read_cache.pop(project, None)
-                self.read_cache[project] = (committed, keys, view)
-                while len(self.read_cache) > CACHED_READS:
-                    self.read_cache.popitem(last=False)
+            self.remember(project, (committed, keys, view))
             return view
+
+    def remember(self, project, entry):
+        with self.cache_lock:
+            self.read_cache.pop(project, None)
+            self.read_cache[project] = entry
+            while len(self.read_cache) > CACHED_READS:
+                self.read_cache.popitem(last=False)
 
     async def view(self, project):
         """read() in a worker thread: it waits for the project lock and may copy the whole workspace."""
@@ -368,20 +376,30 @@ class TemplatePipeline:
                 client_mutation_id=identifier, request_sha256=hashlib.sha256(identifier.encode()).hexdigest())
             return self.read(project)
 
-    def update_operation(self, project, operation_id, transition, *, copy_on_write=False):
-        del copy_on_write
+    def update_operation(self, project, operation_id, transition):
         session = self.repository.open(project)
         with session.lock:
             before = self.read(project)
-            view = before.model_copy(deep=True)
-            data = owner(view)
-            prior = operation_in(view, operation_id)
-            updated = checked(transition(prior, data, view))
-            data.template_operations = [updated if value.id == operation_id else value for value in data.template_operations]
-            if view == before:
+            # The cached view is shared (execute_task, view() and the status route read it): a step gets its operation
+            # and a copy of the holder and edits neither in place. Its one validation reads the JSON the sidecar gets.
+            data = owner(before).model_copy()
+            prior = operation_in(before, operation_id)
+            text = transition(prior, data, with_holder(before, data)).model_dump_json(by_alias=True)
+            updated = ImportOperation.model_validate_json(text)
+            if updated == prior and data.facts == owner(before).facts:
                 return before
-            OperationSidecar(session.directory).write(project, before.project_revision, updated, data.facts)
-            self.read_cache.pop(project, None)
+            sidecar = OperationSidecar(session.directory)
+            sidecar.write(project, before.project_revision, updated, data.facts, text=text)
+            after = with_holder(before, owner(before).model_copy(update={'facts': data.facts, 'template_operations': [
+                updated if value.id == operation_id else value for value in owner(before).template_operations]}))
+            keys = sidecar.keys(project, after)
+            # The next read keeps what the sidecar now holds. With another import's sidecar file it reads the disk again,
+            # as before, so two live sidecars still end unknown.
+            if all(key is None for value, key in zip(owner(after).template_operations, keys) if value.id != operation_id):
+                self.remember(project, (session.workspace, keys, after))
+            else:
+                with self.cache_lock:
+                    self.read_cache.pop(project, None)
             return self.read(project)
 
     def update(self, project, identifier, transition):
@@ -640,8 +658,8 @@ class TemplatePipeline:
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
             value, handles = self.task_input(operation, task, data)
             workspace = await asyncio.to_thread(self.update_operation, project, operation_id,
-                lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(), id_factory=self.id_factory),
-                copy_on_write=True)
+                lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(),
+                    id_factory=self.id_factory, check=False))
             operation = operation_in(workspace, operation_id)
         if task.kind in {'derive', 'source_copy'}:
             derived = self.derive(operation, task_in(operation, task_id), owner(workspace))
@@ -733,10 +751,10 @@ class TemplatePipeline:
                 captured = [Relation.model_validate(relation) for relation in attempt_in(value, attempt_id).request_value.get('capturedRelations', [])]
                 self.facts_current(value, current.facts)
                 updated, facts, _proposal = parse_proposal(value, attempt_id, current.template_package,
-                    current.sources, current.facts, captured_relations=captured, id_factory=self.id_factory)
+                    current.sources, current.facts, captured_relations=captured, id_factory=self.id_factory, check=False)
                 current.facts = facts
                 return updated
-            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, parse, copy_on_write=True)
+            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, parse)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             proposal = next(value for value in operation.proposals if value.attempt_id == attempt_id)
             if proposal.state == 'invalid':
@@ -781,7 +799,8 @@ class TemplatePipeline:
                 kept_first = [False]
                 def accept(value, current, _workspace):
                     self.facts_current(value, current.facts)
-                    updated, receipt = record_review(value, review_id, current.sources, self.wall(), id_factory=self.id_factory)
+                    updated, receipt = record_review(value, review_id, current.sources, self.wall(), id_factory=self.id_factory,
+                        check=False)
                     admitted = applied_receipt(updated, task_id)
                     kept_first[:] = [admitted is not None and admitted.id != receipt.id and not better_repair(updated,
                         current.template_package, admitted, receipt, review, proposal)]
@@ -790,10 +809,11 @@ class TemplatePipeline:
                     updated, facts = admit_proposal(updated, proposal.id, receipt.id, current.template_package, current.sources,
                         current.facts, expected_revisions={handle: record.revision
                             for handle, record in current_handles(updated, current.facts).items()},
-                        expected_relation_revisions={relation.id: relation.revision for relation in current.facts.relations})
+                        expected_relation_revisions={relation.id: relation.revision for relation in current.facts.relations},
+                        check=False)
                     current.facts = facts
                     return updated
-                workspace = await asyncio.to_thread(self.update_operation, project, operation_id, accept, copy_on_write=True)
+                workspace = await asyncio.to_thread(self.update_operation, project, operation_id, accept)
                 operation = operation_in(workspace, operation_id)
                 receipt = next(value for value in operation.receipts if value.attempt_id == review_id)
                 decision = decide_review(review, receipt, proposal)
@@ -882,9 +902,9 @@ class TemplatePipeline:
         groups = grouped(scopes, count)
         def spawn(value, _data, _workspace):
             # The review goes first so it starts beside the first entries and adds a missed one early.
-            value = add_outline_review(value, task_id, id_factory=self.id_factory)
-            return add_entry_tasks(value, task_id, groups, 'outline', id_factory=self.id_factory)
-        workspace = await asyncio.to_thread(self.update_operation, project, operation_id, spawn, copy_on_write=True)
+            value = add_outline_review(value, task_id, id_factory=self.id_factory, check=False)
+            return add_entry_tasks(value, task_id, groups, 'outline', id_factory=self.id_factory, check=False)
+        workspace = await asyncio.to_thread(self.update_operation, project, operation_id, spawn)
         operation = operation_in(workspace, operation_id)
         return Spawned(task_id, tuple(child.id for child in children_of(operation, task_id)), True)
 
@@ -938,8 +958,7 @@ class TemplatePipeline:
             before = {child.id for child in children_of(operation, parent_id)}
             # Each missed entry runs on its own: they are few, and the groups already run.
             workspace = await asyncio.to_thread(self.update_operation, project, operation_id, lambda value, _data, _workspace:
-                add_entry_tasks(value, parent_id, [[scope] for scope in missing], 'review', id_factory=self.id_factory),
-                copy_on_write=True)
+                add_entry_tasks(value, parent_id, [[scope] for scope in missing], 'review', id_factory=self.id_factory, check=False))
             operation = operation_in(workspace, operation_id)
             added = [child.id for child in children_of(operation, parent_id) if child.id not in before]
         issues = []
@@ -960,6 +979,7 @@ class TemplatePipeline:
         def close(operation, current, _workspace):
             if operation.state in {'cancelled', 'fenced'} or any(result.task_id == parent_id for result in operation.task_results):
                 return operation
+            operation = fork(operation, tasks={parent_id}, lists=('task_results',))
             parent = task_in(operation, parent_id)
             results = {result.task_id: result for result in operation.task_results}
             if any(child.id not in results for child in children_of(operation, parent_id)):
@@ -994,14 +1014,16 @@ class TemplatePipeline:
                     return observed
             # A review's request is its review input record; storing it twice doubled the operation (5.3 MB, live).
             result, identifier = reserve_attempt(result, task_id, slot, digest(value), policy, launch_owner, self.wall(),
-                request_value=None if review is not None else value, id_factory=self.id_factory)
+                request_value=None if review is not None else value, id_factory=self.id_factory, check=False)
             if review is not None:
                 record = ReviewInputRecord(id=self.id_factory('review-input'), attemptId=identifier, inputHash=digest(review), value=review)
+                # reserve_attempt's fork shares this list with the cached view; its new attempt is its own.
+                result = fork(result, lists=('review_inputs',))
                 result.review_inputs.append(record)
                 attempt_in(result, identifier).review_input_record_id = record.id
             reserved.append(identifier)
             return result
-        await asyncio.to_thread(self.update_operation, project, operation_id, reserve, copy_on_write=True)
+        await asyncio.to_thread(self.update_operation, project, operation_id, reserve)
         if not reserved:
             raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
         attempt_id = reserved[0]
@@ -1012,8 +1034,8 @@ class TemplatePipeline:
             result = observe_time(result, now, elapsed_remaining=remaining)
             if remaining <= 0:
                 return self.reconcile_unlaunched(result, attempt_id, now)
-            return dispatch_attempt(result, attempt_id, now)
-        dispatched = await asyncio.to_thread(self.update_operation, project, operation_id, dispatch, copy_on_write=True)
+            return dispatch_attempt(result, attempt_id, now, check=False)
+        dispatched = await asyncio.to_thread(self.update_operation, project, operation_id, dispatch)
         if attempt_in(operation_in(dispatched, operation_id), attempt_id).state != 'dispatch_started':
             return attempt_id
         def returned(frame):
@@ -1029,9 +1051,10 @@ class TemplatePipeline:
                 result = record_return(result, attempt_id, frame.raw_return, 'timed_out' if late else frame.outcome,
                     ObservedUsage(inputTokens=frame.usage.input_tokens, cachedInputTokens=frame.usage.cached_input_tokens,
                         outputTokens=frame.usage.output_tokens, complete=frame.usage.complete), cleanup,
-                    error_code=frame.original_code or ('IMPORT_PROCESSING_EXHAUSTED' if late else None), returned_at=observed)
-                return reconcile_cleanup(result, proof, self.wall()) if proof is not None else result
-            self.update_operation(project, operation_id, retain, copy_on_write=True)
+                    error_code=frame.original_code or ('IMPORT_PROCESSING_EXHAUSTED' if late else None), returned_at=observed,
+                    check=False)
+                return reconcile_cleanup(result, proof, self.wall(), check=False) if proof is not None else result
+            self.update_operation(project, operation_id, retain)
         request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
             GenerationPolicy(policy.model, timeout_seconds=max(0.001, remaining), allow_repair=False,
                 reasoning_effort=policy.effort), on_return=returned, request_value=value)
@@ -1060,7 +1083,8 @@ class TemplatePipeline:
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
                     record_return(result, attempt_id, error.raw_return,  # noqa: F821
                         attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,  # noqa: F821
-                        attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code))  # noqa: F821
+                        attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code,  # noqa: F821
+                        check=False))
         else:
             if attempt_in(operation_in(await self.view(project), operation_id), attempt_id).state == 'dispatch_started':
                 await asyncio.to_thread(returned, ContentTransportReturn(response.raw_return, 'completed', None,
@@ -1073,14 +1097,15 @@ class TemplatePipeline:
 
     def reconcile_unlaunched(self, operation, attempt_id, now):
         """Release an attempt whose call stopped before the transport: that control flow is the never-dispatched proof."""
-        result = operation.model_copy(deep=True)
+        result = fork(operation, attempts={attempt_id})
         attempt = attempt_in(result, attempt_id)
         attempt.error_code = 'IMPORT_PROCESSING_EXHAUSTED'
         return reconcile_cleanup(result, CleanupProof(attempt.id, digest(attempt.owner), digest({'unlaunched': attempt.id}),
-            'coordinator-never-launched', True), now)
+            'coordinator-never-launched', True), now, check=False)
 
     async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False):
         def finish(operation, _data, _workspace):
+            operation = fork(operation, tasks={task_id}, lists=('issues', 'task_results'))
             task = task_in(operation, task_id)
             # A review remark on a block that already has admitted values is not a failed import. The result
             # disposition stays source_fallback so the lines the review named still appear under those values.
@@ -1274,7 +1299,7 @@ class TemplatePipeline:
             if not any(value.task_id == task_id for value in operation.task_inputs):
                 value, handles = self.task_input(operation, task, data)
                 await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
-                    capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory))
+                    capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory, check=False))
             if task.kind == 'outline_review':
                 await self.finish_task(project, operation_id, task_id, None, (), (), 'empty', [])
                 continue

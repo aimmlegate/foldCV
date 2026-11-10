@@ -10,7 +10,7 @@ from ..sources import source_slice
 from .template_identity import (allocate_discoveries, offered_evidence, offered_references, resolve_fields,
                                 resolve_lineage, restore_evidence)
 from ..import_failure import TemplateImportFailure
-from .template_import import attempt_in, checked, identity, task_in
+from .template_import import attempt_in, checked, fork, identity, task_in
 from ..hashing import digest
 from ..hashing import canonical, sha256
 from ..templates.projection import pointer_tokens, reachable_schema, validate_payload
@@ -206,8 +206,12 @@ def transport_refusal(attempt, package, block_id):
     return None
 
 
-def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_relations=(), id_factory=identity):
-    result, working = operation.model_copy(deep=True), facts.model_copy(deep=True)
+def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_relations=(), id_factory=identity,
+                   check=True):
+    # Only the attempt, its task and the appended lists change; the facts only gain observations.
+    result = fork(operation, attempts={attempt_id}, tasks={attempt_in(operation, attempt_id).task_id},
+        lists=('proposals', 'allocations', 'relation_allocations'))
+    working = facts.model_copy(update={'observations': list(facts.observations)})
     attempt = attempt_in(result, attempt_id)
     task = task_in(result, attempt.task_id)
     if attempt.proposal_record_id is not None:
@@ -286,4 +290,4 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
         attempt.error_code = attempt.error_code or 'IMPORT_PROPOSAL_INVALID'
     result.proposals.append(proposal)
     attempt.proposal_record_id, attempt.state = proposal.id, 'reconciled'
-    return checked(result), type(facts).model_validate(working.model_dump(by_alias=True)), proposal
+    return (checked(result) if check else result), type(facts).model_validate(working.model_dump(by_alias=True)), proposal

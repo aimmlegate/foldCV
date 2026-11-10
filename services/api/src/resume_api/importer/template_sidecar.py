@@ -40,12 +40,16 @@ class OperationSidecar:
             raise RepositoryFailure('JOB_STORE_UNAVAILABLE')
         return self.directory / 'imports' / (operation_id + '.json')
 
-    def write(self, project, revision, operation, facts):
-        """Atomically replace the sidecar with the operation and facts after one step on the given project revision."""
+    def write(self, project, revision, operation, facts, *, text=None):
+        """Atomically replace the sidecar with the operation and facts after one step on the given project revision;
+        `text` is the operation's JSON when the caller validated it from that text."""
         target = self.path(project, operation.id)
         _private_directory(target.parent)
-        raw = json.dumps({'schemaVersion': 1, 'projectRevision': revision, 'operation': operation.model_dump(mode='json', by_alias=True),
-            'facts': facts.model_dump(mode='json', by_alias=True)}, ensure_ascii=False, separators=(',', ':')).encode()
+        # The models' own JSON: the bytes json.dumps gave for a whole import record (floats keep their values, an
+        # exponent is spelled 1e-7), in a quarter of the time (D154).
+        raw = b''.join([b'{"schemaVersion":1,"projectRevision":', json.dumps(revision).encode(), b',"operation":',
+            (text or operation.model_dump_json(by_alias=True)).encode(), b',"facts":', facts.model_dump_json(by_alias=True).encode(),
+            b'}'])
         if len(raw) > WORKSPACE_CEILING_BYTES:
             raise RepositoryFailure('JOB_STORAGE_FULL')
         temporary = target.with_name(target.name + '.tmp')

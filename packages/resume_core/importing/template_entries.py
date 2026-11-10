@@ -156,16 +156,17 @@ def entry_records(operation, tasks):
 
 
 def reorder_records(facts, record_ids):
-    """facts with the named records in the given order; each list keeps the slots its named records hold."""
-    wanted = set(record_ids)
+    """facts with the named records in the given order; each list keeps the slots its named records hold. The given
+    facts stay as they were: an import step reads them from the shared cached view."""
+    wanted, update = set(record_ids), {}
     for name in ('records', 'extensions'):
-        items = getattr(facts, name)
+        items = update[name] = list(getattr(facts, name))
         present = [identifier for identifier in record_ids if any(item.id == identifier for item in items)]
         slots = [index for index, item in enumerate(items) if item.id in wanted]
         by_id = {item.id: item for item in items}
         for slot, identifier in zip(slots, present, strict=True):
             items[slot] = by_id[identifier]
-    return facts
+    return facts.model_copy(update=update)
 
 
 def grouped(scopes, count):
