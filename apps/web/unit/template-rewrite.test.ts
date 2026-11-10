@@ -20,8 +20,9 @@ function storage(): Storage {
 }
 Object.assign(globalThis, { sessionStorage: storage(), localStorage: storage() });
 
-const TASK = "Implemented queue processing.";
-const RESULT = "Our team reduced median latency from 800 ms to 500 ms.";
+// List items show without their closing mark: the list draws it (D152).
+const TASK = "Implemented queue processing";
+const RESULT = "Our team reduced median latency from 800 ms to 500 ms";
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; reopen: () => Promise<Opened> };
 
 async function opened(value: Harness): Promise<Opened> {
@@ -114,11 +115,11 @@ test("E05: a preview changes nothing; Apply replaces exactly the shown text once
     // The user adjusts the shown text; exactly that text applies.
     await session.applyRewrite(preview, "Built the queue");
     ({ response, blocks } = await shown(session));
-    assert.equal(blocks.find(block => block.id === second.id)?.text, "Built the queue processing.");
+    assert.equal(blocks.find(block => block.id === second.id)?.text, "Built the queue processing");
     assert.equal(blocks.find(block => block.id === first.id)?.text, TASK, "unrelated content unchanged");
     const claims = response.workspace.project?.facts.records.filter(record => record.kind === "claim")
       .map(record => (record as unknown as { value: { rawText: string } }).value.rawText).sort();
-    assert.deepEqual(claims, [RESULT, TASK, "Built the queue processing."].sort());
+    assert.deepEqual(claims, [RESULT, TASK, "Built the queue processing"].sort());
     assert.equal(session.history.length, length + 1, "one action");
     assert.equal((await rewriteCalls(value)).length, 1, "Apply makes no generation call");
     await session.navigate("undo");
@@ -127,7 +128,7 @@ test("E05: a preview changes nothing; Apply replaces exactly the shown text once
     assert.equal(identities(blocks), shape, "one Undo restores the document");
     await session.navigate("redo");
     ({ blocks } = await shown(session));
-    assert.equal(blocks.find(block => block.id === second.id)?.text, "Built the queue processing.");
+    assert.equal(blocks.find(block => block.id === second.id)?.text, "Built the queue processing");
     assert.equal(warnings.length, 0, warnings.join("\n"));
   } finally { session.close(); await value.close(); }
 });

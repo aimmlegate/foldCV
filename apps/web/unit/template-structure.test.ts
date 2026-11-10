@@ -20,8 +20,9 @@ function storage(): Storage {
 }
 Object.assign(globalThis, { sessionStorage: storage(), localStorage: storage() });
 
-const TASK = "Implemented queue processing.";
-const RESULT = "Our team reduced median latency from 800 ms to 500 ms.";
+// List items show without their closing mark: the list draws it (D152).
+const TASK = "Implemented queue processing";
+const RESULT = "Our team reduced median latency from 800 ms to 500 ms";
 type Opened = { session: TemplateEditorSession; editor: TemplateEditor; warnings: string[]; reopen: () => Promise<Opened> };
 
 async function opened(value: Harness): Promise<Opened> {
@@ -127,7 +128,7 @@ test("E04: reorder, edit, split and merge the second identical task touch only i
     await session.flush();
     ({ response, blocks } = await shown(session));
     const fragments = blocks.filter(block => fields(block).some(field => field.cellId === secondField.cellId));
-    assert.deepEqual(fragments.map(block => block.text), ["Implemented", " queue processing. Again"]);
+    assert.deepEqual(fragments.map(block => block.text), ["Implemented", " queue processing Again"]);
     assert.deepEqual(new Set(fragments.map(block => fields(block)[0]?.occurrenceId)), new Set([secondField.occurrenceId]));
     const right = fragments[1];
     assert.ok(right);
