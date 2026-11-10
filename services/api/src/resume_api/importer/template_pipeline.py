@@ -126,6 +126,9 @@ CACHED_READS = 4
 # A model call holds its thread for its whole time, so calls get their own pool (D154): on the loop's default pool
 # (eight threads on a four-core machine) eight calls left none to steps and views. Room for four imports at width 8.
 CALL_THREADS = 32
+# A per_entry block splits into at most three groups whatever the width (D154): more groups add calls and reviews,
+# and the side blocks, not the entries, are the long part of an import.
+ENTRY_GROUPS = 3
 
 
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
@@ -873,7 +876,7 @@ class TemplatePipeline:
             return None
         # Each group needs its call and its review after the outline review; other blocks spent calls meanwhile.
         room = (operation.capture.policy.call_cap - spent_calls(operation) - 1) // 2
-        count = min(operation.capture.policy.concurrency, room)
+        count = min(operation.capture.policy.concurrency, ENTRY_GROUPS, room)
         if len(scopes) < 2 or count < 2:
             return None
         groups = grouped(scopes, count)

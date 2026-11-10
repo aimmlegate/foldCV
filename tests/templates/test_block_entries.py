@@ -546,7 +546,8 @@ async def test_a_value_every_entry_states_is_cited_from_each_entrys_own_line(tmp
     assert result.state == 'published' and not result.issues
     from packages.resume_core.importing.template_import import attempt_in
     entries = entries_of(result, result.tasks[0].id)
-    assert len(entries) == 4
+    # At most three groups (D154): the first holds two of the four entries.
+    assert [len(task.entry.parts) for task in entries] == [2, 1, 1]
     for task in entries:
         [proposal] = [value for value in result.proposals if attempt_in(result, value.attempt_id).task_id == task.id]
         lines = {digest(span) for span in task.entry.spans}

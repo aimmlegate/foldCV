@@ -6212,8 +6212,8 @@ export interface ImportTask {
 }
 /**
  * The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
- * the outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)
- * and whether the outline or its review named them.
+ * the outline entries they hold (consecutive ones, joined into at most three groups, D154) and whether the outline
+ * or its review named them.
  */
 export interface EntryScope {
   index: Index1;

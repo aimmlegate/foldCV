@@ -2847,7 +2847,7 @@
     },
     "EntryScope": {
       "additionalProperties": false,
-      "description": "The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,\nthe outline entries they hold (consecutive ones, joined so the block makes about as many calls as run at once)\nand whether the outline or its review named them.",
+      "description": "The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,\nthe outline entries they hold (consecutive ones, joined into at most three groups, D154) and whether the outline\nor its review named them.",
       "properties": {
         "index": {
           "minimum": 1,
