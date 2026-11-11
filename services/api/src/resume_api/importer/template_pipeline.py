@@ -51,8 +51,8 @@ from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PR
     review_schema, PROPOSAL_PROTOCOL)
 from packages.resume_core.importing.template_map import (apply_repair, block_evidence, entry_evidence, header_fields,
                                                          map_choices, map_input, map_repair_input, map_scopes, map_task,
-                                                         mapped_review, parse_map, reads_whole_cv, source_map,
-                                                         whole_source)
+                                                         mapped_review, name_findings, parse_map, reads_whole_cv,
+                                                         source_map, titled_by_employer, whole_source)
 
 from .. import import_usage
 from ..inference_admission import CALLS
@@ -923,8 +923,10 @@ class TemplatePipeline:
                     # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                     previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
                 if prior_review is None and task_input.get('mapped'):
-                    # T4: the review reads what the trimmed request read, and the lines the reply cites.
-                    review = mapped_review(review, proposal, attempt.request_value)
+                    # T4: the review reads what the trimmed request read, and the lines the reply cites; a map entry's
+                    # project name its lines do not state word for word is a finding.
+                    review = name_findings(mapped_review(review, proposal, attempt.request_value), proposal, task, block,
+                        data.sources)
             review_attempt = next((value for value in reversed(operation.attempts) if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
                 and value.state != 'released' and not stopped_call(operation, value)), None)
@@ -1250,8 +1252,12 @@ class TemplatePipeline:
             done = [results[task.id] for task in entries]
             current.facts = reorder_records(current.facts, entry_records(operation, entries))
             parent.state, disposition = closed_state(entries)
+            admitted = {attempt_in(operation, proposal.attempt_id).task_id: proposal for proposal in operation.proposals
+                if proposal.applied_receipt_id is not None}
+            flags = titled_by_employer(entries, admitted, current.sources)
             operation.task_results.append(TaskResultRecord(id=self.id_factory('task-result'), taskId=parent_id,
-                inputHash=parent.input_hash, value={'entries': [task.id for task in entries]}, sourceSpans=[],
+                inputHash=parent.input_hash, value={'entries': [task.id for task in entries],
+                    **({'titledByEmployer': flags} if flags else {})}, sourceSpans=[],
                 itemHandles=list(dict.fromkeys(handle for result in done for handle in result.item_handles)), issueIds=[],
                 disposition=disposition))
             return operation

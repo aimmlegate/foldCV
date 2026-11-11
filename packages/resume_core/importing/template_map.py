@@ -16,14 +16,16 @@ import re
 
 from ..hashing import digest
 from ..models.template_import import (EntryHeader, EvidenceOption, HeaderValue, MapRepairReply, MapReply,
-                                      ReviewInput)
+                                      ReviewInput, SettledCheck)
 from ..sources import capture_span, line_spans, source_slice
 from ..templates.compiler import splits_entries
 from ..templates.replies import MAP_PROTOCOL, MAP_REPAIR_PROTOCOL, MAPPED_REVIEW_PROTOCOL
 from ..template_source_cleanup import without_contacts
 from ..templates.projection import pointer_tokens
+from ..templates.source_spans import payload_value
 from .template_entries import MAX_TITLE, _bounds, _position, line_options
 from .template_identity import evidence_options, offered_evidence
+from .template_review import grouped_checks, review_checks
 
 HEADERS = ('employer', 'jobTitle', 'period')
 
@@ -496,6 +498,82 @@ def merge_header(reply, entry, table, block, definition, sources):
         at = next((index for index, (_ref, other) in enumerate(merged) if _position(sources, other.span) > place), len(merged))
         merged.insert(at, (ref, option))
     return {**reply, 'payload': payload, 'fields': entries}, dict(merged)
+
+
+# T4, point 15: the entry's own reply names its project; a name its lines do not state word for word is one finding.
+NAME_FINDING = 'Название проекта не стоит в строках записи слово в слово: «{name}».'
+
+
+def _named(value, texts):
+    """Whether the lines state the value word for word: spacing aside, case and punctuation kept."""
+    pattern = re.compile(r'(?<!\w)' + r'\s+'.join(re.escape(word) for word in value.split()) + r'(?!\w)')
+    return any(pattern.search(text) for text in texts)
+
+
+def _at(pattern, pointer):
+    expected, actual = pointer_tokens(pattern), pointer_tokens(pointer)
+    return len(expected) == len(actual) and all(left in {'*', right} for left, right in zip(expected, actual))
+
+
+def name_pointers(block):
+    """The bound project names of a block of entries: /*/project/name in the bundled templates."""
+    return [binding.pointer for binding in block.bindings if pointer_tokens(binding.pointer)[-2:] == ['project', 'name']]
+
+
+def name_findings(review, proposal, task, block, sources):
+    """The review of a map entry with each project name its own lines do not state word for word failed by the
+    coordinator on the block's first support rule, its other checks held (T4, point 15); the model is asked the rest."""
+    pointers = name_pointers(block)
+    if task.entry is None or task.entry.origin != 'map' or not pointers:
+        return review
+    texts = [source_slice(sources, span) for span in task.entry.spans]
+    cells = {allocation.item_handle: allocation.cell_ids for allocation in review.handle_map}
+    judges = [rule.id for rule in block.checks if rule.kind == 'semantic_support'] + [review.rules[-2].id]
+    found = {}
+    for field in proposal.resolved_fields:
+        value = payload_value(proposal.reply.payload, field.pointer)
+        if (not any(_at(pattern, field.pointer) for pattern in pointers) or not isinstance(value, str) or not value.strip()
+                or _named(value, texts) or field.item_handle not in cells):
+            continue
+        cell = cells[field.item_handle][field.field_key]
+        own = [target for target in review.targets if target.target_id == cell]
+        failing = next((target for rule in judges for target in own if target.rule_id == rule), None)
+        for target in own if failing is not None else []:
+            found[(target.rule_id, target.target_id)] = SettledCheck(ruleId=target.rule_id, targetId=target.target_id,
+                disposition='violation' if target is failing else 'satisfied',
+                reason=NAME_FINDING.format(name=' '.join(value.split())[:120]) if target is failing else '', evidence=[],
+                actionable=target is failing, origin='verbatim')
+    if not found:
+        return review
+    settled = {(value.rule_id, value.target_id): value for value in review.settled}
+    settled.update(found)
+    keys = [(target.rule_id, target.target_id) for target in review.targets]
+    asked = [target for target, key in zip(review.targets, keys) if key not in settled]
+    refs = {digest(option.span): option.ref for option in review.evidence}
+    value = review.model_dump(mode='json', by_alias=True)
+    value['settled'] = [settled[key].model_dump(mode='json', by_alias=True) for key in keys if key in settled]
+    value['semanticContext'] = {**review.semantic_context, 'checks': grouped_checks(review_checks(task, proposal,
+        review.handle_map, asked, refs))}
+    return ReviewInput.model_validate(value)
+
+
+def titled_by_employer(entries, proposals, sources):
+    """The map entries titled by their employer whose reply names a project (T4, point 15): no finding, a flag the
+    block's result keeps for the lane's report. entries are the block's entry tasks, proposals their admitted replies."""
+    flags = []
+    for task in entries:
+        proposal = proposals.get(task.id)
+        items = proposal.reply.payload if proposal is not None and proposal.reply is not None else None
+        if task.entry.origin != 'map' or not isinstance(items, list):
+            continue
+        for position, index in enumerate(_assigned(items, task.entry.parts, sources)):
+            part, item = task.entry.parts[index], items[position]
+            employer = part.header.employer if part.header is not None else None
+            name = ((item.get('project') or {}).get('name') if isinstance(item, dict) else None)
+            if (employer is not None and isinstance(name, str) and name.strip()
+                    and ' '.join(part.title.split()).casefold() == ' '.join(employer.value.split()).casefold()):
+                flags.append({'entry': task.entry.index, 'title': part.title, 'name': ' '.join(name.split())})
+    return flags
 
 
 def unused_spans(operation):

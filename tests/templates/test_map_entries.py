@@ -2,6 +2,8 @@
 its own lines, and the coordinator puts each item's employer, job title and period from the map's header lines into
 the reply before completion. A header value no line states is dropped and named."""
 
+from copy import deepcopy
+
 import pytest
 
 from packages.resume_core.hashing import digest
@@ -168,7 +170,7 @@ async def test_a_scripted_import_of_entries_from_the_map_publishes_the_document_
 async def test_a_header_value_no_line_states_is_dropped_its_field_stays_empty_and_the_entry_names_it(tmp_path):
     def wrap(script):
         def answer(request, value):
-            reply = script(request, value)
+            reply = deepcopy(script(request, value))
             if value.get('slot') == 'map':
                 reply['entries'][0]['employer'] = {'value': 'Imagined Holdings', 'line': reply['entries'][0]['first']}
             elif 'entry' in value and value.get('slot') == 'initial':
@@ -187,3 +189,54 @@ async def test_a_header_value_no_line_states_is_dropped_its_field_stays_empty_an
     notices = [issue for issue in result.issues if issue.code == 'IMPORT_VALUE_UNBOUND']
     assert len(notices) == 1 and '«Imagined Holdings»' in notices[0].message
     assert 'Imagined Holdings' not in '\n'.join(document(workspace))
+
+
+def names(result, block='projects'):
+    tasks = {task.id: task for task in result.tasks}
+    return [value.value for value in result.task_results if tasks[value.task_id].block_id == block
+        and tasks[value.task_id].parent_task_id is None and isinstance(value.value, dict) and 'entries' in value.value]
+
+
+@pytest.mark.asyncio
+async def test_a_project_name_the_entrys_lines_do_not_state_word_for_word_is_one_finding_its_repair_fixes(tmp_path):
+    def wrap(script):
+        def answer(request, value):
+            # The scripted replies share the table's items: change a copy.
+            reply = deepcopy(script(request, value))
+            if 'entry' in value and value.get('slot') == 'initial':
+                for part in reply['payload']:
+                    if (part.get('project') or {}).get('name') == 'Queue Platform':
+                        # Re-punctuated: the lines write «Queue Platform».
+                        part['project']['name'] = 'Queue-Platform'
+            return reply
+        return answer
+    _fixture, result, workspace, _originals = await generic_import(tmp_path, 'F10', source_map=True, concurrency=3, wrap=wrap)
+    assert result.state == 'published'
+    found = [(record, value) for record in result.review_inputs for value in record.value.settled
+        if value.disposition == 'violation' and value.reason.startswith('Название проекта')]
+    assert len(found) == 1 and found[0][1].reason == 'Название проекта не стоит в строках записи слово в слово: «Queue-Platform».'
+    review = found[0][0].value
+    asked = {(target.rule_id, target.target_id) for target in review.targets} - {(value.rule_id, value.target_id)
+        for value in review.settled}
+    # The model is not asked about the name; its other checks keep their refs in target order.
+    assert not any(target_id == found[0][1].target_id for _rule, target_id in asked)
+    assert [group['checks'] for group in review.semantic_context['checks']] and len({check for group in
+        review.semantic_context['checks'] for check in group['checks']}) == len(asked)
+    slots = [attempt.slot for attempt in result.attempts]
+    assert slots.count('primary_repair') == 1 and slots.count('replacement_review') == 1
+    shown = '\n'.join(document(workspace))
+    assert 'Queue Platform' in shown and 'Queue-Platform' not in shown
+    # Only F10's own designed finding (a result claiming more than its line) stays a warning; the name's is fixed.
+    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_FALLBACK']
+    assert 'Название проекта' not in result.issues[0].message
+
+
+@pytest.mark.asyncio
+async def test_an_entry_the_map_titled_by_its_employer_that_names_a_project_is_flagged_without_a_finding(tmp_path):
+    _fixture, result, _workspace, _originals = await generic_import(tmp_path, 'F10', source_map=True, concurrency=3)
+    # The scripted map titles each entry by its company; the second job names its project.
+    [closed] = names(result)
+    assert [(flag['title'], flag['name']) for flag in closed['titledByEmployer']] == [('Example Labs', 'Queue Platform')]
+    assert not any(value.disposition == 'violation' and value.reason.startswith('Название проекта')
+        for record in result.review_inputs for value in record.value.settled)
+    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_FALLBACK']

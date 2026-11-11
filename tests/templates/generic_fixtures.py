@@ -268,8 +268,9 @@ def satisfied(value, verdict=None):
     return {'results': results}
 
 
-def entry_bounds(block, payload, src, cites, value, index):
-    """The first and last offered line the scripted entry `index` cites, by this request's refs (D117)."""
+def entry_bounds(block, payload, src, cites, value, index, *, offered=True):
+    """The first and last offered line the scripted entry `index` cites, by this request's refs (D117); with
+    offered=False, None when this request offers none of them."""
     reply = block_reply(block, payload, src, cites)
     cited = [field['evidence'] for field in reply['fields'] if pointer_tokens(field['pointer'])[:1] == [str(index)]]
     lines = [option for option in value['evidence'] if '\n' not in option['text'].strip()]
@@ -278,6 +279,8 @@ def entry_bounds(block, payload, src, cites, value, index):
     holders = sorted({option['ref'] for spans in cited for cited_span in spans for option in lines
         if option['span']['unitId'] == cited_span['unitId'] and option['span']['start'] <= cited_span['start']
         and cited_span['end'] <= option['span']['end']}, key=order.get)
+    if not holders and not offered:
+        return None
     assert holders, 'scripted entry cites no offered line'
     return holders[0], holders[-1]
 
@@ -295,12 +298,7 @@ def entry_table(payload, cites, indices):
 def entry_items(block, payload, src, cites, value):
     """The scripted items an entry request covers: those whose cited lines are the bounds of one of its parts. An entry
     the map named (T4) is offered only its own lines, so the other items have none here."""
-    bounds = {}
-    for index in range(len(payload)):
-        try:
-            bounds[entry_bounds(block, payload, src, cites, value, index)] = index
-        except AssertionError:
-            continue
+    bounds = {entry_bounds(block, payload, src, cites, value, index, offered=False): index for index in range(len(payload))}
     return [bounds[(part['first'], part['last'])] for part in value['entry']['parts'] if (part['first'], part['last']) in bounds]
 
 
