@@ -24,9 +24,9 @@ from packages.resume_core.sources import line_spans, source_slice
 from packages.resume_core.importing.template_identity import (empty_value, evidence_options, offered_evidence,
                                                               offered_references)
 from packages.resume_core.importing.template_entries import (closed_state, entry_part, entry_records, grouped,
-                                                             line_options, ordered_entries, outline_part,
-                                                             parse_outline, parse_outline_review, reorder_records,
-                                                             splits_entries)
+                                                             header_dropped, line_options, map_entry_part,
+                                                             ordered_entries, outline_part, parse_outline,
+                                                             parse_outline_review, reorder_records, splits_entries)
 from packages.resume_core.importing.template_import import (GENERATION_SLOTS, TRANSIENT, CleanupProof, ProcessingDeadline,
                                                             add_entry_tasks, add_outline_review, admit_operation,
                                                             attempt_in, authorization, cancel_operation,
@@ -49,9 +49,10 @@ from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL,
     map_repair_schema, map_schema, outline_review_schema, outline_schema, proposal_protocol, proposal_schema,
     review_schema, PROPOSAL_PROTOCOL)
-from packages.resume_core.importing.template_map import (apply_repair, block_evidence, map_choices, map_input,
-                                                         map_repair_input, map_task, mapped_review, parse_map,
-                                                         reads_whole_cv, source_map, whole_source)
+from packages.resume_core.importing.template_map import (apply_repair, block_evidence, entry_evidence, header_fields,
+                                                         map_choices, map_input, map_repair_input, map_scopes, map_task,
+                                                         mapped_review, parse_map, reads_whole_cv, source_map,
+                                                         whole_source)
 
 from .. import import_usage
 from ..inference_admission import CALLS
@@ -163,9 +164,12 @@ BACKOFF_SECONDS = 20
 UNBOUND_MESSAGE = 'Убраны данные, которые источник не подтверждает: {values}.'
 
 
+def dropped_text(texts):
+    return UNBOUND_MESSAGE.format(values='; '.join('«' + text.strip()[:120] + '»' for text in texts))
+
+
 def unbound_text(proposal):
-    values = '; '.join('«' + value.text.strip()[:120] + '»' for value in proposal.dropped_values)
-    return UNBOUND_MESSAGE.format(values=values)
+    return dropped_text([value.text for value in proposal.dropped_values])
 
 
 def unbound_issues(id_factory, task_id, proposal, fingerprint):
@@ -174,6 +178,17 @@ def unbound_issues(id_factory, task_id, proposal, fingerprint):
     return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id], blockIds=[],
         category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND',
         message=unbound_text(proposal) + ' Остальное в блоке принято.',
+        importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
+        retiredByAction=None)]
+
+
+def header_issues(id_factory, task, fingerprint):
+    """The notice of a map entry whose header values no source line states (T4): they were dropped, D156's warning."""
+    values = header_dropped(task.entry) if task.entry is not None else []
+    if not values:
+        return []
+    return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task.id, targetIds=['scope-' + task.id], blockIds=[],
+        category='uncertain_interpretation', code='IMPORT_VALUE_UNBOUND', message=dropped_text(values) + ' Остальное в блоке принято.',
         importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
         retiredByAction=None)]
 
@@ -674,6 +689,12 @@ class TemplatePipeline:
             # D117: an entry or the outline review reads the block's captured input, plus the part that names its scope.
             parent = next(value.value for value in operation.task_inputs if value.task_id == task.parent_task_id)
             offered = offered_evidence(parent) or {}
+            if task.entry is not None and task.entry.origin == 'map':
+                # T4: an entry the map named reads only its own lines; its parts bring their header values.
+                lines = source_map(operation)[1]
+                evidence = entry_evidence(offered, lines, task.entry.spans, data.sources)
+                return {**parent, 'evidence': [option.model_dump(mode='json', by_alias=True) for option in evidence],
+                    'entry': map_entry_part(task, offered)}, list(task_in(operation, task.parent_task_id).allowed_handles)
             part = ({'outline': outline_part(operation, task.parent_task_id, offered)} if task.kind == 'outline_review'
                 else {'entry': entry_part(operation, task, offered)})
             return {**parent, **part}, list(task_in(operation, task.parent_task_id).allowed_handles)
@@ -773,7 +794,10 @@ class TemplatePipeline:
             return await self.map_source(project, operation_id, task_id, deadline, cancel)
         block = next(value for value in data.template_package.definition.blocks if value.id == task.block_id)
         if task.parent_task_id is None and splits_entries(block):
-            spawned = await self.outline(project, operation_id, task_id, deadline, cancel)
+            stored = next(value.value for value in operation.task_inputs if value.task_id == task_id)
+            # T4: with a map the block's entries are the map's; without one D117's outline names them.
+            entries = self.map_entries if stored.get('mapped') else self.outline
+            spawned = await entries(project, operation_id, task_id, deadline, cancel)
             if spawned is not None:
                 return spawned
         feedback, unresolved, previous, previous_receipt, repair_reviewed = (), [], None, None, False
@@ -812,7 +836,9 @@ class TemplatePipeline:
                 if offered is not None:
                     references = reference_table(captured, stored.value.get('effectiveCells', []), relations)
                     request['references'] = references.model_dump(mode='json', by_alias=True)
-                    request['replyProtocol'] = proposal_protocol(references, entry=task.entry is not None)
+                    header = (header_fields(block, data.template_package.definition)
+                        if task.entry is not None and task.entry.origin == 'map' else None)
+                    request['replyProtocol'] = proposal_protocol(references, entry=task.entry is not None, header=header)
                 if previous is not None:
                     # D107: a repair that saw only the findings wrote the block anew and lost admitted values.
                     request['previousReply'] = previous_reply(previous, offered, references)
@@ -948,8 +974,10 @@ class TemplatePipeline:
         handles = [handle for handle in [*[field.item_handle for field in proposal.resolved_fields],
             *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
         fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
+        issues = [*unbound_issues(self.id_factory, task_id, proposal, fingerprint),
+            *header_issues(self.id_factory, task_in(operation, task_id), fingerprint)]
         await self.finish_task(project, operation_id, task_id, None, (), handles,
-            'empty' if empty_value(proposal.reply.payload) else 'admitted', unbound_issues(self.id_factory, task_id, proposal, fingerprint))
+            'empty' if empty_value(proposal.reply.payload) else 'admitted', issues)
 
     async def outline(self, project, operation_id, task_id, deadline, cancel):
         """The outline call of a block that extracts its entries on their own (D117): what the block task added, or
@@ -1094,6 +1122,28 @@ class TemplatePipeline:
         """The task's latest call in a slot that counts; a slot holds two when the first never answered (D155)."""
         return next((attempt.id for attempt in reversed(operation.attempts) if attempt.task_id == task_id
             and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
+
+    async def map_entries(self, project, operation_id, task_id, _deadline, _cancel):
+        """The entries of a block the map named (T4, point 9): they run in at most three groups, as D117's do, and one
+        group at one call at a time; no outline and no outline review. None when the block runs whole: it ran whole
+        already, the map named no entry of it, or the cap has no room for a call and a review of a group."""
+        workspace = await self.view(project)
+        operation = operation_in(workspace, operation_id)
+        children = children_of(operation, task_id)
+        if children:
+            # Resumed after its entries were added: they run on and the block closes when they all ended.
+            return Spawned(task_id, tuple(child.id for child in children), True)
+        if any(attempt.task_id == task_id and attempt.slot in GENERATION_SLOTS for attempt in operation.attempts):
+            return None
+        scopes = map_scopes(*source_map(operation), task_in(operation, task_id).block_id)
+        policy = operation.capture.policy
+        count = min(policy.concurrency, ENTRY_GROUPS, (policy.call_cap - spent_calls(operation)) // 2)
+        if not scopes or count < 1:
+            return None
+        groups = grouped(scopes, count)
+        workspace = await self.step(project, operation_id, 'entries', lambda value, _data, _workspace: add_entry_tasks(
+            value, task_id, groups, 'map', id_factory=self.id_factory, check=False))
+        return Spawned(task_id, tuple(child.id for child in children_of(operation_in(workspace, operation_id), task_id)), True)
 
     async def map_call(self, project, operation_id, task_id, slot, request, schema, deadline, cancel, room):
         """One call of the map task (T4) and its one more call if it never answered: the attempt to read, or the code
@@ -1485,6 +1535,8 @@ class TemplatePipeline:
             message = fallback_message(first, len(failures), shown=not kept and len(spans) > len(leftover))
         if applied is not None and applied.dropped_values:
             message += ' ' + unbound_text(applied)
+        if task.entry is not None and header_dropped(task.entry):
+            message += ' ' + dropped_text(header_dropped(task.entry))
         # A rejected cell is absent from the document. The scope target keeps the notice on this block's view.
         targets = list(dict.fromkeys(result.target_id for result in failures)) if failures else ['scope-' + task_id]
         if kept and not any(target.startswith('scope-') for target in targets):

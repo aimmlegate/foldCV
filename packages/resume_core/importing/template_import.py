@@ -248,9 +248,9 @@ ENTRY_TITLE = 120
 
 
 def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity, check=True):
-    """The entry tasks of a block task (D117), one per group of consecutive outline entries ((title, spans) each),
-    after the entries it has, in this order. An entry task extracts as its block does, under the same dependencies,
-    and reads the block's captured input."""
+    """The entry tasks of a block task (D117), one per group of consecutive outline or map entries ((title, spans) each,
+    a map entry also its header), after the entries it has, in this order. An entry task extracts as its block does,
+    under the same dependencies, and reads the block's captured input."""
     result = fork(operation, lists=('tasks',))
     parent = task_in(result, parent_id)
     if (parent.parent_task_id is not None or parent.kind not in {'extract', 'rewrite'} or parent.state in TERMINAL_TASKS
@@ -258,10 +258,11 @@ def add_entry_tasks(operation, parent_id, groups, origin, *, id_factory=identity
         raise TemplateImportFailure('IMPORT_TASK_NOT_READY')
     taken = max([task.entry.index for task in entries_of(result, parent_id)], default=0)
     for offset, group in enumerate(groups, 1):
-        title = ', '.join(title for title, _spans in group)
+        title = ', '.join(part[0] for part in group)
         title = title if len(title) <= ENTRY_TITLE else title[:ENTRY_TITLE - 1].rstrip() + '…'
-        scope = EntryScope(index=taken + offset, title=title, spans=[span for _title, spans in group for span in spans],
-            parts=[EntryPart(title=part, spans=list(spans)) for part, spans in group], origin=origin)
+        scope = EntryScope(index=taken + offset, title=title, spans=[span for part in group for span in part[1]],
+            parts=[EntryPart(title=part[0], spans=list(part[1]), header=part[2] if len(part) > 2 else None) for part in group],
+            origin=origin)
         result.tasks.append(ImportTask(id=id_factory('task'), operationId=result.id, blockId=parent.block_id, kind=parent.kind,
             dependencies=list(parent.dependencies), inputHash=digest({'parent': parent.input_hash, 'entry': scope}),
             allowedHandles=[], expectedChecks=[], state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[],

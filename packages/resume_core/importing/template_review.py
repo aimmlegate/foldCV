@@ -20,6 +20,7 @@ from ..templates.projection import SchemaFailure, pointer_tokens, resolve, schem
 from ..templates.replies import (FAILING_ONLY_PROTOCOLS, REVIEW_PROTOCOL, check_references, review_protocol,
                                  review_schema)
 from ..template_capture import item_identities
+from .template_entries import cited_scope
 
 
 def _matches(pattern, pointer):
@@ -239,7 +240,7 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         for span in other.entry.spans] if task.entry is not None else []
     settled = settled_checks(proposal, targets, allocations, sources, previous=previous,
         rewrite_fields=block.rewrite.fields if operation.capture.allow_text_rewrite else [],
-        scope=task.entry.spans if task.entry is not None else None,
+        scope=cited_scope(task.entry) if task.entry is not None else None,
         content_schema=next(value.full_schema for value in package.blocks if value.id == block.id),
         technologies=(owned, judges, others) if owned else None)
     asked = {(value.rule_id, value.target_id) for value in settled}

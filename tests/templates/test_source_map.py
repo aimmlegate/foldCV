@@ -293,6 +293,14 @@ def calls(operation):
     return made if operation.capture.policy.concurrency == 1 else sorted(made)
 
 
+def prompts(fixture):
+    """The text of every extraction call; sorted when calls ran side by side. A review lists its checks in the order of
+    their cells' ids, which differ from run to run, so reviews are compared by their calls only."""
+    sent = [prompt for prompt, value in zip(fixture.transport.prompts, fixture.transport.calls, strict=True)
+        if value.get('slot') not in {'map', 'map_repair'} and 'targets' not in value]
+    return sent if fixture.command.capture.policy.concurrency == 1 else sorted(sent)
+
+
 def map_result(operation):
     task = next(task for task in operation.tasks if task.kind == 'map')
     return task, next(value for value in operation.task_results if value.task_id == task.id)
@@ -334,8 +342,9 @@ async def test_a_map_that_failed_or_cannot_be_used_ends_empty_and_the_import_run
     task, value = map_result(result)
     assert result.state == 'published' and task.state == 'empty' and value.disposition == 'empty'
     assert value.value['map'] == 'unused' and value.value['reason']
-    # Every other call is the import's without a map, and its document is the same.
+    # Every other call is the import's without a map, sent with the same text, and its document is the same.
     assert calls(result) == calls(baseline)
+    assert prompts(fixture) == prompts(base)
     assert [attempt.slot for attempt in result.attempts if attempt.slot in {'map', 'map_repair'}] == ['map']
     assert fixture.text() == base.text() != '' and result.issues == baseline.issues == []
 
@@ -343,7 +352,8 @@ async def test_a_map_that_failed_or_cannot_be_used_ends_empty_and_the_import_run
 @pytest.mark.asyncio
 @pytest.mark.parametrize('repair', ['leaves', 'fails', 'unknown_entry'])
 async def test_a_map_that_stays_doubted_after_its_repair_ends_empty_and_the_import_runs_as_before(tmp_path, repair):
-    baseline = await run(papers_fixture(tmp_path / 'base', answering(), concurrency=3, mapped=False))
+    base = papers_fixture(tmp_path / 'base', answering(), concurrency=3, mapped=False)
+    baseline = await run(base)
     answers = {'leaves': lambda _value: {'lines': [], 'entries': []}, 'fails': lambda _value: failure('PROVIDER_ERROR'),
         'unknown_entry': lambda value: {'lines': [{'line': value['uncovered'][0], 'entry': 9}], 'entries': []}}
     # The map leaves the second paper out of every entry.
@@ -353,7 +363,7 @@ async def test_a_map_that_stays_doubted_after_its_repair_ends_empty_and_the_impo
     task, value = map_result(result)
     assert result.state == 'published' and task.state == 'empty' and value.value['map'] == 'unused'
     assert [attempt.slot for attempt in result.attempts if attempt.slot.startswith('map')] == ['map', 'map_repair']
-    assert calls(result) == calls(baseline)
+    assert calls(result) == calls(baseline) and prompts(fixture) == prompts(base)
 
 
 @pytest.mark.asyncio
@@ -387,12 +397,14 @@ async def test_a_map_call_that_never_answered_is_made_once_more(tmp_path):
 
 @pytest.mark.asyncio
 async def test_without_room_for_the_map_and_the_blocks_the_import_runs_as_before(tmp_path):
-    baseline = await run(papers_fixture(tmp_path / 'base', answering(), mapped=False, cap=3))
+    base = papers_fixture(tmp_path / 'base', answering(), mapped=False, cap=3)
+    baseline = await run(base)
     fixture = papers_fixture(tmp_path / 'case', answering(), cap=3)
     result = await run(fixture)
     task, value = map_result(result)
     assert value.value == {'map': 'unused', 'reason': 'IMPORT_CALL_CAP'} and not task.attempt_ids
     assert calls(result) == calls(baseline) and spent_calls(result) == spent_calls(baseline)
+    assert prompts(fixture) == prompts(base)
 
 
 @pytest.mark.asyncio

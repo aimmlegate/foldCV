@@ -108,7 +108,9 @@ def document(workspace):
 @pytest.mark.parametrize('name,concurrency,rewrite', [('F10', 1, True), ('F10', 3, True), ('F10', 1, False), ('F04', 3, False),
     ('F07', 1, True), ('F06', 1, True)])
 async def test_a_scripted_import_with_a_map_publishes_the_document_it_publishes_without_one(tmp_path, name, concurrency, rewrite):
-    table = TABLES[name](rewrite)
+    from tests.templates.test_map_entries import template_dates
+    # The map's header period gives each date in the templates' form (D135); the scripted replies write it so too.
+    table = template_dates(TABLES[name](rewrite)) if 'projects' in TABLES[name](rewrite) else TABLES[name](rewrite)
     mapped, result, workspace, _originals = await generic_import(tmp_path / 'map', name, source_map=True,
         concurrency=concurrency, rewrite=rewrite, table=table)
     plain, baseline, before, _originals = await generic_import(tmp_path / 'base', name, concurrency=concurrency,

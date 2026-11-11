@@ -17,6 +17,7 @@ from ..templates.projection import pointer_tokens, reachable_schema, validate_pa
 from ..templates.replies import proposal_schema, strip_unoffered_bookkeeping
 from ..template_capture import item_identities
 from .template_completion import complete_reply
+from .template_map import merge_header
 from .template_technologies import owned_types
 
 import json
@@ -246,6 +247,9 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
                 for relation in declaration.relations for target in relation.target_types}
             # A repair that still states a value no source line states loses that value and keeps the block (I4).
             dropped = [] if attempt.slot in {'primary_repair', 'fallback_repair'} else None
+            if task.entry is not None:
+                # T4: the employer, job title and period of a map entry come from its header lines.
+                outer['payload'], table = merge_header(outer['payload'], task.entry, table, block, package.definition, sources)
             # One entry of a block (D117) cites its own lines first.
             lines = {digest(span) for span in task.entry.spans} if task.entry is not None else set()
             preferred = {ref: option for ref, option in table.items() if digest(option.span) in lines} or None

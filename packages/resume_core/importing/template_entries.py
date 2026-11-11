@@ -120,6 +120,31 @@ def entry_part(operation, task, offered):
         'parts': [{'title': part.title, **_bounds_part(part.spans, refs)} for part in task.entry.parts], 'others': others}
 
 
+def map_entry_part(task, offered):
+    """The request part of an entry the map named (T4): its lines by the request's refs and its parts by title and
+    bounds with their employer, job title and period as the CV states them. Other entries are not named: their lines
+    are not offered."""
+    refs = {digest(option.span): option.ref for option in offered.values()}
+    def header(part):
+        values = part.header
+        return {key: getattr(values, name).value if values is not None and getattr(values, name) is not None else None
+            for key, name in (('employer', 'employer'), ('jobTitle', 'job_title'), ('period', 'period'))}
+    return {'index': task.entry.index, 'title': task.entry.title,
+        'lines': [refs[digest(span)] for span in task.entry.spans if digest(span) in refs],
+        'parts': [{'title': part.title, **_bounds_part(part.spans, refs), **header(part)} for part in task.entry.parts]}
+
+
+def cited_scope(entry):
+    """The lines an entry's values may be cited from: its own and, for a map entry, its header values' lines (T4)."""
+    return [*entry.spans, *[value.span for part in entry.parts if part.header is not None
+        for value in (part.header.employer, part.header.job_title, part.header.period) if value is not None]]
+
+
+def header_dropped(entry):
+    """The header values the map named for an entry that no source line states (T4): dropped, named in its notice."""
+    return [value for part in entry.parts if part.header is not None for value in part.header.dropped]
+
+
 def outline_part(operation, parent_id, offered):
     """The outline as its review reads it: every outline entry with its title and bounds, not the groups they run in."""
     refs = {digest(option.span): option.ref for option in offered.values()}
@@ -132,8 +157,9 @@ def ordered_entries(operation, parent_id, sources):
     """The entry tasks of a block in the order the block shows them: the outline's order; an entry its review added
     goes by its source position when the outlined entries follow the source, else last."""
     entries = sorted(entries_of(operation, parent_id), key=lambda task: task.entry.index)
-    outlined = [task for task in entries if task.entry.origin == 'outline']
-    added = [task for task in entries if task.entry.origin != 'outline']
+    # The map's entries (T4) keep their order, as the outline's do.
+    outlined = [task for task in entries if task.entry.origin in {'outline', 'map'}]
+    added = [task for task in entries if task.entry.origin not in {'outline', 'map'}]
     def position(task):
         return min(_position(sources, span) for span in task.entry.spans) if task.entry.spans else None
     positions = [position(task) for task in outlined]
@@ -170,11 +196,11 @@ def reorder_records(facts, record_ids):
 
 
 def grouped(scopes, count):
-    """Consecutive outline entries ((title, spans) each) joined into at most `count` groups of about the same number of
-    lines. With `count` calls at once, one call per group ends sooner than rounds of one call per entry, and makes
-    fewer calls and reviews: each call pays the same start, prompt and review cost."""
+    """Consecutive outline or map entries ((title, spans, ...) each) joined into at most `count` groups of about the same
+    number of lines. With `count` calls at once, one call per group ends sooner than rounds of one call per entry, and
+    makes fewer calls and reviews: each call pays the same start, prompt and review cost."""
     count = max(1, min(count, len(scopes)))
-    total = sum(len(spans) for _title, spans in scopes)
+    total = sum(len(scope[1]) for scope in scopes)
     groups, current, seen = [], [], 0
     for index, scope in enumerate(scopes):
         current.append(scope)

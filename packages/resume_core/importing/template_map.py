@@ -11,15 +11,18 @@ The map's result names lines by the refs of its own captured request; every bloc
 the same refs.
 """
 
+from copy import deepcopy
 import re
 
 from ..hashing import digest
-from ..models.template_import import MapRepairReply, MapReply, ReviewInput
-from ..sources import capture_span, line_spans
+from ..models.template_import import (EntryHeader, EvidenceOption, HeaderValue, MapRepairReply, MapReply,
+                                      ReviewInput)
+from ..sources import capture_span, line_spans, source_slice
 from ..templates.compiler import splits_entries
 from ..templates.replies import MAP_PROTOCOL, MAP_REPAIR_PROTOCOL, MAPPED_REVIEW_PROTOCOL
 from ..template_source_cleanup import without_contacts
-from .template_entries import _bounds, line_options
+from ..templates.projection import pointer_tokens
+from .template_entries import MAX_TITLE, _bounds, _position, line_options
 from .template_identity import evidence_options, offered_evidence
 
 HEADERS = ('employer', 'jobTitle', 'period')
@@ -329,6 +332,170 @@ def mapped_review(review, proposal, request):
         if option.ref in offered or digest(option.span) in cited]
     value['semanticContext'] = {**review.semantic_context, 'replyProtocol': MAPPED_REVIEW_PROTOCOL}
     return ReviewInput.model_validate(value)
+
+
+def map_scopes(value, offered, block_id):
+    """The entries the map named for a block (T4, point 9) as (title, spans, header), in the map's order."""
+    scopes = []
+    for number, entry in enumerate((value for value in value['entries'] if value['block'] == block_id), 1):
+        def header(key):
+            found = entry['header'].get(key)
+            return None if found is None else HeaderValue(value=found['value'], span=offered[found['line']].span)
+        title = entry['title'][:MAX_TITLE] or 'Запись ' + str(number)
+        scopes.append((title, [offered[ref].span for ref in entry['lines']], EntryHeader(employer=header('employer'),
+            jobTitle=header('jobTitle'), period=header('period'), dropped=list(entry.get('dropped', [])))))
+    return scopes
+
+
+# Header values are put into an entry's reply before completion (T4, point 3). Month stems in Russian and English: a
+# period's dates are read from its wording.
+MONTHS = {1: ('январ', 'янв', 'jan'), 2: ('феврал', 'фев', 'feb'), 3: ('март', 'мар', 'mar'), 4: ('апрел', 'апр', 'apr'),
+    5: ('май', 'мая', 'may'), 6: ('июн', 'jun'), 7: ('июл', 'jul'), 8: ('август', 'авг', 'aug'),
+    9: ('сентябр', 'сен', 'sep'), 10: ('октябр', 'окт', 'oct'), 11: ('ноябр', 'ноя', 'nov'), 12: ('декабр', 'дек', 'dec')}
+PRESENT = re.compile(r'настоящ|н\.\s?в\b|наст\.|сейчас|текущ|present|now|current|today|ongoing', re.IGNORECASE)
+DATE = re.compile(r'(?P<name>[^\W\d_]{3,})\.?\s*(?P<named>(?:19|20)\d{2})(?!\d)|'
+    r'(?<![\d.])(?P<month>0?[1-9]|1[0-2])\s*[./-]\s*(?P<numbered>(?:19|20)\d{2})(?!\d)|'
+    r'(?<![\d.])(?P<first>(?:19|20)\d{2})[-./](?P<later>0[1-9]|1[0-2])(?![\d.])|'
+    r'(?<![\d.])(?P<year>(?:19|20)\d{2})(?!\d)')
+
+
+def _month(name):
+    folded = name.casefold()
+    return next((number for number, stems in MONTHS.items() if any(folded.startswith(stem) for stem in stems)), None)
+
+
+def _date(year, month):
+    # As the templates ask the model to write it (D135): MM.YYYY, or YYYY when the source states only the year.
+    return {'raw': f'{month:02d}.{year}' if month else str(year), 'year': year, 'month': month}
+
+
+def parse_period(text):
+    """The template's period object read from a period's wording, or None when no date reads from it: the first date
+    starts it, a later one ends it, and a word for now after the start makes it ongoing."""
+    dates = []
+    for found in DATE.finditer(text):
+        if found['named']:
+            dates.append((found.start(), _date(int(found['named']), _month(found['name']))))
+        elif found['numbered']:
+            dates.append((found.start(), _date(int(found['numbered']), int(found['month']))))
+        elif found['first']:
+            dates.append((found.start(), _date(int(found['first']), int(found['later']))))
+        else:
+            dates.append((found.start(), _date(int(found['year']), None)))
+    if not dates:
+        return None
+    start, ongoing = dates[0][1], PRESENT.search(text[dates[0][0]:]) is not None
+    end = None if ongoing or len(dates) < 2 else dates[1][1]
+    if end is not None and (end['year'], end['month'] or 0) < (start['year'], start['month'] or 0):
+        return None
+    return {'raw': ' '.join(text.split()), 'start': start, 'end': end, 'ongoing': ongoing}
+
+
+def header_fields(block, definition):
+    """The fields of an item of a block of entries that its header fills: {employer, jobTitle, period} → the field's path
+    in the item, from the bindings of the block's employment facts; {} for a block without them."""
+    types = {value.id: value for value in definition.fact_types}
+    found = {}
+    for binding in block.bindings:
+        declaration = types.get(binding.semantic_type)
+        mapped = declaration.builtin_fields.get(binding.field) if declaration is not None and declaration.builtin_kind == 'employment' else None
+        tokens = pointer_tokens(binding.pointer)
+        if mapped is None or tokens[:1] != ['*'] or len(tokens) < 2:
+            continue
+        if mapped.field == 'employer':
+            found['employer'] = tokens[1:]
+        elif mapped.field == 'role':
+            found['jobTitle'] = tokens[1:]
+        elif mapped.field == 'start' and len(tokens) > 2:
+            found['period'] = tokens[1:-1]
+    return found
+
+
+def _assigned(items, parts, sources):
+    """The part each reply item belongs to: by position when the counts match, else the part whose lines hold most of
+    the item's words, the item's own position among equals."""
+    if len(items) == len(parts):
+        return list(range(len(items)))
+    texts = [' '.join(source_slice(sources, span) for span in part.spans).casefold() for part in parts]
+    def words(value):
+        if isinstance(value, str):
+            return re.findall(r'\w{4,}', value.casefold())
+        if isinstance(value, dict):
+            return [word for child in value.values() for word in words(child)]
+        if isinstance(value, list):
+            return [word for child in value for word in words(child)]
+        return []
+    chosen = []
+    for position, item in enumerate(items):
+        found = words(item)
+        scores = [sum(word in text for word in found) for text in texts]
+        own = min(position, len(parts) - 1)
+        chosen.append(own if scores[own] == max(scores) else scores.index(max(scores)))
+    return chosen
+
+
+def merge_header(reply, entry, table, block, definition, sources):
+    """The referenced reply of an entry with each item's header values put in before completion (T4, point 3): the
+    employer and the period of the item's part, and its job title as the role when the item gives none, each cited by
+    the line that states it; and the table with those lines. A part whose period no date reads from keeps the reply's."""
+    fields = header_fields(block, definition)
+    items = reply.get('payload') if isinstance(reply, dict) else None
+    if not fields or not isinstance(items, list) or not items or not any(part.header for part in entry.parts):
+        return reply, table
+    payload, entries = deepcopy(items), [dict(value) for value in reply.get('fields') or [] if isinstance(value, dict)]
+    known = {digest(option.span): ref for ref, option in table.items()}
+    added, serial = {}, max([int(ref[1:]) for ref in table if ref[1:].isdecimal()], default=0)
+
+    def ref_of(span):
+        nonlocal serial
+        key = digest(span)
+        if key not in known:
+            serial += 1
+            known[key] = 'S' + str(serial)
+            added[known[key]] = EvidenceOption(ref=known[key], span=span, text=source_slice(sources, span))
+        return known[key]
+
+    def put(position, path, value, span):
+        target = payload[position]
+        for key in path[:-1]:
+            if not isinstance(target.get(key), dict):
+                return
+            target = target[key]
+        target[path[-1]] = value
+        pointer = '/' + str(position) + ''.join('/' + key for key in path)
+        cited = [ref_of(span)]
+        own = [value for value in entries if value.get('pointer') == pointer]
+        # A value the reply cites inside the replaced one goes with it; an entry at its pointer keeps its item.
+        entries[:] = [value for value in entries if not str(value.get('pointer') or '').startswith(pointer + '/')]
+        for value in own:
+            value['evidence'] = cited
+        if not own:
+            entries.append({'item': None, 'fieldKey': None, 'pointer': pointer, 'evidence': cited, 'effectiveCells': None})
+
+    for position, index in enumerate(_assigned(payload, entry.parts, sources)):
+        header = entry.parts[index].header
+        if header is None or not isinstance(payload[position], dict):
+            continue
+        if header.employer is not None and 'employer' in fields:
+            put(position, fields['employer'], header.employer.value, header.employer.span)
+        if header.period is not None and 'period' in fields:
+            period = parse_period(header.period.value)
+            if period is not None:
+                put(position, fields['period'], period, header.period.span)
+        role = fields.get('jobTitle')
+        if header.job_title is not None and role is not None:
+            current = payload[position]
+            for key in role:
+                current = current.get(key) if isinstance(current, dict) else None
+            if not isinstance(current, str) or not current.strip():
+                put(position, role, header.job_title.value, header.job_title.span)
+    # A header line goes where it stands in the CV, before the lines after it: citations prefer the nearest lines.
+    merged = list(table.items())
+    for ref, option in added.items():
+        place = _position(sources, option.span)
+        at = next((index for index, (_ref, other) in enumerate(merged) if _position(sources, other.span) > place), len(merged))
+        merged.insert(at, (ref, option))
+    return {**reply, 'payload': payload, 'fields': entries}, dict(merged)
 
 
 def map_task(operation):

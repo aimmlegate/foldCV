@@ -293,8 +293,14 @@ def entry_table(payload, cites, indices):
 
 
 def entry_items(block, payload, src, cites, value):
-    """The scripted items an entry request covers: those whose cited lines are the bounds of one of its parts."""
-    bounds = {entry_bounds(block, payload, src, cites, value, index): index for index in range(len(payload))}
+    """The scripted items an entry request covers: those whose cited lines are the bounds of one of its parts. An entry
+    the map named (T4) is offered only its own lines, so the other items have none here."""
+    bounds = {}
+    for index in range(len(payload)):
+        try:
+            bounds[entry_bounds(block, payload, src, cites, value, index)] = index
+        except AssertionError:
+            continue
     return [bounds[(part['first'], part['last'])] for part in value['entry']['parts'] if (part['first'], part['last']) in bounds]
 
 

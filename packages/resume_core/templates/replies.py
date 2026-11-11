@@ -187,6 +187,17 @@ ENTRY_RULE = ('entry names the part of the source this reply extracts: entry.lin
     'lines of entry.others are extracted by their own requests, so never take their values or claims here.')
 
 
+# T4: an entry the map named reads its own lines, and the coordinator gives each item its part's employer, job title
+# and period from the map's header values; requests of other entries keep protocol 6 and ENTRY_RULE.
+MAPPED_PROPOSAL_VERSION = 'template-proposal-protocol-7'
+MAP_ENTRY_RULE = ('entry names the part of the source this reply extracts: entry.lines, refs of this request, and the '
+    'entries the map found in them (entry.parts, each by title, its first and last line and its employer, jobTitle and '
+    'period as the CV states them). payload holds the items of the block that these lines state, usually one per part, '
+    'in the order of entry.parts, read from these lines only, or [] when they state none.')
+MAP_HEADER_RULE = ('Leave {employer} and {period} of each item null: the coordinator fills them from its part. Give {role} '
+    'only when these lines state a role of the item\'s own; else leave it null and the coordinator takes the part\'s jobTitle.')
+
+
 # The same protocol for a request that offers no captured items or relations: nothing can be updated, split or merged,
 # so the reply needs no lineage or relations and the coordinator derives them (a live import: a first projects reply was
 # refused for relations that named a handle nobody offered). The schema keeps the keys so a model that still sends them
@@ -205,10 +216,16 @@ def offers_nothing(references):
     return references is not None and not references.items and not references.relations
 
 
-def proposal_protocol(references, *, entry=False):
+def proposal_protocol(references, *, entry=False, header=None):
     """The reply rules for a request: the full protocol with offers, the content-only wording without them; an entry
-    request (D117) adds the rule that binds the reply to its entry."""
+    request (D117) adds the rule that binds the reply to its entry. header, for an entry the map named (T4), maps
+    employer, jobTitle and period to the item fields its header fills ({} for a block without such fields)."""
     rules = list(CONTENT_ONLY_RULES) if offers_nothing(references) else PROPOSAL_PROTOCOL['rules']
+    if header is not None:
+        names = {key: '/'.join(path) for key, path in header.items()}
+        filled = [MAP_HEADER_RULE.format(employer=names['employer'], period=names['period'], role=names['jobTitle'])] if (
+            set(names) == {'employer', 'jobTitle', 'period'}) else []
+        return {'version': MAPPED_PROPOSAL_VERSION, 'rules': [*rules, MAP_ENTRY_RULE, *filled]}
     if not entry:
         return PROPOSAL_PROTOCOL if rules is PROPOSAL_PROTOCOL['rules'] else {'version': PROPOSAL_PROTOCOL['version'], 'rules': rules}
     return {'version': PROPOSAL_PROTOCOL['version'], 'rules': [*rules, ENTRY_RULE]}
@@ -247,7 +264,7 @@ FAILING_ONLY_PROTOCOLS = frozenset({'template-review-protocol-3', 'template-revi
 # it was captured with says, so each version stays named here when a newer one comes.
 COMPACT_PROTOCOLS = frozenset({'template-proposal-protocol-6', 'template-review-protocol-6', 'template-outline-protocol-2',
     'template-outline-review-protocol-2', 'template-map-protocol-1', 'template-map-repair-protocol-1',
-    'template-review-protocol-7'})
+    'template-review-protocol-7', MAPPED_PROPOSAL_VERSION})
 
 
 def model_targets(review):
