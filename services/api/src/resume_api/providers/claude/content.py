@@ -51,8 +51,8 @@ MODEL_EVENTS = {"assistant", "user", "result"}
 # line counts against the reply budget, as Codex's one final message does; this keeps the whole stream bounded.
 STREAM_MULTIPLE = 8
 # The CLI writes the whole prompt of each call to the one-hour cache at twice the input price, and no later import
-# call reads it (T1). Import calls run with caching off; rewrite previews keep it until their measured pair says not.
-PREVIEWS_CACHED = True
+# call reads it (T1). Rewrite previews too: a measured pair read nothing from the cache and cost 43 % less without it.
+PREVIEWS_CACHED = False
 UNCACHED = {"DISABLE_PROMPT_CACHING": "1"}
 LOG = logging.getLogger(__name__)
 
