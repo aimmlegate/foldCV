@@ -182,6 +182,17 @@ def unbound_issues(id_factory, task_id, proposal, fingerprint):
         retiredByAction=None)]
 
 
+# T4, point 10: lines the map gives to no block and that hold content are named once; the export never shows it.
+UNUSED_MESSAGE = 'Строки резюме не попали ни в один раздел: {count}. {quotes}'
+UNUSED_QUOTED = 3
+
+
+def unused_text(texts):
+    quotes = ', '.join('«' + (text if len(text) <= 80 else text[:79].rstrip() + '…') + '»' for text in texts[:UNUSED_QUOTED])
+    more = ' и ещё ' + str(len(texts) - UNUSED_QUOTED) if len(texts) > UNUSED_QUOTED else ''
+    return UNUSED_MESSAGE.format(count=len(texts), quotes=quotes + more + '.')
+
+
 def header_issues(id_factory, task, fingerprint):
     """The notice of a map entry whose header values no source line states (T4): they were dropped, D156's warning."""
     values = header_dropped(task.entry) if task.entry is not None else []
@@ -1210,10 +1221,19 @@ class TemplatePipeline:
         return await self.finish_map(project, operation_id, task_id, value, None)
 
     async def finish_map(self, project, operation_id, task_id, value, reason):
-        """The map task's result: the checked map, or an empty result naming why the import reads the whole CV."""
+        """The map task's result: the checked map with one notice of the lines no block reads (T4, point 10), or an
+        empty result naming why the import reads the whole CV."""
         if value is None:
             return await self.finish_task(project, operation_id, task_id, {'map': 'unused', 'reason': reason}, (), (), 'empty', [])
-        await self.finish_task(project, operation_id, task_id, value, (), (), 'derived', [])
+        operation = operation_in(await self.view(project), operation_id)
+        stored = next(record.value for record in operation.task_inputs if record.task_id == task_id)
+        offered = offered_evidence(stored)
+        texts = [' '.join(offered[ref].text.split()) for ref in value['unused']]
+        issues = [ImportIssue(id=self.id_factory('issue'), ruleId=None, taskId=task_id, targetIds=['scope-' + task_id],
+            blockIds=[], category='uncertain_interpretation', code='IMPORT_SOURCE_UNUSED', message=unused_text(texts),
+            importedFingerprint=digest(stored), reviewInputHash=None, lifecycleId=self.id_factory('issue-lifecycle'),
+            state='active', retiredByAction=None)] if texts else []
+        await self.finish_task(project, operation_id, task_id, value, (), (), 'derived', issues)
 
     async def close_entries(self, project, operation_id, parent_id):
         """A block whose entries ran on their own ends with what they collected (D117): their handles, admitted when

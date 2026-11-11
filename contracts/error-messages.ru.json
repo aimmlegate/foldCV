@@ -369,7 +369,8 @@
     "assistantFileNotFound": "Файл больше недоступен. Попросите помощника выгрузить его снова.",
     "agentStoreFull": "Диалог помощника слишком большой. Начните новый диалог.",
     "providerInactive": "Этот провайдер выключен. Включите его в настройках и повторите.",
-    "providerUnavailable": "Этот провайдер пока недоступен в foldCV Beta."
+    "providerUnavailable": "Этот провайдер пока недоступен в foldCV Beta.",
+    "importSourceUnused": "Часть строк резюме не попала ни в один раздел. Проверьте, не потерялось ли содержание."
   },
   "codes": {
     "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
@@ -1235,7 +1236,8 @@
     "PROVIDER_INACTIVE": "providerInactive",
     "PROVIDER_UNAVAILABLE": "providerUnavailable",
     "IMPORT_MAP_INVALID": "importResult",
-    "IMPORT_MAP_INCOMPLETE": "importResult"
+    "IMPORT_MAP_INCOMPLETE": "importResult",
+    "IMPORT_SOURCE_UNUSED": "importSourceUnused"
   },
   "nonErrorSymbols": {
     "CLOCK_BOOTTIME": "Operating-system clock identifier",

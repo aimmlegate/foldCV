@@ -498,6 +498,15 @@ def merge_header(reply, entry, table, block, definition, sources):
     return {**reply, 'payload': payload, 'fields': entries}, dict(merged)
 
 
+def unused_spans(operation):
+    """The lines the import's map gave to no block and that may hold content (T4, point 10)."""
+    found = source_map(operation)
+    if found is None:
+        return []
+    value, offered = found
+    return [offered[ref].span for ref in value.get('unused', [])]
+
+
 def map_task(operation):
     return next((task for task in operation.tasks if task.kind == 'map'), None)
 

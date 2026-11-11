@@ -1,5 +1,6 @@
 """Publish the initial template tree while retaining original sources and fact history."""
 
+from ..models.template_import import MAP_BLOCK_ID
 from ..models.template_workspace import ProjectV6, validated_with_history
 from ..templates.focus import catalog_for, remembered_icon, row_name
 from ..templates.materialize import materialize
@@ -8,6 +9,7 @@ from ..templates.span_coverage import overlaps
 from ..template_capture import item_identities
 from ..editing.template_effective import effective_cells
 from ..templates.source_spans import payload_value
+from .template_map import unused_spans
 from .template_proposals import relation_evidence
 
 
@@ -55,7 +57,8 @@ def assemble_template(workspace, operation, remembered=None):
     result = workspace.model_copy(deep=True)
     data = result.pre_draft
     document, coverage = materialize(data.template_package, data.facts, data.template_operations, data.sources,
-        operation_id=operation.id, revision=result.document_revision + 1, as_of=result.formatting_as_of)
+        operation_id=operation.id, revision=result.document_revision + 1, as_of=result.formatting_as_of,
+        unused=[span for retained in data.template_operations for span in unused_spans(retained)])
     remembered_rows(document, data.template_package, data.facts, remembered)
     issues = [issue.model_copy(deep=True) for issue in operation.issues]
     identities = {identity.item_handle: identity for retained in data.template_operations for identity in item_identities(retained)}
@@ -106,7 +109,12 @@ def assemble_template(workspace, operation, remembered=None):
         if target in target_values and target not in shown:
             return False
         return any(overlaps(value.span, span) for span in target_spans.get(target, []))
+    first = next(iter(order), None)
     for issue in issues:
+        if views.get(issue.task_id) == MAP_BLOCK_ID:
+            # The map's notice of lines no block reads (T4) has no block of its own: it shows at the top of the page.
+            issue.block_ids = [first] if first is not None else []
+            continue
         # A rejected value names the shown fields with the same text, as a «Kafka 4.0» chip another block admitted: the
         # remark marks them, and changing them retires it.
         alike = [cell for target in issue.target_ids if target in target_values and target not in shown

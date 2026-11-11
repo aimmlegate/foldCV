@@ -121,20 +121,39 @@ def _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missi
         placements[last] = union_spans(sources, [*placements.get(last, []), *leftover])
 
 
-def _retained_coverage(sources, coverage, add_coverage):
-    """Source text outside every configured field view is recorded as retained source only."""
+# T4, point 10: a line the import's map gave to no block is retained source with this reason.
+UNUSED_REASON = 'не отнесена ни к одному разделу'
+
+
+def _retained_coverage(sources, coverage, add_coverage, unused=()):
+    """Source text outside every configured field view is recorded as retained source only; the part of it on a line the
+    map gave to no block (T4) says so."""
     covered = union_spans(sources, [value.span for value in coverage])
     for source in sources:
         for unit in source.units:
+            key = (source.id, source.revision, unit.id, unit.revision)
+            lines = sorted((span for span in unused if unit_key(span) == key), key=lambda span: span.start)
+            def retained(start, end):
+                for line in lines:
+                    low, high = max(start, line.start), min(end, line.end)
+                    if low >= high:
+                        continue
+                    if start < low:
+                        add_coverage(capture_span(source, unit, start, low), None, [], 'source_only', 'retained outside configured field views')
+                    add_coverage(capture_span(source, unit, low, high), None, [], 'source_only', UNUSED_REASON)
+                    start = high
+                if start < end:
+                    add_coverage(capture_span(source, unit, start, end), None, [], 'source_only', 'retained outside configured field views')
             cursor = 0
-            spans = [span for span in covered if unit_key(span) == (source.id, source.revision, unit.id, unit.revision)]
+            spans = [span for span in covered if unit_key(span) == key]
             for span in [*spans, capture_span(source, unit, len(unit.text), len(unit.text))]:
                 if cursor < span.start:
-                    add_coverage(capture_span(source, unit, cursor, span.start), None, [], 'source_only', 'retained outside configured field views')
+                    retained(cursor, span.start)
                 cursor = span.end
 
 
-def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None):
+def materialize(package, facts, operations, sources, *, operation_id, revision=1, as_of=None, unused=()):
+    """unused: the lines the import's map gave to no block (T4); their coverage names it."""
     verify_package(package)
     declarations = {value.id: value for value in package.definition.blocks}
     operation_ids = {value.id for value in package.definition.operations}
@@ -394,6 +413,6 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         record, handle = cell_owners[identifier]
         for span in current[identifier].evidence:
             add_coverage(span, handle, blocks, 'multiple_views' if len(blocks) > 1 else 'accepted', 'configured field presentation')
-    _retained_coverage(sources, coverage, add_coverage)
+    _retained_coverage(sources, coverage, add_coverage, unused)
     document = RichDocumentV2(schemaVersion=2, revision=revision, regions=list(regions.values()))
     return document, coverage
