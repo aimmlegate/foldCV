@@ -2,16 +2,17 @@
 entries leave lines out, and a map that failed or stays doubted is not used: the import runs as before it."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from packages.resume_core.models.contracts import Source
 from packages.resume_core.hashing import sha256
-from packages.resume_core.importing.template_identity import evidence_options
+from packages.resume_core.importing.template_identity import evidence_options, offered_evidence
 from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, reserve_attempt,
                                                             retain_operation, spent_calls)
-from packages.resume_core.importing.template_map import (apply_repair, map_repair_input, parse_map, uncovered,
-                                                         whole_source)
+from packages.resume_core.importing.template_map import (apply_repair, map_input, map_repair_input, parse_map,
+                                                         uncovered, whole_source)
 from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.models.template_import import MAP_BLOCK_ID, ImportOperation
 from packages.resume_core.templates.compiler import compile_bytes
@@ -115,6 +116,34 @@ def test_a_map_with_a_ref_that_is_no_offered_line_a_backwards_range_or_entries_s
         reply['entries'][0]['employer']['line'] = 'S99'
     with pytest.raises(ValueError):
         parse_map(reply, offered, [src], REQUEST)
+
+
+def units_source(texts):
+    """A source read one unit per line, as a PDF is."""
+    raw = ('\n'.join(texts) + '\n').encode()
+    return Source(id='source-pdf', revision=1, originalName='cv.pdf', mimeType='application/pdf', byteSha256=sha256(raw),
+        byteRef='sources/cv.pdf', parser='text', parserVersion='1', units=[{'id': 'unit-' + str(index), 'revision': 1,
+            'order': index, 'text': text, 'location': {'kind': 'pasted', 'index': index, 'row': None, 'column': None},
+            'disposition': 'shown', 'representedFactIds': []} for index, text in enumerate(texts)], overlays=[], warnings=[])
+
+
+def test_the_map_request_offers_no_blank_unit_so_its_map_is_not_refused_for_naming_one():
+    # Live: a PDF's first unit was blank; the map named its ref, which is no line, and the whole map was refused.
+    src = units_source(['', *LINES])
+    whole = table(src)
+    blank = next(ref for ref, option in whole.items() if not option.text.strip())
+    reply = full_map(whole)
+    reply['hidden'].append({'first': blank, 'last': blank})
+    with pytest.raises(ValueError, match='no offered line'):
+        parse_map(reply, whole, [src], REQUEST)
+    _command, package, _src = mapped_operation()
+    request = map_input(SimpleNamespace(capture=SimpleNamespace(allow_text_rewrite=True)),
+        SimpleNamespace(template_package=package, sources=[src]))
+    offered = offered_evidence(request)
+    assert blank not in offered and all(option.text.strip() for option in offered.values())
+    assert sorted(option.text.strip() for option in offered.values()) == sorted(LINES)
+    value = parse_map(full_map(offered), offered, [src], REQUEST)
+    assert [offered[ref].text.strip() for ref in value['blocks']['identity']] == LINES[:2]
 
 
 def test_a_header_value_stays_on_its_line_moves_to_the_line_that_states_it_or_is_dropped():

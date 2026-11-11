@@ -45,6 +45,12 @@ def whole_source(sources):
     return [span for source in sources for unit in source.units for span in [capture_span(source, unit), *line_spans(source, unit)]]
 
 
+def map_evidence(sources):
+    """The map request's lines: the whole CV but its blank units. A blank ref is no line, so a map that named one
+    (live: a PDF's first unit) was refused whole."""
+    return [option for option in evidence_options(whole_source(sources), sources) if option.text.strip()]
+
+
 def map_input(operation, data):
     """The map task's request: the whole CV, the blocks by id, title and first extract rule, the blocks of entries with
     all their rules, and the template's general extract rules."""
@@ -53,7 +59,7 @@ def map_input(operation, data):
     return {'protocol': 'template_import_v1', 'tools': [], 'replyProtocol': MAP_PROTOCOL,
         'packageHash': data.template_package.package_hash, 'allowTextRewrite': operation.capture.allow_text_rewrite,
         'modelInstructions': {'extract': list(definition.model.extract)},
-        'evidence': [option.model_dump(mode='json', by_alias=True) for option in evidence_options(whole_source(data.sources), data.sources)],
+        'evidence': [option.model_dump(mode='json', by_alias=True) for option in map_evidence(data.sources)],
         'blocks': [{'block': block.id, 'title': _title(definition, block), 'extract': list(block.extract[:1])} for block in blocks],
         'entryBlocks': [{'block': block.id, 'extract': list(block.extract)} for block in blocks if splits_entries(block)]}
 
