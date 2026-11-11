@@ -442,10 +442,15 @@ def _assigned(items, parts, sources):
     return chosen
 
 
+def _folded(text):
+    return ' '.join(text.split()).strip('«»"\' ').casefold()
+
+
 def merge_header(reply, entry, table, block, definition, sources):
     """The referenced reply of an entry with each item's header values put in before completion (T4, point 3): the
     employer and the period of the item's part, and its job title as the role when the item gives none, each cited by
-    the line that states it; and the table with those lines. A part whose period no date reads from keeps the reply's."""
+    the line that states it; and the table with those lines. A part whose period no date reads from keeps the reply's.
+    A project name that only repeats the item's employer is dropped."""
     fields = header_fields(block, definition)
     items = reply.get('payload') if isinstance(reply, dict) else None
     if not fields or not isinstance(items, list) or not items or not any(part.header for part in entry.parts):
@@ -480,12 +485,32 @@ def merge_header(reply, entry, table, block, definition, sources):
         if not own:
             entries.append({'item': None, 'fieldKey': None, 'pointer': pointer, 'evidence': cited, 'effectiveCells': None})
 
+    def drop_copied_name(position, employer):
+        # The map titles an entry that names no project by its employer; a reply that took that title as the
+        # project's name would show «Employer — Employer» (live, comparison CV).
+        for path in [pointer_tokens(pointer)[1:] for pointer in name_pointers(block)]:
+            parent = payload[position]
+            for key in path[:-2]:
+                parent = parent.get(key) if isinstance(parent, dict) else None
+            target = parent.get(path[-2]) if isinstance(parent, dict) else None
+            value = target.get(path[-1]) if isinstance(target, dict) else None
+            if not isinstance(value, str) or _folded(value) != _folded(employer):
+                continue
+            target[path[-1]] = None
+            # A project left with no value is no project, as when the reply names none.
+            if not any(target.values()):
+                parent[path[-2]], path = None, path[:-1]
+            pointer = '/' + str(position) + ''.join('/' + key for key in path)
+            entries[:] = [kept for kept in entries if kept.get('pointer') != pointer
+                and not str(kept.get('pointer') or '').startswith(pointer + '/')]
+
     for position, index in enumerate(_assigned(payload, entry.parts, sources)):
         header = entry.parts[index].header
         if header is None or not isinstance(payload[position], dict):
             continue
         if header.employer is not None and 'employer' in fields:
             put(position, fields['employer'], header.employer.value, header.employer.span)
+            drop_copied_name(position, header.employer.value)
         if header.period is not None and 'period' in fields:
             period = parse_period(header.period.value)
             if period is not None:

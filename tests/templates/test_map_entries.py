@@ -101,6 +101,26 @@ def test_items_that_do_not_match_the_parts_one_by_one_take_the_part_whose_lines_
     assert merged['payload'][0]['company'] == 'Second Works'
 
 
+def test_a_project_name_that_only_repeats_the_items_employer_is_dropped():
+    # Live: the map titles an entry that names no project by its employer, the reply took that title as the project's
+    # name, and the card read «Employer — Employer».
+    src = cv_source()
+    offered = table(src)
+    package = generic_package()
+    block = next(value for value in package.definition.blocks if value.id == 'projects')
+    entry = scoped(offered, [('Second Works', LINES[9:11], {'employer': ('Second Works', LINES[9])})])
+    cases = [({'name': ' second  works', 'description': None}, None, []),
+        ({'name': 'Second Works', 'description': 'Nightly reports'}, {'name': None, 'description': 'Nightly reports'}, []),
+        ({'name': 'Report Engine', 'description': None}, {'name': 'Report Engine', 'description': None}, ['/0/project/name'])]
+    for project, shown, cited in cases:
+        reply = {'payload': [{**item(tasks=['Ran the nightly reports']), 'project': project}],
+            'fields': [{'pointer': '/0/project/name', 'evidence': [line(offered, LINES[9])], 'item': None, 'fieldKey': None,
+                'effectiveCells': None}]}
+        merged, _table = merge_header(reply, entry, dict(offered), block, package.definition, [src])
+        assert merged['payload'][0]['project'] == shown and merged['payload'][0]['company'] == 'Second Works'
+        assert [value['pointer'] for value in merged['fields'] if value['pointer'].startswith('/0/project')] == cited
+
+
 def test_an_entry_of_the_map_reads_the_entry_rule_with_its_header_fields_and_others_keep_protocol_six():
     header = {'employer': ['company'], 'jobTitle': ['role'], 'period': ['period']}
     mapped = proposal_protocol(None, entry=True, header=header)
