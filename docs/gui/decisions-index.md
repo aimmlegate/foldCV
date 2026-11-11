@@ -158,3 +158,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D153 A model call that sends nothing for five minutes ends as stalled
 - D154 Import speed, short version: width 8 for Claude, three entry groups, one validation per step
 - D155 Nested projects take their employer and role; a call that never answered gets one more; one system prompt for both CLIs
+- D156 Review findings left after the repair are warnings; a fallback never empties other entries
