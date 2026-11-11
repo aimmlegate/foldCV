@@ -11,7 +11,8 @@ from ..sources import capture_span, source_slice
 from ..templates.source_spans import payload_value
 from .template_identity import empty_value, evidence_options, offered_evidence, restore_evidence
 from ..import_failure import TemplateImportFailure
-from .template_import import attempt_in, checked, fork, identity, task_in
+from .template_import import attempt_in, checked, entries_of, fork, identity, task_in
+from .template_technologies import FINDING, foreign_technologies, owned_types
 from ..hashing import digest
 from ..models.template_package import Check
 from ..hashing import canonical, sha256
@@ -150,13 +151,18 @@ def _within(span, scope):
         and span.end <= other.end for other in scope)
 
 
-def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, previous=None, scope=None, content_schema=None):
+def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, previous=None, scope=None, content_schema=None,
+                   technologies=None):
     """The checks the coordinator settles without the model (D115). A string value outside the rewritten fields that
     stands word for word in a cited source line satisfies every check on its cell: the coordinator bound it there.
     In a replacement review a value or relation the repair left as it was, same value and same evidence, keeps the
     earlier receipt's result for each of its checks, a finding included. The scope check is never settled.
     scope, for one entry of a block (D117), is the entry's lines: a value cited outside them stays with the model.
-    content_schema is the block's: a value it lets choose from listed values (enum, const) stays with the model."""
+    content_schema is the block's: a value it lets choose from listed values (enum, const) stays with the model.
+    technologies, for a block whose entries own technologies (D164, point 14), is their semantic types, the rules that
+    may fail such a value, the template's own first, and the lines of the block's other entries: a technology the
+    lines of its entry do not name fails the first of those rules that checks it and holds the rest, so it is one
+    finding."""
     cells = {allocation.item_handle: allocation.cell_ids for allocation in allocations}
     settled = {}
     def settle(target, disposition, reason, evidence, actionable, origin):
@@ -177,6 +183,20 @@ def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, p
             if target.target_id == cell:
                 # Like an unlisted check of the model: satisfied, no reason, no cited refs (the field has its own).
                 settle(target, 'satisfied', '', [], False, 'verbatim')
+    if technologies is not None:
+        types, rules, others = technologies
+        for field in foreign_technologies(proposal, allocations, sources, types, scope, others):
+            own = [target for target in targets if target.target_id == cells[field.item_handle][field.field_key]]
+            failing = next((target for rule in rules for target in own if target.rule_id == rule), None)
+            if failing is None:
+                continue
+            name = ' '.join(payload_value(proposal.reply.payload, field.pointer).split())[:120]
+            # The origin of a check settled on the value's text; a new origin would change the record and its contracts.
+            for target in own:
+                if target is failing:
+                    settle(target, 'violation', FINDING.format(name=name), [], True, 'verbatim')
+                else:
+                    settle(target, 'satisfied', '', [], False, 'verbatim')
     if previous is not None:
         earlier, receipt = previous
         results = {(result.rule_id, result.target_id): result for result in receipt.reply.results}
@@ -212,10 +232,16 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
     handles = set(task.allowed_handles) | {field.item_handle for field in proposal.resolved_fields}
     allocations = [allocation for allocation in item_identities(operation) if allocation.item_handle in handles]
     targets = expected_checks(task, proposal, allocations, rules)
+    owned = owned_types(package.definition.fact_types) & {binding.semantic_type for binding in block.bindings}
+    # The block's own support rule holds its review lines, the technology rule among them; else the application's.
+    judges = [rule.id for rule in block.checks if rule.kind == 'semantic_support'] + [rules[-2].id]
+    others = [span for other in entries_of(operation, task.parent_task_id) if other.id != task.id
+        for span in other.entry.spans] if task.entry is not None else []
     settled = settled_checks(proposal, targets, allocations, sources, previous=previous,
         rewrite_fields=block.rewrite.fields if operation.capture.allow_text_rewrite else [],
         scope=task.entry.spans if task.entry is not None else None,
-        content_schema=next(value.full_schema for value in package.blocks if value.id == block.id))
+        content_schema=next(value.full_schema for value in package.blocks if value.id == block.id),
+        technologies=(owned, judges, others) if owned else None)
     asked = {(value.rule_id, value.target_id) for value in settled}
     asked = [target for target in targets if (target.rule_id, target.target_id) not in asked]
     spans = [capture_span(source, unit) for source in sources for unit in source.units]

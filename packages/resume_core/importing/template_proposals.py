@@ -17,6 +17,7 @@ from ..templates.projection import pointer_tokens, reachable_schema, validate_pa
 from ..templates.replies import proposal_schema, strip_unoffered_bookkeeping
 from ..template_capture import item_identities
 from .template_completion import complete_reply
+from .template_technologies import owned_types
 
 import json
 
@@ -249,7 +250,8 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             lines = {digest(span) for span in task.entry.spans} if task.entry is not None else set()
             preferred = {ref: option for ref, option in table.items() if digest(option.span) in lines} or None
             completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped,
-                preferred=preferred, previous=attempt.request_value.get('previousReply'))
+                preferred=preferred, previous=attempt.request_value.get('previousReply'),
+                technologies=owned_types(package.definition.fact_types))
             proposal.dropped_values = [DroppedValue.model_validate(value) for value in dropped or []]
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}

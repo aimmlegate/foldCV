@@ -24,6 +24,7 @@ import json
 import re
 
 from .template_identity import _binding_instances, empty_value
+from .template_technologies import respelling
 from ..templates.source_spans import _bound_root, payload_value
 from ..templates.projection import pointer_tokens
 
@@ -259,6 +260,49 @@ def _cleared(reply, pointer):
     return {**reply, 'payload': payload}
 
 
+def _respelled(reply, bindings, technologies, scopes):
+    """The reply with each technology an entry owns in the spelling of the lines that write it with other spaces or
+    punctuation, cited by the lines that state that spelling (D164, point 14). A value read from the editor's cells
+    stays as it is."""
+    payload, given = reply.get('payload'), [entry for entry in reply.get('fields') or [] if isinstance(entry, dict)]
+    texts = [[option.text for option in scope.values()] for scope in scopes]
+    changes = []
+    for pointer, semantic, field in sorted(_binding_instances(payload, bindings), key=lambda value: _natural(value[0])):
+        value = payload_value(payload, pointer)
+        own = [entry for entry in given if entry.get('pointer') == pointer]
+        if (semantic not in technologies or not isinstance(value, str)
+                or any(entry.get('effectiveCells') for entry in own)):
+            continue
+        spelled = respelling(value, texts)
+        if spelled is None:
+            continue
+        # What the reply cites for the value, or for the list above it, would cite it unchanged: it cites the lines that
+        # state the new spelling instead, nearest those first. Without either the value's evidence is derived as usual.
+        cited = [entry for entry in own if entry.get('evidence')] or sorted((entry for entry in given
+            if isinstance(entry.get('pointer'), str) and _under(pointer, entry['pointer']) and entry.get('evidence')),
+            key=lambda entry: len(pointer_tokens(entry['pointer'])))[-1:]
+        refs = next((found for scope in scopes if (found := stating(spelled, scope,
+            [ref for entry in cited for ref in entry['evidence']]))), [])
+        if refs:
+            changes.append((pointer, field, spelled, refs if cited else None))
+    if not changes:
+        return reply
+    payload = deepcopy(payload)
+    fields = [dict(entry) if isinstance(entry, dict) else entry for entry in reply.get('fields') or []]
+    for pointer, field, spelled, refs in changes:
+        tokens = pointer_tokens(pointer)
+        parent = payload_value(payload, pointer_of(tokens[:-1]))
+        parent[int(tokens[-1]) if isinstance(parent, list) else tokens[-1]] = spelled
+        if refs is not None:
+            own = [entry for entry in fields if isinstance(entry, dict) and entry.get('pointer') == pointer]
+            for entry in own:
+                entry['evidence'] = refs
+            if not own:
+                fields.append({'item': None, 'fieldKey': field, 'pointer': pointer, 'evidence': refs,
+                    'effectiveCells': None})
+    return {**reply, 'payload': payload, 'fields': fields}
+
+
 def _offered_items(previous, bindings, kinds):
     """{(semantic type, item root): H ref} of the items in the reply under repair."""
     previous = previous or {}
@@ -314,7 +358,8 @@ def _kept_items(free, handles, offered, payload, previous, bindings):
     return kept
 
 
-def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None, previous=None):
+def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None, previous=None,
+                   technologies=frozenset()):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
@@ -328,9 +373,14 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     cited from those lines first and from the whole table only when they do not state it. A value that four entries
     share otherwise took the first lines that state it, another entry's, and failed its own entry's review.
 
-    previous, for a repair, is the reply under repair as its request shows it; see _kept_items."""
+    previous, for a repair, is the reply under repair as its request shows it; see _kept_items.
+
+    technologies are the semantic types of the technologies an entry owns (D164, point 14): such a value that the
+    entry's lines (preferred), else the table, write with other spaces or punctuation takes their spelling first."""
     if not isinstance(reply, dict) or not bindings:
         return reply
+    if technologies:
+        reply = _respelled(reply, bindings, technologies, [preferred, table] if preferred else [table])
     payload = reply.get('payload')
     instances = {}
     for pointer, semantic, field in _binding_instances(payload, bindings):
