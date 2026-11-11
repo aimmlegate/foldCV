@@ -160,3 +160,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D155 Nested projects take their employer and role; a call that never answered gets one more; one system prompt for both CLIs
 - D156 Review findings left after the repair are warnings; a fallback never empties other entries
 - D157 The PDF original draws on older WebKit; a failed original stays in its pane
+- D158 Token economy: the plan runs; its sizes are aims, quality is the gate
