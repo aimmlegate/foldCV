@@ -115,7 +115,8 @@ class ProcessRunner:
             assert process.stdin is not None and process.stdout is not None and process.stderr is not None
             if host.WINDOWS:
                 return self._exchange_threads(process, pending, close_input, deadline, cancel, on_line,
-                                              poll_input, max_output, max_line, max_stdout, max_stderr, on_output)
+                                              poll_input, max_output, max_line, max_stdout, max_stderr, on_output,
+                                              idle_seconds)
             with selectors.DefaultSelector() as selector:
                 for stream, kind in ((process.stdin, "stdin"), (process.stdout, "stdout"), (process.stderr, "stderr")):
                     os.set_blocking(stream.fileno(), False)
@@ -202,7 +203,8 @@ class ProcessRunner:
                     files.stop_worker(final=False)
 
     def _exchange_threads(self, process, pending, close_input, deadline, cancel, on_line, poll_input,
-                          max_output, max_line, max_stdout, max_stderr, on_output=None) -> tuple[bytes, bytes]:
+                          max_output, max_line, max_stdout, max_stderr, on_output=None,
+                          idle_seconds=None) -> tuple[bytes, bytes]:
         """The selector loop above for Windows, where select() takes only sockets: threads move the pipe data.
         A reply after stdin was asked to close is refused, as one after the close is on macOS."""
         events: queue.Queue[tuple[str, bytes]] = queue.Queue()
@@ -250,17 +252,20 @@ class ProcessRunner:
             send(b"")
         try:
             return self._pump(process, events, send, deadline, cancel, on_line, poll_input, max_output, max_line,
-                              max_stdout, max_stderr, on_output)
+                              max_stdout, max_stderr, on_output, idle_seconds)
         finally:
             if not closing:
                 writes.put(None)
 
     def _pump(self, process, events, send, deadline, cancel, on_line, poll_input, max_output, max_line, max_stdout,
-              max_stderr, on_output=None) -> tuple[bytes, bytes]:
+              max_stderr, on_output=None, idle_seconds=None) -> tuple[bytes, bytes]:
         output, errors, line = bytearray(), bytearray(), bytearray()
         open_streams = {"stdout", "stderr"}
+        heard = self.clock()
         while open_streams or process.poll() is None:
             self._check(deadline, cancel)
+            if idle_seconds is not None and self.clock() - heard >= idle_seconds:
+                raise SpikeError("STALLED")
             if poll_input is not None:
                 reply = poll_input()
                 if reply is not None:
@@ -274,6 +279,7 @@ class ProcessRunner:
                 continue
             target = output if kind == "stdout" else errors
             target.extend(chunk)
+            heard = self.clock()
             if len(output) + len(errors) > max_output:
                 raise SpikeError("OUTPUT_TOO_LARGE")
             if ((max_stdout is not None and len(output) > max_stdout)

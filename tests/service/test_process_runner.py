@@ -83,3 +83,25 @@ def test_the_idle_limit_must_be_a_positive_finite_number(tmp_path):
     for value in (0, -1, float("inf"), float("nan")):
         with pytest.raises(SpikeError, match="INVALID_LIMIT"):
             run(tmp_path / "limit", "print(1)", idle_seconds=value)
+
+
+def test_the_windows_pipe_threads_end_a_silent_child_as_stalled_too():
+    """Windows reads the pipes on threads (select() takes only sockets): the idle limit holds there as well."""
+    import subprocess
+    runner = ProcessRunner(Path(sys.executable))
+
+    def exchange(source):
+        process = subprocess.Popen([sys.executable, "-c", source], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+        try:
+            return runner._exchange_threads(process, bytearray(), True, time.monotonic() + 5, threading.Event(), None,
+                                            None, 10_000, 10_000, None, None, idle_seconds=0.5)
+        finally:
+            process.kill()
+            process.wait(5)
+    started = time.monotonic()
+    with pytest.raises(SpikeError, match="STALLED"):
+        exchange("import time;time.sleep(4)")
+    assert time.monotonic() - started < 3
+    result, _ = exchange("import sys,time\nfor _ in range(4):\n sys.stdout.write('tick\\n');sys.stdout.flush();time.sleep(0.2)")
+    assert result == b"tick\n" * 4
