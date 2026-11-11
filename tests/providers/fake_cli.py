@@ -101,6 +101,15 @@ assert not any(key.startswith(("OPENAI_", "CODEX_", "T3CODE_", "PYTHON", "HTTP_P
 owned = Path(os.environ["TMPDIR"]).parent
 for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
     assert Path(os.environ[key]).parent == owned
+# D155: one file beside the schema replaces the CLI's built-in instructions; a strict CLI without the key stops here.
+named = [value.split("=", 1)[1] for value in settings if value.startswith("model_instructions_file=")]
+assert len(named) == 1 and Path(json.loads(named[0])).parent == owned
+if case == "unknown_instructions_key":
+    print("Error loading config.toml: unknown configuration field `model_instructions_file` in -c/--config override",
+          file=sys.stderr)
+    sys.exit(1)
+with (base / "audit.jsonl").open("a") as audit:
+    audit.write(json.dumps({"instructions": Path(json.loads(named[0])).read_bytes().decode()}) + "\n")
 if config.get("plain_text"):
     assert "--output-schema" not in args and not (owned / "schema.json").exists()
     schema = {}

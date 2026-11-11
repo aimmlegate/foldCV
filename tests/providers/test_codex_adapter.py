@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import json
 import os
+from pathlib import Path
 import threading
 import time
 from unittest.mock import patch
@@ -14,7 +15,7 @@ import pytest
 
 from resume_api.lifecycle import OperationFiles, SpikeError, has_blocked_owned
 from resume_api.providers.codex.content import CodexCliProvider, FixtureTransport
-from resume_api.providers.shared import strict_json
+from resume_api.providers.shared import SYSTEM_PROMPT, strict_json
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 from tests.providers.fixtures import PROMPT, Summary, fake, request  # noqa: F401 (pytest fixture)
 
@@ -105,7 +106,7 @@ def test_rewrite_diagnostics_separate_cli_preflight_startup_and_model_turn(fake,
     ("usage_limit", "QUOTA_EXHAUSTED"), ("usage_limit_turn", "QUOTA_EXHAUSTED"), ("plain_error", "CLI_FAILED"),
     ("invalid_startup_warning", "INVALID_RESULT"),
     ("model_denied", "MODEL_DENIED"), ("excessive", "OUTPUT_TOO_LARGE"),
-    ("excessive_stderr", "OUTPUT_TOO_LARGE"),
+    ("excessive_stderr", "OUTPUT_TOO_LARGE"), ("unknown_instructions_key", "CLI_FAILED"),
 ])
 def test_protocol_failures_are_terminal(fake, case: str, code: str) -> None:
     failure(fake, case, code, 1)
@@ -272,6 +273,42 @@ def test_safe_argv_environment_and_private_text_remain_in_stdin(fake) -> None:
     assert any(entry.get("stdin_match") and entry.get("restrictions_checked") for entry in audit)
     assert PROMPT not in json.dumps(audit) and "synthetic-secret" not in json.dumps(audit)
     assert not (cli.parent.parent / "inert").exists()
+
+
+def test_every_exec_replaces_the_built_in_instructions_with_the_shared_system_prompt(fake) -> None:
+    from packages.resume_core.editing.text_rewrite import PlainTextReply
+    cli, root, keep, configure, starts = fake
+    generate(fake)
+    configure(plain_text=True, result_text="A short plain reply.")
+    plain = ContentInput(PROMPT, PlainTextReply, GenerationPolicy("gpt-6-luna", allow_repair=False))
+    with OperationFiles(root).open() as files:
+        CodexCliProvider(cli, fixture_transport=FixtureTransport(cli)).generate(plain, files, threading.Event())
+    rows = [json.loads(line) for line in (cli.parent / "audit.jsonl").read_text().splitlines()]
+    calls = [row["args"] for row in rows if row.get("generation")]
+    assert len(calls) == starts() == 2 and "--output-schema" in calls[0] and "--output-schema" not in calls[1]
+    for args in calls:
+        named, = (value for value in args if value.startswith("model_instructions_file="))
+        assert args[args.index(named) - 1] == "--config"
+        assert Path(json.loads(named.split("=", 1)[1])).name == "instructions.txt"
+    # The fake read the file while the call ran: the operation directory is gone now.
+    assert [row["instructions"] for row in rows if "instructions" in row] == [SYSTEM_PROMPT, SYSTEM_PROMPT]
+    assert not any("model_instructions_file" in json.dumps(row.get("args")) for row in rows if not row.get("generation"))
+    assert list(root.iterdir()) == [keep]
+
+
+def test_the_profile_names_the_instructions_file_for_exec_only(tmp_path) -> None:
+    from resume_api.providers.codex.agent_profile import AgentProfile
+    from resume_api.providers.codex.profile import ExperimentalCliProfile
+    operation = tmp_path / "operation"
+    profile = ExperimentalCliProfile(tmp_path / "profile", tmp_path / "codex")
+    args = profile.exec_arguments(operation, "gpt-6-luna")
+    assert [value for value in args if "model_instructions_file" in value] == [
+        "model_instructions_file=" + json.dumps(str(operation / "instructions.txt"))]
+    assert args[args.index("--output-schema") + 1] == str(operation / "schema.json") and args[-1] == "-"
+    # The probe and the assistant's app server, whose config check refuses an instructions file, go without it.
+    assistant = AgentProfile(profile.root, profile.executable).arguments(
+        operation, url="http://127.0.0.1:4100/mcp", tools=("check_resume",), allow_web=False)
+    assert not any("model_instructions_file" in value for value in (*profile.config(operation), *assistant))
 
 
 @pytest.mark.parametrize("raw", [b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":1e309}',

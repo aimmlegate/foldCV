@@ -31,7 +31,7 @@ from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache
 from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments,
                                              overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
-from ..shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, _combine, strict_json
+from ..shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, SYSTEM_PROMPT, _combine, strict_json
 
 
 # What `exec --json` sends today. A newer CLI adds events of its own; tools only ever run as items, which stay checked.
@@ -440,6 +440,7 @@ class CodexCliProvider:
                 raise ContentFailure("TEMP_FAILED")
             if not plain:
                 (files.path / "schema.json").write_bytes(schema)
+            (files.path / "instructions.txt").write_bytes(SYSTEM_PROMPT.encode())
             attempt_limit = 2 if policy.allow_repair and not plain else 1
             for index in range(attempt_limit):
                 self.process._check(deadline, cancel)

@@ -24,6 +24,7 @@ from resume_api.lifecycle import OperationFiles
 from resume_api.providers.claude import catalog as claude_catalog
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
+from resume_api.providers.shared import SYSTEM_PROMPT
 
 
 PROMPT = "Synthetic Alex; 'quotes' ☃ $() `inert` synthetic-secret"
@@ -104,6 +105,7 @@ def test_success_uses_the_isolated_argv_and_keeps_the_prompt_on_stdin(fake):
     assert args[args.index("--permission-prompts") + 1] == "none"
     assert json.loads(args[args.index("--settings") + 1])["disableAllHooks"] is True
     assert "--dangerously-skip-permissions" not in args and "--bare" not in args and "--effort" not in args
+    assert args[args.index("--system-prompt") + 1] == SYSTEM_PROMPT
 
 
 def test_effort_from_the_catalog_is_passed_and_unknown_effort_is_denied(fake):
@@ -127,6 +129,7 @@ def test_allowed_runs_without_repair_dispatch_exactly_once(fake):
 def test_plain_text_drops_the_schema_and_returns_the_final_text(fake):
     result, starts = generate(fake, "valid", value=request(result=PlainTextReply), text="Rewritten line")
     assert result.value.text == "Rewritten line" and "--json-schema" not in starts[0]["args"]
+    assert starts[0]["args"][starts[0]["args"].index("--system-prompt") + 1] == SYSTEM_PROMPT
 
 
 def test_a_run_that_renews_the_sign_in_runs_once_more(fake):

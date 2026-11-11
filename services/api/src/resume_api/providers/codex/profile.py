@@ -10,7 +10,7 @@ import stat
 
 from packages.resume_core import host
 from resume_api.providers.codex import pins as codex
-from resume_api.providers.codex.pins import overrides
+from resume_api.providers.codex.pins import instructions, overrides
 from resume_api.cli.qualification import QualificationError, require_publisher
 from resume_api.cli.releases import Runtime
 from . import distribution
@@ -186,7 +186,7 @@ class ExperimentalCliProfile:
             "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
             "--json", "--color", "never", "--model", model,
             "--output-schema", str(operation / "schema.json"),
-            *self.config(operation), "-",
+            *self.config(operation), *instructions(operation), "-",
         )
 
     def launch(self, executable: Path, args: tuple[str, ...], operation: Path

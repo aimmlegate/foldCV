@@ -77,11 +77,17 @@ def overrides(directory: Path) -> list[str]:
     return [part for value in values for part in ("--config", value)]
 
 
+def instructions(directory: Path) -> list[str]:
+    """The file that replaces the CLI's built-in coding-agent instructions (D155). Exec only: the CLI reads it at
+    config load, and the assistant's app server refuses any instructions file, so `overrides` stays without it."""
+    return ["--config", f"model_instructions_file={json.dumps(str(directory / 'instructions.txt'))}"]
+
+
 def exec_arguments(directory: Path, model: str) -> list[str]:
     return [
         "exec", "--strict-config", "--ignore-user-config", "--ignore-rules",
         "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
         "--json", "--color", "never", "--model", model,
         "--output-schema", str(directory / "schema.json"),
-        *overrides(directory), "-",
+        *overrides(directory), *instructions(directory), "-",
     ]

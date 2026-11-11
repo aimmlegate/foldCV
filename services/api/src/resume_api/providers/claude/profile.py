@@ -16,6 +16,7 @@ from resume_api.providers.claude import distribution as claude_distribution
 from resume_api.cli import qualification
 from resume_api.cli.qualification import Compatibility, QualificationError
 from resume_api.cli.releases import Runtime
+from resume_api.providers.shared import SYSTEM_PROMPT
 
 
 KIND = "claude_cli"
@@ -33,8 +34,6 @@ HIDDEN_FLAGS = ("--max-turns",)
 ACCEPTED_AUTH = "claude.ai"
 STRUCTURED_TOOLS = ("StructuredOutput",)
 STRUCTURED_MAX_TURNS = 4
-SYSTEM_PROMPT = ("Follow the user's instructions exactly. Return the result only through the structured "
-                 "output; do not add commentary.")
 # Built-in plugins seen in 2.1.308. A new one adds nothing the system/init check does not see: it reports tools, skills,
 # commands and MCP servers on their own, and hooks stay off.
 SETTINGS = {"disableAllHooks": True,

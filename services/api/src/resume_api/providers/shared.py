@@ -27,6 +27,11 @@ MAX_DEPTH = 32
 REPAIR_FEEDBACK = "The completed response was invalid JSON or did not match the schema. Return only a valid JSON object matching the schema."
 
 
+# The whole system prompt of a content call on either CLI: it replaces Claude Code's and Codex's own (D155).
+SYSTEM_PROMPT = ("Follow the user's instructions exactly. Return the result only through the structured "
+                 "output; do not add commentary.")
+
+
 def strict_json(raw: bytes | str, *, max_bytes: int = MAX_RESULT) -> object:
     try:
         if isinstance(raw, bytes):
