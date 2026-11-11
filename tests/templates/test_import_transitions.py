@@ -10,7 +10,7 @@ from packages.resume_core.importing.template_import import (CleanupProof, Proces
                                                             cancel_operation, capture_task_input, dispatch_attempt,
                                                             observe_time, reconcile_cleanup, owed_reviews,
                                                             record_return, recover_operation, reserve_attempt,
-                                                            resume_operation, spent_calls, start_operation,
+                                                            resume_operation, retry_open, spent_calls, start_operation,
                                                             stopped_call, stops_import)
 from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.hashing import digest
@@ -195,6 +195,64 @@ def test_only_a_call_stopped_from_outside_leaves_its_slot_free(outcome, code, fr
     else:
         with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
             reserve(operation, index=2)
+
+
+def ended(operation, attempt, outcome, code, raw=None):
+    return record_return(dispatch_attempt(operation, attempt, NOW), attempt, raw, outcome, usage(), cleaned(),
+        error_code=code)
+
+
+@pytest.mark.parametrize('outcome,code,raw,again', [('timed_out', 'STALLED', None, True),
+    ('timed_out', 'DEADLINE_EXCEEDED', None, True), ('invalid_payload', 'INVALID_RESULT', None, True),
+    ('invalid_payload', 'INVALID_RESULT', '{bad', False), ('timed_out', 'IMPORT_PROCESSING_EXHAUSTED', None, False),
+    ('transport_failure', 'CLI_FAILED', None, False), ('timed_out', 'DEADLINE', None, False)])
+def test_a_call_that_never_answered_leaves_its_slot_one_more_call_of_the_same_request(outcome, code, raw, again):
+    # D155: a reply that came back is repaired or falls back; a late return is the import's own time.
+    operation, attempt = reserve(ready_operation())
+    operation = ended(operation, attempt, outcome, code, raw)
+    assert retry_open(operation, operation.attempts[0]) is again
+    if not again:
+        with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
+            reserve(operation, index=2)
+        return
+    with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
+        reserve_attempt(operation, operation.tasks[0].id, 'initial', digest('another request'),
+            operation.capture.primary, owner(2), NOW)
+    operation, second = reserve(operation, index=2)
+    assert spent_calls(operation) == 2 and not retry_open(operation, operation.attempts[0])
+    operation = ended(operation, second, outcome, code)
+    # One more call is all: a second call that never answered spends the slot.
+    assert not retry_open(operation, operation.attempts[1])
+    with pytest.raises(TemplateImportFailure, match='IMPORT_SLOT_SPENT'):
+        reserve(operation, index=3)
+
+
+def test_a_stopped_second_call_and_a_call_that_never_ran_leave_the_one_more_call():
+    operation, attempt = reserve(ready_operation())
+    operation = ended(operation, attempt, 'timed_out', 'STALLED')
+    operation, second = reserve(operation, index=2)
+    operation = ended(operation, second, 'cancelled', 'CANCELLED')
+    assert stopped_call(operation, operation.attempts[1]) and retry_open(operation, operation.attempts[0])
+    operation, third = reserve(operation, index=3)
+    # A qualification timeout before any process: released, it took no call and the slot still has its one more.
+    operation = ended(operation, third, 'timed_out', 'DEADLINE_EXCEEDED')
+    operation = reconcile_cleanup(operation, CleanupProof(third, digest(operation.attempts[2].owner),
+        cleaned().evidence_hash, cleaned().witness, True), NOW)
+    assert operation.attempts[2].state == 'released' and retry_open(operation, operation.attempts[2])
+    operation, _fourth = reserve(operation, index=4)
+    assert spent_calls(operation) == 3
+
+
+def test_a_review_that_never_answered_takes_one_more_call_of_its_input():
+    operation, attempt = reserve(ready_operation())
+    operation = returned(operation, attempt)
+    operation, review = reserve(operation, 'review', 2)
+    operation = ended(operation, review, 'timed_out', 'STALLED')
+    assert retry_open(operation, operation.attempts[1])
+    operation, second = reserve(operation, 'review', 3)
+    operation = ended(operation, second, 'timed_out', 'STALLED')
+    with pytest.raises(TemplateImportFailure, match='IMPORT_REVIEW_ALREADY_SPENT'):
+        reserve(operation, 'review', 4)
 
 
 def test_a_refused_fallback_model_spends_its_own_slot():

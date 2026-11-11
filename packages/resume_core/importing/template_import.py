@@ -16,6 +16,7 @@ from ..import_failure import TemplateImportFailure
 TERMINAL_TASKS = frozenset({'accepted', 'empty', 'source_fallback', 'cancelled', 'technical_failure'})
 GENERATION_SLOTS = frozenset({'initial', 'primary_repair', 'fallback_repair'})
 REPAIR_SLOTS = frozenset({'primary_repair', 'fallback_repair'})
+REVIEW_SLOTS = frozenset({'review', 'replacement_review'})
 # D117: the outline of a block that extracts its entries on their own, and the review of that outline.
 OUTLINE_SLOTS = frozenset({'outline', 'outline_review'})
 IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
@@ -288,6 +289,45 @@ def stopped_call(operation, attempt):
         and (attempt.outcome == 'cancelled' or stops_import(operation, attempt)))
 
 
+# D155: a call that ended so never answered: five minutes without output, a bound short of the import's own time, or
+# the CLI refused its reply against the schema and returned none. A reply that came back is repaired or falls back.
+UNANSWERED = frozenset({'STALLED', 'INVALID_RESULT', 'DEADLINE_EXCEEDED'})
+
+
+def unanswered(attempt):
+    """A call that ended with verified cleanup and gave the import nothing; its slot takes one more call. A released
+    one never ran."""
+    return (attempt.state in {'returned', 'reconciled', 'released'} and attempt.cleanup.state == 'verified'
+        and attempt.outcome != 'completed' and attempt.error_code in UNANSWERED
+        and (attempt.error_code != 'INVALID_RESULT' or attempt.raw_return is None)
+        and attempt.proposal_record_id is None and attempt.review_receipt_id is None)
+
+
+def slot_calls(attempts, slot, input_hash):
+    """The calls of one task in a slot; a review's are those of its input, in either review slot."""
+    if slot in REVIEW_SLOTS:
+        return [attempt for attempt in attempts if attempt.slot in REVIEW_SLOTS and attempt.input_hash == input_hash]
+    return [attempt for attempt in attempts if attempt.slot == slot]
+
+
+def slot_spent(attempts, slot, input_hash):
+    """A call that answered spends its slot; one that never answered leaves one more call of the same request."""
+    calls = slot_calls(attempts, slot, input_hash)
+    return len(calls) > 1 or any(not unanswered(attempt) or attempt.input_hash != input_hash for attempt in calls)
+
+
+def prior_calls(operation, task_id):
+    """The calls a task's slots count: a stopped one frees its slot and a released one never ran."""
+    return [attempt for attempt in operation.attempts if attempt.task_id == task_id and attempt.state != 'released'
+        and not stopped_call(operation, attempt)]
+
+
+def retry_open(operation, attempt):
+    """Whether a call that never answered may be made once more, by the rule reserve_attempt applies to its slot."""
+    return unanswered(attempt) and not slot_spent(prior_calls(operation, attempt.task_id), attempt.slot,
+        attempt.input_hash)
+
+
 def owed_reviews(operation, *, excluding=None):
     """Repairs still waiting for their review, each holding one call of the cap: a repair counts only after its review.
     A refused repair goes unreviewed and an ended task owes nothing."""
@@ -328,10 +368,9 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     held = owed_reviews(result, excluding=task_id if slot in {'review', 'replacement_review'} else None)
     if spent_calls(result) + held + needed > result.capture.policy.call_cap:
         raise TemplateImportFailure('IMPORT_CALL_CAP')
-    prior = [attempt for attempt in result.attempts if attempt.task_id == task_id and attempt.state != 'released'
-        and not stopped_call(result, attempt)]
+    prior = prior_calls(result, task_id)
     if slot in GENERATION_SLOTS:
-        if any(attempt.slot == slot for attempt in prior):
+        if slot_spent(prior, slot, input_hash):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
         expected = (result.capture.fallback or result.capture.primary) if slot == 'fallback_repair' else result.capture.primary
         if not same_captured_model(model, expected):
@@ -340,26 +379,25 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
             raise TemplateImportFailure('IMPORT_REPAIR_WITHOUT_INITIAL')
         if slot == 'fallback_repair' and not any(attempt.slot == 'primary_repair' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REPAIR_ORDER')
-    elif slot in {'review', 'replacement_review'}:
+    elif slot in REVIEW_SLOTS:
         if not any(attempt.slot in GENERATION_SLOTS and attempt.state in {'returned', 'reconciled'}
                 and attempt.outcome == 'completed' for attempt in prior):
             raise TemplateImportFailure('IMPORT_REVIEW_WITHOUT_PROPOSAL')
         if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.fallback,
-                result.capture.review]) or any(
-                attempt.slot in {'review', 'replacement_review'} and attempt.input_hash == input_hash for attempt in prior):
+                result.capture.review]) or slot_spent(prior, slot, input_hash):
             raise TemplateImportFailure('IMPORT_REVIEW_ALREADY_SPENT')
     elif slot == 'outline':
         # D117: a block task outlines its entries once, with the import model, before any extraction of its own.
         if task.parent_task_id is not None or task.kind not in {'extract', 'rewrite'}:
             raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
-        if any(attempt.slot in GENERATION_SLOTS or attempt.slot == 'outline' for attempt in prior):
+        if any(attempt.slot in GENERATION_SLOTS for attempt in prior) or slot_spent(prior, slot, input_hash):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
         if not same_captured_model(model, result.capture.primary):
             raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
     elif slot == 'outline_review':
         if task.kind != 'outline_review':
             raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
-        if any(attempt.slot == 'outline_review' for attempt in prior):
+        if slot_spent(prior, slot, input_hash):
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
         if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.review]):
             raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')

@@ -330,11 +330,13 @@ async def test_a_reply_the_transport_refuses_by_schema_is_repaired_without_its_q
 
 
 def timing_out(fixture, limits, *, slots=('initial',), review=False):
-    """Calls in slots (or the review) run out of time without a reply; the others answer correctly."""
+    """Calls in slots (or the review) run out of the import's time without a reply; the others answer correctly."""
     from resume_api.providers.content import ContentFailure, ReportedUsage
     def script(request, value):
         limits.append(request.policy.timeout_seconds)
         if ('targets' in value) == review and (review or value['slot'] in slots):
+            # The import's own limit passes with the call; a bound short of it gets one more call (D155).
+            fixture.now = '2026-10-21T00:05:01+00:00'
             raise ContentFailure('DEADLINE_EXCEEDED', logical_attempts=1, usage=ReportedUsage(None, None, None, False),
                 cleanup_verified=True, dispatch_witness={'transport': 'controlled'})
         return satisfied_review(value) if 'targets' in value else raw_proposal(fixture.source)

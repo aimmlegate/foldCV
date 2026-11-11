@@ -21,7 +21,8 @@ from packages.resume_core.importing.template_builtin_admission import current_ha
 from packages.resume_core.editing.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
 from packages.resume_core.sources import capture_span, line_spans, source_slice
-from packages.resume_core.importing.template_identity import empty_value, evidence_options, offered_evidence
+from packages.resume_core.importing.template_identity import (empty_value, evidence_options, offered_evidence,
+                                                              offered_references)
 from packages.resume_core.importing.template_entries import (closed_state, entry_part, entry_records, grouped,
                                                              line_options, ordered_entries, outline_part,
                                                              parse_outline, parse_outline_review, reorder_records,
@@ -33,8 +34,8 @@ from packages.resume_core.importing.template_import import (GENERATION_SLOTS, Cl
                                                             children_of, dispatch_attempt, entries_of, fork, identity,
                                                             observe_time, record_return, reconcile_cleanup,
                                                             recover_operation, reserve_attempt, resume_operation,
-                                                            spent_calls, start_operation, stopped_call, stops_import,
-                                                            task_in)
+                                                            retry_open, spent_calls, start_operation, stopped_call,
+                                                            stops_import, task_in)
 from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.hashing import digest
 from packages.resume_core.importing.template_proposals import parse_proposal, transport_refusal
@@ -209,6 +210,13 @@ def better_repair(operation, package, first_receipt, receipt, review, proposal):
     after = [value for value in before if value.item_handle not in touched]
     return repair_wins(before, failed_targets(first_receipt),
         after + shown_values(proposal, set(admitted), allocations, rewrite), failed_targets(receipt), touched)
+
+
+def sent_schema(package, block_id, request):
+    """The proposal schema a captured request went with, as transport_refusal reads it."""
+    offered = offered_evidence(request)
+    return proposal_schema(next(value.full_schema for value in package.blocks if value.id == block_id),
+        None if offered is None else list(offered), offered_references(request) if offered is not None else None)
 
 
 def previous_reply(proposal, offered, references):
@@ -683,7 +691,8 @@ class TemplatePipeline:
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
-            existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
+            # The latest call: a slot holds two when the first never answered (D155).
+            existing = next((attempt for attempt in reversed(operation.attempts) if attempt.task_id == task_id
                 and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
             if slot != 'initial' and not feedback:
                 break
@@ -729,6 +738,9 @@ class TemplatePipeline:
                     break
             else:
                 attempt_id = existing.id
+            # A reply needs its review: one more call only with room for both.
+            attempt_id = await self.again(project, operation_id, attempt_id, deadline, cancel, room=2,
+                schema=lambda value: sent_schema(data.template_package, task.block_id, value))
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             attempt = attempt_in(operation, attempt_id)
@@ -782,7 +794,7 @@ class TemplatePipeline:
                     'otherBlocks': other_blocks(operation, task, data.template_package)},
                 # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                 previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
-            review_attempt = next((value for value in operation.attempts if value.task_id == task_id
+            review_attempt = next((value for value in reversed(operation.attempts) if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
                 and value.state != 'released' and not stopped_call(operation, value)), None)
             try:
@@ -792,6 +804,8 @@ class TemplatePipeline:
                         review_schema(review), deadline, cancel, review=review)
                 else:
                     review_id = review_attempt.id
+                review_id = await self.again(project, operation_id, review_id, deadline, cancel, room=1,
+                    schema=lambda _value: review_schema(review), review=review)
                 operation = operation_in(await self.view(project), operation_id)
                 if halted(operation, attempt_in(operation, review_id), cancel):
                     return
@@ -854,8 +868,9 @@ class TemplatePipeline:
         if children:
             # Resumed after its entries were added: they run on and the block closes when they all ended.
             return Spawned(task_id, tuple(child.id for child in children), True)
-        existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id and attempt.slot == 'outline'
-            and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
+        existing = next((attempt for attempt in reversed(operation.attempts) if attempt.task_id == task_id
+            and attempt.slot == 'outline' and attempt.state != 'released' and not stopped_call(operation, attempt)),
+            None)
         if existing is None:
             if any(attempt.task_id == task_id and attempt.slot in GENERATION_SLOTS for attempt in operation.attempts):
                 return None
@@ -879,6 +894,10 @@ class TemplatePipeline:
                 return None
         else:
             attempt_id = existing.id
+        # One more outline needs the room the first one did.
+        attempt_id = await self.again(project, operation_id, attempt_id, deadline, cancel, room=2 + 2 * 2,
+            schema=lambda value: outline_schema([option.ref for option in line_options(offered_evidence(value),
+                data.sources)]))
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
         attempt = attempt_in(operation, attempt_id)
@@ -916,7 +935,7 @@ class TemplatePipeline:
         task = task_in(operation, task_id)
         parent_id = task.parent_task_id
         stored = next(value for value in operation.task_inputs if value.task_id == task_id)
-        existing = next((attempt for attempt in operation.attempts if attempt.task_id == task_id
+        existing = next((attempt for attempt in reversed(operation.attempts) if attempt.task_id == task_id
             and attempt.slot == 'outline_review' and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
         unresolved, missing, remarks = [], [], []
         if existing is None:
@@ -933,6 +952,10 @@ class TemplatePipeline:
                 attempt_id = None
         else:
             attempt_id = existing.id
+        if attempt_id is not None:
+            attempt_id = await self.again(project, operation_id, attempt_id, deadline, cancel, room=1,
+                schema=lambda value: outline_review_schema([option.ref for option in line_options(
+                    offered_evidence(value) or {}, data.sources)]))
         workspace = await self.view(project)
         operation, data = operation_in(workspace, operation_id), owner(workspace)
         if cancel.is_set():
@@ -994,6 +1017,28 @@ class TemplatePipeline:
                 disposition=disposition))
             return operation
         await asyncio.to_thread(self.update_operation, project, operation_id, close)
+
+    async def again(self, project, operation_id, attempt_id, deadline, cancel, *, room, schema, review=None):
+        """A call that never answered is made once more with its request, as a new attempt of its slot (D155), while the
+        import has time and the cap room for it and what follows it. Returns the attempt to read on: the new one, or
+        this one."""
+        operation = operation_in(await self.view(project), operation_id)
+        attempt = attempt_in(operation, attempt_id)
+        if (cancel.is_set() or operation.state != 'processing' or not retry_open(operation, attempt)
+                or operation.capture.policy.call_cap - spent_calls(operation) < room
+                or deadline.remaining(operation, self.wall(), self.elapsed()) <= 0):
+            return attempt_id
+        value = review.model_dump(mode='json', by_alias=True) if review is not None else attempt.request_value
+        if value is None:
+            return attempt_id
+        try:
+            return await self.call(project, operation_id, attempt.task_id, attempt.slot, value, schema(value), deadline,
+                cancel, review=review)
+        except AccountStop:
+            raise
+        except TemplateImportFailure:
+            # Refused before it ran (the cap or the time ran out meanwhile): the first call stands.
+            return attempt_id
 
     async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None):
         workspace = await self.view(project)
