@@ -49,6 +49,7 @@ from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL, outline_review_schema,
     outline_schema, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL)
 
+from .. import import_usage
 from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
 from ..providers.dynamic_result import dynamic_result
 from .template_sidecar import OperationSidecar
@@ -407,13 +408,17 @@ class TemplatePipeline:
     def update_operation(self, project, operation_id, transition):
         session = self.repository.open(project)
         with session.lock:
+            import_usage.lap('lockWait')
             before = self.read(project)
             # The cached view is shared (execute_task, view() and the status route read it): a step gets its operation
             # and a copy of the holder and edits neither in place. Its one validation reads the JSON the sidecar gets.
             data = owner(before).model_copy()
             prior = operation_in(before, operation_id)
-            text = transition(prior, data, with_holder(before, data)).model_dump_json(by_alias=True)
+            result = transition(prior, data, with_holder(before, data))
+            import_usage.lap('transition')
+            text = result.model_dump_json(by_alias=True)
             updated = ImportOperation.model_validate_json(text)
+            import_usage.lap('validation')
             if updated == prior and data.facts == owner(before).facts:
                 return before
             sidecar = OperationSidecar(session.directory)
@@ -428,7 +433,18 @@ class TemplatePipeline:
             else:
                 with self.cache_lock:
                     self.read_cache.pop(project, None)
-            return self.read(project)
+            view = self.read(project)
+            import_usage.lap('write')
+            return view
+
+    async def step(self, project, operation_id, kind, transition):
+        """update_operation in a worker thread; the import's timing sums its parts under `kind` (R1)."""
+        submitted = time.perf_counter()
+
+        def timed():
+            with import_usage.step(kind, submitted):
+                return self.update_operation(project, operation_id, transition)
+        return await asyncio.to_thread(timed)
 
     def update(self, project, identifier, transition):
         def apply(workspace):
@@ -524,18 +540,21 @@ class TemplatePipeline:
                     lambda value, _data, workspace: self.resume(value, command, workspace))
                 operation = operation_in(workspace, operation.id)
             cancel = self.cancels[(project, operation.id)] = cancel_event if cancel_event is not None else threading.Event()
-            await asyncio.to_thread(self.authorize, project, operation)
-            await admitted()
-            workspace = await asyncio.to_thread(self.update, project, operation.id,
-                lambda value, _data, _workspace: admit_operation(value, self.wall()))
-            operation = operation_in(workspace, operation.id)
-            deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
-            await self.run_tasks(project, operation, deadline, cancel,
-                implicit=implicit_dependencies(owner(workspace).template_package, operation))
-            operation = operation_in(await self.view(project), operation.id)
-            if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
-                return operation
-            return await self.finalize(project, operation.id, cancel) if finalize else operation
+            # T0.1: the run's usage and timing go to one diagnostics file; its last write reads the record as it ends.
+            async with import_usage.collecting(getattr(self.repository, 'root', None), project, operation.id, self.wall,
+                    lambda: operation_in(self.read(project), operation.id)):
+                await asyncio.to_thread(self.authorize, project, operation)
+                await admitted()
+                workspace = await asyncio.to_thread(self.update, project, operation.id,
+                    lambda value, _data, _workspace: admit_operation(value, self.wall()))
+                operation = operation_in(workspace, operation.id)
+                deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
+                await self.run_tasks(project, operation, deadline, cancel,
+                    implicit=implicit_dependencies(owner(workspace).template_package, operation))
+                operation = operation_in(await self.view(project), operation.id)
+                if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
+                    return operation
+                return await self.finalize(project, operation.id, cancel) if finalize else operation
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
@@ -684,13 +703,15 @@ class TemplatePipeline:
             await self.finish_task(project, operation_id, task_id, {'branch': branch}, [], [], 'empty', [])
             return
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
-            value, handles = self.task_input(operation, task, data)
-            workspace = await asyncio.to_thread(self.update_operation, project, operation_id,
+            with import_usage.timed('tasks', 'taskInput'):
+                value, handles = self.task_input(operation, task, data)
+            workspace = await self.step(project, operation_id, 'taskInput',
                 lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(),
                     id_factory=self.id_factory, check=False))
             operation = operation_in(workspace, operation_id)
         if task.kind in {'derive', 'source_copy'}:
-            derived = self.derive(operation, task_in(operation, task_id), owner(workspace))
+            with import_usage.timed('tasks', 'derive'):
+                derived = self.derive(operation, task_in(operation, task_id), owner(workspace))
             stored = next(value for value in operation.task_inputs if value.task_id == task_id)
             issues = [ImportIssue(id=self.id_factory('issue'), ruleId=None, taskId=task_id,
                 targetIds=list(issue.target_ids) or ['scope-' + task_id], blockIds=[], category='uncertain_interpretation',
@@ -782,11 +803,12 @@ class TemplatePipeline:
                 from packages.resume_core.models.template_facts import Relation
                 captured = [Relation.model_validate(relation) for relation in attempt_in(value, attempt_id).request_value.get('capturedRelations', [])]
                 self.facts_current(value, current.facts)
-                updated, facts, _proposal = parse_proposal(value, attempt_id, current.template_package,
-                    current.sources, current.facts, captured_relations=captured, id_factory=self.id_factory, check=False)
+                with import_usage.timed('tasks', 'parseProposal'):
+                    updated, facts, _proposal = parse_proposal(value, attempt_id, current.template_package,
+                        current.sources, current.facts, captured_relations=captured, id_factory=self.id_factory, check=False)
                 current.facts = facts
                 return updated
-            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, parse)
+            workspace = await self.step(project, operation_id, 'parse', parse)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
             proposal = next(value for value in operation.proposals if value.attempt_id == attempt_id)
             if proposal.state == 'invalid':
@@ -804,16 +826,17 @@ class TemplatePipeline:
                 and attempt_in(operation, value.attempt_id).task_id == task_id), None)
             # The review offers its own evidence table under the same references, so the task input omits its copy.
             task_input = next(value.value for value in operation.task_inputs if value.task_id == task_id)
-            review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,
-                # Only the cells the proposal reads: the reviewer sees no others and wording restores from these
-                # (a live import: every effective cell was 250 KB of each 320 KB review input).
-                effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
-                    if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
-                semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
-                    'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
-                    'otherBlocks': other_blocks(operation, task, data.template_package)},
-                # D115: what the repair left as it was keeps the reviewed reply's receipt results.
-                previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
+            with import_usage.timed('tasks', 'makeReviewInput'):
+                review = prior_review or make_review_input(operation, proposal, data.template_package, data.sources, policy,
+                    # Only the cells the proposal reads: the reviewer sees no others and wording restores from these
+                    # (a live import: every effective cell was 250 KB of each 320 KB review input).
+                    effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
+                        if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
+                    semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
+                        'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
+                        'otherBlocks': other_blocks(operation, task, data.template_package)},
+                    # D115: what the repair left as it was keeps the reviewed reply's receipt results.
+                    previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
             review_attempt = next((value for value in reversed(operation.attempts) if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
                 and value.state != 'released' and not stopped_call(operation, value)), None)
@@ -847,7 +870,7 @@ class TemplatePipeline:
                         check=False)
                     current.facts = facts
                     return updated
-                workspace = await asyncio.to_thread(self.update_operation, project, operation_id, accept)
+                workspace = await self.step(project, operation_id, 'review', accept)
                 operation = operation_in(workspace, operation_id)
                 receipt = next(value for value in operation.receipts if value.attempt_id == review_id)
                 decision = decide_review(review, receipt, proposal)
@@ -943,7 +966,7 @@ class TemplatePipeline:
             # The review goes first so it starts beside the first entries and adds a missed one early.
             value = add_outline_review(value, task_id, id_factory=self.id_factory, check=False)
             return add_entry_tasks(value, task_id, groups, 'outline', id_factory=self.id_factory, check=False)
-        workspace = await asyncio.to_thread(self.update_operation, project, operation_id, spawn)
+        workspace = await self.step(project, operation_id, 'outline', spawn)
         operation = operation_in(workspace, operation_id)
         return Spawned(task_id, tuple(child.id for child in children_of(operation, task_id)), True)
 
@@ -1000,7 +1023,7 @@ class TemplatePipeline:
         if missing:
             before = {child.id for child in children_of(operation, parent_id)}
             # Each missed entry runs on its own: they are few, and the groups already run.
-            workspace = await asyncio.to_thread(self.update_operation, project, operation_id, lambda value, _data, _workspace:
+            workspace = await self.step(project, operation_id, 'entries', lambda value, _data, _workspace:
                 add_entry_tasks(value, parent_id, [[scope] for scope in missing], 'review', id_factory=self.id_factory, check=False))
             operation = operation_in(workspace, operation_id)
             added = [child.id for child in children_of(operation, parent_id) if child.id not in before]
@@ -1036,7 +1059,7 @@ class TemplatePipeline:
                 itemHandles=list(dict.fromkeys(handle for result in done for handle in result.item_handles)), issueIds=[],
                 disposition=disposition))
             return operation
-        await asyncio.to_thread(self.update_operation, project, operation_id, close)
+        await self.step(project, operation_id, 'close', close)
 
     async def again(self, project, operation_id, attempt_id, deadline, cancel, *, room, schema, review=None):
         """A call that never answered is made once more with its request, as a new attempt of its slot (D155), while the
@@ -1088,7 +1111,7 @@ class TemplatePipeline:
                 attempt_in(result, identifier).review_input_record_id = record.id
             reserved.append(identifier)
             return result
-        await asyncio.to_thread(self.update_operation, project, operation_id, reserve)
+        await self.step(project, operation_id, 'reserve', reserve)
         if not reserved:
             raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
         attempt_id = reserved[0]
@@ -1100,10 +1123,10 @@ class TemplatePipeline:
             if remaining <= 0:
                 return self.reconcile_unlaunched(result, attempt_id, now)
             return dispatch_attempt(result, attempt_id, now, check=False)
-        dispatched = await asyncio.to_thread(self.update_operation, project, operation_id, dispatch)
+        dispatched = await self.step(project, operation_id, 'dispatch', dispatch)
         if attempt_in(operation_in(dispatched, operation_id), attempt_id).state != 'dispatch_started':
             return attempt_id
-        def returned(frame):
+        def returned(frame, submitted=None):
             def retain(result, _data, _workspace):
                 attempt = attempt_in(result, attempt_id)
                 proof = self.transport.prove_return(attempt, frame)
@@ -1119,33 +1142,39 @@ class TemplatePipeline:
                     error_code=frame.original_code or ('IMPORT_PROCESSING_EXHAUSTED' if late else None), returned_at=observed,
                     check=False)
                 return reconcile_cleanup(result, proof, self.wall(), check=False) if proof is not None else result
-            self.update_operation(project, operation_id, retain)
+            with import_usage.step('return', submitted):
+                workspace = self.update_operation(project, operation_id, retain)
+            import_usage.returned(attempt_id, frame.usage.detail, operation_in(workspace, operation_id))
         request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
             GenerationPolicy(policy.model, timeout_seconds=max(0.001, remaining), allow_repair=False,
                 reasoning_effort=policy.effort), on_return=returned, request_value=value)
-        def launch():
+        def launch(submitted):
+            waited = time.perf_counter() - submitted
             current = operation_in(self.read(project), operation_id)
             self.guard(project, current)
             remaining = deadline.remaining(current, self.wall(), self.elapsed())
             if remaining <= 0:
-                self.update_operation(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
-                    observe_time(result, self.wall(), elapsed_remaining=0), attempt_id, self.wall()))
+                with import_usage.step('unlaunched'):
+                    self.update_operation(project, operation_id, lambda result, _data, _workspace: self.reconcile_unlaunched(
+                        observe_time(result, self.wall(), elapsed_remaining=0), attempt_id, self.wall()))
                 return None
             bounded = replace(request, policy=replace(request.policy, timeout_seconds=remaining))
-            return self.transport.generate(bounded, cancel)
+            with import_usage.call(attempt_id, waited):
+                return self.transport.generate(bounded, cancel)
         try:
             # As asyncio.to_thread does, the call keeps its context: the transport reads the import's permit from it.
-            response = await asyncio.get_running_loop().run_in_executor(self.calls, contextvars.copy_context().run, launch)
+            response = await asyncio.get_running_loop().run_in_executor(self.calls, contextvars.copy_context().run, launch,
+                time.perf_counter())
         except ContentFailure as error:
             operation = operation_in(await self.view(project), operation_id)
             attempt = attempt_in(operation, attempt_id)
             if attempt.state == 'dispatch_started':
                 await asyncio.to_thread(returned, ContentTransportReturn(error.raw_return, outcome_state(error.code),
                     error.code, error.logical_attempts, error.usage, error.cleanup_verified, error.dispatch_witness,
-                    policy.effort))
+                    policy.effort), time.perf_counter())
             else:
                 # The lambda runs inside update_operation while this except block still binds `error`.
-                await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
+                await self.step(project, operation_id, 'return', lambda result, _data, _workspace:
                     record_return(result, attempt_id, error.raw_return,  # noqa: F821
                         attempt.outcome if attempt.outcome == 'timed_out' else outcome_state(error.code), attempt.usage,  # noqa: F821
                         attempt.cleanup, error_code=attempt.error_code if attempt.outcome == 'timed_out' else error.code,  # noqa: F821
@@ -1154,7 +1183,7 @@ class TemplatePipeline:
             if attempt_in(operation_in(await self.view(project), operation_id), attempt_id).state == 'dispatch_started':
                 await asyncio.to_thread(returned, ContentTransportReturn(response.raw_return, 'completed', None,
                     response.logical_attempts, response.usage, response.cleanup_verified, response.dispatch_witness,
-                    response.reasoning_effort))
+                    response.reasoning_effort), time.perf_counter())
         current = operation_in(await self.view(project), operation_id)
         if stops_import(current, attempt_in(current, attempt_id)):
             raise AccountStop(attempt_in(current, attempt_id).error_code)
@@ -1181,7 +1210,7 @@ class TemplatePipeline:
                 inputHash=task.input_hash, value=value, sourceSpans=list(spans), itemHandles=list(dict.fromkeys(handles)),
                 issueIds=task.issue_ids, disposition=disposition))
             return operation
-        await asyncio.to_thread(self.update_operation, project, operation_id, finish)
+        await self.step(project, operation_id, 'finish', finish)
 
     async def fallback(self, project, operation_id, task_id, errors):
         current = await self.view(project)
@@ -1311,17 +1340,21 @@ class TemplatePipeline:
         """Publish the import. The publication commit is the point of no return: a cancel seen before it leaves the
         import unpublished and resumable."""
         stopped = cancel if cancel is not None else threading.Event()
-        workspace = await self.view(project)
+        with import_usage.timed('finalization', 'view'):
+            workspace = await self.view(project)
         operation = operation_in(workspace, identifier)
         if workspace.project is not None and operation.finalization is not None:
             return await asyncio.to_thread(self.record_publication, project, identifier)
-        await asyncio.to_thread(self.guard, project, operation)
+        with import_usage.timed('finalization', 'guard'):
+            await asyncio.to_thread(self.guard, project, operation)
         if any(attempt.cleanup.state != 'verified' for attempt in operation.attempts):
             return operation
-        authored = await asyncio.to_thread(self.assemble, workspace, operation)
+        with import_usage.timed('finalization', 'assemble'):
+            authored = await asyncio.to_thread(self.assemble, workspace, operation)
         authored.document_revision = workspace.document_revision + 1
         authored.project.document.revision = authored.document_revision
-        candidate = self.candidate(operation, authored.project)
+        with import_usage.timed('finalization', 'candidate'):
+            candidate = self.candidate(operation, authored.project)
         if stopped.is_set():
             return operation
 
@@ -1333,7 +1366,8 @@ class TemplatePipeline:
             value.finalization, value.state = candidate, 'finalizing'
             return value
 
-        before = await asyncio.to_thread(self.update, project, identifier, prepare)
+        with import_usage.timed('finalization', 'prepare'):
+            before = await asyncio.to_thread(self.update, project, identifier, prepare)
         authored.project.template_operations = owner(before).template_operations
         authored.project_revision = before.project_revision + 1
         authored.project.revision = authored.project_revision
@@ -1343,8 +1377,9 @@ class TemplatePipeline:
             if stopped.is_set():
                 return operation_in(self.read(project), identifier)
             mutation_id = 'template_publication_' + candidate.id
-            self.repository.replace(project, base_revision=before.project_revision, workspace=authored,
-                reason='publication', client_mutation_id=mutation_id, request_sha256=hashlib.sha256(mutation_id.encode()).hexdigest())
+            with import_usage.timed('finalization', 'publish'):
+                self.repository.replace(project, base_revision=before.project_revision, workspace=authored,
+                    reason='publication', client_mutation_id=mutation_id, request_sha256=hashlib.sha256(mutation_id.encode()).hexdigest())
             return self.record_publication(project, identifier)
 
         return await asyncio.to_thread(publish)
@@ -1362,7 +1397,8 @@ class TemplatePipeline:
     def record_publication(self, project, identifier):
         session = self.repository.open(project)
         with session.lock:
-            workspace = self.read(project)
+            with import_usage.timed('finalization', 'publishedRead'):
+                workspace = self.read(project)
             operation = operation_in(workspace, identifier)
             if operation.publication.state == 'saved':
                 return operation
@@ -1370,12 +1406,14 @@ class TemplatePipeline:
             # After a crash, finish its outcome metadata; never assemble over later manual edits.
             if workspace.project is None or operation.finalization is None:
                 raise RepositoryFailure('OUTCOME_UNKNOWN')
-            outcome = PublicationOutcome(state='saved', intentId=operation.finalization.id,
-                workspaceHash=hashlib.sha256(rich_snapshot_bytes(workspace)).hexdigest(), errorCode=None)
+            with import_usage.timed('finalization', 'workspaceHash'):
+                outcome = PublicationOutcome(state='saved', intentId=operation.finalization.id,
+                    workspaceHash=hashlib.sha256(rich_snapshot_bytes(workspace)).hexdigest(), errorCode=None)
             def recorded(value, _data, _workspace):
                 value.publication, value.state = outcome, 'published'
                 return value
-            return operation_in(self.update(project, identifier, recorded), identifier)
+            with import_usage.timed('finalization', 'record'):
+                return operation_in(self.update(project, identifier, recorded), identifier)
 
     async def finish_fallbacks(self, project, operation_id):
         for task_id in [task.id for task in operation_in(await self.view(project), operation_id).tasks]:
@@ -1390,8 +1428,9 @@ class TemplatePipeline:
                 # A block with entries closes after them, below.
                 continue
             if not any(value.task_id == task_id for value in operation.task_inputs):
-                value, handles = self.task_input(operation, task, data)
-                await asyncio.to_thread(self.update_operation, project, operation_id, lambda result, _data, _workspace:
+                with import_usage.timed('tasks', 'taskInput'):
+                    value, handles = self.task_input(operation, task, data)
+                await self.step(project, operation_id, 'taskInput', lambda result, _data, _workspace:
                     capture_task_input(result, task_id, value, handles, self.wall(), id_factory=self.id_factory, check=False))
             if task.kind == 'outline_review':
                 await self.finish_task(project, operation_id, task_id, None, (), (), 'empty', [])
