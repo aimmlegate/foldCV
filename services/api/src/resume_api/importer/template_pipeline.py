@@ -811,7 +811,7 @@ class TemplatePipeline:
             spawned = await entries(project, operation_id, task_id, deadline, cancel)
             if spawned is not None:
                 return spawned
-        feedback, unresolved, previous, previous_receipt, repair_reviewed = (), [], None, None, False
+        feedback, unresolved, previous, previous_receipt = (), [], None, None
         for slot in ['initial', 'primary_repair', 'fallback_repair']:
             workspace = await self.view(project)
             operation, data = operation_in(workspace, operation_id), owner(workspace)
@@ -820,8 +820,9 @@ class TemplatePipeline:
                 and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
             if slot != 'initial' and not feedback:
                 break
-            # Without a fallback model, a repair that never reached its review gets one more try on the import model.
-            if slot == 'fallback_repair' and operation.capture.fallback is None and repair_reviewed:
+            # One repair pass (D168): the fallback slot runs only on a captured fallback model; D126's second try on
+            # the import model is gone.
+            if slot == 'fallback_repair' and operation.capture.fallback is None:
                 break
             if existing is not None and existing.state == 'outcome_unknown':
                 break
@@ -969,7 +970,7 @@ class TemplatePipeline:
             except (TemplateImportFailure, ValueError) as error:
                 unresolved.append(getattr(error, 'code', 'IMPORT_REVIEW_INVALID'))
                 break
-            feedback, previous, previous_receipt, repair_reviewed = decision.feedback, proposal, receipt, slot != 'initial'
+            feedback, previous, previous_receipt = decision.feedback, proposal, receipt
             # A clean repair that was not better leaves the first reply and its findings in place.
             if not decision.unresolved_target_ids and not kept_first[0]:
                 await self.finish_admitted(project, operation_id, task_id, proposal)

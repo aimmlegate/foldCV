@@ -17,7 +17,7 @@ from resume_api.providers.content import ContentFailure
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('repair', ['primary', 'fallback', 'fallback_failure', 'fallback_unavailable', 'no_fallback',
-    'no_fallback_refused', 'no_fallback_reviewed'])
+    'no_fallback_reviewed'])
 async def test_repairs_keep_siblings_and_use_only_captured_models(tmp_path, repair):
     fixture = RuntimeFixture(tmp_path, fallback=not repair.startswith('no_fallback'))
     rejected, reviews, models = [], [], []
@@ -37,10 +37,8 @@ async def test_repairs_keep_siblings_and_use_only_captured_models(tmp_path, repa
             result['payload'][1]['journal'] = 'Invented journal'
             return result
         assert value['feedback'] and all(item['ruleId'] and item['targetId'] and item['reason'] for item in value['feedback'])
-        if repair in {'fallback', 'fallback_unavailable', 'no_fallback', 'no_fallback_refused'} and value['slot'] == 'primary_repair':
+        if repair in {'fallback', 'fallback_unavailable', 'no_fallback'} and value['slot'] == 'primary_repair':
             return '{invalid primary repair'
-        if repair == 'no_fallback_refused' and value['slot'] == 'fallback_repair':
-            return '{invalid second repair'
         if repair == 'fallback_unavailable' and value['slot'] == 'fallback_repair':
             raise ContentFailure('MODEL_DENIED', logical_attempts=0, cleanup_verified=True,
                 dispatch_witness={'transport': 'controlled', 'neverDispatched': True})
@@ -60,7 +58,7 @@ async def test_repairs_keep_siblings_and_use_only_captured_models(tmp_path, repa
     assert len(facts.extensions) == 2
     assert facts.extensions[0].cells[0].revision == 1
     assert next(value for value in facts.observations if value.typed_value == 'Invented journal').admission == 'rejected'
-    if repair in {'primary', 'fallback', 'no_fallback'}:
+    if repair in {'primary', 'fallback'}:
         assert not operation.issues and operation.tasks[0].state == 'accepted'
         assert next(cell for record in facts.extensions for cell in record.cells if cell.id == rejected[0]).typed_value == 'Queue Review'
         assert len(operation.receipts) == 2 and reviews[0] != reviews[-1]
@@ -75,11 +73,14 @@ async def test_repairs_keep_siblings_and_use_only_captured_models(tmp_path, repa
         assert operation.issues and operation.tasks[0].state == 'accepted'
         assert operation.task_results[0].disposition == 'source_fallback'
         assert rejected[0] not in {cell.id for record in facts.extensions for cell in record.cells}
-        assert len(fixture.transport.calls) == (6 if repair == 'fallback_failure' else 4)
+        # One repair pass (D168): without a fallback model a refused repair is not tried again.
+        assert len(fixture.transport.calls) == {'fallback_failure': 6, 'no_fallback': 3}.get(repair, 4)
         assert 'исправить её автоматически не удалось' in operation.issues[0].message
         if repair == 'fallback_unavailable':
             assert operation.attempts[-1].state == 'released' and operation.cleanup_records[-1].never_dispatched
     assert ('synthetic-fallback' in models) == (repair in {'fallback', 'fallback_failure', 'fallback_unavailable'})
+    assert ('fallback_repair' in {attempt.slot for attempt in operation.attempts}) == (not repair.startswith('no_fallback')
+        and repair != 'primary')
 
 
 @pytest.mark.asyncio
