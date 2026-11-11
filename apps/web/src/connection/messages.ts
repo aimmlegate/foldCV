@@ -1,6 +1,15 @@
-import type { ConnectionState, ProviderEntry } from "./workflow";
+import type { ConnectionState, Leaving, ProviderEntry } from "./workflow";
 
 type Names = Pick<ProviderEntry, "display" | "subscription">;
+
+/** What Settings asks once more before a sign-out or a clearing. Each touches only the app's own profile. */
+export function leaveQuestion(leaving: Leaving, { display }: Names, account?: string | null): { title: string; body: string; confirm: string } {
+  if (leaving === "logout") return { title: `Выйти из аккаунта ${display}?`, confirm: "Выйти",
+    body: `Приложение выйдет из аккаунта${account ? ` ${account}` : ""}. Идущий импорт, правка или ответ помощника прервутся. ` +
+      `Вход в ${display} в терминале и других программах останется.` };
+  return { title: `Очистить данные ${display}?`, confirm: "Очистить",
+    body: `Удалятся настройки, журналы и временные файлы ${display} в профиле приложения. Резюме и шаблоны не изменятся, войти можно будет снова.` };
+}
 
 export function connectionMessage(state: ConnectionState, { display, subscription }: Names): string {
   const messages: Record<ConnectionState, string> = {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ConnectionWorkflow, connectionSummary, installable, modelGroups, updateNotice, validConnection, type ConnectionSnapshot,
-  type ProviderEntry } from "../src/connection/workflow";
+import { ConnectionWorkflow, canClear, canSignOut, connectionSummary, installable, modelGroups, updateNotice, validConnection,
+  type ConnectionSnapshot, type ProviderEntry } from "../src/connection/workflow";
 import { errorMessage } from "../src/errors/messages";
 
 type Entry = Record<string, unknown> & { kind: string; enabled: boolean; metadataReady: boolean; models: string[] };
@@ -482,4 +482,80 @@ test("an update installs over a connected provider and checks it again", async (
   assert.deepEqual(calls, ["/v1/settings/connection", "/v1/host/install", "/v1/host/status"]);
   assert.equal(workflow.entry("claude_cli")?.state, "connected");
   assert.equal(workflow.entry("claude_cli")?.installation?.installed, "2.1.318");
+});
+
+// D158: the account a provider names, the sign-out and the clearing of its data.
+const own = { ownProfile: true, account: "fictional@example.invalid · Fictional Team" };
+const signedOutClaude = { ...claude, ...off, ownProfile: true, state: "login_required" };
+
+test("a provider entry may name its account and its own profile, in bounded forms only", () => {
+  assert.equal(validConnection(reply([codex, { ...claude, ...own }], "claude_cli")), true);
+  assert.equal(validConnection(reply([codex, { ...claude, account: null, ownProfile: false }], "claude_cli")), true);
+  for (const broken of [{ account: "" }, { account: 7 }, { account: "a".repeat(513) }, { ownProfile: "yes" }]) {
+    assert.equal(validConnection(reply([codex, { ...claude, ...broken }], "claude_cli")), false, JSON.stringify(broken));
+  }
+});
+
+test("a sign-out is offered for a signed-in account and a clearing after a sign-out, both only in the app's own profile", () => {
+  const entry = (changes: Record<string, unknown>) => ({ ...claude, ...own, ...changes }) as unknown as ProviderEntry;
+  for (const state of ["connected", "unknown_limits", "quota_exhausted", "api_key_mode"]) assert.equal(canSignOut(entry({ state })), true, state);
+  for (const state of ["login_required", "login_pending", "metadata_failed", "unchecked", "cli_missing"]) assert.equal(canSignOut(entry({ state })), false, state);
+  assert.equal(canClear(entry({ state: "login_required" })), true);
+  assert.equal(canClear(entry({})), false);
+  for (const changes of [{ ownProfile: false }, { ownProfile: undefined }, { enabled: false }]) {
+    assert.equal(canSignOut(entry(changes)), false, JSON.stringify(changes));
+    assert.equal(canClear(entry({ ...changes, state: "login_required" })), false, JSON.stringify(changes));
+  }
+});
+
+test("a sign-out names its provider, shows its stage, runs once and ends with the state the server read", async () => {
+  const calls: { path: string; body: unknown }[] = [];
+  let release: ((value: Response) => void) | undefined;
+  const workflow = new ConnectionWorkflow(() => {}, (input, init) => {
+    const path = String(input);
+    calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) as unknown : null });
+    if (path.endsWith("/logout")) return new Promise<Response>(resolve => { release = resolve; });
+    if (path.endsWith("/clear-data")) return Promise.resolve(response(reply([codex, signedOutClaude], "claude_cli")));
+    return Promise.resolve(response(reply([codex, { ...claude, ...own }], "claude_cli")));
+  });
+  await workflow.peek(false);
+  const leaving = workflow.signOut("claude_cli");
+  assert.equal(workflow.view.activity.claude_cli?.leaving, "logout");
+  assert.equal(workflow.view.snapshot.generationReady, false);
+  await workflow.signOut("claude_cli");
+  await workflow.clearData("claude_cli");
+  release?.(response(reply([codex, signedOutClaude], "claude_cli")));
+  await leaving;
+  assert.equal(workflow.entry("claude_cli")?.state, "login_required");
+  assert.equal(workflow.view.activity.claude_cli, undefined);
+  await workflow.clearData("claude_cli");
+  assert.deepEqual(calls.map(call => [call.path, call.body]), [
+    ["/v1/settings/connection", null],
+    ["/v1/host/logout", { provider: "claude_cli" }],
+    ["/v1/host/clear-data", { provider: "claude_cli" }],
+  ]);
+});
+
+test("a refused sign-out or clearing keeps the service's code and reads the state the status left", async () => {
+  const calls: string[] = [];
+  let current: Entry = { ...claude, ...own };
+  const workflow = new ConnectionWorkflow(() => {}, input => {
+    const path = String(input);
+    calls.push(path);
+    if (path.endsWith("/logout")) return Promise.resolve(refusal("SIGN_OUT_FAILED", 409));
+    if (path.endsWith("/clear-data")) return Promise.resolve(refusal("SIGN_OUT_REQUIRED", 409));
+    return Promise.resolve(response(reply([codex, current], "claude_cli")));
+  });
+  await workflow.peek(false);
+  await workflow.signOut("claude_cli");
+  assert.equal(workflow.view.activity.claude_cli?.error, "SIGN_OUT_FAILED");
+  assert.match(errorMessage(workflow.view.activity.claude_cli?.error), /не подтверждён/u);
+  assert.equal(workflow.entry("claude_cli")?.account, own.account);
+  current = signedOutClaude;
+  await workflow.peek(false);
+  await workflow.clearData("claude_cli");
+  assert.equal(workflow.view.activity.claude_cli?.error, "SIGN_OUT_REQUIRED");
+  assert.match(errorMessage("SIGN_OUT_NOT_AVAILABLE"), /терминале/u);
+  assert.deepEqual(calls, ["/v1/settings/connection", "/v1/host/logout", "/v1/settings/connection", "/v1/settings/connection",
+    "/v1/host/clear-data", "/v1/settings/connection"]);
 });

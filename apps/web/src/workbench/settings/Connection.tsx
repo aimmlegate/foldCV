@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { errorMessage } from "../../errors/messages";
-import { installable, loginCodePattern, type ConnectionView, type ConnectionWorkflow, type ProviderActivity, type ProviderEntry } from "../../connection/workflow";
-import { connectionMessage } from "../../connection/messages";
+import { canClear, canSignOut, installable, loginCodePattern, type ConnectionView, type ConnectionWorkflow, type Leaving, type ProviderActivity,
+  type ProviderEntry } from "../../connection/workflow";
+import { connectionMessage, leaveQuestion } from "../../connection/messages";
 import { APP_NAME } from "../app-name";
 import { Button } from "../ui/Button";
+import { Dialog } from "../ui/Dialog";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { Installation } from "./Installation";
@@ -17,7 +19,7 @@ export function Connections({ view, workflow, disabled }: { view: ConnectionView
       <Button className="small" onClick={() => void workflow.peek()}>Повторить</Button></div>}
     {snapshot.providers.map(entry => <ProviderCard key={entry.kind} entry={entry} activity={view.activity[entry.kind]}
       experimental={snapshot.experimentalMode} workflow={workflow} disabled={disabled} />)}
-    {snapshot.providers.some(entry => entry.enabled) && <p className="settings-lead provider-note">Вход, установка и отключение останавливают работу моделей:
+    {snapshot.providers.some(entry => entry.enabled) && <p className="settings-lead provider-note">Вход, выход из аккаунта, установка и отключение останавливают работу моделей:
       идущий импорт, правка или ответ помощника прервутся.</p>}
   </>;
 }
@@ -30,13 +32,23 @@ export function quotaText(quota: ProviderEntry["quota"]): string {
   return `${used}${quota.state === "exhausted" ? " · лимит исчерпан" : ""}${reset}`;
 }
 
+/** The question before a sign-out or a clearing (D158); the card mounts it only while it asks. */
+export function LeaveDialog({ leaving, entry, close, confirm }: { leaving: Leaving; entry: ProviderEntry; close: () => void; confirm: () => void }) {
+  const question = leaveQuestion(leaving, entry, entry.account);
+  return <Dialog open close={close} title={question.title}>
+    <p className="dialog-copy">{question.body}</p>
+    <div className="dialog-actions"><Button variant="quiet" onClick={close}>Отмена</Button>
+      <Button variant={leaving === "clear" ? "danger" : "primary"} onClick={confirm}>{question.confirm}</Button></div>
+  </Dialog>;
+}
+
 /** One provider in one block (D147): the switch, name and actions in the head row, then the status with the usage,
- * then only the rows that apply (update, install progress, sign-in code, error); the storage note folds away. */
+ * then only the rows that apply (account, update, install progress, sign-in code, error); the storage note folds away. */
 function ProviderCard({ entry, activity, experimental, workflow, disabled }: { entry: ProviderEntry; activity: ProviderActivity | undefined;
   experimental: boolean; workflow: ConnectionWorkflow; disabled: boolean }) {
   const { kind, display, subscription, publisher, loginCode } = entry;
-  const pending = activity?.pending ?? false, detaching = activity?.detaching ?? false;
-  const [code, setCode] = useState(""), [codeSent, setCodeSent] = useState(false);
+  const pending = activity?.pending ?? false, detaching = activity?.detaching ?? false, leaving = activity?.leaving;
+  const [code, setCode] = useState(""), [codeSent, setCodeSent] = useState(false), [asking, setAsking] = useState<Leaving | null>(null);
   const installation = entry.installation;
   const installing = installation && ["downloading", "verifying", "extracting"].includes(installation.state);
   const canInstall = installable(entry), update = Boolean(installation?.update) && !installing;
@@ -44,7 +56,8 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
   const signedIn = ["connected", "unknown_limits", "quota_exhausted"].includes(entry.state);
   const installNote = update ? `${display} ${installation?.latest ?? ""} будет скачан с сайта ${publisher}.${signedIn ? " Вход сохранится." : ""}`
     : `${display} будет установлен с сайта ${publisher}.`;
-  const status = detaching ? "Останавливаем подключение…" : installing ? `${installation?.installed ? "Обновляем" : "Устанавливаем"} ${display}…`
+  const status = detaching ? "Останавливаем подключение…" : leaving === "logout" ? "Выходим из аккаунта…"
+    : leaving === "clear" ? "Очищаем данные…" : installing ? `${installation?.installed ? "Обновляем" : "Устанавливаем"} ${display}…`
     : entry.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : pending ? "Проверяем подключение…"
     : connectionMessage(entry.state, { display, subscription });
   const id = `provider-${kind}`;
@@ -60,7 +73,9 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
         {installing && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelInstall(kind)}>Отменить установку</button>}
         {experimental && entry.state === "login_required" && <button className="text-button" disabled={disabled || pending} onClick={() => void workflow.login(kind)}>Войти через {subscription}</button>}
         {entry.state === "login_pending" && <button className="text-button" disabled={disabled} onClick={() => void workflow.cancelLogin(kind)}>Отменить вход</button>}
-        <Button className="small" busy={pending && !installing && entry.state !== "login_pending"} busyLabel="Проверяем…" disabled={disabled || pending || Boolean(installing)}
+        {canSignOut(entry) && <button className="text-button" disabled={disabled || pending} onClick={() => setAsking("logout")}>Выйти из аккаунта</button>}
+        {canClear(entry) && <button className="text-button" disabled={disabled || pending} onClick={() => setAsking("clear")}>Очистить данные</button>}
+        <Button className="small" busy={pending && !installing && !leaving && entry.state !== "login_pending"} busyLabel="Проверяем…" disabled={disabled || pending || Boolean(installing)}
           title="Проверить подключение" onClick={() => void workflow.refresh(kind).then(() => workflow.checkReleases())}>Проверить</Button>
         <Button variant="quiet" className="small" busy={detaching} busyLabel="Отключаем…" disabled={disabled} onClick={() => void workflow.detach(kind)}>Отключить</Button>
       </div>}
@@ -72,6 +87,7 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
         <span className="quota-line">{entry.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${String(entry.quota.usedPercent)}%` }} /></span>}
           {quotaText(entry.quota)}</span>
       </div>
+      {entry.account && <p className="provider-line">Аккаунт: {entry.account}</p>}
       {entry.versionStatus === "graceful" && <p className="provider-line">Версия новее проверенной в {APP_NAME}; её возможности проверены при подключении.</p>}
       {update ? <p className="provider-line provider-update" role="status">Доступна новая версия {display}: {installation?.latest}. Установлена {installation?.installed}.</p>
         : installation?.latest && installation.latest === installation.installed && !installing
@@ -96,5 +112,9 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
         : <p className="provider-line provider-legal">Обработка недоступна в текущем режиме подключения.</p>}
     </>}
     {activity?.error && <p className="notice error provider-line" role="alert">{errorMessage(activity.error)}</p>}
+    {asking && <LeaveDialog leaving={asking} entry={entry} close={() => setAsking(null)} confirm={() => {
+      setAsking(null);
+      void (asking === "logout" ? workflow.signOut(kind) : workflow.clearData(kind));
+    }} />}
   </div>;
 }

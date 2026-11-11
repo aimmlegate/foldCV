@@ -13,7 +13,7 @@ const { DeleteDialog, History } = await import("../src/workbench/layout/History"
 const { enterOption } = await import("../src/workbench/facts/FocusIconDialog");
 const { PreDraft } = await import("../src/workbench/import/PreDraft");
 const { Composer } = await import("../src/workbench/assistant/Composer");
-const { Connections, quotaText } = await import("../src/workbench/settings/Connection");
+const { Connections, LeaveDialog, quotaText } = await import("../src/workbench/settings/Connection");
 const { FileDialog } = await import("../src/workbench/files/FileDialog");
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -147,4 +147,40 @@ test("the usage line says the share used and the reset, or that the provider rep
   assert.equal(quotaText({ state: "available", usedPercent: 12, resetsAt: null }), "Использовано 12 %");
   assert.equal(quotaText({ state: "unknown", usedPercent: null, resetsAt: null }), "Расход неизвестен");
   assert.match(quotaText({ state: "exhausted", usedPercent: 100, resetsAt: Date.UTC(2026, 10, 5, 9, 0) / 1000 }), /^Использовано 100 % · лимит исчерпан · сброс \d+ нояб\./u);
+});
+
+test("a signed-in card names its account and offers the sign-out; a signed-out one offers the clearing (D158)", () => {
+  const account = "fictional@example.invalid · Fictional Team";
+  const signedIn = connections({ ...provider, state: "connected", plan: "max", ownProfile: true, account });
+  assert.match(signedIn, /<div class="provider-actions">.*Выйти из аккаунта/u);
+  assert.match(signedIn, /Аккаунт: fictional@example\.invalid · Fictional Team/u);
+  assert.ok(!signedIn.includes("Очистить данные") && !signedIn.includes("<dialog"), "nothing asks before a click");
+  const signedOut = connections({ ...provider, ownProfile: true });
+  assert.match(signedOut, /Очистить данные/u);
+  assert.ok(!signedOut.includes("Выйти из аккаунта") && !signedOut.includes("Аккаунт:"));
+  // Without the app's own profile the CLI would sign out the user's own: the card offers neither.
+  for (const state of ["connected", "login_required"] as const) {
+    const foreign = connections({ ...provider, state, ownProfile: false, account });
+    assert.ok(!foreign.includes("Выйти из аккаунта") && !foreign.includes("Очистить данные"), state);
+  }
+  const leaving = connections({ ...provider, state: "connected", ownProfile: true },
+    { activity: { claude_cli: { pending: true, detaching: false, error: null, leaving: "logout" } } });
+  assert.match(leaving, /Выходим из аккаунта…/u);
+  assert.ok(!leaving.includes("Проверяем…"), "the check button does not claim the sign-out");
+  assert.match(connections(provider), /Вход, выход из аккаунта, установка и отключение останавливают работу моделей/u);
+});
+
+test("each new action asks once more, naming what it ends and what stays", () => {
+  const entry: ProviderEntry = { ...provider, state: "connected", ownProfile: true, account: "fictional@example.invalid" };
+  const question = (leaving: "logout" | "clear", value = entry) =>
+    renderToStaticMarkup(createElement(LeaveDialog, { leaving, entry: value, close: () => {}, confirm: () => {} }));
+  const out = question("logout");
+  assert.match(out, /aria-label="Выйти из аккаунта Claude\?"/u);
+  assert.match(out, /Приложение выйдет из аккаунта fictional@example\.invalid\./u);
+  assert.match(out, /прервутся/u); assert.match(out, /в терминале и других программах останется/u);
+  assert.match(out, /class="button quiet "[^>]*><span[^>]*>Отмена</u); assert.match(out, /class="button primary "[^>]*><span[^>]*>Выйти</u);
+  assert.match(question("logout", { ...entry, account: null }), /Приложение выйдет из аккаунта\. /u);
+  const clear = question("clear", { ...entry, state: "login_required", account: null });
+  assert.match(clear, /aria-label="Очистить данные Claude\?"/u);
+  assert.match(clear, /Резюме и шаблоны не изменятся/u); assert.match(clear, /class="button danger "[^>]*><span[^>]*>Очистить</u);
 });

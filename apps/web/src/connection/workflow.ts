@@ -17,6 +17,9 @@ export type ProviderEntry = {
   loginUrl?: string | null; enabled: boolean; state: ConnectionState; version: string | null; versionStatus: "supported" | "graceful" | null;
   plan: string | null; models: string[]; modelReasoning?: Record<string, ModelReasoning>; quota: Quota;
   metadataReady: boolean; installation?: CliInstallation | null;
+  // Who is signed in, from the last check; never logged. `ownProfile`: the CLI runs in a profile of the app's own,
+  // so a sign-out and a clearing touch only that profile (D158).
+  account?: string | null; ownProfile?: boolean;
 };
 
 export type ConnectionSnapshot = {
@@ -38,8 +41,10 @@ export type ConnectionSnapshot = {
   experimentalMode: boolean;
 };
 
-/** `error`: the service's code when it refused, shown through the catalog; else the client's own text. */
-export type ProviderActivity = { pending: boolean; detaching: boolean; error: string | null };
+/** `error`: the service's code when it refused, shown through the catalog; else the client's own text. `leaving`: the
+ * sign-out or clearing that runs. */
+export type Leaving = "logout" | "clear";
+export type ProviderActivity = { pending: boolean; detaching: boolean; error: string | null; leaving?: Leaving };
 /** `readFailed`: the last read of the state failed, so what is shown may be old or nothing at all. */
 export type ConnectionView = { snapshot: ConnectionSnapshot; pending: boolean; detaching: boolean; error: string | null; readFailed: boolean;
   activity: Partial<Record<ProviderKind, ProviderActivity>> };
@@ -75,6 +80,17 @@ export function installable(entry: ProviderEntry): boolean {
   const installation = entry.installation;
   if (!installation?.available || installingStates.includes(installation.state) || entry.state === "login_pending") return false;
   return ["cli_missing", "launcher_unsupported", "unsupported_version"].includes(entry.state) || installation.update;
+}
+
+/** A sign-out is offered while an account is signed in, an API key's too; the server refuses it without the app's own
+ * profile, where the CLI would sign out the user's own. */
+export function canSignOut(entry: ProviderEntry): boolean {
+  return entry.enabled && entry.ownProfile === true && ["connected", "unknown_limits", "quota_exhausted", "api_key_mode"].includes(entry.state);
+}
+
+/** The clearing follows a sign-out the status confirmed: on macOS Claude's sign-in is not a file it would remove. */
+export function canClear(entry: ProviderEntry): boolean {
+  return entry.enabled && entry.ownProfile === true && entry.state === "login_required";
 }
 
 /** The sidebar's offer: the providers that are on and have a newer managed release. */
@@ -143,7 +159,9 @@ function validProvider(item: unknown): item is ProviderEntry {
   return record(item) && kinds.includes(String(item.kind)) && name(item.display) && name(item.subscription) && name(item.publisher) &&
     typeof item.loginCode === "boolean" && validLoginUrl(item.loginUrl) && typeof item.installed === "boolean" && typeof item.enabled === "boolean" &&
     validState(item) && validModels(item.models) && typeof item.metadataReady === "boolean" &&
-    (item.modelReasoning === undefined || validReasoning(item.modelReasoning, item.models));
+    (item.modelReasoning === undefined || validReasoning(item.modelReasoning, item.models)) &&
+    (item.account === undefined || item.account === null || typeof item.account === "string" && item.account.length > 0 && item.account.length <= 512) &&
+    (item.ownProfile === undefined || typeof item.ownProfile === "boolean");
 }
 
 export function validConnection(value: unknown): value is ConnectionSnapshot {
@@ -418,6 +436,25 @@ export class ConnectionWorkflow {
       const snapshot = await this.post("cancel-login", {}, kind);
       if (this.current(kind, epoch)) this.update(kind, null, snapshot);
     } catch (error) { if (this.current(kind, epoch)) this.update(kind, { pending: false, detaching: false, error: reason(error, "Could not stop sign-in. Try again.") }); }
+  }
+  /** The CLI's own sign-out in the app's profile (D158): the server stops model work first and the status after it
+   * decides. A refusal keeps its code, and the read after it shows the state that status left. */
+  signOut(kind: ProviderKind): Promise<void> { return this.leave(kind, "logout"); }
+  /** Removes the provider's data in the app's profile, after a sign-out the status confirms. */
+  clearData(kind: ProviderKind): Promise<void> { return this.leave(kind, "clear"); }
+  private async leave(kind: ProviderKind, leaving: Leaving): Promise<void> {
+    const item = this.entry(kind);
+    if (!item || this.activityOf(kind).pending || !(leaving === "logout" ? canSignOut(item) : canClear(item))) return;
+    const epoch = this.begin(kind);
+    this.update(kind, { pending: true, detaching: false, error: null, leaving }, { ...this.view.snapshot, generationReady: false });
+    try {
+      const snapshot = await this.post(leaving === "logout" ? "logout" : "clear-data", {}, kind);
+      if (this.current(kind, epoch)) this.update(kind, null, snapshot);
+    } catch (error) {
+      if (!this.current(kind, epoch)) return;
+      this.update(kind, { pending: false, detaching: false, error: reason(error, "Could not finish. Try again.") });
+      await this.peek(false);
+    }
   }
   async detach(kind: ProviderKind): Promise<void> {
     if (this.activityOf(kind).detaching) return;
