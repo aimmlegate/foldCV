@@ -360,6 +360,17 @@ class ReviewDecision:
     unresolved_target_ids: tuple[str, ...]
 
 
+# D156: these kinds say where a value belongs (a task given as a result) or what the block misses, not that its lines do
+# not state it; their findings keep the value. Every other kind, an unknown one too, withdraws it.
+KEEPING_KINDS = frozenset({'task_result_separation', 'content_schema', 'complete_assignment'})
+
+
+def withdraws(rules, result):
+    """Whether a failing review result withdraws the value or relation it names (D156)."""
+    kind = next((rule.kind for rule in rules if rule.id == result.rule_id), None)
+    return result.disposition != 'satisfied' and not result.target_id.startswith('scope-') and kind not in KEEPING_KINDS
+
+
 def decide_review(value, receipt, proposal):
     if receipt.review_input_hash != digest(value) or receipt.expected_checks != value.targets:
         raise TemplateImportFailure('IMPORT_REVIEW_INPUT_CHANGED')
@@ -368,16 +379,18 @@ def decide_review(value, receipt, proposal):
     if len(pairs) != len(set(pairs)) or set(pairs) != {(target.rule_id, target.target_id) for target in value.targets}:
         raise TemplateImportFailure('IMPORT_REVIEW_INCOMPLETE')
     failed = {result.target_id for result in results if result.disposition != 'satisfied'}
+    # A finding that keeps its value still asks the repair to fix it and stays a remark when it does not.
+    withheld = {result.target_id for result in results if withdraws(value.rules, result)}
     targets = {target.target_id for target in value.targets}
     cells = {allocation.item_handle: allocation.cell_ids for allocation in value.handle_map}
-    admitted_relations = {relation.id for relation in proposal.resolved_relations if relation.id in targets and relation.id not in failed}
+    admitted_relations = {relation.id for relation in proposal.resolved_relations if relation.id in targets and relation.id not in withheld}
     denied_subjects = {relation.subject_id for relation in proposal.resolved_relations
         if relation.kind in {'owned_by', 'extension_of'} and relation.id not in admitted_relations}
     admitted = []
     for field in proposal.resolved_fields:
         allocation = next(allocation for allocation in value.handle_map if allocation.item_handle == field.item_handle)
         cell_id = cells[field.item_handle][field.field_key]
-        if cell_id in targets and cell_id not in failed and allocation.record_id not in denied_subjects:
+        if cell_id in targets and cell_id not in withheld and allocation.record_id not in denied_subjects:
             admitted.append(cell_id)
     # A repair reads the reviewed reply as previousReply; a field finding names its place there.
     pointers = {cells[field.item_handle][field.field_key]: field.pointer for field in proposal.resolved_fields}

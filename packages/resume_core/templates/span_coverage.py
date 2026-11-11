@@ -58,22 +58,26 @@ def subtract_spans(sources, spans, exclusions):
     return union_spans(sources, remaining)
 
 
-def fallback_plan(sources, spans_by_view, cells_by_view, *, protected_spans=()):
-    """A view's fallback replaces only the overlapping cells that view shows; accepted blocks elsewhere stay (K02).
+def within_spans(sources, spans, scope):
+    """The parts of spans that lie inside the scope spans."""
+    return subtract_spans(sources, spans, subtract_spans(sources, spans, scope))
+
+
+def fallback_plan(sources, fallbacks, cells_by_view, *, protected_spans=()):
+    """Each fallback (view, owner, spans) shows its lines in its view and replaces there only its owner's cells that
+    cite them, with their lines (K02's one source copy); `cells_by_view` lists (cell, owners) per view. A fallback never
+    reaches another task's or record's values (D156): every card cites the shared employer and job-title lines.
     Suppressed cells are (view, cell id) pairs: a cell another view also shows stays there."""
-    protected = [*protected_spans, *[span for cells in cells_by_view.values() for cell in cells
+    protected = [*protected_spans, *[span for cells in cells_by_view.values() for cell, _owners in cells
         if cell.origin == 'human' for span in cell.evidence]]
-    placements = {view: subtract_spans(sources, spans, protected) for view, spans in spans_by_view.items()}
-    expanded, suppressed = {view: set() for view in placements}, set()
-    while True:
-        changed = False
-        for view, spans in placements.items():
-            added = [cell for cell in cells_by_view.get(view, ()) if cell.origin != 'human' and cell.id not in expanded[view]
-                and any(overlaps(span, raw) for span in cell.evidence for raw in spans)]
-            if added:
-                changed = True
-                expanded[view].update(cell.id for cell in added)
-                suppressed.update((view, cell.id) for cell in added)
-                placements[view] = subtract_spans(sources, [*spans, *[span for cell in added for span in cell.evidence]], protected)
-        if not changed:
-            return union_spans(sources, [span for spans in placements.values() for span in spans]), suppressed, placements
+    placements, suppressed = {}, set()
+    for view, owner, spans in fallbacks:
+        own = [cell for cell, owners in cells_by_view.get(view, ()) if cell.origin != 'human' and owner in owners]
+        placed, taken = subtract_spans(sources, spans, protected), set()
+        while added := [cell for cell in own if cell.id not in taken
+                and any(overlaps(span, raw) for span in cell.evidence for raw in placed)]:
+            taken.update(cell.id for cell in added)
+            placed = subtract_spans(sources, [*placed, *[span for cell in added for span in cell.evidence]], protected)
+        suppressed.update((view, identifier) for identifier in taken)
+        placements[view] = union_spans(sources, [*placements.get(view, []), *placed])
+    return union_spans(sources, [span for spans in placements.values() for span in spans]), suppressed, placements

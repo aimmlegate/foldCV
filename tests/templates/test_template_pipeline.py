@@ -52,7 +52,6 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
     result = await run_entry(fixture)
     assert result.state == 'published' and result.task_results[0].disposition == 'source_fallback'
     assert len(fixture.transport.calls) == 2 and result.issues
-    assert fixture.source.units[0].text in fixture.text()
     assert len(result.receipts) == (1 if review_failure == 'uncertain' else 0)
     # One notice for the block, whatever the number of failing checks.
     [issue] = result.issues
@@ -64,7 +63,12 @@ async def test_unusable_review_uses_source_fallback_and_no_review_retry(tmp_path
         assert {cell.field_key for record in records for cell in record.cells} == {'title', 'journal', 'url'}
         assert issue.message == ('Проверка не подтвердила извлечённые данные. Attribution is unclear. '
             'Ещё замечаний: ' + str(len(issue.target_ids) - 1) + '.')
+        # D156: the category and year cite the whole unit, no line of it states them, so its lines show only where no
+        # kept value covers them, not in place of the kept values.
+        value = result.task_results[0]
+        assert value.source_spans and {digest(span) for span in value.source_spans} == set(value.value['leftoverOnly'])
     else:
+        assert fixture.source.units[0].text in fixture.text()
         assert result.tasks[0].state == 'source_fallback' and not fixture.current().project.facts.extensions
         assert issue.message == 'Показан исходный текст: проверку извлечённых данных не удалось завершить.'
 
@@ -477,8 +481,12 @@ async def test_a_repair_that_adds_a_missing_value_replaces_the_first_on_a_covera
     assert request['previousReply']['payload'] == first.reply.payload
     assert {field['item'] for field in request['previousReply']['fields']} == {'H1'} and len(request['previousReply']['fields']) == 5
     assert [entry['targetId'] for entry in request['feedback']] == ['scope-' + result.tasks[0].id]
-    # The coverage finding left after the repair is not shown and places no source lines.
-    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'admitted' and not result.issues
+    # D156 (D107 hid it): the coverage finding left after the repair is the block's warning and withdraws nothing; it
+    # names no line here, so none is added.
+    [issue] = result.issues
+    assert result.tasks[0].state == 'accepted' and result.task_results[0].disposition == 'source_fallback'
+    assert issue.code == 'IMPORT_SOURCE_FALLBACK' and issue.target_ids == ['scope-' + result.tasks[0].id]
+    assert not result.task_results[0].source_spans
     assert len(fixture.current().project.facts.extensions) == 2
 
 

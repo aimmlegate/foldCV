@@ -52,11 +52,61 @@ def _stored_views(package, operations, current):
     return hidden, compact, assigned
 
 
-def _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view):
+def _positions(sources):
+    """A span's place in the document: its source, its unit's order, its start."""
+    units = {(source.id, source.revision, unit.id, unit.revision): (index, unit.order)
+        for index, source in enumerate(sources) for unit in source.units}
+    return lambda span: (*units[unit_key(span)], span.start)
+
+
+def _nearest(cards, position, span):
+    """The card whose cited lines come last before the span; the first card when the span precedes them all.
+    `cards`: card -> positions of its cited lines, in the cards' order."""
+    at = position(span)
+    before = [(max(value for value in places if value <= at), -index, card)
+        for index, (card, places) in enumerate(cards.items()) if any(value <= at for value in places)]
+    if before:
+        return max(before)[2]
+    after = [(min(places), index, card) for index, (card, places) in enumerate(cards.items()) if places]
+    return min(after)[2] if after else next(iter(cards))
+
+
+def _place_kept(sources, kept, unshown, homes, task_cards, occupied, placements, missing_by_view):
+    """The lines a task that kept its values still shows (D156), each in the entry it belongs to: the lines of a value it
+    does not show in that value's card, and lines no shown value covers (an omission) only once, in the card that cites
+    the lines before them. A task without a card in its view places them in the block. Returns {(view, card): spans}."""
+    position, result = _positions(sources), {}
+    def owners(task_id, cards, span):
+        found = {homes[(proposal, root)] for task, proposal, root, evidence in unshown if task == task_id
+            and homes.get((proposal, root)) in cards and any(overlaps(span, raw) for raw in evidence)}
+        return found or ({_nearest(cards, position, span)} if cards else set())
+    for view, task_id, cited, left in kept:
+        cards = task_cards.get((view, task_id), {})
+        for span in cited:
+            found = owners(task_id, cards, span)
+            for card in found:
+                result.setdefault((view, card), []).append(span)
+            if not found:
+                placements[view] = union_spans(sources, [*placements.get(view, []), span])
+        for line in scope_lines(sources, left):
+            if any(overlaps(line, other) for other in occupied):
+                continue
+            found = owners(task_id, cards, line)
+            if found:
+                card = _nearest({card: cards[card] for card in found}, position, line)
+                result.setdefault((view, card), []).append(line)
+            else:
+                missing_by_view.setdefault(view, []).append(line)
+            occupied.append(line)
+    return {key: union_spans(sources, spans) for key, spans in result.items()}
+
+
+def _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view, shown=()):
     """Lines of an uncited scope that no accepted value or cited fallback shows go once to the last such block on the
-    page; a coverage gap's lines go to the block's own view, once (`placements` is updated in place)."""
+    page; a coverage gap's lines go to the block's own view, once (`placements` is updated in place). `shown`: lines
+    the cards show already."""
     occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
-        *[span for spans in placements.values() for span in spans]]
+        *[span for spans in placements.values() for span in spans], *shown]
     # A coverage gap's lines go to the block's own view, once, unless an accepted value or another fallback shows them
     # (a live import: courses repeated the education lines, open source the portfolio items).
     for view in [declaration.id for declaration in ordered if missing_by_view.get(declaration.id)]:
@@ -99,7 +149,10 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
     # Focus durations need the formatting date that ends an ongoing job; without it nothing is computed.
     durations = focus_durations(facts, as_of, package.definition.template.default_locale) if as_of is not None else {}
     hidden, compact, assigned = _stored_views(package, operations, current)
-    fallbacks_by_view, uncited_by_view, missing_by_view, human_scopes = {}, {}, {}, []
+    fallbacks, uncited_by_view, missing_by_view, human_scopes = [], {}, {}, []
+    # D156: whose each shown value is (its task and record), the root record of each reply item, the values a reply
+    # does not show, and the fallbacks of tasks that kept values.
+    value_owners, homes, unshown, kept = {}, {}, [], []
     for operation in operations:
         tasks = {task.id: task for task in operation.tasks}
         attempts = {attempt.id: attempt for attempt in operation.attempts}
@@ -122,21 +175,26 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                     # the facts' order, which the block's close set, like captured items.
                     shown = (str(record_order[identity.record_id]),) if task.entry is not None and root else root
                     roots[(declaration.id, identity.record_id)] = (shown, identity)
+                    homes[(proposal.id, root)] = identity.record_id
                 cell = current.get(identifier)
                 if identifier not in proposal.admitted_cell_ids or cell is None:
+                    unshown.append((task.id, proposal.id, root, field.evidence))
                     continue
                 relative = tuple(tokens[len(root):])
                 if cell.origin == 'human' and visible_path(declaration, relative):
                     human_scopes.extend(field.evidence)
                 fields[(declaration.id, identifier)] = DisplayField(relative, identity.record_id, identity.item_handle, cell)
+                value_owners[(declaration.id, identifier)] = (task.id, identity.record_id)
                 unassigned.pop((declaration.id, identifier), None)
                 # Without a declared period format an ongoing period has no readable label, so it shows source wording.
+                # It replaces only the cells of its own record that cite the same lines (D156).
                 if cell.state == 'uncertain' or (period_format is None and cell.origin != 'human' and cell.typed_value is True
                         and relative[-1:] == ('ongoing',)):
-                    fallbacks_by_view.setdefault(declaration.id, []).extend(cell.evidence)
+                    fallbacks.append((declaration.id, ('record', identity.record_id), cell.evidence))
         for result in sorted(operation.task_results, key=lambda value: order[value.task_id]):
             if result.disposition == 'source_fallback':
-                view = tasks[result.task_id].block_id
+                task = tasks[result.task_id]
+                view = task.block_id
                 if view in operation_ids:
                     # An operation has no view; the blocks it reads show their own source lines.
                     continue
@@ -145,21 +203,30 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 uncited = isinstance(result.value, dict) and result.value.get('scope') == 'uncited'
                 # Lines a review names as missing from the block are placed only where no view shows them yet.
                 missing = set(result.value.get('leftoverOnly', ())) if isinstance(result.value, dict) else set()
-                (uncited_by_view if uncited else fallbacks_by_view).setdefault(view, []).extend(
-                    span for span in result.source_spans if digest(span) not in missing)
-                missing_by_view.setdefault(view, []).extend(span for span in result.source_spans if digest(span) in missing)
+                cited = [span for span in result.source_spans if digest(span) not in missing]
+                left = [span for span in result.source_spans if digest(span) in missing]
+                if task.state == 'accepted' and not uncited:
+                    # A task that kept values withdraws none of them; its findings' lines go to its own cards (D156),
+                    # those of a value whose owner the review doubts to its block.
+                    unowned = set(result.value.get('unowned', ())) if isinstance(result.value, dict) else set()
+                    kept.append((view, task.id, [span for span in cited if digest(span) not in unowned], left))
+                    # An owner with no cells: these lines replace no value.
+                    fallbacks.append((view, ('kept', task.id), [span for span in cited if digest(span) in unowned]))
+                    continue
+                if uncited:
+                    uncited_by_view.setdefault(view, []).extend(cited)
+                else:
+                    fallbacks.append((view, ('task', task.id), cited))
+                missing_by_view.setdefault(view, []).extend(left)
     visible_by_view = {}
     for (view, identifier), field in [*fields.items(), *unassigned.items()]:
         if visible_path(declarations[view], field.relative):
             visible_by_view.setdefault(view, {})[identifier] = field.cell
-    _fallback, suppressed, placements = fallback_plan(sources, fallbacks_by_view,
-        {view: list(cells.values()) for view, cells in visible_by_view.items()}, protected_spans=human_scopes)
+    owned_by = {key: {('task', task_id), ('record', record_id)} for key, (task_id, record_id) in value_owners.items()}
+    cells_by_view = {view: [(cell, owned_by.get((view, identifier), set())) for identifier, cell in cells.items()]
+        for view, cells in visible_by_view.items()}
+    _fallback, suppressed, placements = fallback_plan(sources, fallbacks, cells_by_view, protected_spans=human_scopes)
     ordered = sorted(declarations.values(), key=lambda value: (['header', 'sidebar', 'main'].index(value.placement.region), value.placement.order, value.id))
-    _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view)
-    regions = {role: {'id': stable_id(operation_id, role), 'role': role, 'revision': revision, 'blocks': []}
-        for role in ['header', 'sidebar', 'main']}
-    coverage, displayed, owned, shown_scopes, shown_fallback = [], {}, set(), set(), []
-    scopes = {scope.id: scope for scope in facts.manual_scopes}
     parents = ownership_parents(facts)
     def primary_owner(identifier, view, seen=()):
         if (view, identifier) in roots:
@@ -167,6 +234,25 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         if identifier in seen:
             raise ValueError('cyclic materialized ownership')
         return set().union(*(primary_owner(parent, view, (*seen, identifier)) for parent in parents.get(identifier, set())))
+    # The cards each kept task shows, with the places of the lines they cite.
+    position, task_cards, keeping = _positions(sources), {}, {(view, task_id) for view, task_id, _cited, _left in kept}
+    for (view, identifier), field in fields.items():
+        if ((view, value_owners.get((view, identifier), (None,))[0]) not in keeping
+                or identifier not in visible_by_view.get(view, {}) or (view, identifier) in suppressed):
+            continue
+        card = primary_owner(field.record_id, view)
+        if len(card) == 1 and not card & hidden.get(view, set()):
+            task_cards.setdefault((view, value_owners[(view, identifier)][0]), {}).setdefault(next(iter(card)), []).extend(
+                position(span) for span in field.cell.evidence)
+    occupied = [*[span for cells in visible_by_view.values() for cell in cells.values() for span in cell.evidence],
+        *[span for spans in placements.values() for span in spans]]
+    card_lines = _place_kept(sources, kept, unshown, homes, task_cards, occupied, placements, missing_by_view)
+    _place_gaps_and_uncited(sources, ordered, visible_by_view, placements, missing_by_view, uncited_by_view,
+        [span for spans in card_lines.values() for span in spans])
+    regions = {role: {'id': stable_id(operation_id, role), 'role': role, 'revision': revision, 'blocks': []}
+        for role in ['header', 'sidebar', 'main']}
+    coverage, displayed, owned, shown_scopes, shown_fallback = [], {}, set(), set(), []
+    scopes = {scope.id: scope for scope in facts.manual_scopes}
     for (view, _identifier), field in unassigned.items():
         owners = primary_owner(field.record_id, view)
         if len(owners) != 1:
@@ -180,6 +266,20 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
                 if identity.record_id in by_record})
     def add_coverage(span, handle, blocks, disposition, reason):
         coverage.append(SpanCoverage(span=span, itemHandle=handle, blockIds=blocks, disposition=disposition, reason=reason))
+    rewriting = any(value.capture.allow_text_rewrite for value in operations)
+    def source_paragraph(span, identifier, ref):
+        """One exact source line (or adjacent lines) as a paragraph with its citation; None for blank text."""
+        shown = without_line_break(sources, span)
+        wording = source_slice(sources, shown) if shown is not None else ''
+        if not rewriting:
+            wording = without_contacts(wording)
+        if not wording.strip():
+            return None
+        text = literal(wording, ref)
+        text.citations = [shown]
+        add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
+        return {'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
+            'children': [], 'provenance': [], 'presentation': ref}
     def listed(declaration, sections, instance, selected, handle=None):
         """One section of records another block owns, rendered through this view's own nodes."""
         children, mounted = render_nodes(package, declaration, instance, selected, scopes, shown_scopes, period_format, durations)
@@ -219,6 +319,10 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
             plain, plain_mounted = render_plain_fields(package, declaration, instance, plain_fields, scopes, shown_scopes)
             children.extend(plain)
             mounted.update(plain_mounted)
+            # The source lines of this entry's remarks follow its values, inside its card (D156).
+            ref = reference(package, declaration.id, fallback_style(declaration), instance, primary.item_handle)
+            children.extend(paragraph for span in card_lines.get((declaration.id, primary.record_id), [])
+                if (paragraph := source_paragraph(span, stable_id(instance, 'fallback', digest(span)), ref)) is not None)
             if not children:
                 continue
             section_id = stable_id(instance, 'item')
@@ -261,24 +365,13 @@ def materialize(package, facts, operations, sources, *, operation_id, revision=1
         output = regions[declaration.placement.region]['blocks']
         # Each view shows its own placements; a line two failed blocks both cited shows once, in the first of them.
         paragraphs = []
-        rewriting = any(value.capture.allow_text_rewrite for value in operations)
         for span in subtract_spans(sources, placements.get(declaration.id, []), shown_fallback):
             shown_fallback.append(span)
-            key = digest(span)
-            shown = without_line_break(sources, span)
-            wording = source_slice(sources, shown) if shown is not None else ''
-            if not rewriting:
-                wording = without_contacts(wording)
-            if not wording.strip():
-                continue
-            identifier = stable_id(operation_id, 'fallback', key)
             ref = reference(package, declaration.id, fallback_style(declaration),
                 stable_id(operation_id, declaration.id, 'fallback'))
-            text = literal(wording, ref)
-            text.citations = [shown]
-            paragraphs.append({'type': 'paragraph', 'id': identifier, 'revision': 1, 'props': {}, 'content': [text],
-                'children': [], 'provenance': [], 'presentation': ref})
-            add_coverage(shown, None, [identifier], 'fallback', 'exact source scope')
+            paragraph = source_paragraph(span, stable_id(operation_id, 'fallback', digest(span)), ref)
+            if paragraph is not None:
+                paragraphs.append(paragraph)
         # A block that shows only source lines keeps its own title (a live import: projects text without "ПРОЕКТЫ").
         if sections or paragraphs:
             title = locale_text(declaration.view.title, package.definition.template.default_locale)

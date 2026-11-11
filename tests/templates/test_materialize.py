@@ -378,7 +378,8 @@ def test_captured_human_fields_survive_source_fallback_without_resurrecting_old_
 
 
 def test_a_fallback_suppresses_a_shared_cell_only_in_its_own_view():
-    # K02: a cell two views show is replaced by one view's source copy there and stays in the other view.
+    # K02: a cell two views show is replaced by one view's source copy there and stays in the other view. D156: only its
+    # own task's cells; another task's cell citing the same line stays.
     from types import SimpleNamespace
     from packages.resume_core.templates.span_coverage import fallback_plan
     src, _raw = employment_source()
@@ -388,8 +389,10 @@ def test_a_fallback_suppresses_a_shared_cell_only_in_its_own_view():
         return capture_span(src, unit, start, start + len(value))
     shared = SimpleNamespace(id='cell-shared', origin='model', evidence=[phrase('Python')])
     other = SimpleNamespace(id='cell-other', origin='model', evidence=[phrase('Example Labs')])
-    _spans, suppressed, placements = fallback_plan([src], {'tasks': [phrase('Python')]},
-        {'tasks': [shared], 'skills': [shared, other]})
+    sibling = SimpleNamespace(id='cell-sibling', origin='model', evidence=[phrase('Python')])
+    failed, kept = {('task', 'failed')}, {('task', 'kept')}
+    _spans, suppressed, placements = fallback_plan([src], [('tasks', ('task', 'failed'), [phrase('Python')])],
+        {'tasks': [(shared, failed), (sibling, kept)], 'skills': [(shared, failed), (other, failed)]})
     assert suppressed == {('tasks', 'cell-shared')} and set(placements) == {'tasks'}
     assert [source_slice([src], span) for span in placements['tasks']] == ['Python']
 

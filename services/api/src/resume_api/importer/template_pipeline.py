@@ -40,7 +40,10 @@ from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.hashing import digest
 from packages.resume_core.importing.template_proposals import parse_proposal, transport_refusal
 from packages.resume_core.importing.template_review import (decide_review, make_review_input, record_review,
-                                                            repair_wins, shown_values)
+                                                            repair_wins, shown_values, withdraws)
+from packages.resume_core.editing.template_wording import own_evidence
+from packages.resume_core.templates.source_spans import payload_value
+from packages.resume_core.templates.span_coverage import within_spans
 from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL, outline_review_schema,
@@ -292,6 +295,23 @@ def cited_spans(operation, task_id, offered):
         if spans:
             return list({digest(span): span for span in spans}.values())
     return []
+
+
+def value_lines(sources, raw, evidence):
+    """The cited lines that state a withdrawn value (D156), found as D134 finds a paraphrase's own lines, a cited whole
+    unit by its lines; and whether they were found. When they were not, every cited line comes back."""
+    units = {(source.id, source.revision, unit.id, unit.revision): (source, unit)
+        for source in sources for unit in source.units}
+    lines = []
+    for span in evidence:
+        source, unit = units[(span.source_id, span.source_revision, span.unit_id, span.unit_revision)]
+        lines += (line_spans(source, unit) or [span]) if span.start == 0 and span.end == len(unit.text) else [span]
+    lines = list({digest(span): span for span in lines}.values())
+    if len(lines) < 2 or not isinstance(raw, str) or not raw.strip():
+        return lines, len(lines) == 1
+    whole = {key: capture_span(source, unit) for key, (source, unit) in units.items()}
+    own = own_evidence(raw.strip(), lines, whole, {digest(span): units[key][1].text for key, span in whole.items()})
+    return own, len(own) < len(lines)
 
 
 def gated_branch(operation, task, data):
@@ -1177,26 +1197,32 @@ class TemplatePipeline:
             if value.id in task.receipt_ids), None)
         applied = next((value for value in reversed(operation.proposals) if receipt is not None
             and value.applied_receipt_id == receipt.id), None)
-        # Admitted values stay. The remark does not mark the block as a failed import.
+        # Admitted values stay. The remark does not mark the block as a failed import. D156: findings left after the
+        # repair are its warnings, a coverage finding too (D107 hid it), and they withdraw no admitted value.
         kept = applied is not None and bool(applied.admitted_cell_ids)
-        leftover = []
+        leftover, unowned = [], []
         failures = [result for result in receipt.reply.results if result.disposition != 'satisfied'] if receipt else []
-        if kept and failures and len(task.receipt_ids) > 1:
-            # D107: after a reviewed repair a coverage finding is not shown: the reviewer names a new partial list
-            # each round, and its raw lines split the block. Findings on shown values stay.
-            failures = [result for result in failures if not result.target_id.startswith('scope-')]
-            if not failures:
-                await self.finish_admitted(project, operation_id, task_id, applied)
-                return
         sources = owner(current).sources
-        if offered is None:
+        def own(spans):
+            # An entry shows only its own lines: other entries cite the shared employer and job-title lines (D156).
+            if task.entry is None:
+                return spans
+            parts = [part for span in spans for part in within_spans(sources, [span], task.entry.spans)]
+            return list({digest(part): part for part in parts}.values())
+        if task.entry is not None and not kept:
+            # An entry that kept no value shows its own lines, not the unit its reply cited (D156, finding 6).
+            spans, scope = list(task.entry.spans), 'cited'
+        elif offered is None:
             # A request without references predates cited fallback and keeps its whole captured scope.
             spans, scope = [SourceSpan.model_validate(value) for value in stored.value['sourceSpans']], 'cited'
         elif failures:
             # A review named what fails, so its findings are the smallest reliable scope: a rejected value shows
             # its own evidence, a coverage gap the lines the reviewer cites as missing; accepted values stay. Live,
-            # showing every line the reply cited repeated the accepted values as raw text.
-            rejected = {result.target_id for result in failures}
+            # showing every line the reply cited repeated the accepted values as raw text. A finding that keeps its
+            # value (a task given as a result) shows no line (D156).
+            rules = next((value.value.rules for value in operation.review_inputs
+                if value.attempt_id == receipt.attempt_id), [])
+            rejected = {result.target_id for result in failures if withdraws(rules, result)}
             proposal = next((value for value in reversed(operation.proposals) if value.applied_receipt_id == receipt.id), None)
             allocated = {value.item_handle: value for value in item_identities(operation)}
             # A failed owner relation withholds its subject and what that subject owns, and may cite other lines than theirs.
@@ -1209,23 +1235,44 @@ class TemplatePipeline:
             # sentence. The notice names the rejected value; the admitted names stay.
             kinds = {value.id: value.builtin_kind for value in owner(current).template_package.definition.fact_types}
             names_only = {handle for handle, value in allocated.items() if kinds.get(value.semantic_type) == 'technology'}
-            affected = [span for field in proposal.resolved_fields if field.item_handle not in names_only
+            withdrawn = [field for field in proposal.resolved_fields if field.item_handle not in names_only
                 and (allocated[field.item_handle].cell_ids[field.field_key] in rejected
-                    or allocated[field.item_handle].record_id in denied) for span in field.evidence] if proposal else []
+                    or allocated[field.item_handle].record_id in denied)] if proposal else []
+            relations = []
             if proposal is not None:
                 from packages.resume_core.importing.template_proposals import relation_evidence
-                affected.extend(span for identifier, spans in relation_evidence(operation, proposal).items()
-                    if identifier in rejected for span in spans)
+                relations = [span for identifier, spans in relation_evidence(operation, proposal).items()
+                    if identifier in rejected for span in spans]
+            gaps = [span for result in failures if result.target_id.startswith('scope-') for span in result.evidence]
+            if kept:
+                # A withdrawn value's own lines show in its card. A value whose owner the review doubts shows them under
+                # no entry (B03). Lines found less surely and the lines a coverage finding names show only where no
+                # shown value covers them (D156).
+                ownership = {rule.id for rule in rules if rule.kind == 'claim_ownership'}
+                doubted = {result.target_id for result in failures if result.rule_id in ownership}
+                found, unsure, elsewhere = [], [], list(relations)
+                for field in withdrawn:
+                    lines, sure = value_lines(sources, payload_value(proposal.reply.payload, field.pointer), field.evidence)
+                    if (allocated[field.item_handle].record_id in denied
+                            or allocated[field.item_handle].cell_ids[field.field_key] in doubted):
+                        elsewhere.extend(lines)
+                    else:
+                        (found if sure else unsure).extend(lines)
+                affected, gaps, unowned = own([*found, *elsewhere]), own([*unsure, *gaps]), own(elsewhere)
+            else:
+                affected = [*[span for field in withdrawn for span in field.evidence], *relations]
             cited = list({digest(span): span for span in affected}.values())
             # Lines the reviewer names as missing show only where no other block shows them (materialize).
-            missing = [span for span in {digest(span): span for result in failures if result.target_id.startswith('scope-')
-                for span in result.evidence}.values() if digest(span) not in {digest(value) for value in cited}]
+            missing = [span for span in {digest(span): span for span in gaps}.values()
+                if digest(span) not in {digest(value) for value in cited}]
             spans, scope, leftover = [*cited, *missing], 'cited', [digest(span) for span in missing]
+        elif kept:
+            # The review did not complete: the admitted values stay, and the lines the latest reply cited show only
+            # where no shown value covers them (D156).
+            spans = own(cited_spans(operation, task_id, offered))
+            scope, leftover = 'cited', [digest(span) for span in spans]
         else:
             spans = cited_spans(operation, task_id, offered)
-            if not spans and task.entry is not None:
-                # One entry of a block (D117) shows its own lines: the outline named them for it.
-                spans = list(task.entry.spans)
             scope = 'cited' if spans else 'uncited'
             if not spans:
                 # No reply is not evidence of absence: a block offers its scope and the materializer places only the
@@ -1256,7 +1303,8 @@ class TemplatePipeline:
             lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)]
         await self.finish_task(project, operation_id, task_id,
             {'sourceTexts': {digest(span): source_slice(owner(current).sources, span) for span in spans},
-                'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {})}, spans,
+                'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {}),
+                **({'unowned': [digest(span) for span in unowned]} if unowned else {})}, spans,
             task.allowed_handles, 'source_fallback', issues, accepted=kept)
 
     async def finalize(self, project, identifier, cancel=None):
