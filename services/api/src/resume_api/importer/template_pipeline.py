@@ -27,7 +27,7 @@ from packages.resume_core.importing.template_entries import (closed_state, entry
                                                              line_options, ordered_entries, outline_part,
                                                              parse_outline, parse_outline_review, reorder_records,
                                                              splits_entries)
-from packages.resume_core.importing.template_import import (GENERATION_SLOTS, CleanupProof, ProcessingDeadline,
+from packages.resume_core.importing.template_import import (GENERATION_SLOTS, TRANSIENT, CleanupProof, ProcessingDeadline,
                                                             add_entry_tasks, add_outline_review, admit_operation,
                                                             attempt_in, authorization, cancel_operation,
                                                             capture_finalization, capture_task_input, checked,
@@ -50,6 +50,7 @@ from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PR
     outline_schema, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL)
 
 from .. import import_usage
+from ..inference_admission import CALLS
 from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
 from ..providers.dynamic_result import dynamic_result
 from .template_sidecar import OperationSidecar
@@ -139,6 +140,9 @@ CALL_THREADS = 32
 # A per_entry block splits into at most three groups whatever the width (D154): more groups add calls and reviews,
 # and the side blocks, not the entries, are the long part of an import.
 ENTRY_GROUPS = 3
+# A call the provider refused as rate-limited or overloaded is made once more after this pause, inside the import's
+# time; from then on the run starts half as many model tasks at once (R3 of D158).
+BACKOFF_SECONDS = 20
 
 
 # The editor shows these notices in Russian; a reviewer's own reason (asked for in Russian since review protocol 3)
@@ -335,13 +339,18 @@ def operation_in(workspace, identifier):
 
 class TemplatePipeline:
     def __init__(self, transport, *, repository, authority, assemble, derive, wall, elapsed=time.monotonic,
-                 id_factory=identity):
+                 id_factory=identity, places=CALLS):
         self.repository, self.transport = repository, transport
         self.authority, self.assemble, self.derive = authority, assemble, derive
         self.wall, self.elapsed, self.id_factory = wall, elapsed, id_factory
         self.locks, self.cancels = {}, {}
         self.read_cache, self.cache_lock = OrderedDict(), threading.Lock()
         self.calls = ThreadPoolExecutor(max_workers=CALL_THREADS, thread_name_prefix='foldcv-import-call')
+        # The calls in flight in the service, shared with every import and rewrite preview (R3).
+        self.places = places
+        # Each running import's own width, by (project, operation id): the captured one, halved after a call the
+        # provider refused as rate-limited or overloaded (R3). The record keeps the captured one.
+        self.widths = {}
 
     def close(self):
         """Release the call threads at shutdown; a call still running ends on its own thread."""
@@ -559,7 +568,8 @@ class TemplatePipeline:
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
         at once, and tasks without a model call take no place of it (D154); concurrency 1 awaits each task in place.
-        A block that extracts its entries on their own (D117) adds them while it runs, stays open until they all
+        After a call the provider refused as rate-limited or overloaded, new model tasks start only below half of it
+        (R3). A block that extracts its entries on their own (D117) adds them while it runs, stays open until they all
         ended and then closes. After a failure or a cancel nothing new starts, the running tasks end, and the first
         failure is raised."""
         # The children a block added before (a resumed import) are reported by the block when it runs again.
@@ -601,10 +611,12 @@ class TemplatePipeline:
                 pending.remove(identifier)
                 await settle(identifier, await self.execute_task(project, operation.id, identifier, deadline, cancel))
             return
+        key = (project, operation.id)
+        self.widths[key] = width
         try:
             while pending or running:
                 if failure is None and not cancel.is_set():
-                    slots = width - sum(identifier not in free for identifier in running.values())
+                    slots = self.widths[key] - sum(identifier not in free for identifier in running.values())
                     for identifier in ready_tasks():
                         if identifier not in free:
                             if slots <= 0:
@@ -628,8 +640,17 @@ class TemplatePipeline:
                 future.cancel()
             await asyncio.gather(*running, return_exceptions=True)
             raise
+        finally:
+            # A resumed import starts again at its captured width.
+            self.widths.pop(key, None)
         if failure is not None:
             raise failure
+
+    def narrow(self, project, operation):
+        """From now on this run starts half as many model tasks at once, at least one (R3); only the run holds it."""
+        key = (project, operation.id)
+        if key in self.widths:
+            self.widths[key] = max(1, operation.capture.policy.concurrency // 2)
 
     def resume(self, operation, command, workspace):
         self.authority(operation, workspace)
@@ -1063,14 +1084,23 @@ class TemplatePipeline:
 
     async def again(self, project, operation_id, attempt_id, deadline, cancel, *, room, schema, review=None):
         """A call that never answered is made once more with its request, as a new attempt of its slot (D155), while the
-        import has time and the cap room for it and what follows it. Returns the attempt to read on: the new one, or
-        this one."""
+        import has time and the cap room for it and what follows it. One the provider refused as rate-limited or
+        overloaded waits BACKOFF_SECONDS first, and only while the import has more time than that (R3). Returns the
+        attempt to read on: the new one, or this one."""
         operation = operation_in(await self.view(project), operation_id)
         attempt = attempt_in(operation, attempt_id)
-        if (cancel.is_set() or operation.state != 'processing' or not retry_open(operation, attempt)
-                or operation.capture.policy.call_cap - spent_calls(operation) < room
-                or deadline.remaining(operation, self.wall(), self.elapsed()) <= 0):
+        wait = BACKOFF_SECONDS if attempt.error_code in TRANSIENT else 0
+
+        def shut(current, margin):
+            return (cancel.is_set() or current.state != 'processing' or not retry_open(current, attempt)
+                or current.capture.policy.call_cap - spent_calls(current) < room
+                or deadline.remaining(current, self.wall(), self.elapsed()) <= margin)
+        if shut(operation, wait):
             return attempt_id
+        if wait:
+            await self.pause(wait, cancel)
+            if shut(operation_in(await self.view(project), operation_id), 0):
+                return attempt_id
         value = review.model_dump(mode='json', by_alias=True) if review is not None else attempt.request_value
         if value is None:
             return attempt_id
@@ -1083,14 +1113,42 @@ class TemplatePipeline:
             # Refused before it ran (the cap or the time ran out meanwhile): the first call stands.
             return attempt_id
 
+    async def pause(self, seconds, cancel):
+        """Wait `seconds` without holding a thread; a cancel ends the wait."""
+        end = time.monotonic() + seconds
+        while not cancel.is_set() and (left := end - time.monotonic()) > 0:
+            await asyncio.sleep(min(left, 0.25))
+
     async def call(self, project, operation_id, task_id, slot, value, schema, deadline, cancel, *, review=None):
         workspace = await self.view(project)
         operation = operation_in(workspace, operation_id)
         await asyncio.to_thread(self.guard, project, operation)
-        remaining = deadline.remaining(operation, self.wall(), self.elapsed())
         # Every call runs the model and effort chosen for the import (D114 removed the block-level effort).
         policy = (review.policy if review is not None else (operation.capture.fallback or operation.capture.primary) if slot == 'fallback_repair'
             else (operation.capture.review or operation.capture.primary) if slot == 'outline_review' else operation.capture.primary)
+        # A place among the provider's calls in flight in the service comes before the reservation, so a call that waits
+        # for one is never recorded as dispatched (R3). The wait ends with the import's time or a cancel.
+        place = await self.places.take(policy.adapter, cancel, deadline.remaining(operation, self.wall(), self.elapsed()))
+        if place is None:
+            if cancel.is_set():
+                raise TemplateImportFailure('CANCELLED')
+            # The import's time ran out while it waited; the record notes it, as for a reservation past the deadline.
+            await self.step(project, operation_id, 'reserve', lambda result, _data, _workspace: observe_time(result,
+                self.wall(), elapsed_remaining=0))
+            raise TemplateImportFailure('IMPORT_PROCESSING_EXHAUSTED')
+        try:
+            return await self.placed_call(project, operation, task_id, slot, value, schema, deadline, cancel, policy,
+                place, review=review)
+        finally:
+            # Once the call runs on its thread, the thread gives the place back as it ends.
+            if place.future is None:
+                place.release()
+
+    async def placed_call(self, project, operation, task_id, slot, value, schema, deadline, cancel, policy, place, *,
+                          review=None):
+        """A call that holds its place: reserved, dispatched, run and returned in the record."""
+        operation_id = operation.id
+        remaining = deadline.remaining(operation, self.wall(), self.elapsed())
         launch_owner = self.transport.reserve_owner(operation, task_in(operation, task_id), policy)
         reserved = []
         def reserve(result, _data, _workspace):
@@ -1161,10 +1219,11 @@ class TemplatePipeline:
             bounded = replace(request, policy=replace(request.policy, timeout_seconds=remaining))
             with import_usage.call(attempt_id, waited):
                 return self.transport.generate(bounded, cancel)
+        # As asyncio.to_thread does, the call keeps its context: the transport reads the import's permit from it.
+        future = self.calls.submit(contextvars.copy_context().run, launch, time.perf_counter())
+        place.follow(future)
         try:
-            # As asyncio.to_thread does, the call keeps its context: the transport reads the import's permit from it.
-            response = await asyncio.get_running_loop().run_in_executor(self.calls, contextvars.copy_context().run, launch,
-                time.perf_counter())
+            response = await asyncio.wrap_future(future)
         except ContentFailure as error:
             operation = operation_in(await self.view(project), operation_id)
             attempt = attempt_in(operation, attempt_id)
@@ -1185,6 +1244,8 @@ class TemplatePipeline:
                     response.logical_attempts, response.usage, response.cleanup_verified, response.dispatch_witness,
                     response.reasoning_effort), time.perf_counter())
         current = operation_in(await self.view(project), operation_id)
+        if attempt_in(current, attempt_id).error_code in TRANSIENT:
+            self.narrow(project, current)
         if stops_import(current, attempt_in(current, attempt_id)):
             raise AccountStop(attempt_in(current, attempt_id).error_code)
         return attempt_id

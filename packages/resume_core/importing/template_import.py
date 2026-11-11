@@ -289,9 +289,12 @@ def stopped_call(operation, attempt):
         and (attempt.outcome == 'cancelled' or stops_import(operation, attempt)))
 
 
+# The provider refused the call as rate-limited or overloaded (R3 of D158); the pipeline pauses before its one more call.
+# A reply that names the usage limit is QUOTA_EXHAUSTED, an account stop.
+TRANSIENT = frozenset({'RATE_LIMITED', 'PROVIDER_OVERLOADED'})
 # D155: a call that ended so never answered: five minutes without output, a bound short of the import's own time, or
 # the CLI refused its reply against the schema and returned none. A reply that came back is repaired or falls back.
-UNANSWERED = frozenset({'STALLED', 'INVALID_RESULT', 'DEADLINE_EXCEEDED'})
+UNANSWERED = frozenset({'STALLED', 'INVALID_RESULT', 'DEADLINE_EXCEEDED'}) | TRANSIENT
 
 
 def unanswered(attempt):

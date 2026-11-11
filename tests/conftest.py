@@ -18,11 +18,15 @@ def free_inference_permit():
     # The permit is process-wide too; an import keeps it while an attempt's cleanup is unproven, which must not
     # hold the next test.
     yield
-    from resume_api.inference_admission import INFERENCE
+    from resume_api.inference_admission import CALLS, INFERENCE
     with INFERENCE.condition:
         INFERENCE.shared, INFERENCE.exclusive, INFERENCE.blocked = 0, False, False
         INFERENCE.reservations.clear()
         INFERENCE._notify()
+    # So are the places of the calls in flight: places a failed test kept would hold every later Claude preview.
+    with CALLS.condition:
+        CALLS.busy = dict.fromkeys(CALLS.caps, 0)
+        CALLS._notify()
 
 
 @pytest.fixture(autouse=True)

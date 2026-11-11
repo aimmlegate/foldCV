@@ -204,10 +204,12 @@ def ended(operation, attempt, outcome, code, raw=None):
 
 @pytest.mark.parametrize('outcome,code,raw,again', [('timed_out', 'STALLED', None, True),
     ('timed_out', 'DEADLINE_EXCEEDED', None, True), ('invalid_payload', 'INVALID_RESULT', None, True),
+    ('transport_failure', 'RATE_LIMITED', None, True), ('transport_failure', 'PROVIDER_OVERLOADED', None, True),
     ('invalid_payload', 'INVALID_RESULT', '{bad', False), ('timed_out', 'IMPORT_PROCESSING_EXHAUSTED', None, False),
     ('transport_failure', 'CLI_FAILED', None, False), ('timed_out', 'DEADLINE', None, False)])
 def test_a_call_that_never_answered_leaves_its_slot_one_more_call_of_the_same_request(outcome, code, raw, again):
-    # D155: a reply that came back is repaired or falls back; a late return is the import's own time.
+    # D155: a reply that came back is repaired or falls back; a late return is the import's own time. R3 of D158: a
+    # call the provider refused as rate-limited or overloaded never answered either.
     operation, attempt = reserve(ready_operation())
     operation = ended(operation, attempt, outcome, code, raw)
     assert retry_open(operation, operation.attempts[0]) is again

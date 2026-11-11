@@ -27,7 +27,7 @@ from resume_api.providers.content import (STALL_SECONDS, ContentFailure, Content
                                           outcome_state, ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp, preflight_key
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp, beside, preflight_key
 from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, LEAN, REQUIRED_FLAGS, UNKNOWN, check_features,
                                              exec_arguments, loaded, overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
@@ -185,7 +185,7 @@ class CodexCliProvider:
         self.fixture_transport = fixture_transport
         self.experimental_profile = experimental_profile
         self.clock = clock
-        self.preflight_cache = PreflightCache[Probe](clock)
+        self.preflight_cache = PreflightCache[Probe](clock, held=INFERENCE.importing)
         # (binary identity, takes the LEAN keys): probed once per binary, not with every qualification.
         self.lean_binary: tuple[tuple, bool] | None = None
         self.model_started = None
@@ -202,6 +202,7 @@ class CodexCliProvider:
         epoch, cached = self.preflight_cache.read(key, model)
         if cached is not None:
             self.check_effort(cached, model, effort)
+            self.preflight_cache.renew(lambda epoch: self._renew(files.root, epoch, key, model))
             return cached
         # One qualification at a time (D153): calls starting together each ran the five probe processes inside the
         # same 15 s and timed out on each other; the ones that wait take the first one's result.
@@ -211,20 +212,31 @@ class CodexCliProvider:
                 self.check_effort(cached, model, effort)
                 return cached
             self.process._check(deadline, cancel)
-            bound = min(deadline, self.clock() + QUALIFICATION_SECONDS)
-            probe = self.probe(files, cancel, deadline=bound)
-            if not probe.generation_ready:
-                raise ContentFailure("CLI_PROFILE_UNSAFE")
-            metadata = {}
-            models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
-            probe = replace(probe, reasoning=metadata)
-            if model not in models:
-                raise ContentFailure("MODEL_DENIED")
-            probe = replace(probe, lean=self.takes_lean(files, cancel, bound, model))
+            probe, models = self._qualify(files, cancel, min(deadline, self.clock() + QUALIFICATION_SECONDS), model)
             if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
                 self.preflight_cache.remember(epoch, key, probe, models)
         self.check_effort(probe, model, effort)
         return probe
+
+    def _qualify(self, files, cancel, bound, model):
+        """The probe, the model list and the LEAN check of one qualification."""
+        probe = self.probe(files, cancel, deadline=bound)
+        if not probe.generation_ready:
+            raise ContentFailure("CLI_PROFILE_UNSAFE")
+        metadata = {}
+        models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
+        probe = replace(probe, reasoning=metadata)
+        if model not in models:
+            raise ContentFailure("MODEL_DENIED")
+        return replace(probe, lean=self.takes_lean(files, cancel, bound, model)), models
+
+    def _renew(self, root, epoch, key, model):
+        """The qualification that runs beside the calls before the snapshot ends (R4); it replaces the snapshot."""
+        with beside(root, self._profile_owner) as files, self.preflight_cache.qualifying:
+            if epoch == self.preflight_cache.epoch:
+                probe, models = self._qualify(files, threading.Event(), self.clock() + QUALIFICATION_SECONDS, model)
+                if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
+                    self.preflight_cache.remember(epoch, key, probe, models)
 
     @staticmethod
     def check_effort(probe, model, effort):

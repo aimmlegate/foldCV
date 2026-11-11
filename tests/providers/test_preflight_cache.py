@@ -11,7 +11,7 @@ from resume_api.lifecycle import OperationFiles
 from resume_api.providers.claude import content as claude_cli
 from resume_api.providers.codex.content import CodexCliProvider, FixtureTransport, Probe
 from resume_api.providers.content import ContentFailure
-from resume_api.providers.preflight import QUALIFICATION_SECONDS, TTL_SECONDS, PreflightCache, preflight_key
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, RENEW_SECONDS, TTL_SECONDS, PreflightCache, preflight_key
 from tests.providers.fixtures import fake, request  # noqa: F401 (pytest fixture)
 
 
@@ -196,3 +196,70 @@ def test_calls_starting_together_qualify_the_cli_once_and_share_the_result(fake)
         thread.join(10)
     assert not errors and len(results) == 3 and len(probes) == 1
     assert all(result == results[0] for result in results)
+
+
+def test_a_snapshot_stays_while_an_import_holds_its_permit_and_a_drop_still_ends_it():
+    # R4 of D158: a long import (Sol takes five to nine minutes) outlives the snapshot's time.
+    now, held = [0.0], [False]
+    cache = PreflightCache(lambda: now[0], held=lambda: held[0])
+    cache.remember(cache.epoch, ("cli",), "probe", ("model",))
+    now[0] = TTL_SECONDS
+    assert cache.read(("cli",), "model")[1] is None
+    held[0] = True
+    assert cache.read(("cli",), "model")[1] == "probe"
+    assert cache.read(("other cli",), "model")[1] is None and cache.read(("cli",), "other model")[1] is None
+    cache.invalidate()
+    assert cache.read(("cli",), "model")[1] is None
+
+
+def test_the_next_qualification_starts_beside_the_calls_before_the_snapshot_ends_and_replaces_it():
+    now, gate, runs = [0.0], threading.Event(), []
+    cache = PreflightCache(lambda: now[0])
+    cache.remember(cache.epoch, ("cli",), "first", ("model",))
+
+    def qualify(epoch):
+        runs.append(epoch)
+        gate.wait(5)
+        cache.remember(epoch, ("cli",), "second", ("model",))
+    cache.renew(qualify)
+    assert cache.renewing is None
+    now[0] = TTL_SECONDS - RENEW_SECONDS
+    cache.renew(qualify)
+    cache.renew(qualify)
+    # The calls keep the snapshot while the qualification runs.
+    assert cache.read(("cli",), "model")[1] == "first"
+    gate.set()
+    cache.renewing.join(5)
+    assert runs == [0] and cache.read(("cli",), "model")[1] == "second"
+    assert cache.snapshot.expires == now[0] + TTL_SECONDS
+
+
+def test_a_failed_qualification_beside_the_calls_leaves_the_snapshot_to_its_end(caplog):
+    now = [0.0]
+    cache = PreflightCache(lambda: now[0])
+    cache.remember(cache.epoch, ("cli",), "first", ("model",))
+    now[0] = TTL_SECONDS - 1
+
+    def failing(_epoch):
+        raise ContentFailure("CLI_FAILED")
+    cache.renew(failing)
+    first = cache.renewing
+    first.join(5)
+    cache.renew(failing)
+    assert cache.renewing is first and cache.read(("cli",), "model")[1] == "first"
+    assert [record.getMessage() for record in caplog.records] == ["CLI qualification beside the calls failed: CLI_FAILED"]
+    now[0] = TTL_SECONDS
+    assert cache.read(("cli",), "model")[1] is None
+
+
+def test_a_codex_snapshot_that_ends_soon_is_qualified_again_beside_the_calls(fake):
+    cli, root, _keep, _configure, starts = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    first = check(provider, root)
+    cache = provider.preflight_cache
+    cache.snapshot = replace(cache.snapshot, expires=cache.clock() + RENEW_SECONDS / 2)
+    assert check(provider, root) == first
+    cache.renewing.join(10)
+    assert cache.snapshot.expires > cache.clock() + TTL_SECONDS - RENEW_SECONDS
+    assert sum(row == ["--version"] for row in commands(cli)) == 2
+    assert sum(row[0] == "app-server" for row in commands(cli)) == 2 and starts() == 0

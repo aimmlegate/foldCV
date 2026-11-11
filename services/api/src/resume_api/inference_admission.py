@@ -1,4 +1,5 @@
-"""Cancellable FIFO admission for model work: shared permits run side by side, an exclusive one runs alone."""
+"""Cancellable FIFO admission for model work: shared permits run side by side, an exclusive one runs alone; a
+provider's model calls in flight are capped across the service."""
 
 from collections import deque
 from contextlib import contextmanager
@@ -118,6 +119,11 @@ class InferenceAdmission:
         with self.condition:
             return self.exclusive or any(ticket.exclusive for ticket in self.waiting)
 
+    def importing(self):
+        """An import holds the permit it keeps for its whole run (reserve)."""
+        with self.condition:
+            return bool(self.reservations)
+
     def acquire(self, blocking=True, timeout=-1, *, exclusive=False):
         deadline = None if timeout == -1 else time.monotonic() + timeout
         with self.condition:
@@ -209,3 +215,110 @@ class OwnedPermit:
 
 
 INFERENCE = InferenceAdmission()
+# Claude calls in flight in the service (R3 of D158): width 8 ran nine at once on Max without a rate-limit reply, and
+# two imports at width 8 ran sixteen. Codex has no cap.
+CLAUDE_CALLS = 8
+# A waiting call reads its cancel, a thread's event, at least this often.
+CALL_POLL_SECONDS = 0.1
+
+
+class CallPlace:
+    """One model call's place among its provider's calls in flight; it goes back once. A provider without a cap gives
+    an empty one."""
+
+    def __init__(self, places=None, key=None):
+        self.places, self.key, self.held, self.future = places, key, places is not None, None
+
+    def release(self):
+        if self.places is None:
+            return
+        with self.places.condition:
+            if self.held:
+                self.held = False
+                self.places.busy[self.key] -= 1
+                self.places._notify()
+
+    def follow(self, future):
+        """The place goes back when `future`, the call's thread, ends, or when the call is cancelled before it ran."""
+        self.future = future
+        future.add_done_callback(lambda _future: self.release())
+
+
+class CallPlaces:
+    """Model calls in flight in the service, per provider (R3 of D158). An import's call takes a place before its
+    attempt is reserved and a rewrite preview before it starts; the assistant takes none (one long run of its own).
+    Waiting calls are served in order."""
+
+    def __init__(self, caps):
+        self.caps = dict(caps)
+        self.condition = threading.Condition()
+        self.busy = dict.fromkeys(self.caps, 0)
+        self.waiting = {key: deque() for key in self.caps}
+        self.async_waiters = {}
+
+    def _notify(self):
+        self.condition.notify_all()
+        for loop, future in self.async_waiters.values():
+            def wake(target=future):
+                if not target.done():
+                    target.set_result(None)
+            if not loop.is_closed():
+                loop.call_soon_threadsafe(wake)
+
+    def _first(self, key, ticket):
+        return self.waiting[key][0] is ticket and self.busy[key] < self.caps[key]
+
+    def _take(self, key):
+        self.busy[key] += 1
+        return CallPlace(self, key)
+
+    async def take(self, key, cancel, seconds):
+        """A place for one call of the provider `key`, or None when `seconds` passed or `cancel` was set first."""
+        if key not in self.caps:
+            return CallPlace()
+        loop, ticket, end = asyncio.get_running_loop(), object(), time.monotonic() + seconds
+        with self.condition:
+            self.waiting[key].append(ticket)
+        try:
+            while True:
+                with self.condition:
+                    if cancel.is_set() or time.monotonic() >= end:
+                        return None
+                    if self._first(key, ticket):
+                        return self._take(key)
+                    wake = loop.create_future()
+                    self.async_waiters[ticket] = (loop, wake)
+                await asyncio.wait([wake], timeout=max(0.0, min(CALL_POLL_SECONDS, end - time.monotonic())))
+        finally:
+            with self.condition:
+                self.async_waiters.pop(ticket, None)
+                self.waiting[key].remove(ticket)
+                self._notify()
+
+    @contextmanager
+    def hold(self, key, cancel):
+        """A place for one call of the provider `key` while the block runs, waited for in this thread; a cancel raises
+        AdmissionCancelled."""
+        if key not in self.caps:
+            yield
+            return
+        ticket = object()
+        with self.condition:
+            self.waiting[key].append(ticket)
+            try:
+                while not self._first(key, ticket):
+                    if cancel.is_set():
+                        raise AdmissionCancelled()
+                    self.condition.wait(0.025)
+                place = self._take(key)
+            finally:
+                self.waiting[key].remove(ticket)
+                self._notify()
+        try:
+            yield
+        finally:
+            place.release()
+
+
+# Keyed by the providers' adapter names (`template_adapter`, the captured model's `adapter`).
+CALLS = CallPlaces({"claude_cli": CLAUDE_CALLS})

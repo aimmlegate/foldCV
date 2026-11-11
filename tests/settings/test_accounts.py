@@ -147,6 +147,22 @@ def test_the_account_label_takes_only_values_it_can_show(email, organisation, la
 
 
 @pytest.mark.asyncio
+async def test_a_sign_in_drops_the_snapshot_that_imports_and_api_errors_keep(tmp_path, unconfined):
+    # R4 of D158 keeps the CLI's qualification while an import runs and through an overloaded reply, not a sign-in.
+    stand_in = StandIn(tmp_path, "claude_cli")
+    stand_in.configure("logged_out")
+    app, _profile = app_for(tmp_path, stand_in)
+    cache = host_of(app).slots["claude_cli"].provider.preflight_cache
+    async with client_session(app) as client:
+        await post(client, "enable", "claude_cli", enabled=True)
+        assert (await post(client, "status", "claude_cli")).json()["state"] == "login_required"
+        cache.remember(cache.epoch, ("synthetic",), object(), ("claude-sonnet-5-5",))
+        reply = await post(client, "login", "claude_cli")
+        assert reply.status_code == 200, reply.text
+        assert cache.snapshot is None and len(stand_in.runs(["auth", "login", "--claudeai"])) == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("kind", KINDS)
 async def test_a_sign_out_ends_the_apps_own_sign_in_and_another_account_signs_in(tmp_path, unconfined, caplog, kind):
     caplog.set_level(logging.INFO, logger="foldcv")

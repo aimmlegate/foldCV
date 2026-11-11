@@ -161,7 +161,9 @@ errors = {"auth": ("authentication_failed", "Not logged in · Please run /login"
           "rate_limit": ("rate_limit", "Rate limited, try again"),
           "quota": ("rate_limit", "You've hit your usage limit · resets 5pm"),
           "model": ("model_not_found", "There's an issue with the selected model"),
-          "billing": ("billing_error", "Credit balance is too low")}
+          "billing": ("billing_error", "Credit balance is too low"),
+          "overloaded": ("overloaded", "API Error: Overloaded"),
+          "server_error": ("server_error", "API Error: Internal server error")}
 if case == "renewal" and count == 1:
     case = "auth"
 if case in errors:

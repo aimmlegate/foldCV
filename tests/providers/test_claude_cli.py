@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -20,6 +22,7 @@ from resume_api.cli.process_runner import ProcessRunner
 from resume_api.providers.claude import profile as rules
 from resume_api.providers.base import ConnectionFailure
 from resume_api.providers.claude.connection import ClaudeConnectionAdapter
+from resume_api.inference_admission import INFERENCE
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers.claude import catalog as claude_catalog
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
@@ -186,6 +189,7 @@ def test_a_sign_in_that_stays_refused_fails_after_the_second_run(fake):
 
 @pytest.mark.parametrize(("case", "code"), [
     ("rate_limit", "RATE_LIMITED"), ("quota", "QUOTA_EXHAUSTED"),
+    ("overloaded", "PROVIDER_OVERLOADED"), ("server_error", "PROVIDER_OVERLOADED"),
     ("model", "MODEL_DENIED"), ("billing", "QUOTA_EXHAUSTED"), ("max_retries", "INVALID_RESULT"),
     ("tool", "UNEXPECTED_TOOL_ACTIVITY"), ("subagent", "UNEXPECTED_TOOL_ACTIVITY"),
     ("compact", "UNEXPECTED_TOOL_ACTIVITY"), ("denied", "UNEXPECTED_TOOL_ACTIVITY"),
@@ -297,6 +301,69 @@ def test_preflight_is_reused_until_invalidated(fake):
     with OperationFiles(root).open() as files:
         provider.generate(request(), files, threading.Event())
     assert sum(entry["args"] == ["auth", "status", "--json"] for entry in audit()) == 2
+
+
+def qualified(provider, root):
+    """The provider once its CLI qualified; returns the threads every later qualification ran on."""
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    threads, probe = [], provider.probe
+
+    def counted(files, cancel, *, deadline):
+        threads.append(threading.current_thread().name)
+        return probe(files, cancel, deadline=deadline)
+    provider.probe = counted
+    return threads
+
+
+def test_an_overloaded_or_rate_limited_reply_keeps_the_snapshot_and_an_auth_failure_drops_it(fake):
+    # R4 of D158: an API error says nothing of the CLI or the sign-in.
+    cli, root, _directory, configure, _audit = fake
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    threads = qualified(provider, root)
+    for case, code in [("overloaded", "PROVIDER_OVERLOADED"), ("server_error", "PROVIDER_OVERLOADED"),
+                       ("rate_limit", "RATE_LIMITED")]:
+        configure(case)
+        with OperationFiles(root).open() as files, pytest.raises(ContentFailure, match=code):
+            provider.generate(request(), files, threading.Event())
+        assert provider.preflight_cache.snapshot is not None
+    configure("valid")
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    assert threads == []
+    configure("auth")
+    with OperationFiles(root).open() as files, pytest.raises(ContentFailure, match="AUTH_REQUIRED"):
+        provider.generate(request(), files, threading.Event())
+    assert provider.preflight_cache.snapshot is None
+
+
+def test_an_import_keeps_the_snapshot_past_its_time_and_the_next_qualification_runs_beside_the_calls(fake):
+    cli, root, _directory, _configure, _audit = fake
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    threads, cache = qualified(provider, root), provider.preflight_cache
+    cache.snapshot = replace(cache.snapshot, expires=cache.clock() - 1)
+    permit = asyncio.run(INFERENCE.reserve(asyncio.Event()))
+    try:
+        with OperationFiles(root).open() as files:
+            provider.generate(request(), files, threading.Event())
+        cache.renewing.join(10)
+        # The call ran on the snapshot the import kept; the qualification ran on its own thread and replaced it.
+        assert threads == ["foldcv-preflight"] and cache.snapshot.expires > cache.clock() + 200
+        with OperationFiles(root).open() as files:
+            provider.generate(request(), files, threading.Event())
+        assert threads == ["foldcv-preflight"]
+        # A sign-in or a CLI change still drops it while the import runs.
+        provider.invalidate_preflight()
+        assert cache.read(provider._key(), MODEL)[1] is None
+    finally:
+        permit.release()
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    cache.snapshot = replace(cache.snapshot, expires=cache.clock() - 1)
+    # Without an import an ended snapshot is qualified again in the call, as before.
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    assert threads == ["foldcv-preflight", "MainThread", "MainThread"]
 
 
 def test_timeout_and_cancel_stop_the_process_group(fake):

@@ -22,7 +22,7 @@ from resume_api.cli.process_runner import ProcessExit, ProcessRunner
 from resume_api.cli.runner import safe_environment
 from resume_api.providers.claude import profile as profile_rules
 from resume_api.providers.claude.profile import ClaudeCliProfile, ClaudeProfileError
-from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
+from resume_api.inference_admission import CALLS, INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers.claude import catalog as claude_catalog
@@ -31,17 +31,18 @@ from resume_api.providers.shared import (MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBAC
 from resume_api.providers.content import (STALL_SECONDS, ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp, beside
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.rewrite_timing import add_phase, measure
 
 
 _GENERATION_LOCK = INFERENCE
 KEY_MODES = {"api_key", "api_key_helper", "oauth_token", "third_party"}
-# Observed or documented assistant error kinds; anything else is a plain CLI failure.
+# Observed or documented assistant error kinds; anything else is a plain CLI failure. An overloaded or failing API is
+# the provider's own trouble, not the CLI's: an import calls once more after a pause (R3 of D158).
 ERRORS = {"authentication_failed": "AUTH_REQUIRED", "billing_error": "QUOTA_EXHAUSTED",
           "rate_limit": "RATE_LIMITED", "model_not_found": "MODEL_DENIED", "invalid_request": "CLI_FAILED",
-          "overloaded": "CLI_FAILED", "server_error": "CLI_FAILED"}
+          "overloaded": "PROVIDER_OVERLOADED", "server_error": "PROVIDER_OVERLOADED"}
 # Notices that carry no model output; compaction and permission denials are never expected.
 # `thinking_tokens` reports thinking progress; 2.1.308 sends it once a turn thinks for a while.
 NOTICES = {"api_retry", "status", "rate_limit_event", "thinking_tokens"}
@@ -308,7 +309,7 @@ class ClaudeCliProvider:
         self.profile = profile
         self.fixture_transport = fixture_transport
         self.clock = clock
-        self.preflight_cache = PreflightCache[Probe](clock)
+        self.preflight_cache = PreflightCache[Probe](clock, held=INFERENCE.importing)
         self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock, launch=self._launch,
                                      workdir=getattr(profile, "workdir", None))
@@ -429,6 +430,7 @@ class ClaudeCliProvider:
         epoch, cached = self.preflight_cache.read(key, model)
         if cached is not None:
             self.check_effort(cached, model, effort)
+            self.preflight_cache.renew(lambda epoch: self._renew(files.root, epoch, key))
             return cached
         # One qualification at a time (D153); the calls that wait take the first one's result.
         with self.preflight_cache.qualifying:
@@ -444,6 +446,14 @@ class ClaudeCliProvider:
                 self.preflight_cache.remember(epoch, key, probe, tuple(probe.reasoning))
         self.check_effort(probe, model, effort)
         return probe
+
+    def _renew(self, root, epoch, key):
+        """The qualification that runs beside the calls before the snapshot ends (R4); it replaces the snapshot."""
+        with beside(root, self._profile_owner) as files, self.preflight_cache.qualifying:
+            if epoch == self.preflight_cache.epoch:
+                probe = self.probe(files, threading.Event(), deadline=self.clock() + QUALIFICATION_SECONDS)
+                if key == self._key():
+                    self.preflight_cache.remember(epoch, key, probe, tuple(probe.reasoning))
 
     @staticmethod
     def check_effort(probe: Probe, model: str, effort: str | None) -> None:
@@ -463,7 +473,8 @@ class ClaudeCliProvider:
     def generate_queued(self, request, files, cancel, admitted):
         try:
             waiting = time.perf_counter()
-            with INFERENCE.hold(cancel):
+            # A rewrite preview takes one of the Claude calls in flight in the service, as an import's call does (R3).
+            with INFERENCE.hold(cancel), CALLS.hold(profile_rules.KIND, cancel):
                 with self._profile_owner(cancel, files.root):
                     add_phase("account_queue", time.perf_counter() - waiting)
                     admitted()
@@ -651,6 +662,7 @@ class ClaudeCliProvider:
             raise failure("TEMP_FAILED") from None
         except ContentFailure as error:
             observed(outcome_state(error.code), error.code)
+            # A rate-limited or overloaded reply says nothing of the CLI or the sign-in: the snapshot stays (R4).
             if error.code in {"AUTH_REQUIRED", "AUTH_MODE_MISMATCH", "MODEL_DENIED", "CLI_UNSUPPORTED",
                               "CLI_PROFILE_UNSAFE", "CLI_FAILED", "METADATA_FAILED", "PROCESS_CLEANUP_FAILED",
                               "QUOTA_EXHAUSTED"}:

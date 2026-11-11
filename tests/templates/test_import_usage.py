@@ -193,14 +193,19 @@ async def test_a_failed_call_still_has_its_row_with_the_numbers_it_reported(tmp_
     def limited(_request, _cancel):
         raise ContentFailure('RATE_LIMITED', logical_attempts=1, usage=ReportedUsage(7, 0, 0, True, detail),
             cleanup_verified=True, dispatch_witness={'transport': 'controlled'})
-    fixture.transport.generate = limited
+
+    async def no_pause(_seconds, _cancel):
+        pass
+    fixture.transport.generate, fixture.pipeline.pause = limited, no_pause
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published' and result.task_results[0].disposition == 'source_fallback'
     _path, data = stored(fixture)
-    [row] = data['attempts']
-    assert (row['outcome'], row['errorCode']) == ('transport_failure', 'RATE_LIMITED')
-    assert row['reported'] == {'inputTokens': 7, 'cachedInputTokens': 0, 'outputTokens': 0}
-    assert row['claude'] == detail['claude'] and set(row['phases']) == PHASES
+    # A rate-limited call is made once more (R3 of D158); each call keeps its own row.
+    assert len(data['attempts']) == 2
+    for row in data['attempts']:
+        assert (row['outcome'], row['errorCode']) == ('transport_failure', 'RATE_LIMITED')
+        assert row['reported'] == {'inputTokens': 7, 'cachedInputTokens': 0, 'outputTokens': 0}
+        assert row['claude'] == detail['claude'] and set(row['phases']) == PHASES
 
 
 @pytest.mark.asyncio
