@@ -23,7 +23,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = 'ae3975834bfd496c07f5ad35ded5f7243af041d1b79a6cee037aa6fc0632fba4'
+TWO_COLUMN_HASH = '563579f19191b95a6968e9cb23ff3db1307e8b44ec2061451dc8a718896c670f'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 PUBLIC = ['generic-two-column', 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
 

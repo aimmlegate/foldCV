@@ -399,8 +399,8 @@ def test_the_short_form_declares_per_entry_and_the_bundled_projects_blocks_use_i
     for template in BUNDLED_TEMPLATES:
         package = bundled_package(template)
         assert [item.id for item in package.definition.blocks if item.per_entry] == ['projects']
-    assert compile_template(BUNDLED_TEMPLATES['generic-two-column']).revision == '1.4.0'
-    assert compile_template(BUNDLED_TEMPLATES['generic-one-column']).revision == '1.4.0'
+    assert compile_template(BUNDLED_TEMPLATES['generic-two-column']).revision == '1.5.0'
+    assert compile_template(BUNDLED_TEMPLATES['generic-one-column']).revision == '1.5.0'
 
 
 def scheduled(pipeline, tasks, width, spawns):

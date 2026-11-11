@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 1.4.0
+  revision: 1.5.0
   name: Две колонки
   default_locale: ru
 model:
@@ -308,6 +308,9 @@ blocks:
     project_claim (owned_by): [tasks/*/value, results/*/value]
   extract:
   - Keep source-backed company and project boundaries; one entry per stated project or employment.
+  - A project described inside a place of work is its own entry, and project.name names the project; its company is that
+    employer and its role is the job title stated for that employment unless the project states its own role. Cite the
+    employer and the job title where the source states them, even outside the lines of this entry.
   - Keep grouped employment as one entry when the source gives no separate records.
   - Order entries newest first.
   - Extract the period, the technology stack of this entry, the project name, the product purpose and the business problem.
