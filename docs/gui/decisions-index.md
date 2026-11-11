@@ -162,3 +162,5 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D157 The PDF original draws on older WebKit; a failed original stays in its pane
 - D158 Token economy: the plan runs; its sizes are aims, quality is the gate
 - D159 Sign out of an account and clear a provider's data from Settings (T8 of D158)
+- D160 Each import writes its usage to a diagnostics file; Claude content calls run without prompt caching; Codex execs drop the CLI's unused notes and tools (T0.1 and T1 of D158)
+- D161 History files no import record names are removed (R8 of D158)
