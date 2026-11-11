@@ -16,7 +16,7 @@ pytestmark = pytest.mark.slow
 # Model calls, and characters of every prompt and reply schema, of one import with rewriting at width 1. Width 1 runs
 # the tasks in declaration order; at a higher width a review made before the role branch is decided lists the blocks
 # of both branches, so its size would follow the timing.
-PINS = {'F01': (28, 430394), 'F07': (28, 2897756), 'F10': (30, 516763)}
+PINS = {'F01': (28, 303569), 'F07': (28, 1671595), 'F10': (30, 361142)}
 BELOW = 0.02
 
 

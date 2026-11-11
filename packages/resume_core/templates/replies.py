@@ -79,9 +79,11 @@ def _closed_schema(model, payload_schema=None, choices=None):
 
 
 # Application-owned reply rules sent with every extraction task; generic for any template declaration.
-PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-5', 'rules': [
+# Protocol 6: a request shows each evidence entry as [ref, text] and a whole unit by the refs of its first and last
+# line, whose entries already hold its text (template_prompt); a stored request of protocol 5 still reads {ref, text}.
+PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-6', 'rules': [
     'Return payload and fields; send null for discoveries, lineage and relations unless a rule below needs them. payload follows the block content schema; use null or [] for data the source does not state.',
-    'Evidence is selected by reference: each evidence entry {ref, text} offers one exact source text, and a reply lists only refs. A value copied word for word from an offered text needs no fields entry: the coordinator cites the entries that contain it.',
+    'Evidence is selected by reference: each evidence entry [ref, text] offers one exact source text, and a reply lists only refs. An entry [ref, [first, last]] is a whole unit made of the lines first to last; citing its ref cites all of them. A value copied word for word from an offered text needs no fields entry: the coordinator cites the entries that contain it.',
     'Every other non-null value (reworded, inferred, classified or normalized) needs one fields entry {pointer: its concrete payload pointer, for example /0/role or /items/2, evidence: the refs of the entries that state it, item: null, fieldKey: null, effectiveCells: null}. One entry at a list pointer, for example /items, may give the evidence of every value in that list. A value read from references.cells lists their E refs in effectiveCells.',
     'The coordinator derives one new item per concrete item pointer of the declaration bindings, its add lineage and the relations the bindings configure. To update an item listed in references.items, give at least one fields entry of that item with item {kind: handle, ref: its H ref}; its other values join it. To split or merge listed items, give discoveries {key, semanticType, pointer} for the new items and lineage {kind: split or merge, parents: H refs, children: discovery keys}.',
     'Never copy an id: every selection is a key of this reply or a ref offered by this request.',
@@ -95,7 +97,10 @@ PROPOSAL_PROTOCOL = {'version': 'template-proposal-protocol-5', 'rules': [
 # Protocol 4 (D115): the coordinator settles the checks of a value it found word for word in its cited line and, in a
 # replacement review, of a value the repair left as it was; the model sees and answers only the remaining checks.
 # Protocol 5 (D117): a review of one entry of a block checks coverage of that entry's lines only.
-REVIEW_PROTOCOL = {'version': 'template-review-protocol-5', 'rules': [
+# Protocol 6: evidence entries as in proposal protocol 6; otherBlocks names each block by id and title, and the task
+# declaration leaves out its view, bindings and placement (template_prompt).
+REVIEW_PROTOCOL = {'version': 'template-review-protocol-6', 'rules': [
+    'Each evidence entry [ref, text] offers one exact source text; an entry [ref, [first, last]] is a whole unit made of the lines first to last, and citing its ref cites all of them.',
     'semanticContext.checks lists each target once: a field (its pointer in the proposed payload, value and evidence refs), a relation (its kind, subject and target items and evidence refs) or the extraction scope. Its checks map each check ref to the rule (rules) that check applies to that target; a target has one check per rule.',
     'A value of the proposal that has no check is settled already: the coordinator found it word for word in its cited source line, or an earlier review of this same value stands. Do not report it.',
     'Apply every rule of every target. results holds one entry {check, disposition, reason, evidence, actionable} only for a check whose rule is broken (violation) or that the evidence does not settle (uncertain). Never list a satisfied check: a check not in results is satisfied, and results is [] when every check holds.',
@@ -105,12 +110,15 @@ REVIEW_PROTOCOL = {'version': 'template-review-protocol-5', 'rules': [
     'reason is one short sentence in Russian that names the defect or what is missing; evidence lists the refs that support the disposition, or []. actionable is true only when a corrected proposal could fix it from the offered evidence.']}
 
 
-# D117: a block declared per_entry is outlined first, then each entry is extracted by its own request.
-OUTLINE_PROTOCOL = {'version': 'template-outline-protocol-1', 'rules': [
+# D117: a block declared per_entry is outlined first, then each entry is extracted by its own request. Protocol 2 and
+# outline review protocol 2: evidence entries as in proposal protocol 6.
+OUTLINE_PROTOCOL = {'version': 'template-outline-protocol-2', 'rules': [
+    'Each evidence entry [ref, text] offers one exact source text; an entry [ref, [first, last]] is a whole unit made of the lines first to last.',
     'This request outlines the block before its entries are extracted one by one. payload.entries lists every entry the block declaration extracts from the evidence, in the order the declaration asks for, each as {title, first, last}: title names the entry as the source does (the employer, the project, the school), first and last are the refs of its first and its last source line; the lines between belong to it.',
     'An entry is one item of the block content; keep the boundaries the source states, as the declaration says. The lines of one entry are contiguous, a line belongs to at most one entry, and a line that states no entry of this block is in none. Return [] when the source states no entry of this block.']}
 
-OUTLINE_REVIEW_PROTOCOL = {'version': 'template-outline-review-protocol-1', 'rules': [
+OUTLINE_REVIEW_PROTOCOL = {'version': 'template-outline-review-protocol-2', 'rules': [
+    OUTLINE_PROTOCOL['rules'][0],
     'outline.entries lists the entries of the block as the coordinator extracts them, each with its title and the refs of its first and last source line. Check the outline against the whole evidence: payload.missing lists every entry of the block the outline leaves out, each as {title, first, last} like an outline entry; payload.remarks lists an outline entry that joins two entries of the source or splits one, as {entries: [their indices], reason}.',
     'Text outside the declared content is no entry, nor is a statement that fits a block in otherBlocks better. reason is one short sentence in Russian. Return empty lists when the outline is complete.']}
 
@@ -174,7 +182,13 @@ def review_protocol(review):
 
 
 # Protocols whose reply lists failing checks only; an unlisted check holds.
-FAILING_ONLY_PROTOCOLS = frozenset({'template-review-protocol-3', 'template-review-protocol-4', REVIEW_PROTOCOL['version']})
+FAILING_ONLY_PROTOCOLS = frozenset({'template-review-protocol-3', 'template-review-protocol-4', 'template-review-protocol-5',
+    REVIEW_PROTOCOL['version']})
+
+# Protocols whose requests the model reads in the compact form (template_prompt). A stored request reads as the protocol
+# it was captured with says, so each version stays named here when a newer one comes.
+COMPACT_PROTOCOLS = frozenset({'template-proposal-protocol-6', 'template-review-protocol-6', 'template-outline-protocol-2',
+    'template-outline-review-protocol-2'})
 
 
 def model_targets(review):

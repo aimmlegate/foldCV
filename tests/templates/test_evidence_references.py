@@ -17,7 +17,8 @@ from packages.resume_core.importing.template_review import (make_review_input, r
                                                             validate_review_reply)
 from packages.resume_core.hashing import sha256
 from packages.resume_core.templates.projection import SchemaFailure, validate_payload
-from packages.resume_core.templates.replies import check_references, proposal_schema, review_schema, model_targets
+from packages.resume_core.templates.replies import (REVIEW_PROTOCOL, check_references, proposal_schema, review_schema,
+    model_targets)
 from resume_api.providers.dynamic_result import dynamic_result
 from tests.templates.evidence_references import by_reference
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, ready_operation, setup_operation, usage
@@ -223,7 +224,7 @@ def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_hol
             'actionable': True}]
     operation, attempt, value, raw = review_returned(operation, proposal, captured, src, results)
     refs = list(check_references(value))
-    assert value.semantic_context['replyProtocol']['version'] == 'template-review-protocol-5' and len(refs) > 2
+    assert value.semantic_context['replyProtocol'] == REVIEW_PROTOCOL and len(refs) > 2
     assert review_schema(value)['required'] == ['results']
     reply = validate_review_reply({'results': results(value)}, value, [src])
     by_target = {(result.rule_id, result.target_id): result for result in reply.results}
@@ -247,6 +248,20 @@ def test_a_protocol_3_review_lists_only_failing_checks_and_every_other_check_hol
     assert sum(result.disposition == 'violation' for result in same_twice.results) == 1
     with pytest.raises(SchemaFailure):
         validate_review_reply({'results': [{**results(value)[0], 'check': 'C0'}]}, value, [src])
+
+
+def test_a_review_stored_with_protocol_5_still_decodes_a_reply_that_lists_failing_checks_only():
+    operation, _, proposal, captured, src, _options, _ = returned(referenced)
+    value = make_review_input(operation, proposal, captured, [src], operation.capture.primary,
+        effective_cells=[], semantic_context={'capturedTaskInput': operation.task_inputs[0].value})
+    stored = value.model_copy(update={'semantic_context': {**value.semantic_context,
+        'replyProtocol': {**REVIEW_PROTOCOL, 'version': 'template-review-protocol-5'}}})
+    failing = [{'check': 'C1', 'disposition': 'violation', 'reason': 'Год не указан в источнике', 'evidence': [],
+        'actionable': True}]
+    for review in (value, stored):
+        results = validate_review_reply({'results': failing}, review, [src]).results
+        assert len(results) == len(review.targets) and [result.disposition for result in results].count('violation') == 1
+        assert all(result.disposition == 'satisfied' for result in validate_review_reply({'results': []}, review, [src]).results)
 
 
 def test_a_review_sent_with_protocol_2_still_decodes_its_one_entry_per_check_reply():
@@ -330,10 +345,13 @@ async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_
         stored = attempt.request_value or next(record.value.model_dump(mode='json', by_alias=True)
             for record in operation.review_inputs if record.attempt_id == attempt.id)
         sent = json.loads(prompt)
-        # The model sees each offered entry as its ref and text; the stored request restores spans from the ref.
-        assert sent['evidence'] and all(set(entry) == {'ref', 'text'} for entry in sent['evidence'])
+        # The model sees each offered entry as [ref, text], a whole unit beside its lines as [ref, [first, last]]; the
+        # stored request restores spans from the ref.
+        texts = {entry['ref']: entry['text'] for entry in stored['evidence']}
+        assert sent['evidence'] and all(len(entry) == 2 and (entry[1] == texts[entry[0]] if isinstance(entry[1], str)
+            else len(entry[1]) == 2 and set(entry[1]) <= set(texts)) for entry in sent['evidence'])
         assert all('span' in entry for entry in stored['evidence'])
-        assert [entry['ref'] for entry in sent['evidence']] == [entry['ref'] for entry in stored['evidence']]
+        assert [entry[0] for entry in sent['evidence']] == [entry['ref'] for entry in stored['evidence']]
         assert len(json.dumps(sent['evidence'], ensure_ascii=False)) * 3 < len(json.dumps(stored['evidence'], ensure_ascii=False))
         # Identities, hashes and spans stay in storage; the reply selects everything by reference.
         assert not {'allowedHandles', 'capturedHandles', 'capturedRelations', 'handleMap', 'targets', 'policy',
