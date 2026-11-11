@@ -31,7 +31,8 @@ from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache
 from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments,
                                              overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
-from ..shared import InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, SYSTEM_PROMPT, _combine, strict_json
+from ..shared import (InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, SYSTEM_PROMPT, _combine, mapping,
+                      natural, strict_json)
 
 
 # What `exec --json` sends today. A newer CLI adds events of its own; tools only ever run as items, which stay checked.
@@ -53,6 +54,16 @@ def _usage(raw: object) -> ReportedUsage:
     if any(type(raw.get(key)) is not int or raw[key] < 0 for key in keys):
         raise ContentFailure("INVALID_RESULT")
     return ReportedUsage(raw["input_tokens"], raw["cached_input_tokens"], raw["output_tokens"], True)
+
+
+def _detail(raw: object) -> dict | None:
+    """The turn's own numbers for the import's diagnostics file (T0.1); a field missing or malformed is left out."""
+    usage = mapping(raw)
+    values = {"input": natural(usage.get("input_tokens")), "cachedInput": natural(usage.get("cached_input_tokens")),
+              "output": natural(usage.get("output_tokens")),
+              "reasoningOutput": natural(usage.get("reasoning_output_tokens"))}
+    found = {key: value for key, value in values.items() if value is not None}
+    return {"codex": found} if found else None
 
 
 
@@ -104,7 +115,7 @@ class Events:
                 # The last completed assistant message is the structured final response.
                 self.text = item["text"]
         elif kind == "turn.completed" and self.turn and self.text is not None:
-            self.usage = _usage(event.get("usage"))
+            self.usage = replace(_usage(event.get("usage")), detail=_detail(event.get("usage")))
             self.complete = True
         elif kind in {"error", "turn.failed"}:
             detail = event.get("error")

@@ -508,3 +508,89 @@ def test_envelopes_of_the_live_mp00_run_are_accepted():
     value = events.result(Check, StructuredSchema(Check.model_json_schema()))
     assert value == Check(answer="ready", count=3, items=["alpha", "beta", "gamma"])
     assert (events.usage.input_tokens, events.usage.output_tokens, events.usage.complete) == (1230, 107, True)
+
+
+class LiveCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    answer: str
+    count: int
+    items: list[str]
+
+
+def live_run(change=lambda event: [event]):
+    """The live MP00 stream with each event replaced by what `change` gives for it; returns the reader and the reply."""
+    from resume_api.providers.claude.content import ClaudeEvents
+    from resume_api.providers.structured_schema import StructuredSchema
+
+    events = ClaudeEvents(model=MODEL, version="2.1.308", structured=True, max_bytes=262_144)
+    for raw in (SOURCE / "fixtures/claude-2.1.308-structured.jsonl").read_bytes().splitlines():
+        for event in change(json.loads(raw)):
+            events.accept(json.dumps(event).encode())
+    return events, events.result(LiveCheck, StructuredSchema(LiveCheck.model_json_schema()))
+
+
+def test_the_live_run_reports_its_cache_writes_cost_turns_and_subscription_windows():
+    # T0.1: the CLI writes the whole prompt to the one-hour cache, and num_turns is 2 on this clean one-shot call.
+    events, _reply = live_run()
+    assert events.usage.detail == {"claude": {
+        "uncachedInput": 2, "cacheWrite5m": 0, "cacheWrite1h": 1228, "cacheRead": 0, "output": 107, "thinking": 0,
+        "costUsd": 0.005986, "numTurns": 2, "assistantMessages": 1,
+        "fiveHour": {"utilization": 0.14, "resetsAt": 1793139000},
+        "sevenDay": {"utilization": 0.02, "resetsAt": 1793250000}}}
+
+
+@pytest.mark.parametrize("damage", ["malformed", "missing"])
+def test_a_malformed_or_missing_cost_field_is_left_out_and_the_call_stands(damage):
+    def change(event):
+        if event["type"] == "result":
+            usage = event["usage"]
+            if damage == "malformed":
+                usage["cache_creation"]["ephemeral_1h_input_tokens"] = "1228"
+                usage["output_tokens_details"] = None
+                event["total_cost_usd"], event["num_turns"] = -0.5, 2.0
+            else:
+                del usage["cache_creation"], usage["output_tokens_details"], event["total_cost_usd"], event["num_turns"]
+        elif event["type"] == "rate_limit_event":
+            windows = event["rate_limit_info"]["unifiedWindows"]
+            if damage == "malformed":
+                windows["five_hour"], windows["seven_day"] = {"utilization": "14%", "resetsAt": True}, None
+            else:
+                del event["rate_limit_info"]["unifiedWindows"]
+        return [event]
+
+    events, reply = live_run(change)
+    assert reply == LiveCheck(answer="ready", count=3, items=["alpha", "beta", "gamma"])
+    usage = events.usage
+    assert (usage.input_tokens, usage.cached_input_tokens, usage.output_tokens, usage.complete) == (1230, 0, 107, True)
+    kept = {"uncachedInput": 2, "cacheRead": 0, "output": 107, "assistantMessages": 1}
+    assert usage.detail == {"claude": {**kept, **({"cacheWrite5m": 0} if damage == "malformed" else {})}}
+
+
+@pytest.mark.parametrize(("identifier", "turns"), [(None, 1), ("msg_second_turn", 2)])
+def test_turns_count_assistant_messages_not_their_blocks(identifier, turns):
+    # The CLI sends one event per content block under its message's id; a reply asked again is a new message.
+    def change(event):
+        if event["type"] != "assistant":
+            return [event]
+        again = json.loads(json.dumps(event))
+        again["message"]["id"] = identifier or event["message"]["id"]
+        return [event, again]
+
+    events, _reply = live_run(change)
+    assert events.usage.detail["claude"]["assistantMessages"] == turns
+
+
+def test_a_failed_call_keeps_the_numbers_its_run_reported(fake):
+    error = failure(fake, "rate_limit", "RATE_LIMITED", 1)
+    assert error.usage.detail == {"claude": {
+        "uncachedInput": 12, "cacheWrite5m": 0, "cacheWrite1h": 3, "cacheRead": 5, "output": 7, "thinking": 2,
+        "costUsd": 0.01, "numTurns": 2, "assistantMessages": 0,
+        "fiveHour": {"utilization": 0.25, "resetsAt": 1800000000},
+        "sevenDay": {"utilization": 0.05, "resetsAt": 1800500000}}}
+
+
+def test_a_repaired_call_sums_the_numbers_of_both_runs(fake):
+    result, starts = generate(fake, "repair")
+    claude = result.usage.detail["claude"]
+    assert len(starts) == 2 and (claude["output"], claude["cacheWrite1h"], claude["numTurns"]) == (14, 6, 4)
+    assert claude["assistantMessages"] == 2 and claude["costUsd"] == pytest.approx(0.02)

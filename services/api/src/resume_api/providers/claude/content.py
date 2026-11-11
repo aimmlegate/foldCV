@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import json
 import logging
 from pathlib import Path
@@ -12,7 +12,7 @@ import threading
 import time
 from typing import Callable
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, JsonValue, ValidationError
 
 from packages.resume_core.reasoning import ModelReasoning
 from packages.resume_core.storage import StorageFailure
@@ -25,7 +25,8 @@ from resume_api.inference_admission import INFERENCE, AdmissionBlocked, Admissio
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
 from resume_api.providers.claude import catalog as claude_catalog
-from resume_api.providers.shared import MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, strict_json
+from resume_api.providers.shared import (MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, amount,
+                                         mapping, natural, strict_json)
 from resume_api.providers.content import (STALL_SECONDS, ContentFailure, ContentInput, ContentResult, ContentTransportReturn,
                                           ReportedUsage, ResultT, outcome_state)
 from resume_api.providers.dynamic_result import DynamicResultSpec
@@ -70,6 +71,32 @@ def _usage(raw: object) -> ReportedUsage:
     return ReportedUsage(total, cached, raw.get("output_tokens", 0), "input_tokens" in raw and "output_tokens" in raw)
 
 
+def _numbers(event: dict) -> dict[str, int | float]:
+    """The result's own cost numbers for the import's diagnostics file (T0.1). Unlike `_usage` they never fail a
+    call: a field missing or malformed is left out."""
+    usage = mapping(event.get("usage"))
+    written, details = mapping(usage.get("cache_creation")), mapping(usage.get("output_tokens_details"))
+    values = {"uncachedInput": natural(usage.get("input_tokens")),
+              "cacheWrite5m": natural(written.get("ephemeral_5m_input_tokens")),
+              "cacheWrite1h": natural(written.get("ephemeral_1h_input_tokens")),
+              "cacheRead": natural(usage.get("cache_read_input_tokens")), "output": natural(usage.get("output_tokens")),
+              "thinking": natural(details.get("thinking_tokens")), "costUsd": amount(event.get("total_cost_usd")),
+              "numTurns": natural(event.get("num_turns"))}
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def _windows(event: dict) -> dict[str, dict[str, int | float]]:
+    """The subscription windows a `rate_limit_event` carries, as far as they are readable."""
+    windows = mapping(mapping(event.get("rate_limit_info")).get("unifiedWindows"))
+    found = {}
+    for key, name in (("five_hour", "fiveHour"), ("seven_day", "sevenDay")):
+        window = mapping(windows.get(key))
+        values = {"utilization": amount(window.get("utilization")), "resetsAt": natural(window.get("resetsAt"))}
+        if any(value is not None for value in values.values()):
+            found[name] = {field: value for field, value in values.items() if value is not None}
+    return found
+
+
 class ClaudeEvents:
     """Strict reader of one `-p --output-format stream-json --verbose` run."""
 
@@ -81,7 +108,11 @@ class ClaudeEvents:
         self.complete = False
         self.text: str | None = None
         self.value: object = None
-        self.usage = ReportedUsage()
+        self.counted = ReportedUsage()
+        self.numbers: dict[str, int | float] = {}
+        self.windows: dict[str, dict[str, int | float]] = {}
+        self.message_ids: set[str] = set()
+        self.unnamed_messages = 0
         self.tool_ids: set[str] = set()
         self.error: str | None = None
         self.output = False
@@ -93,12 +124,24 @@ class ClaudeEvents:
         """The run failed sign-in before any model output: the CLI renewed an expired sign-in in it."""
         return self.error == "authentication_failed" and not self.output
 
+    @property
+    def usage(self) -> ReportedUsage:
+        """The counted usage, with the run's own numbers for the import's diagnostics file."""
+        detail: dict[str, JsonValue] = dict(self.numbers)
+        if self.started:
+            # The model's turns in this run: `num_turns` is 2 on a clean one-shot call.
+            detail["assistantMessages"] = len(self.message_ids) + self.unnamed_messages
+        detail.update(self.windows)
+        return replace(self.counted, detail={"claude": detail} if detail else None)
+
     def accept(self, raw: bytes) -> None:
         event = strict_json(raw, max_bytes=self.max_bytes)
         if not isinstance(event, dict) or not isinstance(event.get("type"), str):
             raise ContentFailure("INVALID_RESULT")
         kind, subtype = event["type"], event.get("subtype")
         if kind == "rate_limit_event" or kind == "system" and subtype in NOTICES:
+            if kind == "rate_limit_event":
+                self.windows.update(_windows(event))
             return
         if kind not in MODEL_EVENTS and not (kind == "system" and (subtype == "init" or subtype in FORBIDDEN)):
             skipped(self.skipped, f"system/{subtype}" if kind == "system" else kind)
@@ -139,6 +182,11 @@ class ClaudeEvents:
             self.error = event["error"]
         else:
             self.output = True
+            # The CLI sends one event per content block, each with its message's id.
+            if isinstance(message.get("id"), str):
+                self.message_ids.add(message["id"])
+            else:
+                self.unnamed_messages += 1
         for block in message["content"]:
             kind = block.get("type") if isinstance(block, dict) else None
             if kind == "tool_use":
@@ -166,7 +214,8 @@ class ClaudeEvents:
                 raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
 
     def _result(self, event: dict) -> None:
-        self.usage = _usage(event.get("usage"))
+        self.counted = _usage(event.get("usage"))
+        self.numbers = _numbers(event)
         if event.get("permission_denials"):
             raise ContentFailure("UNEXPECTED_TOOL_ACTIVITY")
         subtype, failed = event.get("subtype"), event.get("is_error")

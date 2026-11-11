@@ -79,6 +79,33 @@ def strict_json(raw: bytes | str, *, max_bytes: int = MAX_RESULT) -> object:
         raise ContentFailure("INVALID_RESULT") from None
 
 
+def mapping(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def natural(value: object) -> int | None:
+    """A count as a CLI sent it, or None when it is missing or malformed."""
+    return value if type(value) is int and 0 <= value < 2 ** 63 else None
+
+
+def amount(value: object) -> float | None:
+    """A non-negative finite number (a cost or a share), or None."""
+    if type(value) is int and natural(value) is not None:
+        return float(value)
+    return value if type(value) is float and math.isfinite(value) and value >= 0 else None
+
+
+def _details(usages: list[ReportedUsage]) -> dict | None:
+    """The providers' own numbers summed over the runs of one call; a window (an object) is the last one sent."""
+    merged: dict[str, dict] = {}
+    for usage in usages:
+        for provider, values in (usage.detail or {}).items():
+            into = merged.setdefault(provider, {})
+            for key, value in values.items():
+                into[key] = value if isinstance(value, dict) or key not in into else into[key] + value
+    return merged or None
+
+
 def _combine(usages: list[ReportedUsage]) -> ReportedUsage:
     def total(name: str) -> int | None:
         values = [getattr(usage, name) for usage in usages]
@@ -86,7 +113,7 @@ def _combine(usages: list[ReportedUsage]) -> ReportedUsage:
         return sum(known) if known else None
 
     return ReportedUsage(total("input_tokens"), total("cached_input_tokens"),
-                         total("output_tokens"), bool(usages) and all(u.complete for u in usages))
+                         total("output_tokens"), bool(usages) and all(u.complete for u in usages), _details(usages))
 
 
 class InvalidFinal(ContentFailure):

@@ -257,6 +257,8 @@ if case == "missing_usage":
     events[-1].pop("usage")
 if case == "bad_usage":
     events[-1]["usage"]["input_tokens"] = True
+if case == "bad_reasoning":
+    events[-1]["usage"]["reasoning_output_tokens"] = "4"
 if case == "fragmented":
     events[2]["item"]["text"] = '{"summary":"Вымышленный инженер ☃"}'
     events[2]["optional_new_field"] = {"safe": True}

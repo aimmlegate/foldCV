@@ -551,3 +551,23 @@ def test_plain_empty_reply_fails_once_without_repair(fake):
             provider.generate(ContentInput(PROMPT, PlainTextReply,
                 GenerationPolicy(model="gpt-6-luna", allow_repair=False)), files, threading.Event())
     assert starts() == 1
+
+
+def test_the_turn_reports_its_own_counts_and_reasoning_tokens(fake) -> None:
+    result, _count = generate(fake)
+    assert result.usage.detail == {"codex": {"input": 100, "cachedInput": 0, "output": 12, "reasoningOutput": 4}}
+
+
+def test_a_repaired_call_sums_the_turns_of_both_runs(fake) -> None:
+    result, count = generate(fake, case="repair")
+    assert count == 2 and result.usage.detail == {"codex": {"input": 200, "cachedInput": 0, "output": 24,
+                                                            "reasoningOutput": 8}}
+
+
+def test_a_malformed_reasoning_count_is_left_out_and_the_call_stands(fake) -> None:
+    result, count = generate(fake, case="bad_reasoning")
+    assert result.value.summary == "Fictional engineer builds small services." and count == 1
+    assert (result.usage.input_tokens, result.usage.output_tokens, result.usage.complete) == (100, 12, True)
+    assert result.usage.detail == {"codex": {"input": 100, "cachedInput": 0, "output": 12}}
+    result, _count = generate(fake, case="missing_usage")
+    assert result.usage.detail is None

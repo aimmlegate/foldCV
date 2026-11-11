@@ -127,19 +127,33 @@ if case == "hang":
         time.sleep(0.01)
 if case == "compact":
     emit({"type": "system", "subtype": "compact_boundary"})
+# The cost details 2.1.308 sends beside the counts (T0.1); `detail` sends them malformed.
+detail = config.get("detail", "valid")
+windows = {"valid": {"five_hour": {"utilization": 0.25, "resetsAt": 1800000000},
+                     "seven_day": {"utilization": 0.05, "resetsAt": 1800500000}},
+           "malformed": {"five_hour": {"utilization": "high", "resetsAt": -1}, "seven_day": [0.05]}}.get(detail)
 emit({"type": "system", "subtype": "api_retry", "attempt": 1, "error": "overloaded"} if case == "retry" else
-     {"type": "rate_limit_event", "rate_limit_info": {"status": "allowed"}})
+     {"type": "rate_limit_event", "rate_limit_info": {"status": "allowed",
+                                                      **({"unifiedWindows": windows} if windows else {})}})
 emit({"type": "system", "subtype": "thinking_tokens", "estimated_tokens": 64, "estimated_tokens_delta": 64})
 if case == "unknown_notice":
     for _ in range(2):
         emit({"type": "system", "subtype": "new_notice", "detail": "synthetic-secret"})
         emit({"type": "new_event", "detail": "synthetic-secret"})
 usage = {"input_tokens": 12, "cache_creation_input_tokens": 3, "cache_read_input_tokens": 5, "output_tokens": 7}
+costs = {"num_turns": 2, "total_cost_usd": 0.01}
+if detail == "valid":
+    usage.update(cache_creation={"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 3},
+                 output_tokens_details={"thinking_tokens": 2})
+if detail == "malformed":
+    usage.update(cache_creation={"ephemeral_5m_input_tokens": None, "ephemeral_1h_input_tokens": "3"},
+                 output_tokens_details=[2])
+    costs = {"num_turns": True, "total_cost_usd": "0.01"}
 
 
 def result(**fields):
-    emit({"type": "result", "subtype": "success", "is_error": False, "num_turns": 2, "session_id": "s-1",
-          "usage": usage, "permission_denials": [], "total_cost_usd": 0.01, **fields})
+    emit({"type": "result", "subtype": "success", "is_error": False, "session_id": "s-1",
+          "usage": usage, "permission_denials": [], **costs, **fields})
 
 
 errors = {"auth": ("authentication_failed", "Not logged in · Please run /login"),
@@ -173,7 +187,7 @@ if structured:
     tool = "Bash" if case == "tool" else "StructuredOutput"
     extra = {"new_block": [{"type": "new_block"}], "server_tool": [{"type": "server_tool_use"}]}.get(case, [])
     emit({"type": "assistant", "parent_tool_use_id": None,
-          "message": {"role": "assistant", "model": model, "content": [
+          "message": {"id": "msg-1", "role": "assistant", "model": model, "content": [
               *extra, {"type": "thinking", "thinking": "", "signature": "x"},
               {"type": "tool_use", "id": "t-1", "name": tool, "input": value}]}})
     emit({"type": "user", "parent_tool_use_id": None, "message": {"role": "user", "content": [
@@ -189,5 +203,5 @@ if structured:
 else:
     text = config.get("text", "plain answer")
     emit({"type": "assistant", "parent_tool_use_id": None,
-          "message": {"role": "assistant", "model": model, "content": [{"type": "text", "text": text}]}})
+          "message": {"id": "msg-1", "role": "assistant", "model": model, "content": [{"type": "text", "text": text}]}})
     result(result=text)

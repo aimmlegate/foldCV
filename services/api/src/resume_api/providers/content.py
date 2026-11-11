@@ -64,6 +64,9 @@ class ReportedUsage:
     cached_input_tokens: int | None = None
     output_tokens: int | None = None
     complete: bool = False
+    # The provider's own numbers under its name ({"claude": {...}} or {"codex": {...}}), read best-effort for the
+    # import's diagnostics file only; the import record keeps the three counts above.
+    detail: dict[str, dict[str, JsonValue]] | None = None
 
 
 @dataclass(frozen=True)
