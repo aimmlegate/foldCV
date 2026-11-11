@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { Icon } from "../ui/Icon";
 import { OriginalPreview } from "./OriginalPreview";
 import { originalUrl } from "./original-source";
@@ -23,6 +24,8 @@ export function SourceDialog({ projectId, sources, expanded, toggle, close }: {
       </select> : <span title={source?.originalName}>{source?.originalName ?? "Нет файла"}</span>}
       <span className="source-file-type">{source?.originalName.split(".").pop()?.toUpperCase()}</span>
     </div>
-    {source && <OriginalPreview key={`${projectId}:${source.id}:${source.byteSha256}`} projectId={projectId} source={source} />}
+    {source && <ErrorBoundary key={`${projectId}:${source.id}:${source.byteSha256}`}
+      fallback={<p className="source-viewer-message" role="alert">Не удалось показать оригинал. Скачайте его.</p>}>
+      <OriginalPreview projectId={projectId} source={source} /></ErrorBoundary>}
   </div>;
 }

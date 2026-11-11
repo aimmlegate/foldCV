@@ -149,7 +149,21 @@ def hand_kept() -> list[Component]:
         Component("Technology icon library", "", "MIT", [read(library)] if library.is_file() else [], "Technology icons (Devicon set)."),
         Component("WebKit (macOS), WebView2 (Windows)", "", "system component", [],
                   "The apps show their page in the system web view; nothing of it is distributed."),
+        pdf_polyfills(),
     ]
+
+
+def pdf_polyfills() -> Component:
+    """core-js inside the legacy build of pdf.js. It is no package of the tree, so that build names its version."""
+    build = read(ROOT / "apps/web/node_modules/pdfjs-dist/legacy/build/pdf.mjs")
+    address = re.search(r"https://github\.com/zloirock/core-js/blob/v([\d.]+)/LICENSE", build)
+    if not address:
+        raise SystemExit("the legacy build of pdfjs-dist names no core-js licence; check what it bundles now")
+    text = ROOT / f"tools/notices/core-js-{address[1]}-LICENSE.txt"
+    if not text.is_file():
+        raise SystemExit(f"save {address[0]} as {text.relative_to(ROOT)}")
+    return Component("core-js", address[1], "MIT", [read(text)],
+                     "Polyfills inside the legacy build of pdfjs-dist, which draws the PDF original.")
 
 
 def render(sections: list[tuple[str, str, list[Component]]]) -> str:

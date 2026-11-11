@@ -1,7 +1,10 @@
 import { errorMessage } from "../../errors/messages";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getDocument, GlobalWorkerOptions, type PDFPageProxy } from "pdfjs-dist";
-import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+// The legacy build of pdf.js with two polyfills in front runs from Safari 16.4; the main build needs Safari 26.2,
+// and the WebKit of macOS 12–14 is older.
+import "./pdf-polyfills";
+import { getDocument, GlobalWorkerOptions, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
+import workerUrl from "./pdf.worker?worker&url";
 import { OperationStatus } from "../ui/OperationStatus";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
