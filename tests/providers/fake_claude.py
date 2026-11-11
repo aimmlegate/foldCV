@@ -19,7 +19,8 @@ count = int(calls.read_text()) + 1 if calls.exists() else 1
 if generation:
     calls.write_text(str(count))
 with (base / "audit.jsonl").open("a") as audit:
-    audit.write(json.dumps({"generation": generation, "args": args, "config": os.environ.get("CLAUDE_CONFIG_DIR")}) + "\n")
+    audit.write(json.dumps({"generation": generation, "args": args, "config": os.environ.get("CLAUDE_CONFIG_DIR"),
+                            "uncached": os.environ.get("DISABLE_PROMPT_CACHING")}) + "\n")
 # A sign-in leaves `signed-in` with the account's email, if the fixture names one; a sign-out leaves `signed-out`.
 signed_in, signed_out_marker = base / "signed-in", base / "signed-out"
 FLAGS = ("--print --output-format --verbose --json-schema --model --effort --restricted --tools "

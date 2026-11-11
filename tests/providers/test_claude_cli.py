@@ -132,6 +132,45 @@ def test_plain_text_drops_the_schema_and_returns_the_final_text(fake):
     assert starts[0]["args"][starts[0]["args"].index("--system-prompt") + 1] == SYSTEM_PROMPT
 
 
+def test_an_import_call_runs_with_the_prompt_cache_off_and_a_preview_keeps_it(fake):
+    audit = fake[4]
+    _result, starts = generate(fake)
+    assert [entry["uncached"] for entry in starts] == ["1"]
+    assert not any(entry["uncached"] for entry in audit() if not entry["generation"])
+    _result, starts = generate(fake, value=request(result=PlainTextReply), text="Rewritten line")
+    assert [entry["uncached"] for entry in starts] == [None]
+
+
+def test_a_preview_turns_the_cache_off_when_its_one_constant_says_so(fake, monkeypatch):
+    from resume_api.providers.claude import content
+    monkeypatch.setattr(content, "PREVIEWS_CACHED", False)
+    _result, starts = generate(fake, value=request(result=PlainTextReply), text="Rewritten line")
+    assert [entry["uncached"] for entry in starts] == ["1"]
+
+
+def test_only_the_content_launch_of_an_import_call_turns_the_cache_off(fake, tmp_path):
+    from resume_api.providers.claude.runtime import ClaudeAgentRuntime
+    cli, root, _directory, _configure, audit = fake
+    profile = rules.ClaudeCliProfile(tmp_path / "profile", Path("/bin/echo"), home=tmp_path / "home")
+    content, assistant = ClaudeCliProvider(profile=profile), ClaudeAgentRuntime(profile, tmp_path / "assistant")
+    agent = rules.agent_arguments(tmp_path / "mcp.json", MODEL, None, ("mcp__foldcv__read_resume",), SYSTEM_PROMPT,
+                                  max_turns=3)
+    imported = rules.structured_arguments("{}", MODEL, None)
+    with OperationFiles(root).open() as files:
+        program, command, environment = profile.launch(profile.executable, imported, files.path)
+        assert content.process.launch(profile.executable, imported, files.path) == (
+            program, command, {**environment, "DISABLE_PROMPT_CACHING": "1"})
+        for args in (rules.structured_arguments(None, MODEL, None), ("--version",), ("auth", "status", "--json")):
+            assert "DISABLE_PROMPT_CACHING" not in content.process.launch(profile.executable, args, files.path)[2]
+        # The assistant re-reads its context every turn and keeps its cache, as the profile's own environment does.
+        assert "DISABLE_PROMPT_CACHING" not in assistant.launch("synthetic-token")(profile.executable, agent,
+                                                                                 files.path)[2]
+        assert "DISABLE_PROMPT_CACHING" not in environment
+    with OperationFiles(root).open() as files:
+        ClaudeConnectionAdapter(None, fixture_transport=FixtureTransport(cli)).inspect(files, threading.Event())
+    assert audit() and not any(entry["uncached"] for entry in audit())
+
+
 def test_a_run_that_renews_the_sign_in_runs_once_more(fake):
     result, starts = generate(fake, "renewal")
     assert result.value.summary == "Synthetic summary" and len(starts) == 2 and result.logical_attempts == 2

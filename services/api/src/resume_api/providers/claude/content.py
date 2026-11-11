@@ -19,6 +19,7 @@ from packages.resume_core.storage import StorageFailure
 from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessExit, ProcessRunner
+from resume_api.cli.runner import safe_environment
 from resume_api.providers.claude import profile as profile_rules
 from resume_api.providers.claude.profile import ClaudeCliProfile, ClaudeProfileError
 from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
@@ -49,6 +50,10 @@ MODEL_EVENTS = {"assistant", "user", "result"}
 # The stream repeats the reply (each tool call of a schema retry, then the result) and adds thinking. Only the final
 # line counts against the reply budget, as Codex's one final message does; this keeps the whole stream bounded.
 STREAM_MULTIPLE = 8
+# The CLI writes the whole prompt of each call to the one-hour cache at twice the input price, and no later import
+# call reads it (T1). Import calls run with caching off; rewrite previews keep it until their measured pair says not.
+PREVIEWS_CACHED = True
+UNCACHED = {"DISABLE_PROMPT_CACHING": "1"}
 LOG = logging.getLogger(__name__)
 
 
@@ -305,8 +310,17 @@ class ClaudeCliProvider:
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock)
         self.model_started = None
-        self.process = ProcessRunner(self.executable, clock=clock, launch=profile.launch if profile else None,
+        self.process = ProcessRunner(self.executable, clock=clock, launch=self._launch,
                                      workdir=getattr(profile, "workdir", None))
+
+    def _launch(self, executable: Path, args: tuple[str, ...], operation: Path):
+        """The profile's launch, or the fixture's plain environment. Only here, not in the profile's environment that
+        the assistant shares (it re-reads its context every turn), does a structured run turn the prompt cache off."""
+        launched = (self.profile.launch(executable, args, operation) if self.profile is not None
+                    else (executable, args, safe_environment(operation)))
+        if args[:1] == ("-p",) and ("--json-schema" in args or not PREVIEWS_CACHED):
+            return (*launched[:2], {**launched[2], **UNCACHED})
+        return launched
 
     @property
     def native(self) -> bool:
