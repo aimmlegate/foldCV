@@ -555,6 +555,7 @@ class ProjectRepository:
             self._sweep_renders(session)
         except RepositoryFailure:
             LOG.warning('asset sweep failed on close')
+        self._sweep_history(session)
 
     def read(self, project_id):
         """The committed workspace; shared read-only, callers change copies only."""
@@ -948,6 +949,45 @@ class ProjectRepository:
                     path.unlink()
         except (OSError, StorageFailure):
             raise RepositoryFailure('PROJECT_UNSAFE_STORAGE') from None
+
+    def sweep_history(self, project_id):
+        """Remove the history files no import record of the project names now; a failure waits for a later sweep."""
+        session = self.open(project_id)
+        with session.lock:
+            return self._sweep_history(session)
+
+    def _sweep_history(self, session):
+        """A publication writes its record twice and the outcome commit names only the second file (R8); older builds
+        left such files too. A pre-draft, anything in `imports` (an import's sidecar) or a project file written outside
+        this repository keeps every file. Storage errors are only logged: what was not removed waits for the next sweep."""
+        project, folder = session.workspace.project, session.directory / 'history'
+        if project is None or not folder.is_dir():
+            return []
+        keep = {blob_path(session.directory, 'history', ref.sha256).name for ref in project.current_history()}
+        sidecars = session.directory / 'imports'
+        removed = []
+        try:
+            # A commit, in another process too, writes its record files and then the project file under this lock.
+            with locked_root(self.root, '.projects.lock'):
+                if sidecars.is_symlink() or (sidecars.exists() and (not sidecars.is_dir() or any(sidecars.iterdir()))):
+                    return []
+                if _key(session.directory / 'workspace.json') != session.file_key:
+                    return []
+                private_directory(folder)
+                for path in folder.iterdir():
+                    # Record files are written under this lock, so a half-written one seen here is left from a crash.
+                    if path.name in keep or not (path.name.startswith('.foldcv-write-')
+                            or re.fullmatch(BLOB_FOLDERS['history'], path.name)):
+                        continue
+                    try:
+                        owned_file(path, WORKSPACE_BYTES)
+                        path.unlink()
+                        removed.append(path.name)
+                    except (OSError, StorageFailure) as error:
+                        LOG.warning('history file left for a later sweep: %s', type(error).__name__)
+        except (OSError, StorageFailure) as error:
+            LOG.warning('history sweep skipped: %s', type(error).__name__)
+        return removed
 
 
 BLOB_FOLDERS = {'sources': r'[0-9a-f]{64}\.bin', 'renders': r'[0-9a-f]{64}\.(?:docx|foldcv)',

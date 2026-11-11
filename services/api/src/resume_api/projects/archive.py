@@ -28,7 +28,7 @@ class ArchiveDownload(BaseModel):
 
 def export_archive(service, project_id, request, *, trusted=False):
     """The open editor's project as a .foldcv file. The journal stays on disk. `trusted` is the assistant's export.
-    The lock covers the project file and the images, which a sweep may remove. Sources and import records are
+    The lock covers the project file, its import records and the images, which sweeps may remove. Sources are
     content-addressed and stay until delete, so they are read, and the zip is built, after the lock."""
     session = service.repository.open(project_id)
     try:
@@ -45,7 +45,7 @@ def export_archive(service, project_id, request, *, trusted=False):
                     path = session.directory / asset.path
                     if path.is_file():
                         images[asset.id] = read_owned(path, IMAGE_BYTES, 'IMAGE_NOT_FOUND')
-        loaded = decode_project(session.directory, raw, history=True)
+            loaded = decode_project(session.directory, raw, history=True)
         owner = loaded.project or loaded.pre_draft
         originals = {}
         for source in owner.sources:

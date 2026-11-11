@@ -1413,7 +1413,10 @@ class TemplatePipeline:
                 value.publication, value.state = outcome, 'published'
                 return value
             with import_usage.timed('finalization', 'record'):
-                return operation_in(self.update(project, identifier, recorded), identifier)
+                published = operation_in(self.update(project, identifier, recorded), identifier)
+            # The outcome changed the record, so its file from the publication commit is named no more (R8).
+            self.repository.sweep_history(project)
+            return published
 
     async def finish_fallbacks(self, project, operation_id):
         for task_id in [task.id for task in operation_in(await self.view(project), operation_id).tasks]:

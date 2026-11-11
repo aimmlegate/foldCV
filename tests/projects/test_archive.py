@@ -82,6 +82,40 @@ def test_the_zip_is_built_after_the_project_lock_is_released(tmp_path, monkeypat
         assert free == [True] and 'manifest.json' in zipfile.ZipFile(io.BytesIO(downloaded.content)).namelist()
 
 
+@pytest.mark.asyncio
+async def test_a_commit_and_a_sweep_cannot_remove_the_import_records_an_archive_reads(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from resume_api.projects import archive
+    from tests.templates.template_runtime_fixtures import RuntimeFixture
+    fixture = RuntimeFixture(tmp_path)
+    result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
+    session = fixture.repository.open(fixture.project)
+    exported = fixture.repository.read(fixture.project)
+    decode, raced = archive.decode_project, []
+
+    def racing(*args, **options):
+        # Whenever the project lock is free, a commit changes the record and the sweep removes its old file.
+        def commit_and_sweep():
+            if session.lock.acquire(blocking=False):
+                try:
+                    fixture.pipeline.update(fixture.project, result.id, lambda value, _data, _workspace:
+                        value.model_copy(update={'last_observed_at': '2026-10-21T00:00:01+00:00'}))
+                    raced.append(fixture.repository.sweep_history(fixture.project))
+                finally:
+                    session.lock.release()
+        racer = threading.Thread(target=commit_and_sweep)
+        racer.start()
+        racer.join()
+        return decode(*args, **options)
+
+    monkeypatch.setattr(archive, 'decode_project', racing)
+    request = SimpleNamespace(editor_token=None, project_revision=exported.project_revision,
+        document_revision=exported.document_revision)
+    data = archive.export_archive(SimpleNamespace(repository=fixture.repository), fixture.project, request, trusted=True)
+    names = zipfile.ZipFile(io.BytesIO(data)).namelist()
+    assert raced == [] and 'template/history/' + exported.project.import_history[0].sha256 in names
+
+
 def test_a_png_with_a_bad_chunk_checksum_is_an_archive_image_mismatch():
     buffer = io.BytesIO()
     Image.new('RGB', (4, 4), 'red').save(buffer, format='PNG')
