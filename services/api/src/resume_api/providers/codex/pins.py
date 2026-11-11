@@ -83,11 +83,36 @@ def instructions(directory: Path) -> list[str]:
     return ["--config", f"model_instructions_file={json.dumps(str(directory / 'instructions.txt'))}"]
 
 
-def exec_arguments(directory: Path, model: str) -> list[str]:
+# Keys that take the CLI's own notes and tools out of a content call, which uses none of them (T1): the permissions,
+# collaboration-mode and environment notes, the multi-agent notes and tools, the user-input tools and the tools nested
+# in code mode. Each one changed the captured request of 0.166.0-alpha.5.1; the two `enabled=false` keep the
+# profile's switches off, since a table replaces its `features.<name>=false`. Exec only, for a CLI seen to take them.
+LEAN = (
+    "include_permissions_instructions=false", "include_collaboration_mode_instructions=false",
+    "include_environment_context=false", "features.multi_agent_v2.enabled=false",
+    "features.multi_agent_v2.disable_native_tools=true", 'features.multi_agent_v2.root_agent_usage_hint_text=""',
+    'features.multi_agent_v2.multi_agent_mode_hint_text=""', "features.code_mode.enabled=false",
+    'features.code_mode.excluded_tool_namespaces=["functions","clock"]',
+    "tools.experimental_request_user_input.enabled=false",
+)
+# No CLI knows this key: the probe's control run, which the CLI must refuse before it reads the instructions file.
+UNKNOWN = "foldcv_probe_unknown_key=true"
+
+
+def keys(values: tuple[str, ...]) -> list[str]:
+    return [part for value in values for part in ("--config", value)]
+
+
+def loaded(stderr: bytes) -> bool:
+    """A probe exec passed its key check: config load went on to the instructions file, which it does not find."""
+    return b"model instructions file" in stderr
+
+
+def exec_arguments(directory: Path, model: str, extra: tuple[str, ...] = ()) -> list[str]:
     return [
         "exec", "--strict-config", "--ignore-user-config", "--ignore-rules",
         "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
         "--json", "--color", "never", "--model", model,
         "--output-schema", str(directory / "schema.json"),
-        *overrides(directory), *instructions(directory), "-",
+        *overrides(directory), *instructions(directory), *keys(extra), "-",
     ]

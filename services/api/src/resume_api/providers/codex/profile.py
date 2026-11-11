@@ -10,7 +10,7 @@ import stat
 
 from packages.resume_core import host
 from resume_api.providers.codex import pins as codex
-from resume_api.providers.codex.pins import instructions, overrides
+from resume_api.providers.codex.pins import instructions, keys, overrides
 from resume_api.cli.qualification import QualificationError, require_publisher
 from resume_api.cli.releases import Runtime
 from . import distribution
@@ -180,13 +180,13 @@ class ExperimentalCliProfile:
         """Windows: the other processes a run may start inside its job."""
         return 0
 
-    def exec_arguments(self, operation: Path, model: str) -> tuple[str, ...]:
+    def exec_arguments(self, operation: Path, model: str, extra: tuple[str, ...] = ()) -> tuple[str, ...]:
         return (
             "exec", "--strict-config", "--ignore-user-config", "--ignore-rules",
             "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only",
             "--json", "--color", "never", "--model", model,
             "--output-schema", str(operation / "schema.json"),
-            *self.config(operation), *instructions(operation), "-",
+            *self.config(operation), *instructions(operation), *keys(extra), "-",
         )
 
     def launch(self, executable: Path, args: tuple[str, ...], operation: Path

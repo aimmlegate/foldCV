@@ -292,7 +292,9 @@ def test_every_exec_replaces_the_built_in_instructions_with_the_shared_system_pr
         assert Path(json.loads(named.split("=", 1)[1])).name == "instructions.txt"
     # The fake read the file while the call ran: the operation directory is gone now.
     assert [row["instructions"] for row in rows if "instructions" in row] == [SYSTEM_PROMPT, SYSTEM_PROMPT]
-    assert not any("model_instructions_file" in json.dumps(row.get("args")) for row in rows if not row.get("generation"))
+    # Only the key probe, an exec itself (T1), names the file among the runs that are not a call.
+    assert not any("model_instructions_file" in json.dumps(row.get("args")) for row in rows
+                   if not row.get("generation") and not row.get("probe"))
     assert list(root.iterdir()) == [keep]
 
 
@@ -309,6 +311,116 @@ def test_the_profile_names_the_instructions_file_for_exec_only(tmp_path) -> None
     assistant = AgentProfile(profile.root, profile.executable).arguments(
         operation, url="http://127.0.0.1:4100/mcp", tools=("check_resume",), allow_web=False)
     assert not any("model_instructions_file" in value for value in (*profile.config(operation), *assistant))
+
+
+def audit_rows(cli) -> list[dict]:
+    return [json.loads(line) for line in (cli.parent / "audit.jsonl").read_text().splitlines()]
+
+
+def lean_pairs() -> list[str]:
+    from resume_api.providers.codex.pins import LEAN
+    return [part for key in LEAN for part in ("--config", key)]
+
+
+def test_a_cli_that_takes_the_lean_keys_gets_them_in_exec_only(fake) -> None:
+    from resume_api.providers.codex.pins import LEAN, UNKNOWN
+    cli, root, keep, _configure, starts = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    for _ in range(2):
+        with OperationFiles(root).open() as files:
+            provider.generate(request(), files, threading.Event())
+    rows, pairs = audit_rows(cli), lean_pairs()
+    calls = [row["args"] for row in rows if row.get("generation")]
+    assert len(calls) == starts() == 2
+    # Last before stdin, so each table replaces the profile's own `features.<name>=false`.
+    assert all(args[-1 - len(pairs):-1] == pairs and UNKNOWN not in args for args in calls)
+    # One probe for the binary: the control key is refused, then the LEAN keys reach the missing instructions file.
+    # Neither run sends a prompt or names a reply schema.
+    probes = [row["args"] for row in rows if row.get("probe")]
+    assert len(probes) == 2 and UNKNOWN in probes[0] and not set(LEAN) & set(probes[0])
+    assert probes[1][-1 - len(pairs):-1] == pairs and not any("--output-schema" in args for args in probes)
+    assert [row["probe_stdin"] for row in rows if "probe_stdin" in row] == [0]
+    others = [row["args"] for row in rows if "args" in row and not row["generation"] and not row["probe"]]
+    assert {args[0] for args in others} == {"--version", "exec", "features", "login", "app-server"}
+    assert not any(key in args for args in others for key in (*LEAN, UNKNOWN))
+    assert list(root.iterdir()) == [keep]
+
+
+@pytest.mark.parametrize("unknown", ["include_environment_context", "features.multi_agent_v2.root_agent_usage_hint_text"])
+def test_a_cli_that_refuses_a_lean_key_imports_with_todays_arguments_after_one_probe(fake, unknown) -> None:
+    from resume_api.providers.codex.pins import LEAN
+    cli, root, keep, configure, starts = fake
+    configure(unknown_keys=[unknown])
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    for _ in range(2):
+        with OperationFiles(root).open() as files:
+            result = provider.generate(request(), files, threading.Event())
+        assert result.value.summary == "Fictional engineer builds small services."
+        # The next call qualifies the CLI again; the binary is the same, so the probe is not.
+        provider.invalidate_preflight()
+    rows = audit_rows(cli)
+    assert sum(row.get("args") == ["--version"] for row in rows) == 2
+    assert sum(bool(row.get("probe")) for row in rows) == 2
+    calls = [row["args"] for row in rows if row.get("generation")]
+    assert len(calls) == starts() == 2 and not any(set(LEAN) & set(args) for args in calls)
+    assert list(root.iterdir()) == [keep]
+
+
+def test_a_cli_that_reads_the_instructions_file_before_the_keys_is_not_given_them(fake) -> None:
+    from resume_api.providers.codex.pins import LEAN
+    cli = fake[0]
+    _result, count = generate(fake, case="late_key_check")
+    rows = audit_rows(cli)
+    # Its control run reaches the file in spite of the unknown key, so the probe ends there.
+    assert count == 1 and sum(bool(row.get("probe")) for row in rows) == 1
+    args, = (row["args"] for row in rows if row.get("generation"))
+    assert not set(LEAN) & set(args)
+
+
+def test_a_changed_binary_is_probed_again(fake) -> None:
+    cli, root, keep, _configure, starts = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    cli.write_text(cli.read_text() + "\n# A newer build of the same CLI.\n")
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    assert sum(bool(row.get("probe")) for row in audit_rows(cli)) == 4 and starts() == 2
+    assert list(root.iterdir()) == [keep]
+
+
+def test_a_probe_without_an_answer_is_asked_again(fake, monkeypatch) -> None:
+    cli, root, keep, _configure, starts = fake
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    loads, asked = provider._loads, []
+
+    def interrupted(files, cancel, deadline, model, extra):
+        asked.append(extra)
+        if len(asked) == 1:
+            raise ContentFailure("DEADLINE_EXCEEDED")
+        return loads(files, cancel, deadline, model, extra)
+
+    monkeypatch.setattr(provider, "_loads", interrupted)
+    with OperationFiles(root).open() as files, pytest.raises(ContentFailure, match="DEADLINE_EXCEEDED"):
+        provider.generate(request(), files, threading.Event())
+    with OperationFiles(root).open() as files:
+        provider.generate(request(), files, threading.Event())
+    assert len(asked) == 3 and starts() == 1
+    args, = (row["args"] for row in audit_rows(cli) if row.get("generation"))
+    assert args[-1 - len(lean_pairs()):-1] == lean_pairs() and list(root.iterdir()) == [keep]
+
+
+def test_the_profile_adds_the_lean_keys_to_exec_only(tmp_path) -> None:
+    from resume_api.providers.codex.agent_profile import AgentProfile
+    from resume_api.providers.codex.pins import LEAN
+    from resume_api.providers.codex.profile import ExperimentalCliProfile
+    operation = tmp_path / "operation"
+    profile = ExperimentalCliProfile(tmp_path / "profile", tmp_path / "codex")
+    today = profile.exec_arguments(operation, "gpt-6-luna")
+    assert profile.exec_arguments(operation, "gpt-6-luna", LEAN) == (*today[:-1], *lean_pairs(), "-")
+    assistant = AgentProfile(profile.root, profile.executable).arguments(
+        operation, url="http://127.0.0.1:4100/mcp", tools=("check_resume",), allow_web=False)
+    assert not set(LEAN) & {*today, *profile.config(operation), *assistant}
 
 
 @pytest.mark.parametrize("raw", [b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":1e309}',
@@ -422,8 +534,9 @@ def test_cleanup_failure_blocks_repair_and_preserves_owner_evidence(fake) -> Non
         nonlocal calls
         calls += 1
         original(process)
-        # Version, help, features, login status and model list come first; the sixth is generation.
-        if calls == 6:
+        # Version, help, features, login status, model list and the key probe's two runs come first; the eighth is
+        # generation.
+        if calls == 8:
             raise SpikeError("PROCESS_CLEANUP_FAILED")
 
     with patch.object(lifecycle, "stop_group", fail_generation_cleanup):

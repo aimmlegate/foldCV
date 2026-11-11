@@ -27,9 +27,9 @@ from resume_api.providers.content import (STALL_SECONDS, ContentFailure, Content
                                           outcome_state, ReportedUsage, ResultT)
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
-from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, preflight_key
-from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, REQUIRED_FLAGS, check_features, exec_arguments,
-                                             overrides, qualify)
+from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp, preflight_key
+from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, LEAN, REQUIRED_FLAGS, UNKNOWN, check_features,
+                                             exec_arguments, loaded, overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
 from ..shared import (InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, SYSTEM_PROMPT, _combine, mapping,
                       natural, strict_json)
@@ -163,6 +163,8 @@ class Probe:
     generation_ready: bool
     gaps: tuple[str, ...]
     reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
+    # The binary was seen to take the LEAN keys, so its execs carry them (T1).
+    lean: bool = False
 
 
 @dataclass(frozen=True)
@@ -184,6 +186,8 @@ class CodexCliProvider:
         self.experimental_profile = experimental_profile
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock)
+        # (binary identity, takes the LEAN keys): probed once per binary, not with every qualification.
+        self.lean_binary: tuple[tuple, bool] | None = None
         self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock,
                                      launch=experimental_profile.launch if experimental_profile else None,
@@ -216,6 +220,7 @@ class CodexCliProvider:
             probe = replace(probe, reasoning=metadata)
             if model not in models:
                 raise ContentFailure("MODEL_DENIED")
+            probe = replace(probe, lean=self.takes_lean(files, cancel, bound, model))
             if key == preflight_key(self.executable, self.experimental_profile, self.fixture_transport):
                 self.preflight_cache.remember(epoch, key, probe, models)
         self.check_effort(probe, model, effort)
@@ -227,13 +232,15 @@ class CodexCliProvider:
             raise ContentFailure("MODEL_DENIED")
 
     def _run(self, files: OperationFiles, args: tuple[str, ...], deadline: float,
-             cancel: threading.Event, *, login_status: bool = False,
+             cancel: threading.Event, *, login_status: bool = False, any_exit: bool = False,
              **kwargs: object) -> tuple[bytes, bytes]:
         try:
             return self.process.run(files, args, deadline=deadline, cancel=cancel, **kwargs)
         except ProcessExit as error:
             if login_status and (error.stdout + error.stderr).strip().lower() == b"not logged in":
                 raise ContentFailure("AUTH_REQUIRED") from None
+            if any_exit:
+                return error.stdout, error.stderr
             raise ContentFailure("CLI_FAILED") from None
         except SpikeError as error:
             raise ContentFailure(error.code) from None
@@ -242,6 +249,32 @@ class CodexCliProvider:
 
     def _config(self, files: OperationFiles) -> list[str]:
         return self.experimental_profile.config(files.path) if self.experimental_profile else overrides(files.path)
+
+    def _exec_arguments(self, files: OperationFiles, model: str, extra: tuple[str, ...], *,
+                        plain: bool) -> tuple[str, ...]:
+        args = (self.experimental_profile.exec_arguments(files.path, model, extra)
+                if self.experimental_profile else tuple(exec_arguments(files.path, model, extra)))
+        if plain:
+            at = args.index("--output-schema")
+            args = args[:at] + args[at + 2:]
+        return args
+
+    def takes_lean(self, files: OperationFiles, cancel: threading.Event, deadline: float, model: str) -> bool:
+        """Whether this binary takes the LEAN keys, asked once per binary (T1). It must refuse the control key first:
+        only then does getting as far as the instructions file show that it knew each LEAN key."""
+        binary = (str(self.executable), _stamp(self.executable))
+        if self.lean_binary is None or self.lean_binary[0] != binary:
+            self.lean_binary = (binary, not self._loads(files, cancel, deadline, model, (UNKNOWN,))
+                                and self._loads(files, cancel, deadline, model, LEAN))
+        return self.lean_binary[1]
+
+    def _loads(self, files: OperationFiles, cancel: threading.Event, deadline: float, model: str,
+               extra: tuple[str, ...]) -> bool:
+        """One exec that config load ends before any request: no instructions file and no prompt."""
+        (files.path / "instructions.txt").unlink(missing_ok=True)
+        args = self._exec_arguments(files, model, extra, plain=True)
+        _, errors = self._run(files, args, deadline, cancel, any_exit=True)
+        return loaded(errors)
 
     def probe(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None) -> Probe:
         end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
@@ -465,11 +498,7 @@ class CodexCliProvider:
                 attempts += 1
                 try:
                     try:
-                        args = (self.experimental_profile.exec_arguments(files.path, policy.model)
-                                if self.experimental_profile else tuple(exec_arguments(files.path, policy.model)))
-                        if plain:
-                            at = args.index("--output-schema")
-                            args = args[:at] + args[at + 2:]
+                        args = self._exec_arguments(files, policy.model, LEAN if probe.lean else (), plain=plain)
                         if effective_effort is not None:
                             args = (*args[:-1], "--config", "model_reasoning_effort=" + json.dumps(effective_effort), args[-1])
                         began, active = time.perf_counter(), None

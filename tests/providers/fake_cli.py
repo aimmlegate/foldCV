@@ -13,9 +13,25 @@ base = Path(__file__).resolve().parent
 config = json.loads((base / "fixture.json").read_text())
 case = config.get("case", "valid")
 args = sys.argv[1:]
-generation = bool(args and args[0] == "exec" and "--help" not in args)
+settings = [args[i + 1] for i, arg in enumerate(args) if arg == "--config"]
+named = [value.split("=", 1)[1] for value in settings if value.startswith("model_instructions_file=")]
+# The key probe (T1) is an exec whose instructions file does not exist: config load ends it before any request.
+probe = bool(args and args[0] == "exec" and named and not Path(json.loads(named[0])).exists())
+generation = bool(args and args[0] == "exec" and "--help" not in args) and not probe
 with (base / "audit.jsonl").open("a") as audit:
-    audit.write(json.dumps({"generation": generation, "args": args, "home": os.environ.get("CODEX_HOME")}) + "\n")
+    audit.write(json.dumps({"generation": generation, "probe": probe, "args": args,
+                            "home": os.environ.get("CODEX_HOME")}) + "\n")
+# The keys this CLI knows under --strict-config: those FoldCV sends. `unknown_keys` makes it an older CLI.
+KNOWN = {"model_provider", "forced_login_method", "approval_policy", "web_search", "history.persistence",
+         "project_doc_max_bytes", "developer_instructions", "mcp_servers", "analytics.enabled", "otel.log_user_prompt",
+         "shell_environment_policy.inherit", "log_dir", "sqlite_home", "model_instructions_file",
+         "model_reasoning_effort", "include_permissions_instructions", "include_collaboration_mode_instructions",
+         "include_environment_context", "tools.experimental_request_user_input.enabled"}
+refused = {*config.get("unknown_keys", []), *(["model_instructions_file"] if case == "unknown_instructions_key" else [])}
+
+
+def known(name):
+    return (name in KNOWN or name.startswith("features.")) and name not in refused
 # A sign-in leaves `signed-in` with the account's email, if the fixture names one; a sign-out leaves `signed-out`.
 signed_in, signed_out = base / "signed-in", base / "signed-out"
 
@@ -109,14 +125,13 @@ if args and args[0] == "app-server":
         else:
             sys.exit(92)
     sys.exit(0)
-if not generation:
+if not generation and not probe:
     sys.exit(90)
 
 required = ["--strict-config", "--ignore-user-config", "--ignore-rules", "--ephemeral", "--skip-git-repo-check", "--json"]
 assert all(flag in args for flag in required)
 assert args[-1] == "-"
 assert args[args.index("--sandbox") + 1] == "read-only"
-settings = [args[i + 1] for i, arg in enumerate(args) if arg == "--config"]
 for value in ['forced_login_method="chatgpt"', 'model_provider="openai"', 'history.persistence="none"', 'web_search="disabled"', 'project_doc_max_bytes=0', 'mcp_servers={}']:
     assert value in settings
 for name in ["shell_tool", "unified_exec", "browser_use", "computer_use", "apps", "plugins", "hooks", "memories", "multi_agent", "image_generation", "goals", "daemon_auto_start"]:
@@ -127,15 +142,24 @@ assert not any(key.startswith(("OPENAI_", "CODEX_", "T3CODE_", "PYTHON", "HTTP_P
 owned = Path(os.environ["TMPDIR"]).parent
 for key in ["TMPDIR", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]:
     assert Path(os.environ[key]).parent == owned
-# D155: one file beside the schema replaces the CLI's built-in instructions; a strict CLI without the key stops here.
-named = [value.split("=", 1)[1] for value in settings if value.startswith("model_instructions_file=")]
+# D155: one file beside the schema replaces the CLI's built-in instructions.
 assert len(named) == 1 and Path(json.loads(named[0])).parent == owned
-if case == "unknown_instructions_key":
-    print("Error loading config.toml: unknown configuration field `model_instructions_file` in -c/--config override",
+instructions = Path(json.loads(named[0]))
+# Config load as --strict-config runs it: the first unknown key ends it, then an instructions file it cannot read,
+# both before any request. `late_key_check` reads the file before the keys, which no CLI seen so far does.
+unknown = [name for name in (value.split("=", 1)[0] for value in settings) if not known(name)]
+if unknown and not (case == "late_key_check" and not instructions.exists()):
+    print(f"Error loading config.toml: unknown configuration field `{unknown[0]}` in -c/--config override",
+          file=sys.stderr)
+    sys.exit(1)
+if probe:
+    with (base / "audit.jsonl").open("a") as audit:
+        audit.write(json.dumps({"probe_stdin": len(sys.stdin.buffer.read())}) + "\n")
+    print(f"Error: failed to read model instructions file {instructions}: No such file or directory (os error 2)",
           file=sys.stderr)
     sys.exit(1)
 with (base / "audit.jsonl").open("a") as audit:
-    audit.write(json.dumps({"instructions": Path(json.loads(named[0])).read_bytes().decode()}) + "\n")
+    audit.write(json.dumps({"instructions": instructions.read_bytes().decode()}) + "\n")
 if config.get("plain_text"):
     assert "--output-schema" not in args and not (owned / "schema.json").exists()
     schema = {}
