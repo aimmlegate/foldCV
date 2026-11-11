@@ -1,7 +1,6 @@
 """The local app log: what it records about CLI runs, connection jobs, tasks and errors, and what it keeps out."""
 
 import logging
-from pathlib import Path
 import sys
 import threading
 import time
