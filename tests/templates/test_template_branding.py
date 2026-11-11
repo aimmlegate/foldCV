@@ -46,7 +46,7 @@ def test_an_own_logo_and_email_are_the_next_revision_and_the_text_keeps_its_comm
     saved, refused = config.save_branding(TWO, request(picture(), ' hr@example.com '))
     assert refused is None
     package = TemplateStore(tmp_path).current(TWO)
-    assert package.revision == '1.4.1' != before.revision and saved['package']['revision'] == '1.4.1'
+    assert package.revision == '1.5.1' != before.revision and saved['package']['revision'] == '1.5.1'
     asset = logo_of(package)
     assert (asset.id, asset.path, asset.mime_type) == ('logo', 'assets/logo.png', 'image/png')
     with Image.open(BytesIO(base64.b64decode(asset.bytes_base64))) as image:
@@ -68,7 +68,7 @@ def test_a_jpeg_becomes_a_png_and_removing_it_keeps_the_place_and_the_email(tmp_
     saved, refused = config.save_branding(TWO, request(None, 'hr@example.com', remove=True))
     assert refused is None
     package = TemplateStore(tmp_path).current(TWO)
-    assert package.revision == '1.4.2' and logo_of(package) is None and package.recipe.style.header.logo is not None
+    assert package.revision == '1.5.2' and logo_of(package) is None and package.recipe.style.header.logo is not None
     assert not any(asset.role == 'logo' for asset in package.assets) and package.recipe.style.footer.text == 'hr@example.com'
     assert 'asset: logo' not in saved['text'] and 'assets/logo.png' not in saved['text']
     # Without a new logo and without removal the logo stays and only the email changes.
@@ -144,7 +144,7 @@ async def test_routes_read_and_save_branding_for_imports_made_after_it(tmp_path)
         assert refused.status_code == 422 and refused.json()['error']['message'] == NOT_EMAIL
         saved = await client.put(path, json={'logo': picture(600, 200), 'footer': 'hr@example.com'})
         assert saved.status_code == 200, saved.text
-        assert saved.json()['branding']['footer'] == 'hr@example.com' and saved.json()['package']['revision'] == '1.4.1'
+        assert saved.json()['branding']['footer'] == 'hr@example.com' and saved.json()['package']['revision'] == '1.5.1'
         workspace = (await upload(client, template_id=TWO)).json()['workspace']
         captured = workspace['preDraft']['templatePackage']
         assert captured['packageHash'] == saved.json()['package']['packageHash']
