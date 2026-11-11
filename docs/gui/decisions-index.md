@@ -157,3 +157,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D152 List items close with a semicolon, the last one with a full stop
 - D153 A model call that sends nothing for five minutes ends as stalled
 - D154 Import speed, short version: width 8 for Claude, three entry groups, one validation per step
+- D155 Nested projects take their employer and role; a call that never answered gets one more; one system prompt for both CLIs
