@@ -342,10 +342,71 @@
       "title": "DroppedValue",
       "type": "object"
     },
+    "EntryHeader": {
+      "additionalProperties": false,
+      "description": "The employer, job title and period of one map entry; the coordinator puts them into the entry's reply.",
+      "properties": {
+        "dropped": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dropped",
+          "type": "array"
+        },
+        "employer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HeaderValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jobTitle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HeaderValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HeaderValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "employer",
+        "jobTitle",
+        "period"
+      ],
+      "title": "EntryHeader",
+      "type": "object"
+    },
     "EntryPart": {
       "additionalProperties": false,
-      "description": "One entry the outline named (D117): its title and its source lines.",
+      "description": "One entry the outline or the map named (D117): its title and its source lines; a map entry also its header.",
       "properties": {
+        "header": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntryHeader"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "spans": {
           "items": {
             "$ref": "#/$defs/SourceSpan"
@@ -367,7 +428,7 @@
     },
     "EntryScope": {
       "additionalProperties": false,
-      "description": "The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,\nthe outline entries they hold (consecutive ones, joined into at most three groups, D154) and whether the outline\nor its review named them.",
+      "description": "The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,\nthe outline or map entries they hold (consecutive ones, joined into at most three groups, D154) and whether the\noutline, its review or the map (T4) named them.",
       "properties": {
         "index": {
           "minimum": 1,
@@ -377,7 +438,8 @@
         "origin": {
           "enum": [
             "outline",
-            "review"
+            "review",
+            "map"
           ],
           "title": "Origin",
           "type": "string"
@@ -895,6 +957,26 @@
       "title": "HandleSelector",
       "type": "object"
     },
+    "HeaderValue": {
+      "additionalProperties": false,
+      "description": "A header value of an entry the map named and the coordinator checked on its line (T4).",
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/SourceSpan"
+        },
+        "value": {
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "span"
+      ],
+      "title": "HeaderValue",
+      "type": "object"
+    },
     "ImportAttempt": {
       "additionalProperties": false,
       "properties": {
@@ -1091,7 +1173,10 @@
             "fallback_repair",
             "replacement_review",
             "outline",
-            "outline_review"
+            "outline_review",
+            "map",
+            "map_repair",
+            "names"
           ],
           "title": "Slot",
           "type": "string"
@@ -1468,7 +1553,8 @@
             "rewrite",
             "derive",
             "source_copy",
-            "outline_review"
+            "outline_review",
+            "map"
           ],
           "title": "Kind",
           "type": "string"
@@ -2708,6 +2794,11 @@
           "minimum": 300,
           "title": "Processingseconds",
           "type": "integer"
+        },
+        "sourceMap": {
+          "default": false,
+          "title": "Sourcemap",
+          "type": "boolean"
         }
       },
       "required": [

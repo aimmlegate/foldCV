@@ -107,10 +107,11 @@ async def test_upload_import_task_publishes_a_v7_employment_project_with_two_cal
             for region in opened['workspace']['project']['document']['regions'] for top in region['blocks']
             for block in [top, *top.get('children', [])]]
         assert 'Example Labs' in texts and 'Role: backend engineer' in texts
-        assert [call['kind'] for call in provider.calls] == ['template_extraction', 'template_review']
+        # T4: the map of the CV comes first; the scripted provider refuses it and the block reads the whole CV.
+        assert [call['kind'] for call in provider.calls] == ['template_map', 'template_extraction', 'template_review']
         # A published project is not imported again and no model is called.
         repeated = await run_import(client, app, project, 'import-1')
-        assert repeated['state'] == 'failed' and len(provider.calls) == 2
+        assert repeated['state'] == 'failed' and len(provider.calls) == 3
 
 
 @pytest.mark.asyncio
@@ -247,3 +248,51 @@ async def test_an_import_start_names_an_exhausted_plan_instead_of_asking_to_conn
             done = await run_import(client, app, project, 'start')
             assert (done['state'], done['error']) == ('failed', code)
             assert saved(app, project).pre_draft.template_operations == []
+
+
+class StopOnce(ScriptedTemplateProvider):
+    """The first extraction ends with the account's usage limit, which stops the import; every other call answers."""
+
+    def __init__(self):
+        super().__init__()
+        self.stopped = False
+
+    def generate(self, request, files, cancel):
+        from resume_api.providers.content import ContentFailure, ReportedUsage
+        if not self.stopped and 'targets' not in request.request_value and request.request_value.get('slot') == 'initial':
+            self.stopped = True
+            raise ContentFailure('QUOTA_EXHAUSTED', logical_attempts=1, usage=ReportedUsage(10, 0, 0, True),
+                cleanup_verified=True, dispatch_witness={'transport': 'scripted'})
+        return super().generate(request, files, cancel)
+
+
+@pytest.mark.asyncio
+async def test_an_import_captured_before_the_map_resumes_and_publishes_without_one(tmp_path, monkeypatch):
+    # T4: a capture made before this slice has no sourceMap and its import no map task; the new build's capture has
+    # one, and a stored import is checked against it without that field.
+    provider = StopOnce()
+    async with app_client(tmp_path, call_cap=4, provider=provider) as (client, app):
+        intake = app.state.intake
+        captured = intake.capture
+        def before(*args, **kwargs):
+            value = captured(*args, **kwargs)
+            return value.model_copy(update={'policy': value.policy.model_copy(update={'source_map': False})})
+        monkeypatch.setattr(intake, 'capture', before)
+        project = (await upload(client)).json()['workspace']['projectId']
+        stopped = await run_import(client, app, project, 'before-the-map')
+        assert (stopped['state'], stopped['error']) == ('failed', 'QUOTA_EXHAUSTED'), stopped
+        operation = operation_of(app, project)
+        assert operation.capture.policy.source_map is False and all(task.kind != 'map' for task in operation.tasks)
+        assert 'sourceMap' not in operation.model_dump_json(by_alias=True)
+        monkeypatch.undo()
+        assert intake.capture(saved(app, project), True).policy.source_map is True
+        resumed = await client.post('/v2/projects/' + project + '/import', json={'kind': 'resume', 'operationId': operation.id})
+        assert resumed.status_code == 202, resumed.text
+        runner = app.state.projects.imports.runners.get(resumed.json()['id'])
+        if runner is not None:
+            await runner
+        listed = (await client.get('/v2/projects/' + project + '/tasks')).json()['tasks']
+        assert next(value for value in listed if value['id'] == resumed.json()['id'])['state'] == 'succeeded'
+        operation = operation_of(app, project)
+        assert operation.state == 'published' and all(task.kind != 'map' for task in operation.tasks)
+        assert [attempt.slot for attempt in operation.attempts] == ['initial', 'initial', 'review']

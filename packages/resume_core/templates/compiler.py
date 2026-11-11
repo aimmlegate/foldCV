@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from pydantic import ValidationError
 
 from .loading import load_declared_definition
+from ..models.template_import import MAP_BLOCK_ID
 from ..models.template_package import (CapturedAsset, CompilationManifest, CompiledBlock, CompiledRecipe,
                                        TemplateDefinition, TemplatePackage)
 from .projection import (FORMATS, PROFILE_ID, PROFILE_VERSION, SchemaFailure,
@@ -142,6 +143,9 @@ def check_runs(definition):
     opening, and their runtime refuses or shows source lines."""
     operations = {item.id: item for item in definition.operations}
     blocks = {item.id: item for item in definition.blocks}
+    if MAP_BLOCK_ID in operations or MAP_BLOCK_ID in blocks:
+        # The import's map task (T4) holds this id.
+        raise SchemaFailure("/blocks/" + MAP_BLOCK_ID, "the id is reserved for the import's source map")
     for operation in definition.operations:
         if not runnable(operation, definition):
             raise SchemaFailure("/operations/" + operation.id, "operation is not registered or its inputs do not let it run")

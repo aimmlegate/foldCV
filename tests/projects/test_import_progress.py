@@ -166,8 +166,9 @@ async def test_a_second_project_imports_beside_the_first_and_both_finish(tmp_pat
         assert running.status_code == 202 and running.json()['stage'] == 'processing'
         await until(provider.entered.is_set)
         held = (await task_of(client, first, running.json()['id']))['detail']['progress']
-        assert (held['phase'], held['done'], held['total'], held['current']) == ('processing', 0, 1, ['PROJECTS'])
-        assert held['events'][0]['text'] == 'Извлекаем данные: «PROJECTS»' and held['stalled'] is False
+        # T4: the import maps the CV first; the scripted provider refuses the map, so the block then reads the whole CV.
+        assert (held['phase'], held['done'], held['total'], held['current']) == ('processing', 0, 2, ['Разметка резюме'])
+        assert held['events'][0]['text'] == 'Размечаем резюме: «Разметка резюме»' and held['stalled'] is False
         assert held['lastModelAt'] is not None
         # D121: the second import does not queue behind the first; both model calls run at once.
         beside = await start(client, second, 'import-b')
@@ -183,7 +184,7 @@ async def test_a_second_project_imports_beside_the_first_and_both_finish(tmp_pat
             if runner is not None:
                 await runner
             assert (await task_of(client, project, reply.json()['id']))['state'] == 'succeeded'
-        assert len(provider.calls) == 4
+        assert len(provider.calls) == 6
 
 
 @pytest.mark.asyncio
@@ -208,5 +209,6 @@ async def test_the_start_effort_reaches_the_capture_and_an_unoffered_one_refuses
             await runner
         assert (await task_of(client, project, chosen.json()['id']))['state'] == 'succeeded'
         capture = operation_of(app, project).capture
-        # D116: the review runs at low, which this catalog offers; the proposal keeps the chosen high.
-        assert capture.primary.effort == 'high' and capture.review.effort == 'low' and provider.efforts == ['high', 'low']
+        # D116: the review runs at low, which this catalog offers; the map (T4) and the proposal keep the chosen high.
+        assert capture.primary.effort == 'high' and capture.review.effort == 'low' and provider.efforts == ['high', 'high', 'low']
+        assert capture.policy.source_map is True

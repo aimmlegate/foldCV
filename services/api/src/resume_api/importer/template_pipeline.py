@@ -46,8 +46,11 @@ from packages.resume_core.templates.source_spans import payload_value
 from packages.resume_core.templates.span_coverage import within_spans
 from packages.resume_core.importing.template_prompt import model_prompt
 from packages.resume_core.templates.operations import operation_value
-from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL, outline_review_schema,
-    outline_schema, proposal_protocol, proposal_schema, review_schema, PROPOSAL_PROTOCOL)
+from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL,
+    map_repair_schema, map_schema, outline_review_schema, outline_schema, proposal_protocol, proposal_schema,
+    review_schema, PROPOSAL_PROTOCOL)
+from packages.resume_core.importing.template_map import (apply_repair, map_choices, map_input, map_repair_input,
+                                                         map_task, parse_map)
 
 from .. import import_usage
 from ..inference_admission import CALLS
@@ -123,6 +126,14 @@ def reply_refs(raw):
             evidence = entry.get('evidence') if isinstance(entry, dict) else None
             refs += [ref for ref in evidence if isinstance(ref, str)] if isinstance(evidence, list) else []
     return refs
+
+
+def reply_payload(raw):
+    """The payload of a returned reply in its exact envelope; ValueError for anything else."""
+    outer = strict_json(raw)
+    if not isinstance(outer, dict) or set(outer) != {'payload'}:
+        raise ValueError('reply needs its payload envelope')
+    return outer['payload']
 
 
 def reply_feedback(task_id, errors):
@@ -657,6 +668,8 @@ class TemplatePipeline:
         return resume_operation(operation, command, self.wall())
 
     def task_input(self, operation, task, data):
+        if task.kind == 'map':
+            return map_input(operation, data), []
         if task.parent_task_id is not None:
             # D117: an entry or the outline review reads the block's captured input, plus the part that names its scope.
             parent = next(value.value for value in operation.task_inputs if value.task_id == task.parent_task_id)
@@ -668,7 +681,10 @@ class TemplatePipeline:
             if value.id == task.block_id)
         selectors = declaration.inputs if hasattr(declaration, 'inputs') else declaration.selectors
         types = {value.id for value in selectors if value.kind == 'fact_type'}
-        dependencies = [result for result in operation.task_results if result.task_id in task.dependencies]
+        # The map chooses a block's evidence; written whole into every request it would only add its size (T4).
+        mapper = map_task(operation)
+        dependencies = [result for result in operation.task_results if result.task_id in task.dependencies
+            and (mapper is None or result.task_id != mapper.id)]
         handles = {handle for value in dependencies for handle in value.item_handles}
         handles.update(record.item_handle for record in data.facts.extensions if record.active and record.semantic_type in types)
         records = [record for record in data.facts.extensions if record.active and record.item_handle in handles]
@@ -744,6 +760,8 @@ class TemplatePipeline:
             return
         if task.kind == 'outline_review':
             return await self.review_outline(project, operation_id, task_id, deadline, cancel)
+        if task.kind == 'map':
+            return await self.map_source(project, operation_id, task_id, deadline, cancel)
         block = next(value for value in data.template_package.definition.blocks if value.id == task.block_id)
         if task.parent_task_id is None and splits_entries(block):
             spawned = await self.outline(project, operation_id, task_id, deadline, cancel)
@@ -1059,6 +1077,81 @@ class TemplatePipeline:
         await self.finish_task(project, operation_id, task_id, {'added': added, 'remarks': remarks, 'diagnostics': unresolved},
             (), (), 'derived', issues)
         return Spawned(parent_id, tuple(added), False)
+
+    def latest_call(self, operation, task_id, slot):
+        """The task's latest call in a slot that counts; a slot holds two when the first never answered (D155)."""
+        return next((attempt.id for attempt in reversed(operation.attempts) if attempt.task_id == task_id
+            and attempt.slot == slot and attempt.state != 'released' and not stopped_call(operation, attempt)), None)
+
+    async def map_call(self, project, operation_id, task_id, slot, request, schema, deadline, cancel, room):
+        """One call of the map task (T4) and its one more call if it never answered: the attempt to read, or the code
+        that refused it before it ran."""
+        operation = operation_in(await self.view(project), operation_id)
+        attempt_id = self.latest_call(operation, task_id, slot)
+        if attempt_id is None:
+            if operation.capture.policy.call_cap - spent_calls(operation) < room:
+                return None, 'IMPORT_CALL_CAP'
+            try:
+                attempt_id = await self.call(project, operation_id, task_id, slot, request, schema, deadline, cancel)
+            except AccountStop:
+                raise
+            except TemplateImportFailure as error:
+                return None, error.code
+        return await self.again(project, operation_id, attempt_id, deadline, cancel, room=room, schema=lambda _value: schema), None
+
+    async def map_source(self, project, operation_id, task_id, deadline, cancel):
+        """The map of the CV (T4): one call names each block's lines and the entries of the blocks of entries with their
+        header values, the coordinator checks it, and a map whose entries leave lines out is repaired once. A map that
+        failed, was refused, gave no usable reply or stays doubted ends empty with the reason, and every block then
+        reads the whole CV as before: a doubted map never trims a request."""
+        workspace = await self.view(project)
+        operation = operation_in(workspace, operation_id)
+        stored = next(value.value for value in operation.task_inputs if value.task_id == task_id)
+        offered = offered_evidence(stored)
+        # The map and its repair, and a call and a review of every block; with less room the blocks read the whole CV.
+        room = 2 + 2 * sum(task.kind in {'extract', 'rewrite'} and task.parent_task_id is None for task in operation.tasks)
+        schema = map_schema(*map_choices(stored))
+        attempt_id, refused = await self.map_call(project, operation_id, task_id, 'map', {**stored, 'slot': 'map'}, schema,
+            deadline, cancel, room)
+        if refused is not None:
+            return await self.finish_map(project, operation_id, task_id, None, refused)
+        workspace = await self.view(project)
+        operation, data = operation_in(workspace, operation_id), owner(workspace)
+        attempt = attempt_in(operation, attempt_id)
+        if halted(operation, attempt, cancel):
+            return
+        if attempt.outcome != 'completed' or attempt.raw_return is None:
+            return await self.finish_map(project, operation_id, task_id, None,
+                attempt.error_code or attempt.outcome or 'IMPORT_RETURN_UNKNOWN')
+        try:
+            value = parse_map(reply_payload(attempt.raw_return), offered, data.sources, stored)
+        except (ValueError, TypeError, KeyError, RecursionError):
+            return await self.finish_map(project, operation_id, task_id, None, 'IMPORT_MAP_INVALID')
+        if value['uncovered']:
+            request = map_repair_input(stored, value, offered, data.sources)
+            repair_id, refused = await self.map_call(project, operation_id, task_id, 'map_repair', request,
+                map_repair_schema(), deadline, cancel, room - 1)
+            if refused is not None:
+                return await self.finish_map(project, operation_id, task_id, None, refused)
+            workspace = await self.view(project)
+            operation, data = operation_in(workspace, operation_id), owner(workspace)
+            repair = attempt_in(operation, repair_id)
+            if halted(operation, repair, cancel):
+                return
+            if repair.outcome != 'completed' or repair.raw_return is None:
+                return await self.finish_map(project, operation_id, task_id, None,
+                    repair.error_code or repair.outcome or 'IMPORT_RETURN_UNKNOWN')
+            try:
+                value = apply_repair(value, reply_payload(repair.raw_return), offered, data.sources)
+            except (ValueError, TypeError, KeyError, RecursionError):
+                return await self.finish_map(project, operation_id, task_id, None, 'IMPORT_MAP_INCOMPLETE')
+        return await self.finish_map(project, operation_id, task_id, value, None)
+
+    async def finish_map(self, project, operation_id, task_id, value, reason):
+        """The map task's result: the checked map, or an empty result naming why the import reads the whole CV."""
+        if value is None:
+            return await self.finish_task(project, operation_id, task_id, {'map': 'unused', 'reason': reason}, (), (), 'empty', [])
+        await self.finish_task(project, operation_id, task_id, value, (), (), 'derived', [])
 
     async def close_entries(self, project, operation_id, parent_id):
         """A block whose entries ran on their own ends with what they collected (D117): their handles, admitted when
@@ -1490,6 +1583,10 @@ class TemplatePipeline:
             task = task_in(operation, task_id)
             if task.parent_task_id is None and children_of(operation, task_id):
                 # A block with entries closes after them, below.
+                continue
+            if task.kind == 'map':
+                # A map not done when the import stopped maps nothing; its blocks read the whole CV.
+                await self.finish_map(project, operation_id, task_id, None, 'IMPORT_PROCESSING_STOPPED')
                 continue
             if not any(value.task_id == task_id for value in operation.task_inputs):
                 with import_usage.timed('tasks', 'taskInput'):

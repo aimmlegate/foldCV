@@ -50,6 +50,7 @@ REASONS = {
     'ambiguous active block order': 'порядок блоков неоднозначен',
     # Blocks and their links.
     'block and operation IDs must be distinct': 'у блоков и операций должны быть разные идентификаторы',
+    "the id is reserved for the import's source map": 'этот идентификатор занят разметкой резюме при импорте',
     'unknown dependency': 'неизвестная зависимость',
     'dependency cycle': 'зависимости образуют цикл',
     'derived block needs a registered operation': 'для производного блока нужна зарегистрированная операция',

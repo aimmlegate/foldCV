@@ -298,12 +298,55 @@ def entry_items(block, payload, src, cites, value):
     return [bounds[(part['first'], part['last'])] for part in value['entry']['parts'] if (part['first'], part['last']) in bounds]
 
 
+def line_refs(value, spans):
+    """The refs of the offered lines that hold the given cited spans, in the table's order."""
+    lines = [option for option in value['evidence'] if '\n' not in option['text'].strip()]
+    return [option['ref'] for option in lines if any(option['span']['unitId'] == cited['unitId']
+        and option['span']['start'] <= cited['start'] and cited['end'] <= option['span']['end'] for cited in spans)]
+
+
+def header_value(value, src, text):
+    """A scripted header value: the text and the first offered line that states it."""
+    if not text:
+        return None
+    lines = [option for option in value['evidence'] if '\n' not in option['text'].strip() and text in option['text']]
+    return {'value': text, 'line': lines[0]['ref']} if lines else None
+
+
+def scripted_map(value, src, table, package):
+    """T4: the map a careful model gives the scripted table: each block the lines its values cite, each entry of a block
+    of entries the lines its item cites, with its company, role and period as header values."""
+    blocks = {block.id: block for block in package.definition.blocks}
+    names = {entry['block'] for entry in value['blocks']}
+    result, entries = [], []
+    for block_id, (payload, cites) in table.items():
+        if block_id not in names:
+            continue
+        block = blocks[block_id]
+        reply = block_reply(block, payload, src, cites)
+        refs = line_refs(value, [span for field in reply['fields'] for span in field['evidence']])
+        if refs:
+            result.append({'block': block_id, 'ranges': [{'first': ref, 'last': ref} for ref in refs]})
+        if block_id in {entry['block'] for entry in value['entryBlocks']}:
+            for index, item in enumerate(payload):
+                first, last = entry_bounds(block, payload, src, cites, value, index)
+                period = (item.get('period') or {}).get('raw')
+                entries.append({'block': block_id, 'title': item.get('company') or 'Entry ' + str(index + 1), 'first': first,
+                    'last': last, 'employer': header_value(value, src, item.get('company')),
+                    'jobTitle': header_value(value, src, item.get('role')), 'period': header_value(value, src, period)})
+    return {'blocks': result, 'entries': entries, 'hidden': []}
+
+
 def generic_script(src, table, verdict=None, package=None):
     package = package or generic_package()
     blocks = {block.id: block for block in package.definition.blocks}
     def script(_request, value):
         if 'targets' in value:
             return satisfied(value, verdict)
+        if value.get('slot') == 'map':
+            return scripted_map(value, src, table, package)
+        if value.get('slot') == 'map_repair':
+            return {'lines': [{'line': ref, 'entry': None} for ref in value['uncovered']], 'entries': []}
         if value.get('slot') == 'outline_review':
             return {'missing': [], 'remarks': []}
         block = blocks[value['declaration']['id']]
@@ -331,10 +374,12 @@ def empty_object(block, package=None):
         for key, schema in properties.items()}
 
 
-async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None, concurrency=1):
+async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, cap=60, wrap=None, package=None, concurrency=1,
+                         source_map=False):
     """A published two-column import of one synthetic fixture through the coordinator and the real materializer; wrap
     changes the scripted answers. Another compiled package (CT08) imports with its own table. With one call at a time
-    the projects block runs whole; with more it is outlined and its jobs run in groups (D117)."""
+    the projects block runs whole; with more it is outlined and its jobs run in groups (D117). source_map: the import
+    maps the CV first (T4)."""
     from packages.resume_core.project_limits import finalization_seconds, import_seconds
     from packages.resume_core.templates.operations import derive_task
     from tests.templates.template_runtime_fixtures import EmploymentFixture
@@ -342,6 +387,7 @@ async def generic_import(root, name, *, rewrite=True, verdict=None, table=None, 
     fixture = EmploymentFixture(root, captured=package or generic_package(), src=src, original_bytes=raw, cap=cap, fallback=False,
         concurrency=concurrency)
     fixture.command.capture.allow_text_rewrite = rewrite
+    fixture.command.capture.policy.source_map = source_map
     # The default Settings limits hold about thirty durable calls and the publication on the real clock (D096).
     fixture.command.capture.policy.processing_seconds = import_seconds()
     fixture.command.capture.policy.finalization_seconds = finalization_seconds()

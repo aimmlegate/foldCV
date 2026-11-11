@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from packages.resume_core.models.template_import import MAP_BLOCK_ID
+
 # The CLI streams nothing before its reply, so one call may stay silent until the import limit (D114); this covers
 # process cleanup and the work between calls (task inputs, parsing, saving).
 QUIET_GRACE_SECONDS = 60
@@ -20,7 +22,10 @@ UNTITLED_BLOCK = 'Шапка'
 CALLED = {'initial': 'Извлекаем данные', 'review': 'Проверяем результат',
     'primary_repair': 'Исправляем ответ', 'fallback_repair': 'Исправляем ответ ещё раз',
     'replacement_review': 'Проверяем исправление', 'outline': 'Размечаем записи',
-    'outline_review': 'Проверяем разметку записей'}
+    'outline_review': 'Проверяем разметку записей', 'map': 'Размечаем резюме', 'map_repair': 'Уточняем разметку',
+    'names': 'Собираем навыки'}
+# T4: the task that maps the CV before the blocks.
+MAP_TITLE = 'Разметка резюме'
 RETURNED = {'completed': 'Ответ получен', 'timed_out': 'Нет ответа в срок',
     'invalid_payload': 'Ответ в неверном формате', 'refused': 'Модель отказалась отвечать',
     'incomplete': 'Ответ неполный', 'cancelled': 'Остановлено', 'transport_failure': 'Сбой связи с моделью',
@@ -77,6 +82,7 @@ def step_titles(package):
     titles = {block.id: block.view.title.get(locale) or next(iter(block.view.title.values()), '') or UNTITLED_BLOCK
         for block in definition.blocks}
     titles.update({value.id: OPERATION_TITLES.get(value.kind, value.id) for value in definition.operations})
+    titles[MAP_BLOCK_ID] = MAP_TITLE
     return titles
 
 

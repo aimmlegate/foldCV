@@ -297,8 +297,10 @@ async def test_app_import_selects_evidence_by_reference_and_receipts_retain_rest
         project = (await upload(client)).json()['workspace']['projectId']
         assert (await run_import(client, app, project, 'references'))['state'] == 'succeeded'
         operation = operation_of(app, project)
-    extraction, review = operation.attempts
-    assert [call['kind'] for call in provider.calls] == ['template_extraction', 'template_review']
+    # T4: the import maps the CV first; the scripted provider refuses the map, so the block reads the whole CV.
+    mapper, extraction, review = operation.attempts
+    assert (mapper.slot, mapper.outcome) == ('map', 'refused')
+    assert [call['kind'] for call in provider.calls] == ['template_map', 'template_extraction', 'template_review']
     assert 'evidence' in extraction.request_value and not {'sourceSpans', 'sourceTexts'} & set(extraction.request_value)
     table = {value['ref']: value for value in extraction.request_value['evidence']}
     reply = json.loads(extraction.raw_return)['payload']
@@ -317,7 +319,7 @@ async def test_app_import_selects_evidence_by_reference_and_receipts_retain_rest
     assert [result['check'] for result in answered] == list(check_references(record)) and not any('targetId' in result for result in answered)
     assert all(isinstance(ref, str) for result in answered for ref in result['evidence'])
     assert sha256(review.raw_return.encode()) == review.raw_return_hash
-    assert not operation.issues and [task.state for task in operation.tasks] == ['accepted']
+    assert not operation.issues and [task.state for task in operation.tasks] == ['empty', 'accepted']
 
 
 class PromptRecorder(CitingProvider):
@@ -339,7 +341,8 @@ async def test_model_prompts_offer_refs_and_texts_while_storage_keeps_spans_and_
         project = (await upload(client)).json()['workspace']['projectId']
         assert (await run_import(client, app, project, 'lean'))['state'] == 'succeeded'
         operation = operation_of(app, project)
-    assert len(provider.prompts) == len(operation.attempts) == 2
+    # The map's request (T4) comes first; the scripted provider refuses it.
+    assert len(provider.prompts) == len(operation.attempts) == 3 and operation.attempts[0].slot == 'map'
     for prompt, attempt in zip(provider.prompts, operation.attempts, strict=True):
         # A review attempt's request is its review input record (stored once).
         stored = attempt.request_value or next(record.value.model_dump(mode='json', by_alias=True)

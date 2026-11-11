@@ -1233,7 +1233,9 @@
     "TECHNOLOGY_NAME_EMPTY": "technologyNameEmpty",
     "TECHNOLOGY_IN_FACTS": "technologyInFacts",
     "PROVIDER_INACTIVE": "providerInactive",
-    "PROVIDER_UNAVAILABLE": "providerUnavailable"
+    "PROVIDER_UNAVAILABLE": "providerUnavailable",
+    "IMPORT_MAP_INVALID": "importResult",
+    "IMPORT_MAP_INCOMPLETE": "importResult"
   },
   "nonErrorSymbols": {
     "CLOCK_BOOTTIME": "Operating-system clock identifier",

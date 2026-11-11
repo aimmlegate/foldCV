@@ -222,6 +222,63 @@ class OutlineReviewReply(Wire):
     remarks: list[OutlineRemark]
 
 
+# T4 of D158: the map names lines by plain refs the coordinator checks; an enum of every line in the schema would pass
+# the size of a Windows command line on a long CV.
+LineRef = Annotated[str, Field(pattern=r'^S[1-9][0-9]*$')]
+MapBlockRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'MapBlockRef'})]
+EntryBlockRef = Annotated[str, Field(min_length=1, json_schema_extra={'x-reference': 'EntryBlockRef'})]
+
+
+class LineRange(Wire):
+    first: LineRef
+    last: LineRef
+
+
+class MapBlock(Wire):
+    block: MapBlockRef
+    ranges: list[LineRange]
+
+
+class MapHeader(Wire):
+    """One header value of an entry as the map states it: the value copied word for word from its line."""
+    value: str = Field(min_length=1)
+    line: LineRef
+
+
+class MapEntry(Wire):
+    block: EntryBlockRef
+    title: str
+    first: LineRef
+    last: LineRef
+    employer: MapHeader | None
+    job_title: MapHeader | None
+    period: MapHeader | None
+
+
+class MapReply(Wire):
+    blocks: list[MapBlock]
+    entries: list[MapEntry]
+    hidden: list[LineRange]
+
+
+class RepairLine(Wire):
+    line: LineRef
+    # The entry the line belongs to: its index in the map, or after them an entry of this reply; null for none.
+    entry: int | None = Field(ge=1)
+
+
+class RepairEntry(Wire):
+    title: str
+    employer: MapHeader | None
+    job_title: MapHeader | None
+    period: MapHeader | None
+
+
+class MapRepairReply(Wire):
+    lines: list[RepairLine]
+    entries: list[RepairEntry]
+
+
 class SettledCheck(Wire):
     """A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's
     result for a value the repair left as it was."""
@@ -344,6 +401,8 @@ class RuntimePolicy(Wire):
     finalization_seconds: int = Field(ge=FINALIZATION_BASE_SECONDS, le=FINALIZATION_CEILING_SECONDS)
     primary_repairs: Literal[1]
     fallback_repairs: Literal[1]
+    # T4: the import maps the CV first and each block reads its own lines; captures made before read the whole CV.
+    source_map: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class ImportCapture(Wire):
@@ -404,28 +463,48 @@ class TaskResultRecord(Wire):
     disposition: Literal['admitted', 'derived', 'source_fallback', 'empty']
 
 
+class HeaderValue(Wire):
+    """A header value of an entry the map named and the coordinator checked on its line (T4)."""
+    value: str = Field(min_length=1)
+    span: SourceSpan
+
+
+class EntryHeader(Wire):
+    """The employer, job title and period of one map entry; the coordinator puts them into the entry's reply."""
+    employer: HeaderValue | None
+    job_title: HeaderValue | None
+    period: HeaderValue | None
+    # Values the map named that no source line states: dropped, and named in the entry's notice (D156).
+    dropped: list[str] = Field(default_factory=list, exclude_if=lambda value: not value)
+
+
 class EntryPart(Wire):
-    """One entry the outline named (D117): its title and its source lines."""
+    """One entry the outline or the map named (D117): its title and its source lines; a map entry also its header."""
     title: str
     spans: list[SourceSpan]
+    header: EntryHeader | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class EntryScope(Wire):
     """The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
-    the outline entries they hold (consecutive ones, joined into at most three groups, D154) and whether the outline
-    or its review named them."""
+    the outline or map entries they hold (consecutive ones, joined into at most three groups, D154) and whether the
+    outline, its review or the map (T4) named them."""
     index: int = Field(ge=1)
     title: str
     spans: list[SourceSpan]
     parts: list[EntryPart] = Field(min_length=1)
-    origin: Literal["outline", "review"]
+    origin: Literal["outline", "review", "map"]
+
+
+# T4: the task that maps the CV's lines to blocks; no template may declare this id.
+MAP_BLOCK_ID = 'source-map'
 
 
 class ImportTask(Wire):
     id: Id
     operation_id: Id
     block_id: Id
-    kind: Literal["extract", "rewrite", "derive", "source_copy", "outline_review"]
+    kind: Literal["extract", "rewrite", "derive", "source_copy", "outline_review", "map"]
     dependencies: list[Id]
     input_hash: Sha256
     allowed_handles: list[Id]
@@ -476,7 +555,8 @@ class ImportAttempt(Wire):
     id: Id
     operation_id: Id
     task_id: Id
-    slot: Literal["initial", "review", "primary_repair", "fallback_repair", "replacement_review", "outline", "outline_review"]
+    slot: Literal["initial", "review", "primary_repair", "fallback_repair", "replacement_review", "outline", "outline_review",
+                  "map", "map_repair", "names"]
     input_hash: Sha256
     model: ModelCapture
     state: Literal["reserved", "dispatch_started", "returned", "outcome_unknown", "reconciled", "released"]
@@ -641,6 +721,8 @@ class ImportOperation(Wire):
                 raise ValueError('task belongs to no block task')
             if (task.kind == 'outline_review') != (task.parent_task_id is not None and task.entry is None):
                 raise ValueError('outline review task shape')
+            if (task.kind == 'map') != (task.block_id == MAP_BLOCK_ID) or task.kind == 'map' and task.parent_task_id is not None:
+                raise ValueError('map task shape')
             if task.entry is not None and (parent is None or task.kind != parent.kind):
                 raise ValueError('entry task kind differs from its block task')
         _unique([(task.parent_task_id, task.entry.index) for task in self.tasks if task.entry is not None], 'block entry')

@@ -203,7 +203,7 @@ class TemplateIntake:
             policy=RuntimePolicy(callCap=self.call_cap,
                 concurrency=import_width(primary, fallback) if self.concurrency is None else self.concurrency,
                 processingSeconds=import_seconds(), cleanupSeconds=5,
-                finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1))
+                finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1, sourceMap=True))
 
     def validate(self, operation, workspace):
         data = workspace.project or workspace.pre_draft
@@ -222,8 +222,9 @@ class TemplateIntake:
                 effort=None if stored else operation.capture.primary.effort)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
-        # D117 raised the launcher's call cap: an import saved with the old one resumes with it.
+        # D117 raised the launcher's call cap: an import saved with the old one resumes with it; one saved before T4
+        # resumes without a source map.
         ignored = {'fact_revisions': True, **({'policy': {'processing_seconds', 'finalization_seconds', 'concurrency',
-            'call_cap'}} if stored else {})}
+            'call_cap', 'source_map'}} if stored else {})}
         if expected.model_dump(exclude=ignored) != operation.capture.model_dump(exclude=ignored):
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE')

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import uuid
 
-from ..models.template_import import (AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope,
+from ..models.template_import import (MAP_BLOCK_ID, AttemptCleanupRecord, CleanupOutcome, EntryPart, EntryScope,
                                       FinalizationCandidate, ImportAttempt, ImportAuthorization, ImportOperation,
                                       ImportTask, ObservedUsage, PublicationOutcome, TaskInputRecord)
 from ..hashing import sha256
@@ -19,6 +19,8 @@ REPAIR_SLOTS = frozenset({'primary_repair', 'fallback_repair'})
 REVIEW_SLOTS = frozenset({'review', 'replacement_review'})
 # D117: the outline of a block that extracts its entries on their own, and the review of that outline.
 OUTLINE_SLOTS = frozenset({'outline', 'outline_review'})
+# T4: the map of the CV and its one repair, both on the map task.
+MAP_SLOTS = frozenset({'map', 'map_repair'})
 IN_FLIGHT = frozenset({'reserved', 'dispatch_started'})
 # No later call of the import can succeed after these, so the import stops instead of saving empty blocks (D104).
 ACCOUNT_STOP = frozenset({'QUOTA_EXHAUSTED', 'AUTH_REQUIRED', 'AUTH_MODE_MISMATCH', 'MODEL_DENIED'})
@@ -110,6 +112,11 @@ def authorization(operation):
     return current
 
 
+def maps_source(definition):
+    """Whether an import of this template maps the CV first (T4): a model block reads the source."""
+    return any(block.mode == 'model' and any(ref.kind == 'source' for ref in block.selectors) for block in definition.blocks)
+
+
 def start_operation(project_id, command, package, sources, facts, existing, now, *, id_factory=identity):
     for operation in existing:
         if operation.project_id == project_id and operation.client_request_id == command.client_request_id:
@@ -135,8 +142,12 @@ def start_operation(project_id, command, package, sources, facts, existing, now,
     order = dependency_order(package.definition)
     declarations = {item.id: item for item in [*package.definition.operations, *package.definition.blocks]}
     operations = {item.id for item in package.definition.operations}
+    # T4: one map task reads the CV first and names each block's lines; the model blocks wait for it.
+    tasks = [ImportTask(id=id_factory('task'), operationId=identifier, blockId=MAP_BLOCK_ID, kind='map', dependencies=[],
+        inputHash=digest({'capture': capture, 'map': MAP_BLOCK_ID}), allowedHandles=[], expectedChecks=[], state='pending',
+        attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[])] if (capture.policy.source_map
+            and maps_source(package.definition)) else []
     task_ids = {key: id_factory('task') for key in sorted(order, key=order.get)}
-    tasks = []
     for key in sorted(order, key=order.get):
         item = declarations[key]
         dependencies = set(item.depends_on)
@@ -149,8 +160,9 @@ def start_operation(project_id, command, package, sources, facts, existing, now,
                 dependencies.add(item.when.operation)
         kind = ('derive' if key in operations or item.mode == 'derived' else 'source_copy' if item.mode == 'source_copy'
             else 'rewrite' if capture.allow_text_rewrite and item.rewrite.fields else 'extract')
+        waits = [tasks[0].id] if tasks and tasks[0].kind == 'map' and kind in {'extract', 'rewrite'} else []
         tasks.append(ImportTask(id=task_ids[key], operationId=identifier, blockId=key, kind=kind,
-            dependencies=[task_ids[dep] for dep in sorted(dependencies, key=order.get)],
+            dependencies=[*waits, *[task_ids[dep] for dep in sorted(dependencies, key=order.get)]],
             inputHash=digest({'capture': capture, 'declaration': item}), allowedHandles=[], expectedChecks=[],
             state='pending', attemptIds=[], proposalHash=None, receiptIds=[], issueIds=[]))
     operation = ImportOperation(schemaVersion=1, id=identifier, projectId=project_id, capture=capture,
@@ -404,6 +416,16 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
             raise TemplateImportFailure('IMPORT_SLOT_SPENT')
         if not any(same_captured_model(model, captured) for captured in [result.capture.primary, result.capture.review]):
             raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
+    elif slot in MAP_SLOTS:
+        # T4: the map task maps the CV once with the import model, and repairs its map once after a map that answered.
+        if task.kind != 'map':
+            raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
+        if slot_spent(prior, slot, input_hash):
+            raise TemplateImportFailure('IMPORT_SLOT_SPENT')
+        if slot == 'map_repair' and not any(attempt.slot == 'map' and attempt.outcome == 'completed' for attempt in prior):
+            raise TemplateImportFailure('IMPORT_REPAIR_WITHOUT_INITIAL')
+        if not same_captured_model(model, result.capture.primary):
+            raise TemplateImportFailure('IMPORT_MODEL_NOT_CAPTURED')
     else:
         raise TemplateImportFailure('IMPORT_ATTEMPT_SLOT')
     if any(attempt.owner.reservation_id == owner.reservation_id for attempt in result.attempts):
@@ -419,7 +441,7 @@ def reserve_attempt(operation, task_id, slot, input_hash, model, owner, now, *, 
     result.attempts.append(attempt)
     task.attempt_ids.append(attempt.id)
     task.state = ('checking' if slot in {'review', 'replacement_review'}
-        else 'running' if slot == 'initial' or slot in OUTLINE_SLOTS else 'repairing')
+        else 'running' if slot == 'initial' or slot in OUTLINE_SLOTS or slot in MAP_SLOTS else 'repairing')
     return (checked(result) if check else result), attempt.id
 
 

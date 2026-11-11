@@ -37,8 +37,13 @@ def scripted_template_answer(value):
 
 
 def scripted_template_result(provider, request, answer=scripted_template_answer):
-    """Answer one template task as a provider would, reporting the return before the result."""
+    """Answer one template task as a provider would, reporting the return before the result. The map of the CV (T4) is
+    refused, so the import runs as without one and the service tests keep their blocks' calls."""
     value = request.request_value if request.request_value is not None else json.loads(request.text)
+    if value.get('slot') in {'map', 'map_repair'}:
+        provider.calls.append({'kind': 'template_map'})
+        raise ContentFailure('REFUSED', logical_attempts=1, usage=ReportedUsage(10, 0, 0, True), cleanup_verified=True,
+            dispatch_witness={'transport': 'scripted', 'turnId': str(len(provider.calls))})
     provider.calls.append({'kind': 'template_review' if 'targets' in value else 'template_extraction'})
     raw = json.dumps({'payload': answer(value)})
     usage, witness = ReportedUsage(10, 0, 4, True), {'transport': 'scripted', 'turnId': str(len(provider.calls))}

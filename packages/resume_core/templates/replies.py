@@ -2,8 +2,8 @@
 
 from copy import deepcopy
 
-from ..models.template_import import (OutlineReply, OutlineReviewReply, ProposalReply, ReferencedProposalReply,
-    ReferencedReviewReply, ReviewReply)
+from ..models.template_import import (MapRepairReply, MapReply, OutlineReply, OutlineReviewReply, ProposalReply,
+    ReferencedProposalReply, ReferencedReviewReply, ReviewReply)
 from .projection import pointer_tokens, schema_children, validate_schema
 
 
@@ -122,6 +122,47 @@ OUTLINE_REVIEW_PROTOCOL = {'version': 'template-outline-review-protocol-2', 'rul
     'outline.entries lists the entries of the block as the coordinator extracts them, each with its title and the refs of its first and last source line. Check the outline against the whole evidence: payload.missing lists every entry of the block the outline leaves out, each as {title, first, last} like an outline entry; payload.remarks lists an outline entry that joins two entries of the source or splits one, as {entries: [their indices], reason}.',
     'Text outside the declared content is no entry, nor is a statement that fits a block in otherBlocks better. reason is one short sentence in Russian. Return empty lists when the outline is complete.']}
 
+# T4 of D158: a first request maps the CV, so each block's requests offer only its lines. Refs are plain strings in
+# the schema; the coordinator checks every one (an enum of every line in several places would pass a Windows command
+# line on a long CV).
+MAP_PROTOCOL = {'version': 'template-map-protocol-1', 'rules': [
+    OUTLINE_PROTOCOL['rules'][0],
+    'This request maps the CV before its blocks are extracted: each later request offers a block only the lines named '
+    'here, so give a block every line its content needs. blocks lists the template blocks by id, title and what they '
+    'extract; entryBlocks lists the blocks whose entries are extracted one by one, with their rules.',
+    'payload.blocks: one {block, ranges} per block the CV states content for; ranges lists its lines as {first, last}, '
+    'the refs of the first and the last line of a run of lines, both included, in CV order. Leave out a block the CV '
+    'states nothing for. A line may serve several blocks: a project\'s stack line serves the project and the technology '
+    'lists, a skills line the focus and the technology lists. Give lines to every block whose content the CV states, '
+    'also when two blocks collect the same kind of content for different roles. A block of entries gets every line of '
+    'its entries, their header lines included.',
+    'payload.entries: every entry of each block of entryBlocks, in the order its rules ask for, as {block, title, first, '
+    'last, employer, jobTitle, period}: title names the entry as the CV does (the project, else the employer); first and '
+    'last are the refs of its first and last own line, and the lines between belong to it and to no other entry. A job '
+    'with projects inside it gives one entry per project, and the job\'s own duties and results outside its projects are '
+    'one more entry of that job.',
+    'employer, jobTitle and period of an entry are each {value, line} or null: line is the ref of the line that states '
+    'it and value is copied from that line word for word. A project inside a job takes the job\'s employer, job title and '
+    'period unless it states its own; these lines may lie outside the entry. null when the CV states none.',
+    'payload.hidden: the lines that hold no content of any block, as ranges: section headings, contacts, personal data '
+    'and administrative lines (desired position and salary, employment type, schedule, travel time, citizenship, '
+    'driving, the date the CV was updated).',
+    'Use only refs this request offers; never invent text.']}
+
+# One repair of a map whose entries leave lines of their block out (T4): each such line joins an entry or none.
+MAP_REPAIR_PROTOCOL = {'version': 'template-map-repair-protocol-1', 'rules': [
+    OUTLINE_PROTOCOL['rules'][0],
+    'map.entries lists the entries the map found, numbered from 1, each with its block, title, first and last line and '
+    'header values; uncovered lists the lines of a block of entries that belong to none of them. evidence offers the '
+    'lines of the block.',
+    'payload.lines: one {line, entry} for every ref of uncovered: entry is the number of the entry the line belongs to, '
+    'or null when the line holds no content of an entry. payload.entries adds an entry the map missed, such as a job\'s '
+    'own duties and results outside its projects, as {title, employer, jobTitle, period} with header values as the map '
+    'gives them; the first added entry is number n + 1 when the map has n entries, and the lines that belong to it name '
+    'that number.',
+    'Use only refs this request offers; never invent text.']}
+
+
 # The rule an entry request adds to its proposal protocol.
 ENTRY_RULE = ('entry names the part of the source this reply extracts: entry.lines, refs of this request, and the entries '
     'the outline found in them (entry.parts, each by title and its first and last line). payload holds the items of the '
@@ -188,7 +229,7 @@ FAILING_ONLY_PROTOCOLS = frozenset({'template-review-protocol-3', 'template-revi
 # Protocols whose requests the model reads in the compact form (template_prompt). A stored request reads as the protocol
 # it was captured with says, so each version stays named here when a newer one comes.
 COMPACT_PROTOCOLS = frozenset({'template-proposal-protocol-6', 'template-review-protocol-6', 'template-outline-protocol-2',
-    'template-outline-review-protocol-2'})
+    'template-outline-review-protocol-2', 'template-map-protocol-1', 'template-map-repair-protocol-1'})
 
 
 def model_targets(review):
@@ -227,6 +268,15 @@ def outline_schema(refs):
 
 def outline_review_schema(refs):
     return _closed_schema(OutlineReviewReply, choices={'EvidenceRef': list(refs)})
+
+
+def map_schema(blocks, entry_blocks):
+    """The closed reply of the map request (T4): blocks by their ids, lines by plain refs the coordinator checks."""
+    return _closed_schema(MapReply, choices={'MapBlockRef': list(blocks), 'EntryBlockRef': list(entry_blocks)})
+
+
+def map_repair_schema():
+    return _closed_schema(MapRepairReply)
 
 
 def review_schema(review=None):

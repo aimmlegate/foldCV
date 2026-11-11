@@ -95,7 +95,8 @@ async def test_a_running_import_keeps_its_captured_models_when_settings_change(t
         project = (await upload(client)).json()['workspace']['projectId']
         _operation, done = await run_import(client, app, project, 'running')
         assert done['state'] == 'succeeded', done
-        assert provider.models == ['assistant-model', 'assistant-model']
+        # The map (T4, refused by the scripted provider), the block and its review keep the captured model.
+        assert provider.models == ['assistant-model'] * 3
         assert (await client.get('/v1/settings/preferences')).json()['selectedImportModel'] == 'processing-model'
 
 
@@ -126,12 +127,14 @@ async def test_the_fallback_model_makes_the_last_repair_and_is_never_replaced_wh
         project = (await upload(client)).json()['workspace']['projectId']
         operation, done = await run_import(client, app, project, 'fallback')
         assert done['state'] == 'succeeded', done
+        # T4: the map of the CV comes first and runs with the import model; the scripted provider refuses it.
         slots = [(attempt.slot, attempt.model.model) for attempt in operation.attempts]
+        block = next(task for task in operation.tasks if task.kind != 'map')
         if available:
-            assert slots == [('initial', 'processing-model'), ('primary_repair', 'processing-model'),
+            assert slots == [('map', 'processing-model'), ('initial', 'processing-model'), ('primary_repair', 'processing-model'),
                 ('fallback_repair', 'assistant-model'), ('replacement_review', 'processing-model')]
-            assert operation.tasks[0].state == 'accepted'
+            assert block.state == 'accepted'
         else:
-            assert provider.models == ['processing-model', 'processing-model']
+            assert provider.models == ['processing-model'] * 3
             assert slots[-1] == ('fallback_repair', 'assistant-model') and operation.attempts[-1].error_code == 'MODEL_DENIED'
-            assert operation.tasks[0].state == 'source_fallback'
+            assert block.state == 'source_fallback'

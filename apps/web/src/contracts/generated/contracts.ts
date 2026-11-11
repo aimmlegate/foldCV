@@ -1207,7 +1207,16 @@ export type Returnedat = string | null;
 export type Reviewinputrecordid = string | null;
 export type Reviewreceiptid = string | null;
 export type Slot =
-  "initial" | "review" | "primary_repair" | "fallback_repair" | "replacement_review" | "outline" | "outline_review";
+  | "initial"
+  | "review"
+  | "primary_repair"
+  | "fallback_repair"
+  | "replacement_review"
+  | "outline"
+  | "outline_review"
+  | "map"
+  | "map_repair"
+  | "names";
 export type State3 = "reserved" | "dispatch_started" | "returned" | "outcome_unknown" | "reconciled" | "released";
 export type Taskid1 = string;
 export type Cachedinputtokens1 = number | null;
@@ -1233,6 +1242,7 @@ export type Fallbackrepairs = 1;
 export type Finalizationseconds = number;
 export type Primaryrepairs = 1;
 export type Processingseconds = number;
+export type Sourcemap = boolean;
 export type Itemhandle5 = string;
 export type Recordid4 = string;
 export type Recordrevision = number;
@@ -1439,11 +1449,13 @@ export type Attemptids = string[];
 export type Blockid2 = string;
 export type Dependencies2 = string[];
 export type Index1 = number;
-export type Origin15 = "outline" | "review";
+export type Origin15 = "outline" | "review" | "map";
 /**
  * @minItems 1
  */
 export type Parts = [EntryPart, ...EntryPart[]];
+export type Dropped = string[];
+export type Value3 = string;
 export type Spans = SourceSpan[];
 export type Title6 = string;
 export type Spans1 = SourceSpan[];
@@ -1452,7 +1464,7 @@ export type Expectedchecks1 = CheckTarget[];
 export type Id51 = string;
 export type Inputhash5 = string;
 export type Issueids1 = string[];
-export type Kind33 = "extract" | "rewrite" | "derive" | "source_copy" | "outline_review";
+export type Kind33 = "extract" | "rewrite" | "derive" | "source_copy" | "outline_review" | "map";
 export type Operationid4 = string;
 export type Parenttaskid = string | null;
 export type Proposalhash3 = string | null;
@@ -2809,7 +2821,7 @@ export type Textcolor6 = string | null;
 export type Field10 = string;
 export type Op6 = "update_fact";
 export type Recordid15 = string;
-export type Value3 = string;
+export type Value4 = string;
 export type Jobid6 = string | null;
 export type Kind80 = "candidate" | "employment" | "technology" | "education" | "language" | "claim" | "period";
 export type Op7 = "create_fact";
@@ -2821,7 +2833,7 @@ export type Op9 = "history";
 export type Action2 = "rename" | "formatting_date" | "archive" | "restore" | "delete";
 export type Op10 = "action";
 export type Targetid6 = string | null;
-export type Value4 = string | null;
+export type Value5 = string | null;
 /**
  * @maxItems 100
  */
@@ -5901,6 +5913,7 @@ export interface RuntimePolicy {
   finalizationSeconds: Finalizationseconds;
   primaryRepairs: Primaryrepairs;
   processingSeconds: Processingseconds;
+  sourceMap?: Sourcemap;
 }
 export interface Sourcehashes {
   [k: string]: string;
@@ -6212,8 +6225,8 @@ export interface ImportTask {
 }
 /**
  * The part of a block one entry task extracts (D117): its place in the block's order, its title, its source lines,
- * the outline entries they hold (consecutive ones, joined into at most three groups, D154) and whether the outline
- * or its review named them.
+ * the outline or map entries they hold (consecutive ones, joined into at most three groups, D154) and whether the
+ * outline, its review or the map (T4) named them.
  */
 export interface EntryScope {
   index: Index1;
@@ -6223,11 +6236,28 @@ export interface EntryScope {
   title: Title7;
 }
 /**
- * One entry the outline named (D117): its title and its source lines.
+ * One entry the outline or the map named (D117): its title and its source lines; a map entry also its header.
  */
 export interface EntryPart {
+  header?: EntryHeader | null;
   spans: Spans;
   title: Title6;
+}
+/**
+ * The employer, job title and period of one map entry; the coordinator puts them into the entry's reply.
+ */
+export interface EntryHeader {
+  dropped?: Dropped;
+  employer: HeaderValue | null;
+  jobTitle: HeaderValue | null;
+  period: HeaderValue | null;
+}
+/**
+ * A header value of an entry the map named and the coordinator checked on its line (T4).
+ */
+export interface HeaderValue {
+  span: SourceSpan;
+  value: Value3;
 }
 export interface StoredTemplatePackage {
   assets: Assets;
@@ -7345,7 +7375,7 @@ export interface UpdateFactOp {
   field: Field10;
   op: Op6;
   recordId: Recordid15;
-  value: Value3;
+  value: Value4;
 }
 export interface CreateFactOp {
   jobId?: Jobid6;
@@ -7369,7 +7399,7 @@ export interface ActionOp {
   action: Action2;
   op: Op10;
   targetId?: Targetid6;
-  value?: Value4;
+  value?: Value5;
 }
 export interface PreviewEntryV1 {
   after: After1;
