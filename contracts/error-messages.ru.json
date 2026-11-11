@@ -1268,6 +1268,7 @@
     "DISABLE_AUTOUPDATER": "CLI profile environment setting",
     "DISABLE_TELEMETRY": "CLI profile environment setting",
     "DISABLE_ERROR_REPORTING": "CLI profile environment setting",
+    "DISABLE_PROMPT_CACHING": "CLI content call environment setting",
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "CLI profile environment setting",
     "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "CLI profile environment setting",
     "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "CLI profile environment setting",
