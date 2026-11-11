@@ -580,6 +580,21 @@ def test_without_rewriting_a_value_built_from_two_lines_shows_both():
         'Разработка REST API', 'Настройка CI']
 
 
+def test_without_rewriting_a_wrapped_item_cited_with_its_neighbours_shows_its_own_lines():
+    # Live (T4): a map entry's reply cited three wrapped list items for the last one. The words of its second line
+    # stand in the first item too, and the shown text joined the first lines of both items.
+    text = ('- Kept the stock levels on the report for each warehouse and\n'
+        'sent alerts when a shelf ran low.\n'
+        '- Wrote the import of supplier files, mapped their columns\n'
+        'and checked totals against the ledger.\n'
+        '- Built the order list, item cards, saved filters, notes and tags\n'
+        'on the report.\n')
+    options, table, lines = offered(text)
+    value = 'Built the order list, item cards, saved filters, notes and tags on the report.'
+    wide = {'/x': {'evidence': [lines[line] for line in text.splitlines()]}}
+    assert shown_without_rewriting(options, table, wide, '/x', value) == value
+
+
 def test_a_word_for_word_value_cites_its_own_items_lines_first():
     text = ''.join('Job ' + str(index) + ' — engineer\nPython\n' for index in range(1, 6))
     _options, table, lines = offered(text)

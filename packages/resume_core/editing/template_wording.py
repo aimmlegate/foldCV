@@ -33,7 +33,23 @@ def own_evidence(raw, evidence, text_of):
         table[str(index)] = EvidenceOption(ref=str(index), span=span, text=text)
     value = raw.strip()
     exact = [ref for ref, option in table.items() if option.text.strip() == value]
-    return [table[ref].span for ref in exact[:1] or stating(value, table)[:1] or stating_words(value, table)] or evidence
+    return [table[ref].span for ref in exact[:1] or stating(value, table)[:1] or _stated_run(value, table)
+        or stating_words(value, table)] or evidence
+
+
+def _stated_run(value, table):
+    """The fewest cited lines in a row that hold the value word for word together: a wrapped list item among the
+    lines of its neighbours (a map entry's reply may cite them all, T4), never words picked from several items."""
+    lines = list(table.values())
+    wanted = _plain(value).rstrip('.;:, ')
+    best = None
+    for first in range(len(lines)):
+        for last in range(first, len(lines)):
+            if wanted and wanted in _plain(' '.join(option.text for option in lines[first:last + 1])):
+                if best is None or last - first < best[1] - best[0]:
+                    best = (first, last)
+                break
+    return [] if best is None else [option.ref for option in lines[best[0]:best[1] + 1]]
 
 
 def display_raw_input(review, field, raw):
