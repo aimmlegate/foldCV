@@ -168,3 +168,5 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D163 The model reads whole units by their line range and other blocks by title; the gate gets a tolerance (T2 and T3 of D158)
 - D164 The designs of T9 and of T4 (draft 2) are approved; the technology check by code is a slice of its own before T4
 - D165 A project technology its entry's lines do not name is respelled from the source or is one finding settled by code (point 14 of T4, D164)
+- D166 A first call maps the CV, and each block reads only the lines the map gave it (T4 of D158, design draft 2 of D164)
+- D167 A project technology its entry's lines do not name is respelled or dropped by code, with no model repair (follow-up of D165)
