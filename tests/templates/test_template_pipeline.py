@@ -1122,8 +1122,9 @@ async def test_a_rejected_technology_name_shows_no_source_line(tmp_path):
     def script(_request, value):
         if 'targets' not in value:
             reply = employment_proposal(src)
-            # An invented name citing two lines; the coordinator fails it before the review (D164, point 14).
-            reply['payload'][0]['technologies'][0]['display'] = 'Git'
+            # A name its line states case aside, so the coordinator neither settles nor drops it (D115, D165), citing
+            # two lines; the review rejects it.
+            reply['payload'][0]['technologies'][0]['display'] = 'python'
             field = next(entry for entry in reply['fields'] if entry['pointer'] == '/0/technologies/0/display')
             field['evidence'] = [span(src, 'Python'), span(src, 'Implemented queue processing.')]
             return reply
@@ -1134,4 +1135,4 @@ async def test_a_rejected_technology_name_shows_no_source_line(tmp_path):
     assert not any(record.kind == 'technology' for record in fixture.current().project.facts.records)
     outcome = result.task_results[0]
     assert outcome.disposition == 'source_fallback' and outcome.value['sourceTexts'] == {} and outcome.source_spans == []
-    assert result.issues and 'не называют технологию «Git»' in result.issues[0].message
+    assert result.issues and 'Неверно' in result.issues[0].message

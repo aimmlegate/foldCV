@@ -10,7 +10,7 @@ from ..sources import source_slice
 from .template_identity import (allocate_discoveries, offered_evidence, offered_references, resolve_fields,
                                 resolve_lineage, restore_evidence)
 from ..import_failure import TemplateImportFailure
-from .template_import import attempt_in, checked, fork, identity, task_in
+from .template_import import attempt_in, checked, entries_of, fork, identity, task_in
 from ..hashing import digest
 from ..hashing import canonical, sha256
 from ..templates.projection import pointer_tokens, reachable_schema, validate_payload
@@ -18,7 +18,7 @@ from ..templates.replies import proposal_schema, strip_unoffered_bookkeeping
 from ..template_capture import item_identities
 from .template_completion import complete_reply
 from .template_map import merge_header
-from .template_technologies import owned_types
+from .template_technologies import EntryLines, carried, owned_types
 
 import json
 
@@ -253,10 +253,20 @@ def parse_proposal(operation, attempt_id, package, sources, facts, *, captured_r
             # One entry of a block (D117) cites its own lines first.
             lines = {digest(span) for span in task.entry.spans} if task.entry is not None else set()
             preferred = {ref: option for ref, option in table.items() if digest(option.span) in lines} or None
+            owned = owned_types(package.definition.fact_types)
+            # A technology the lines of its entry name in no form leaves the reply on every slot (D165 follow-up).
+            read = EntryLines(owned & {binding.semantic_type for binding in block.bindings}, sources,
+                task.entry.spans if task.entry is not None else None, [span for other in entries_of(result,
+                    task.parent_task_id) if other.id != task.id for span in other.entry.spans] if task.entry is not None else [])
             completed = complete_reply(outer['payload'], block.bindings, table, references, allowed, dropped=dropped,
-                preferred=preferred, previous=attempt.request_value.get('previousReply'),
-                technologies=owned_types(package.definition.fact_types))
-            proposal.dropped_values = [DroppedValue.model_validate(value) for value in dropped or []]
+                preferred=preferred, previous=attempt.request_value.get('previousReply'), technologies=owned,
+                entry_lines=read if read.types else None)
+            proposal.dropped_values = [DroppedValue.model_validate(value) for value in [*(dropped or []), *read.dropped]]
+            if attempt.slot != 'initial':
+                # A repair keeps the technologies its task's earlier replies lost, so the block's notice still names them.
+                earlier = [value for prior in result.proposals if attempt_in(result, prior.attempt_id).task_id == task.id
+                    for value in prior.dropped_values]
+                proposal.dropped_values += carried(earlier, proposal.dropped_values, completed, block.bindings, read.types)
             reply = restore_reply(ReferencedProposalReply.model_validate(completed, strict=True), table, references, sources)
         declarations = {declaration.id: declaration for declaration in package.definition.fact_types}
         schemas = {key: reachable_schema(declaration.data_schema, package.definition.content_definitions)

@@ -1,37 +1,35 @@
-"""D164, point 14 of T4: the technologies an entry owns are read against the entry's lines. A name the lines state as
-written, case and spacing aside, or by a catalog alias passes; one they write with other spaces or punctuation takes
-their spelling and cites its line; any other is one finding of the template's own rule, settled by code before the
-review, which the repair gets and which stays a warning when the repair leaves it (synthetic text only)."""
+"""D164, point 14 of T4, and D165 with its follow-up: the technologies an entry owns are read against the entry's lines.
+A name the lines name in some form passes; one they word otherwise takes their wording and cites its line; any other
+leaves the reply by code on every slot and is named in the block's notice, so no model repair runs for it (synthetic
+text only)."""
 
 import json
 
 import pytest
 
 from packages.resume_core.hashing import sha256
-from packages.resume_core.importing import template_proposals, template_review
+from packages.resume_core.importing import template_proposals
 from packages.resume_core.importing.template_completion import complete_reply
 from packages.resume_core.importing.template_identity import evidence_options
 from packages.resume_core.importing.template_import import (admit_operation, capture_task_input, dispatch_attempt,
                                                             record_return, reserve_attempt)
 from packages.resume_core.importing.template_proposals import parse_proposal
-from packages.resume_core.importing.template_technologies import (foreign_technologies, named, owned_types,
-                                                                  source_spelling)
+from packages.resume_core.importing.template_technologies import (EntryLines, carried, entry_runs, named, owned_types,
+                                                                  source_spelling, verdict)
 from packages.resume_core.models.contracts import Source
+from packages.resume_core.models.template_import import DroppedValue
 from packages.resume_core.project_limits import finalization_seconds, import_seconds
-from packages.resume_core.sources import capture_span, line_spans
-from packages.resume_core.template_capture import item_identities
+from packages.resume_core.sources import capture_span, line_spans, source_slice
 from packages.resume_core.templates.operations import derive_task
 from tests.templates.entry_fixtures import ref_of
-from tests.templates.evidence_references import model_targets
 from tests.templates.generic_fixtures import (block_reply, date, generic_package, generic_script, identity, job, period,
                                               satisfied)
 from tests.templates.pipeline_fixtures import NOW, cleaned, owner, resume_command, setup_operation, usage
 from tests.templates.template_runtime_fixtures import EmploymentFixture
-from tests.templates.test_reply_completion import NO_OFFERS, entry, offered, projects, reply
+from tests.templates.test_reply_completion import NO_OFFERS, entry, offered, projects, reply, text_source
 
 TYPES = owned_types(generic_package().definition.fact_types)
 EXPANDED = 'TCA (Composable Architecture)'
-FINDING = 'Строки этой записи не называют технологию «' + EXPANDED + '».'
 
 # One employer, a stack line of the team that no entry holds, four projects; each names its stack on a line of its own.
 TEAM = 'Team stack: Fastlane, Xcode Cloud'
@@ -48,6 +46,10 @@ TASKS = {'Atlas': 'Built the Atlas booking screens.', 'Beacon': 'Built the Beaco
 # What the model writes: an expanded abbreviation, names with another dash and spacing, an alias, verbatim names.
 WRITTEN = {'Atlas': ['Swift', EXPANDED, 'Combine'], 'Beacon': ['Swift 4-5', 'Win Forms'], 'Comet': ['Kotlin', 'Kubernetes'],
     'Delta': ['Rust', 'Docker']}
+# The same names as the source writes them.
+STATED = {'Atlas': ['Swift', 'TCA', 'Combine'], 'Beacon': ['Swift 4–5', 'WinForms'], 'Comet': ['Kotlin', 'Kubernetes'],
+    'Delta': ['Rust', 'Docker']}
+UNBOUND = 'Убраны данные, которые источник не подтверждает: {}. Остальное в блоке принято.'
 
 
 def source_of(lines):
@@ -95,6 +97,89 @@ def test_a_name_takes_the_spelling_of_a_line_only_when_spaces_or_punctuation_dif
 ])
 def test_lines_name_a_technology_as_written_or_by_a_catalog_alias(name, line, stated):
     assert named(name, [line]) is stated
+
+
+@pytest.mark.parametrize('name, lines', [
+    # The source layout wrapped the name: two lines in a row read as one.
+    ('Oracle Database 19c', ['Databases: Redis, Oracle Database', '19c, MySQL']),
+    # A range with another dash and spacing, with or without a leading v, beside a qualifier the reply left out.
+    ('Ruby 2.7–3.1', ['Languages: RUBY (MRI) 2.7-3.1, Redis']),
+    ('Ruby v2.7 - 3.1', ['Languages: RUBY (MRI) 2.7-3.1, Redis']),
+    # Base, version and qualifier: every word of them stands in the line of the base.
+    ('Angular 15 (Standalone Components)', ['Web: Angular (v15 Standalone Components, 17 Signals)']),
+    ('MVVM (Model-View-ViewModel)', ['Patterns: MVVM / Model-View-ViewModel']),
+    # A catalog synonym with the same other words.
+    ('Microsoft SQL Server Express', ['Databases: MS SQL Express, Redis']),
+    # The CV's typo, one letter changed or two neighbouring letters swapped, which the name fixes.
+    ('Postman', ['Testing: Pastman, JMeter']),
+    ('Kubernetes', ['Deploy: Kuberentes, Helm']),
+])
+def test_lines_name_a_technology_in_the_other_forms_that_pass(name, lines):
+    assert verdict(name, ['\n'.join(lines)]) is None
+
+
+@pytest.mark.parametrize('name, line, value, fragment', [
+    # A contraction: the parts of the line's name, split at case changes and signs, start the reply's words in order.
+    ('Visual Basic .NET', 'Languages: C#, VB.NET', 'VB.NET', 'VB.NET'),
+    ('Windows Forms', 'UI: WinForms, WPF', 'WinForms', 'WinForms'),
+    ('Windows Presentation Foundation', 'UI: WinForms, WPF', 'WPF', 'WPF'),
+    # A qualifier or version the line does not state: the value becomes the base as the line writes it.
+    (EXPANDED, 'Stack: Swift, TCA, Combine', 'TCA', 'TCA'),
+    ('tca (Composable Architecture)', 'Stack: Swift, TCA, Combine', 'TCA', 'TCA'),
+    ('Realm 10', 'Stack: Swift, Realm, Combine', 'Realm', 'Realm'),
+    # A base named by alias or with the CV's typo keeps the reply's spelling and is cited by the line's.
+    ('Kubernetes (EKS)', 'Deploy to K8s clusters', 'Kubernetes', 'K8s'),
+    ('Postman 10', 'Testing: Pastman, JMeter', 'Postman', 'Pastman'),
+    # P14: other spaces or punctuation.
+    ('Swift 4-5', 'Swift 4–5, UIKit', 'Swift 4–5', 'Swift 4–5'),
+])
+def test_a_technology_the_lines_word_otherwise_takes_their_wording(name, line, value, fragment):
+    assert verdict(name, [line]) == (value, fragment)
+
+
+@pytest.mark.parametrize('name, lines', [
+    ('Tailwind', ['Stack: Swift, TCA, Combine']),
+    # Two lines that are not in a row do not make one name.
+    ('Oracle Database 19c', ['Databases: Redis, Oracle Database', 'Built the reports.', '19c, MySQL']),
+    # The typo rule needs six letters, the same first letter and one change.
+    ('Kafka', ['Queues: Kfaka, Redis']),
+    ('Kotlin', ['Languages: Gotlin']),
+    ('Postman', ['Testing: Pastmen, JMeter']),
+    # A contraction joins two or more words, never across a slash, and every word takes a part.
+    ('JavaScript', ['Languages: Java, Kotlin']),
+    ('GitHubActions', ['CI: GitHub, Jenkins']),
+    ('Apache Beam', ['Ran A/B tests']),
+    ('React Native', ['Web: React, Redux']),
+    # Other words after a catalog name stand right after it.
+    ('Java Spring', ['Backend: Java, Spring']),
+])
+def test_a_technology_the_lines_name_in_no_form_is_left_out(name, lines):
+    assert verdict(name, ['\n'.join(lines)]) is False
+
+
+def units_source(*texts):
+    """A source of one unit per line, as a parsed upload often has."""
+    raw = '\n'.join(texts).encode()
+    return Source(id='source-units', revision=1, originalName='lines.txt', mimeType='text/plain', byteSha256=sha256(raw),
+        byteRef='sources/lines.txt', parser='text', parserVersion='1', units=[{'id': 'unit-' + str(index), 'revision': 1,
+            'order': index, 'text': text, 'location': {'kind': 'pasted', 'index': index, 'row': None, 'column': None},
+            'disposition': 'shown', 'representedFactIds': []} for index, text in enumerate(texts)], overlays=[], warnings=[])
+
+
+def test_the_lines_of_an_entry_stay_in_a_row_across_units_and_another_entry_breaks_the_row():
+    texts = ['Example Labs — engineer', 'Built the reports.', 'Stack: C#, Oracle Database', '19c, Redis',
+        'North Co — engineer', 'Built the exports.']
+    src = units_source(*texts)
+    def line(index):
+        return capture_span(src, src.units[index])
+    # The record cites its header and its task; its stack lines below them are the technologies' own and join the run,
+    # so the name the layout wrapped is named.
+    runs = entry_runs([src], [line(0), line(1)], [line(2), line(3)])
+    assert runs == ['\n'.join(texts[:4])] and verdict('Oracle Database 19c', runs) is None
+    # The text between the cited lines counts, without the lines of another entry.
+    assert entry_runs([src], [line(0), line(5)], [], others=[line(4)]) == ['\n'.join(texts[:4]), texts[5]]
+    # Units that are not in a row are runs of their own.
+    assert entry_runs([src], [line(0)], [line(2)]) == [texts[0], texts[2]]
 
 
 # ---------------------------------------------------------------------------------------------------------- completion
@@ -148,6 +233,50 @@ def test_a_name_the_lines_state_or_do_not_write_at_all_completes_as_before(names
     assert completed(payload, technologies=TYPES) == completed(payload)
 
 
+@pytest.mark.parametrize('company, names', [('North Studio', ['Swift 4–5', 'TCA']), ('North Studio', ['swift 4–5', 'tca']),
+    ('North Studio', ['WinForms', 'Swift 4–5']), ('South Works', ['Kubernetes', 'Win Forms']), ('South Works', [])])
+def test_a_name_its_entry_states_stays_untouched_when_read_against_the_entry(company, names):
+    payload = [job(company, 'iOS developer', None, technologies=names, tasks=['Built the booking screens.'
+        if company == 'North Studio' else 'Built the map module.'])]
+    read = EntryLines(TYPES, [text_source(TEXT)])
+    assert completed(payload, technologies=TYPES, entry_lines=read) == completed(payload) and read.dropped == []
+
+
+STACK_TEXT = ('North Studio — iOS developer, 2019–2021\n'
+    'Stack: Swift, RUBY (MRI) 2.7-3.1, Angular (v15 Standalone Components), Oracle Database\n'
+    '19c, MS SQL Express, Pastman\n'
+    'Also: VB.NET, WinForms, WPF, MVVM, Realm, K8s\n'
+    'Built the booking screens.\n')
+
+
+def test_each_technology_passes_takes_the_wording_of_its_line_or_leaves_the_reply_with_its_citation():
+    _options, table, lines = offered(STACK_TEXT)
+    stack, next_line = lines[STACK_TEXT.splitlines()[1]], lines['19c, MS SQL Express, Pastman']
+    also, header = lines['Also: VB.NET, WinForms, WPF, MVVM, Realm, K8s'], lines['North Studio — iOS developer, 2019–2021']
+    # (written, its citation in the reply or None, what it becomes or None when it leaves, the line it cites then)
+    cases = [('Swift', stack, 'Swift', stack), ('Ruby 2.7–3.1', stack, 'Ruby 2.7–3.1', stack),
+        ('Angular 15 (Standalone Components)', stack, 'Angular 15 (Standalone Components)', stack),
+        ('Oracle Database 19c', stack, 'Oracle Database 19c', stack),
+        ('Microsoft SQL Server Express', next_line, 'Microsoft SQL Server Express', next_line),
+        ('Postman', next_line, 'Postman', next_line),
+        ('Visual Basic .NET', header, 'VB.NET', also), ('Windows Forms', None, 'WinForms', also),
+        ('MVVM (Model-View-ViewModel)', also, 'MVVM', also), ('Realm 10', also, 'Realm', also),
+        ('Kubernetes (EKS)', also, 'Kubernetes', also), ('Tailwind', None, None, None), ('Svelte', stack, None, None)]
+    payload = [job('North Studio', 'iOS developer', None, technologies=[case[0] for case in cases],
+        tasks=['Built the booking screens.'])]
+    given = [entry('/0/technologies/' + str(index) + '/display', [case[1]]) for index, case in enumerate(cases) if case[1]]
+    read = EntryLines(TYPES, [text_source(STACK_TEXT)])
+    done = complete_reply(reply(payload, given), projects().bindings, table, NO_OFFERS, technologies=TYPES, entry_lines=read)
+    kept = [case for case in cases if case[2] is not None]
+    assert [value['display'] for value in done['payload'][0]['technologies']] == [case[2] for case in kept]
+    evidence = {value['pointer']: value['evidence'] for value in done['fields']}
+    assert [evidence['/0/technologies/' + str(index) + '/display'] for index in range(len(kept))] == [[case[3]] for case in kept]
+    assert read.dropped == [{'pointer': '/0/technologies/11/display', 'fieldKey': 'display', 'text': 'Tailwind'},
+        {'pointer': '/0/technologies/12/display', 'fieldKey': 'display', 'text': 'Svelte'}]
+    # The job's other values complete as they would without the names that left.
+    assert evidence['/0/tasks/0/value'] == [lines['Built the booking screens.']]
+
+
 def test_only_the_technologies_an_entry_owns_are_respelled():
     _options, table, _lines = offered(TEXT)
     programming = next(block for block in generic_package().definition.blocks if block.id == 'programming')
@@ -155,10 +284,27 @@ def test_only_the_technologies_an_entry_owns_are_respelled():
         'relations': None}
     assert (complete_reply(skills, programming.bindings, table, NO_OFFERS, technologies=TYPES)
         == complete_reply(skills, programming.bindings, table, NO_OFFERS))
-    # A name read from the editor's cells stays as it is.
-    payload = [job('North Studio', 'iOS developer', None, technologies=['Win-Forms'])]
-    given = [{**entry('/0/technologies/0/display', []), 'effectiveCells': ['E1']}]
-    assert completed(payload, given, technologies=TYPES)['payload'][0]['technologies'][0]['display'] == 'Win-Forms'
+    # A name read from the editor's cells stays as it is, also against its entry.
+    payload = [job('North Studio', 'iOS developer', None, technologies=['Win-Forms', 'Bootstrap'])]
+    given = [{**entry('/0/technologies/' + str(index) + '/display', []), 'effectiveCells': ['E1']} for index in range(2)]
+    read = EntryLines(TYPES, [text_source(TEXT)])
+    done = completed(payload, given, technologies=TYPES, entry_lines=read)
+    assert [value['display'] for value in done['payload'][0]['technologies']] == ['Win-Forms', 'Bootstrap']
+    assert read.dropped == []
+
+
+def dropped(pointer, text, key='display'):
+    return DroppedValue.model_validate({'pointer': pointer, 'fieldKey': key, 'text': text})
+
+
+def test_a_repair_keeps_the_technologies_an_earlier_reply_lost_unless_it_states_or_loses_them_itself():
+    earlier = [dropped('/0/technologies/2/display', 'Tailwind'), dropped('/1/technologies/0/display', 'Svelte'),
+        dropped('/0/tasks/1/value', 'Invented task.', 'value'), dropped('/0/technologies/3/display', 'Docker'),
+        dropped('/1/technologies/1/display', 'Svelte')]
+    repair = {'payload': [job('North Studio', 'iOS developer', None, technologies=['Swift', 'docker'])]}
+    own = [dropped('/0/technologies/2/display', 'tailwind')]
+    # Tailwind is named by the repair's own loss, Docker stands in the repair, a task is no technology; Svelte once.
+    assert [value.text for value in carried(earlier, own, repair, projects().bindings, TYPES)] == ['Svelte']
 
 
 # ----------------------------------------------------------------------------------------------------- a block run whole
@@ -192,44 +338,51 @@ def parsed(text, payload, cites):
 
 def test_a_block_run_whole_reads_each_name_against_the_lines_its_record_cites():
     # Below the record's other lines: a name alone on a line no other value cites stays, and so does an alias; an
-    # abbreviation the reply expanded does not.
+    # abbreviation the reply expanded takes the form of the line it cites, and a name no line states leaves the reply
+    # on the initial slot, the proposal stays valid and names it.
     text = 'Example Labs — backend engineer\n2020–2023\nImplemented queue processing.\nPython\nStack: Go, TCA\n'
     when = period('2020–2023', date('2020', 2020), date('2023', 2023), False)
-    payload = [job('Example Labs', 'backend engineer', when, technologies=['Python', 'Golang', 'TCA (Task Coordination API)'],
-        tasks=['Implemented queue processing.'])]
-    proposal, operation, src = parsed(text, payload, {'/0/technologies/1/display': 'Stack: Go, TCA',
+    payload = [job('Example Labs', 'backend engineer', when,
+        technologies=['Python', 'Golang', 'TCA (Task Coordination API)', 'Tailwind'], tasks=['Implemented queue processing.'])]
+    proposal, _operation, src = parsed(text, payload, {'/0/technologies/1/display': 'Stack: Go, TCA',
         '/0/technologies/2/display': 'Stack: Go, TCA'})
-    found = foreign_technologies(proposal, item_identities(operation), [src], TYPES)
-    assert [field.pointer for field in found] == ['/0/technologies/2/display']
+    assert [value['display'] for value in proposal.reply.payload[0]['technologies']] == ['Python', 'Golang', 'TCA']
+    field = next(value for value in proposal.resolved_fields if value.pointer == '/0/technologies/2/display')
+    assert [source_slice([src], span) for span in field.evidence] == ['Stack: Go, TCA\n']
+    assert [(value.pointer, value.text) for value in proposal.dropped_values] == [('/0/technologies/3/display', 'Tailwind')]
 
 
 # ------------------------------------------------------------------------------------------- the review and the repair
 
-def project(name, technologies):
+def project(name, technologies, role='Senior iOS developer'):
     start, end = YEARS[name].split('–')
-    return job('Example Labs', 'Senior iOS developer', period(YEARS[name], date(start, int(start)), date(end, int(end)), False),
+    return job('Example Labs', role, period(YEARS[name], date(start, int(start)), date(end, int(end)), False),
         project={'name': name, 'description': None}, technologies=technologies, tasks=[TASKS[name]])
 
 
-def scripted(src, written=WRITTEN, *, repaired=None, cites=None):
+def scripted(src, written=WRITTEN, *, repaired=None, cites=None, roles=None, review=satisfied):
     """Replies of the whole import. Outlined, the projects block has one entry per project; each project lists
-    written[name], or repaired[name] in a repair, every name cited from the project's stack line unless cites names
-    another line. Every check the model is asked holds."""
+    written[name], or repaired[name] with its role from roles in a repair, every name cited from the project's stack
+    line unless cites names another line. review answers each review; by default every check the model is asked
+    holds."""
     block = projects()
     others = generic_script(src, {'identity': identity('Alex Example', 'Mobile engineer', 'other', 'Mobile engineer')})
     def script(request, value):
         if 'targets' in value:
-            return satisfied(value)
+            return review(value)
         if value.get('declaration', {}).get('id') != 'projects' or value.get('slot') == 'outline_review':
             return others(request, value)
         if value.get('slot') == 'outline':
             return {'entries': [{'title': name, 'first': ref_of(value, name + ', ' + YEARS[name]),
                 'last': ref_of(value, TASKS[name])} for name in STACKS]}
         names = [part['title'] for part in value['entry']['parts']] if 'entry' in value else list(STACKS)
-        listed = repaired if repaired is not None and value.get('slot') != 'initial' else written
+        repair = repaired is not None and value.get('slot') != 'initial'
+        listed = repaired if repair else written
         moved = {'/' + str(position) + '/technologies/' + str(index) + '/display': (cites or {}).get((name, technology),
             STACKS[name]) for position, name in enumerate(names) for index, technology in enumerate(listed[name])}
-        return block_reply(block, [project(name, listed[name]) for name in names], src, moved, value)
+        items = [project(name, listed[name], (roles or {}).get(name, 'Senior iOS developer') if repair
+            else 'Senior iOS developer') for name in names]
+        return block_reply(block, items, src, moved, value)
     return script
 
 
@@ -249,7 +402,7 @@ async def imported(tmp_path, script_of):
     fixture.transport.scripted = script_of(src)
     result = await fixture.pipeline.run(fixture.project, fixture.command, admitted=fixture.admitted)
     assert result.state == 'published'
-    return result, fixture.current().project
+    return result, fixture.current().project, src
 
 
 def entries(result):
@@ -261,34 +414,27 @@ def slots(result, task):
     return [attempt.slot for attempt in result.attempts if attempt.task_id == task.id]
 
 
-def review_of(result, task, slot='review'):
-    attempt = next(value for value in result.attempts if value.task_id == task.id and value.slot == slot)
-    return next(value.value for value in result.review_inputs if value.attempt_id == attempt.id)
+def proposals_of(result, task):
+    attempts = {attempt.id: attempt for attempt in result.attempts}
+    return [value for value in result.proposals if attempts[value.attempt_id].task_id == task.id]
 
 
-def settled_by_pointer(result, review):
-    """{pointer: [(rule, disposition, reason)]} of the checks the coordinator settled in a review input."""
-    proposal = next(value for value in result.proposals if value.proposal_hash == review.proposal_hash)
-    handles = {allocation.item_handle: allocation for allocation in review.handle_map}
-    pointers = {handles[field.item_handle].cell_ids[field.field_key]: field.pointer for field in proposal.resolved_fields}
-    found = {}
-    for check in review.settled:
-        if check.target_id in pointers:
-            found.setdefault(pointers[check.target_id], []).append((check.rule_id, check.disposition, check.reason))
-    return found
-
-
-def failing(settled):
-    return {pointer: [value for value in values if value[1] != 'satisfied'] for pointer, values in settled.items()
-        if any(value[1] != 'satisfied' for value in values)}
+def admitted(result, task):
+    return next(value for value in reversed(proposals_of(result, task)) if value.applied_receipt_id is not None)
 
 
 def admitted_names(result, task):
     """The technology names of the task's admitted reply, by project name."""
-    attempts = {attempt.id: attempt for attempt in result.attempts}
-    proposal = next(value for value in reversed(result.proposals) if value.applied_receipt_id is not None
-        and attempts[value.attempt_id].task_id == task.id)
-    return {item['project']['name']: [value['display'] for value in item['technologies']] for item in proposal.reply.payload}
+    return {item['project']['name']: [value['display'] for value in item['technologies']]
+        for item in admitted(result, task).reply.payload}
+
+
+def cited_lines(result, task, src):
+    """{technology name: the lines its admitted value cites} of the task's admitted reply."""
+    proposal = admitted(result, task)
+    return {proposal.reply.payload[int(field.pointer.split('/')[1])]['technologies'][int(field.pointer.split('/')[3])]
+        ['display']: [source_slice([src], span).rstrip('\n') for span in field.evidence]
+        for field in proposal.resolved_fields if '/technologies/' in field.pointer}
 
 
 def cards(project):
@@ -303,88 +449,101 @@ def cards(project):
     return found
 
 
-def warnings(project):
-    return [issue for issue in project.import_issues if issue.code == 'IMPORT_SOURCE_FALLBACK']
+def notices(project, code):
+    return {issue.task_id: issue.message for issue in project.import_issues if issue.code == code}
+
+
+def repairs(result):
+    return [attempt for attempt in result.attempts if attempt.slot in {'primary_repair', 'fallback_repair'}]
 
 
 @pytest.mark.asyncio
-async def test_an_expanded_abbreviation_is_one_finding_by_code_and_its_repair_keeps_the_source_form(tmp_path):
-    repaired = {**WRITTEN, 'Atlas': ['Swift', 'TCA', 'Combine']}
-    result, project = await imported(tmp_path, lambda src: scripted(src, repaired=repaired))
+async def test_an_expanded_abbreviation_takes_the_source_form_by_code_and_no_repair_runs(tmp_path):
+    result, project, src = await imported(tmp_path, scripted)
     first, second = entries(result)
-    # The first group (Atlas and Beacon) is repaired once; the second has nothing to repair.
-    assert slots(result, first) == ['initial', 'review', 'primary_repair', 'replacement_review']
-    assert slots(result, second) == ['initial', 'review']
-    review = review_of(result, first)
-    settled = settled_by_pointer(result, review)
-    assert failing(settled) == {'/0/technologies/1/display': [('projects-support', 'violation', FINDING)]}
-    # The value's other checks hold, so the model is asked nothing about it.
-    cell = next(check.target_id for check in review.settled if check.disposition == 'violation')
-    assert len(settled['/0/technologies/1/display']) == sum(target.target_id == cell for target in review.targets) > 1
-    assert cell not in {target['targetId'] for target in model_targets(review.model_dump(mode='json', by_alias=True))}
-    # The repair is told which value and why, and writes the name as the source does.
-    repair = next(attempt.request_value for attempt in result.attempts if attempt.task_id == first.id
-        and attempt.slot == 'primary_repair')
-    assert [(value['ruleId'], value.get('pointer'), value['reason']) for value in repair['feedback']] == [
-        ('projects-support', '/0/technologies/1/display', FINDING)]
-    assert not failing(settled_by_pointer(result, review_of(result, first, 'replacement_review')))
-    # Beacon's names took the source's spelling without a finding; the alias and the verbatim names pass untouched.
+    # P14 made the expansion a finding and repaired the first group; now no group is repaired.
+    assert slots(result, first) == slots(result, second) == ['initial', 'review'] and not repairs(result)
     assert admitted_names(result, first) == {'Atlas': ['Swift', 'TCA', 'Combine'], 'Beacon': ['Swift 4–5', 'WinForms']}
     assert admitted_names(result, second) == {'Comet': ['Kotlin', 'Kubernetes'], 'Delta': ['Rust', 'Docker']}
-    later = settled_by_pointer(result, review_of(result, second))
-    assert not failing(later) and '/0/technologies/1/display' not in later and '/1/technologies/1/display' in later
+    assert cited_lines(result, first, src)['TCA'] == [STACKS['Atlas']]
     shown = cards(project)
     assert 'Composable Architecture' not in shown['Atlas'] and 'TCA' in shown['Atlas']
     assert 'Swift 4–5' in shown['Beacon'] and 'WinForms' in shown['Beacon'] and 'Kubernetes' in shown['Comet']
-    assert not warnings(project)
+    # A name that takes the source's form is not a value the source does not state: no notice.
+    assert not notices(project, 'IMPORT_VALUE_UNBOUND') and not notices(project, 'IMPORT_SOURCE_FALLBACK')
 
 
 @pytest.mark.asyncio
-async def test_a_name_only_another_entry_states_is_a_finding_and_a_line_of_the_job_is_not(tmp_path):
+async def test_a_name_only_another_entry_states_leaves_the_reply_and_a_line_of_the_job_stays(tmp_path):
     # Atlas takes a name of a later project, Delta one of an earlier project; Comet one of its job above its entry, which
     # no entry holds (D155: a project cites its employer and job title there too).
-    written = {**WRITTEN, 'Atlas': ['Swift', 'TCA', 'Combine', 'Docker'], 'Comet': ['Kotlin', 'Kubernetes', 'Fastlane'],
+    written = {**STATED, 'Atlas': ['Swift', 'TCA', 'Combine', 'Docker'], 'Comet': ['Kotlin', 'Kubernetes', 'Fastlane'],
         'Delta': ['Rust', 'Docker', 'Combine']}
-    # The scripted repair keeps the number of names: it gives the place to a name the entry states.
-    repaired = {**written, 'Atlas': ['Swift', 'TCA', 'Combine', 'Realm'], 'Delta': ['Rust', 'Docker', 'Tokio']}
     cites = {('Atlas', 'Docker'): STACKS['Delta'], ('Delta', 'Combine'): STACKS['Atlas'], ('Comet', 'Fastlane'): TEAM}
-    result, project = await imported(tmp_path, lambda src: scripted(src, written, repaired=repaired, cites=cites))
+    result, project, _src = await imported(tmp_path, lambda src: scripted(src, written, cites=cites))
     first, second = entries(result)
-    finding = 'Строки этой записи не называют технологию «{}».'.format
-    assert failing(settled_by_pointer(result, review_of(result, first))) == {
-        '/0/technologies/3/display': [('projects-support', 'violation', finding('Docker'))]}
-    assert failing(settled_by_pointer(result, review_of(result, second))) == {
-        '/1/technologies/2/display': [('projects-support', 'violation', finding('Combine'))]}
-    assert admitted_names(result, first)['Atlas'] == ['Swift', 'TCA', 'Combine', 'Realm']
-    assert admitted_names(result, second) == {'Comet': ['Kotlin', 'Kubernetes', 'Fastlane'], 'Delta': ['Rust', 'Docker', 'Tokio']}
+    assert slots(result, first) == slots(result, second) == ['initial', 'review'] and not repairs(result)
+    assert admitted_names(result, first)['Atlas'] == ['Swift', 'TCA', 'Combine']
+    assert admitted_names(result, second) == {'Comet': ['Kotlin', 'Kubernetes', 'Fastlane'], 'Delta': ['Rust', 'Docker']}
+    assert notices(project, 'IMPORT_VALUE_UNBOUND') == {first.id: UNBOUND.format('«Docker»'),
+        second.id: UNBOUND.format('«Combine»')}
     shown = cards(project)
     assert 'Docker' not in shown['Atlas'] and 'Combine' not in shown['Delta'] and 'Fastlane' in shown['Comet']
-    assert not warnings(project)
+    assert not notices(project, 'IMPORT_SOURCE_FALLBACK')
 
 
 @pytest.mark.asyncio
-async def test_a_repair_that_leaves_the_name_gives_one_warning_and_the_card_keeps_its_other_values(tmp_path):
-    result, project = await imported(tmp_path, lambda src: scripted(src, repaired=WRITTEN))
+async def test_a_name_no_line_states_leaves_the_initial_reply_without_a_repair_and_the_notice_names_it_once(tmp_path):
+    written = {**STATED, 'Atlas': ['Swift', 'Bootstrap', 'TCA', 'Combine']}
+    result, project, src = await imported(tmp_path, lambda src: scripted(src, written))
+    first, second = entries(result)
+    # P14 failed the name by code and the first group made two calls more: a repair and its review.
+    assert slots(result, first) == slots(result, second) == ['initial', 'review'] and not repairs(result)
+    [initial] = proposals_of(result, first)
+    assert [(value.pointer, value.text) for value in initial.dropped_values] == [('/0/technologies/1/display', 'Bootstrap')]
+    # The record keeps its other names, each cited from its stack line.
+    assert admitted_names(result, first)['Atlas'] == ['Swift', 'TCA', 'Combine']
+    assert {name: lines for name, lines in cited_lines(result, first, src).items() if name in {'TCA', 'Combine'}} == {
+        'TCA': [STACKS['Atlas']], 'Combine': [STACKS['Atlas']]}
+    assert notices(project, 'IMPORT_VALUE_UNBOUND') == {first.id: UNBOUND.format('«Bootstrap»')}
+    assert 'Bootstrap' not in cards(project)['Atlas'] and 'Combine' in cards(project)['Atlas']
+    assert not notices(project, 'IMPORT_SOURCE_FALLBACK')
+
+
+def role_review(value):
+    """The first group's first review fails Atlas's role; every other check holds."""
+    shown = value['semanticContext']['proposal']['payload']
+    atlas = isinstance(shown, list) and bool(shown) and ((shown[0] or {}).get('project') or {}).get('name') == 'Atlas'
+    def verdict_of(check):
+        failing = atlas and check.get('pointer') == '/0/role' and check.get('value') == 'Senior iOS developer'
+        return 'violation' if failing else None
+    return satisfied(value, verdict_of)
+
+
+@pytest.mark.asyncio
+async def test_the_notice_still_names_the_lost_name_when_a_repair_runs_for_another_reason(tmp_path):
+    # Beacon's last name is one no line states. The review fails Atlas's role; the repair corrects it and lists Beacon's
+    # names without the lost one.
+    written = {**STATED, 'Beacon': ['Swift 4–5', 'WinForms', 'Bootstrap']}
+    result, project, _src = await imported(tmp_path, lambda src: scripted(src, written, repaired=STATED,
+        roles={'Atlas': 'iOS developer'}, review=role_review))
     first, second = entries(result)
     assert slots(result, first) == ['initial', 'review', 'primary_repair', 'replacement_review']
-    assert failing(settled_by_pointer(result, review_of(result, first, 'replacement_review'))) == {
-        '/0/technologies/1/display': [('projects-support', 'violation', FINDING)]}
-    [issue] = warnings(project)
-    assert issue.task_id == first.id and FINDING in issue.message
-    task_result = next(value for value in result.task_results if value.task_id == first.id)
-    assert (first.state, task_result.disposition) == ('accepted', 'source_fallback')
-    # The name is withdrawn alone: Atlas keeps its other names, its task and its role; Beacon is whole.
-    shown = cards(project)
-    assert EXPANDED not in shown['Atlas'] and 'Swift' in shown['Atlas'] and 'Combine' in shown['Atlas']
-    assert TASKS['Atlas'].rstrip('.') in shown['Atlas'] and 'Senior iOS developer' in shown['Atlas']
-    assert 'WinForms' in shown['Beacon'] and TASKS['Beacon'].rstrip('.') in shown['Beacon']
+    assert slots(result, second) == ['initial', 'review']
+    initial, repair = proposals_of(result, first)
+    assert [value.text for value in initial.dropped_values] == ['Bootstrap']
+    # The repair lost nothing itself and keeps what the first reply lost; it is the reply admitted.
+    assert [value.text for value in repair.dropped_values] == ['Bootstrap'] and admitted(result, first) is repair
+    assert repair.reply.payload[0]['role'] == 'iOS developer'
+    assert notices(project, 'IMPORT_VALUE_UNBOUND') == {first.id: UNBOUND.format('«Bootstrap»')}
+    assert 'Bootstrap' not in cards(project)['Beacon'] and 'WinForms' in cards(project)['Beacon']
 
 
 @pytest.mark.asyncio
 async def test_an_import_stored_before_the_check_resumes_with_its_stored_review(tmp_path, monkeypatch):
-    # The earlier build: no respelling and no finding by code. With one call at a time the projects block runs whole.
+    # The earlier build: no respelling and no technology left out by code. With one call at a time the projects block
+    # runs whole.
     monkeypatch.setattr(template_proposals, 'owned_types', lambda _types: frozenset())
-    monkeypatch.setattr(template_review, 'owned_types', lambda _types: frozenset())
     fixture, src = fixture_for(tmp_path, concurrency=1)
     script = scripted(src)
     def crashing(request, value):
@@ -408,9 +567,10 @@ async def test_an_import_stored_before_the_check_resumes_with_its_stored_review(
     result = await pipeline.run(fixture.project, resume_command(previous), admitted=fixture.admitted)
     assert result.state == 'published'
     task = next(value for value in result.tasks if value.block_id == 'projects')
-    # The stored proposal and review decide: no new call, no finding, and the names stay as the earlier build kept them.
+    # The stored proposal and review decide: no new call, no notice, and the names stay as the earlier build kept them.
     assert slots(result, task) == ['initial', 'review']
     assert [value.proposal_hash for value in result.proposals if value.attempt_id == stored.attempt_id] == [stored.proposal_hash]
-    assert not failing(settled_by_pointer(result, review_of(result, task)))
     assert admitted_names(result, task) == WRITTEN
-    assert EXPANDED in cards(fixture.current().project)['Atlas']
+    shown = fixture.current().project
+    assert EXPANDED in cards(shown)['Atlas']
+    assert not notices(shown, 'IMPORT_VALUE_UNBOUND') and not notices(shown, 'IMPORT_SOURCE_FALLBACK')

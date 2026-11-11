@@ -24,7 +24,7 @@ import json
 import re
 
 from .template_identity import _binding_instances, empty_value
-from .template_technologies import respelling
+from .template_technologies import respelling, verdicts
 from ..templates.source_spans import _bound_root, payload_value
 from ..templates.projection import pointer_tokens
 
@@ -285,9 +285,14 @@ def _respelled(reply, bindings, technologies, scopes):
             [ref for entry in cited for ref in entry['evidence']]))), [])
         if refs:
             changes.append((pointer, field, spelled, refs if cited else None))
+    return _spelled(reply, changes)
+
+
+def _spelled(reply, changes):
+    """The reply with each (pointer, field key, value, refs) change: the value, cited by refs unless they are None."""
     if not changes:
         return reply
-    payload = deepcopy(payload)
+    payload = deepcopy(reply.get('payload'))
     fields = [dict(entry) if isinstance(entry, dict) else entry for entry in reply.get('fields') or []]
     for pointer, field, spelled, refs in changes:
         tokens = pointer_tokens(pointer)
@@ -301,6 +306,30 @@ def _respelled(reply, bindings, technologies, scopes):
                 fields.append({'item': None, 'fieldKey': field, 'pointer': pointer, 'evidence': refs,
                     'effectiveCells': None})
     return {**reply, 'payload': payload, 'fields': fields}
+
+
+def _read(reply, completed, bindings, scopes, instances, lines):
+    """The reply with what the lines of each technology's entry make of it in its completed form (D165 follow-up): a
+    name they word otherwise takes their wording, cited where they state it, and one they name in no form leaves it
+    as an unbound value does (I4) and joins lines.dropped. None when every technology stands as it is."""
+    found = verdicts(completed, bindings, scopes[-1], lines)
+    changes, gone = [], []
+    for pointer, (field, reading, anchors) in sorted(found.items(), key=lambda pair: _natural(pair[0])):
+        if reading is False:
+            gone.append((pointer, field))
+            continue
+        value, fragment = reading
+        # The value may not stand word for word in the line (an alias, a typo of the CV), so the line is cited here.
+        refs = next((refs for scope in scopes if (refs := stating(fragment, scope, anchors))), [])
+        if refs:
+            changes.append((pointer, field, value, refs))
+    if not changes and not gone:
+        return None
+    reply = _spelled(reply, changes)
+    if gone:
+        reply, removed = without_unbound(reply, gone, instances)
+        lines.dropped.extend(removed)
+    return reply
 
 
 def _offered_items(previous, bindings, kinds):
@@ -359,7 +388,7 @@ def _kept_items(free, handles, offered, payload, previous, bindings):
 
 
 def complete_reply(reply, bindings, table, references, allowed_relations=None, dropped=None, preferred=None, previous=None,
-                   technologies=frozenset()):
+                   technologies=frozenset(), entry_lines=None):
     """The referenced reply with derived fields entries, item selections, discoveries, add lineage and relations.
 
     allowed_relations, when given, is the set of (subject type, kind, target type) the template declares; a model
@@ -376,7 +405,11 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     previous, for a repair, is the reply under repair as its request shows it; see _kept_items.
 
     technologies are the semantic types of the technologies an entry owns (D164, point 14): such a value that the
-    entry's lines (preferred), else the table, write with other spaces or punctuation takes their spelling first."""
+    entry's lines (preferred), else the table, write with other spaces or punctuation takes their spelling first.
+
+    entry_lines (template_technologies.EntryLines), on every slot, reads each such value against the lines of its entry
+    once the reply is completed: one they word otherwise takes their wording and one they name in no form leaves the
+    reply and joins entry_lines.dropped, and the reply is completed again (D165 follow-up)."""
     if not isinstance(reply, dict) or not bindings:
         return reply
     if technologies:
@@ -490,7 +523,8 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     if unbound:
         reduced, gone = without_unbound(reply, unbound, instances)
         dropped.extend(gone)
-        return complete_reply(reduced, bindings, table, references, allowed_relations, preferred=preferred, previous=previous)
+        return complete_reply(reduced, bindings, table, references, allowed_relations, preferred=preferred, previous=previous,
+            entry_lines=entry_lines)
     for entry in entries:
         if not entry.get('evidence') and not entry.get('effectiveCells') and entry.get('pointer') in instances:
             entry['evidence'] = derived_evidence(entry['pointer']) or []
@@ -543,8 +577,14 @@ def complete_reply(reply, bindings, table, references, allowed_relations=None, d
     discoveries = [value for value in discoveries if value.get('key') in used] + added
     new = [value['key'] for value in discoveries if value['key'] not in children]
     lineage = explicit + ([{'kind': 'add', 'parents': [], 'children': new}] if new else [])
-    return {**reply, 'fields': entries, 'discoveries': discoveries, 'lineage': lineage,
+    completed = {**reply, 'fields': entries, 'discoveries': discoveries, 'lineage': lineage,
         'relations': _relations(reply, entries, roots, keys, handles, instances, bindings, references, allowed_relations)}
+    read = _read(reply, completed, bindings, [preferred, table] if preferred else [table], instances, entry_lines) \
+        if entry_lines is not None else None
+    if read is not None:
+        return complete_reply(read, bindings, table, references, allowed_relations, dropped, preferred=preferred,
+            previous=previous)
+    return completed
 
 
 def _relations(reply, entries, roots, keys, handles, instances, bindings, references, allowed_relations=None):
