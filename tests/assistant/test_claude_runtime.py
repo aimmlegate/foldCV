@@ -10,6 +10,7 @@ import threading
 import pytest
 
 from packages.resume_core import agent_limits as limits
+from resume_api.providers.base import Quota
 from resume_api.providers.claude.runtime import ClaudeAgentRuntime
 from resume_api.agent.mcp import PrivateMcp
 from resume_api.agent.base import RuntimeInput
@@ -50,18 +51,19 @@ class Listener(PrivateMcp):
             return "ok"
 
 
-def stand_in(root: Path, case: str) -> Path:
+def stand_in(root: Path, case: str, windows=None) -> Path:
     directory = root / "stand-in"
     directory.mkdir()
     cli = directory / "claude"
     cli.write_text("#!" + sys.executable + "\n" + STAND_IN.read_text().split("\n", 1)[1])
     cli.chmod(0o700)
-    (directory / "fixture.json").write_text(json.dumps({"case": case}))
+    (directory / "fixture.json").write_text(json.dumps({"case": case, **({"windows": windows} if windows else {})}))
     return cli
 
 
-async def run(tmp_path, case, *, cancel=None, prompt="Проверь резюме.", grace=2.0, **options):
-    cli = stand_in(tmp_path, case)
+async def run(tmp_path, case, *, cancel=None, prompt="Проверь резюме.", grace=2.0, windows=None, quota_read=None,
+              **options):
+    cli = stand_in(tmp_path, case, windows)
     operations = tmp_path / "operations"
     operations.mkdir(mode=0o700, exist_ok=True)
     listener = Listener()
@@ -74,6 +76,7 @@ async def run(tmp_path, case, *, cancel=None, prompt="Проверь резюм�
                          **options)
     runtime = ClaudeAgentRuntime(None, operations, fixture_executable=cli, admission=InferenceAdmission(),
                                  interrupt_grace=grace, audit=audit.append)
+    runtime.quota_read = quota_read
     try:
         result = await runtime.run(value, cancel or threading.Event(), lambda kind, payload: events.append((kind, payload)))
     finally:
@@ -98,6 +101,23 @@ async def test_a_run_reads_through_foldcv_tools_and_reports_text_usage_and_publi
     assert result.usage.model_dump(by_alias=True) == {"inputTokens": 150, "cachedInputTokens": 30, "outputTokens": 40,
                                                       "totalTokens": 190}
     assert audit["operationRemoved"] and not any((tmp_path / "operations").iterdir())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("case", "windows", "state", "quota"), [
+    ("complete", {"five_hour": {"utilization": 0.4, "resetsAt": 1800000000},
+                  "seven_day": {"utilization": 0.7, "resetsAt": 1800500000}},
+     "completed", Quota("available", 70.0, 1800000000)),
+    # A run the usage limit refused still had its window; Settings shows it spent.
+    ("quota", {"five_hour": {"utilization": 1.0, "resetsAt": 1800000000}},
+     "failed", Quota("exhausted", 100.0, 1800000000)),
+    ("complete", None, "completed", None),
+])
+async def test_a_run_hands_the_window_it_was_sent_to_settings(tmp_path, case, windows, state, quota):
+    # T9: the assistant's runs refresh Claude's quota in Settings, as import calls do.
+    readings = []
+    result, *_rest = await run(tmp_path, case, windows=windows, quota_read=readings.append)
+    assert result.state == state and readings == ([quota] if quota else [])
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,8 @@ export type ConnectionState = "unchecked" | "detached" | "cli_missing" | "launch
 export type CliInstallation = CliInstallationPayload;
 export type ProviderKind = "codex_cli" | "claude_cli";
 export type QuotaState = "unknown" | "available" | "exhausted" | "not_provided";
-export type Quota = { state: QuotaState; usedPercent: number | null; resetsAt: number | null };
+/** `readAt`: when the numbers were read (Unix seconds), at Codex's status check or the call that sent Claude's window. */
+export type Quota = { state: QuotaState; usedPercent: number | null; resetsAt: number | null; readAt?: number | null };
 
 /** One provider with its own connection (D119: every provider that is on stays connected at the same time). */
 export type ProviderEntry = {
@@ -129,9 +130,10 @@ function validInstallation(value: unknown): value is CliInstallation {
 }
 
 function validQuota(quota: unknown): boolean {
+  const time = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
   return record(quota) && ["unknown", "available", "exhausted", "not_provided"].includes(String(quota.state)) &&
     (quota.usedPercent === null || (typeof quota.usedPercent === "number" && Number.isFinite(quota.usedPercent) && quota.usedPercent >= 0 && quota.usedPercent <= 100)) &&
-    (quota.resetsAt === null || (typeof quota.resetsAt === "number" && Number.isSafeInteger(quota.resetsAt) && quota.resetsAt >= 0));
+    (quota.resetsAt === null || time(quota.resetsAt)) && (quota.readAt === undefined || quota.readAt === null || time(quota.readAt));
 }
 
 function validModels(value: unknown): value is string[] {

@@ -14,7 +14,7 @@ import pytest
 
 from resume_api.app import ProviderSlot, create_app
 from resume_api.lifecycle import OperationFiles
-from resume_api.providers.base import ConnectionFailure, account_label
+from resume_api.providers.base import ConnectionFailure, Quota, account_label
 from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.claude import profile as claude_profile
@@ -215,6 +215,39 @@ async def test_a_sign_out_the_cli_refuses_says_so_and_keeps_what_the_status_name
     assert f"{kind} sign-out: {code}" in log
     if case == "logout_fails":
         assert "synthetic" in log.split(f"sign-out: {code}")[1]
+
+
+@pytest.mark.asyncio
+async def test_a_sign_out_and_a_clearing_drop_the_window_claudes_calls_sent(tmp_path, unconfined):
+    # T9: the reading belongs to the account that signed out; the next account starts without one.
+    stand_in = StandIn(tmp_path, "claude_cli")
+    app, _profile = app_for(tmp_path, stand_in)
+    read = host_of(app).slots["claude_cli"].provider.quota_read
+    none = {"state": "not_provided", "usedPercent": None, "resetsAt": None, "readAt": None}
+
+    async def sign_in_again(client):
+        stand_in.configure(login_email=OTHER)
+        await post(client, "login", "claude_cli")
+        reply = (await post(client, "status", "claude_cli")).json()
+        assert reply["state"] == "connected"
+        return entry(reply, "claude_cli")["quota"]
+
+    async with client_session(app) as client:
+        await connect(client, "claude_cli")
+        read(Quota("exhausted", 100.0, 1800000000))
+        assert entry((await client.get("/v1/settings/connection")).json(), "claude_cli")["quota"]["usedPercent"] == 100
+        assert (await post(client, "logout", "claude_cli")).status_code == 200
+        assert await sign_in_again(client) == none
+        assert (await post(client, "logout", "claude_cli")).status_code == 200
+        # A reading kept while signed out goes with the clearing.
+        read(Quota("available", 40.0, 1800000000))
+        assert (await post(client, "clear-data", "claude_cli")).status_code == 200
+        assert await sign_in_again(client) == none
+        # So does one whose account a check finds gone, signed out outside the app.
+        read(Quota("available", 40.0, 1800000000))
+        (stand_in.directory / "signed-out").touch()
+        assert (await post(client, "status", "claude_cli")).json()["state"] == "login_required"
+        assert await sign_in_again(client) == none
 
 
 @pytest.mark.asyncio

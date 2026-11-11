@@ -24,12 +24,29 @@ export function Connections({ view, workflow, disabled }: { view: ConnectionView
   </>;
 }
 
-/** The usage line: the share used and when it resets; null when the provider reports nothing. */
-export function quotaText(quota: ProviderEntry["quota"]): string {
+const dated: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" };
+
+/** A reading's window has reset since: the share it named no longer holds (T9). */
+export function resetPassed(quota: ProviderEntry["quota"], now: number): boolean {
+  return quota.resetsAt !== null && quota.resetsAt * 1000 <= now;
+}
+
+/** «12:41» on the day of `now`, else with its date. */
+function readTime(seconds: number, now: number): string {
+  const read = new Date(seconds * 1000);
+  return read.toLocaleString("ru-RU", read.toDateString() === new Date(now).toDateString() ? { hour: "2-digit", minute: "2-digit" } : dated);
+}
+
+/** The usage line: the share used, when it resets and when it was read. A snapshot whose reset has passed says the use
+ * is unknown until the next one; a full window is only shown, it blocks nothing. */
+export function quotaText(quota: ProviderEntry["quota"], now = Date.now()): string {
   if (quota.state === "not_provided") return "Расход не сообщается";
-  const used = quota.usedPercent !== null ? `Использовано ${String(quota.usedPercent)} %` : "Расход неизвестен";
-  const reset = quota.resetsAt !== null ? ` · сброс ${new Date(quota.resetsAt * 1000).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "";
-  return `${used}${quota.state === "exhausted" ? " · лимит исчерпан" : ""}${reset}`;
+  const passed = resetPassed(quota, now);
+  const used = quota.usedPercent !== null && !passed ? `Использовано ${String(quota.usedPercent)} %` : "Расход неизвестен";
+  const exhausted = quota.state === "exhausted" && !passed ? " · лимит исчерпан" : "";
+  const reset = quota.resetsAt === null ? "" : passed ? " · сброс прошёл" : ` · сброс ${new Date(quota.resetsAt * 1000).toLocaleString("ru-RU", dated)}`;
+  const read = typeof quota.readAt === "number" ? ` · данные на ${readTime(quota.readAt, now)}` : "";
+  return `${used}${exhausted}${reset}${read}`;
 }
 
 /** The question before a sign-out or a clearing (D158); the card mounts it only while it asks. */
@@ -60,7 +77,7 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
     : leaving === "clear" ? "Очищаем данные…" : installing ? `${installation?.installed ? "Обновляем" : "Устанавливаем"} ${display}…`
     : entry.state === "login_pending" ? connectionMessage("login_pending", { display, subscription }) : pending ? "Проверяем подключение…"
     : connectionMessage(entry.state, { display, subscription });
-  const id = `provider-${kind}`;
+  const id = `provider-${kind}`, now = Date.now();
   return <div className="provider-card" data-provider={kind}>
     <div className="provider-head">
       <input className="switch" id={id} aria-label={`Включить ${display}`} role="switch" type="checkbox" checked={entry.enabled}
@@ -84,8 +101,8 @@ function ProviderCard({ entry, activity, experimental, workflow, disabled }: { e
       <div className="provider-status">
         <span className="provider-state" data-state={entry.state}>{pending || detaching || entry.state === "login_pending" ? <Spinner /> : <Icon name={entry.state === "connected" ? "check" : "info"} />}
           <strong role="status">{status}</strong></span>
-        <span className="quota-line">{entry.quota.usedPercent !== null && <span className="quota-bar"><span style={{ width: `${String(entry.quota.usedPercent)}%` }} /></span>}
-          {quotaText(entry.quota)}</span>
+        <span className="quota-line">{entry.quota.usedPercent !== null && !resetPassed(entry.quota, now) && <span className="quota-bar"><span style={{ width: `${String(entry.quota.usedPercent)}%` }} /></span>}
+          {quotaText(entry.quota, now)}</span>
       </div>
       {entry.account && <p className="provider-line">Аккаунт: {entry.account}</p>}
       {entry.versionStatus === "graceful" && <p className="provider-line">Версия новее проверенной в {APP_NAME}; её возможности проверены при подключении.</p>}

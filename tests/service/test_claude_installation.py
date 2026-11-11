@@ -21,6 +21,7 @@ from resume_api.cli.releases import RECORD, Release, ReleaseFailure
 from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.launcher import bind_claude, claude_slot
 from resume_api.lifecycle import OperationFiles, SpikeError
+from resume_api.providers.base import Quota
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure
 from resume_api.providers.registry import CLAUDE, ProviderRegistry
@@ -280,6 +281,28 @@ async def test_install_from_settings_connects_without_a_restart(binary, tmp_path
         connected = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
         assert connected["state"] == "connected" and connected["providers"][1]["installed"] is True
         assert (await client.post("/v1/host/install", json={"provider": "claude_cli"})).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_the_slot_an_install_binds_still_reports_its_calls_windows(binary, tmp_path):
+    # T9: the install rebinds the slot to new objects; their calls must still reach the quota Settings shows.
+    def bind(slot, executable):
+        bound = bind_stand_in(slot, executable)
+        bound.provider = ClaudeCliProvider(executable, fixture_transport=FixtureTransport(executable))
+        bound.rebind = bind
+        return bound
+    slot = claude_slot(tmp_path / "store")
+    app = app_with(tmp_path, bind(slot, slot.profile.executable))
+    host = next(route.endpoint.__self__ for route in app.app.routes if getattr(route, "path", "") == "/v1/host/status")
+    async with client_session(app) as client:
+        await switch_to_claude(client)
+        before = host.slots["claude_cli"].provider
+        installed = (await client.post("/v1/host/install", json={"provider": "claude_cli"})).json()
+        assert installed["installation"]["state"] == "ready" and host.slots["claude_cli"].provider is not before
+        (slot.installation.executable.parent / "fixture.json").write_text(json.dumps({"case": "valid", "value": {}}))
+        host.slots["claude_cli"].provider.quota_read(Quota("available", 40.0, 1800000000))
+        connected = (await client.post("/v1/host/status", json={"provider": "claude_cli"})).json()
+        assert connected["state"] == "connected" and connected["quota"]["usedPercent"] == 40.0
 
 
 @pytest.mark.asyncio

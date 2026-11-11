@@ -31,7 +31,7 @@ from resume_api.providers.claude.profile import ClaudeProfileError
 from resume_api.inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
-from resume_api.providers.claude.content import skipped
+from resume_api.providers.claude.content import report, skipped, subscription_windows, window_quota
 from resume_api.providers.shared import strict_json
 from resume_api.providers.content import ContentFailure
 
@@ -81,6 +81,8 @@ class MessagesStreamSession:
         self.normalized = 0
         self.result = RuntimeResult()
         self.interrupt = lambda: None
+        # The quota of the run's last `rate_limit_event` that named a window, for Settings (T9).
+        self.reading = None
 
     def publish(self, kind, payload):
         self.normalized += len(json.dumps({"type": kind, "payload": payload}, ensure_ascii=False).encode())
@@ -122,7 +124,10 @@ class MessagesStreamSession:
         kind, subtype = event["type"], event.get("subtype")
         if kind == "system" and subtype == "init":
             return self.init(event)
-        if kind == "rate_limit_event" or kind == "system" and subtype in NOTICES:
+        if kind == "rate_limit_event":
+            self.reading = window_quota(subscription_windows(event)) or self.reading
+            return None
+        if kind == "system" and subtype in NOTICES:
             return None
         if kind not in MODEL_EVENTS and not (kind == "system" and subtype in STOPPING):
             skipped(self.skipped, f"system/{subtype}" if kind == "system" else kind)
@@ -311,6 +316,8 @@ class ClaudeAgentRuntime:
         self.temp_root, self.admission, self.network, self.audit = temp_root, admission, network, audit
         self.native = fixture_executable is None
         self.startup_seconds, self.active_seconds, self.interrupt_grace = startup_seconds, active_seconds, interrupt_grace
+        # Set by the app: takes the quota of each run's last window (T9).
+        self.quota_read = None
 
     async def run(self, value, cancel, emit):
         return await asyncio.to_thread(self.execute, value, cancel, emit)
@@ -408,6 +415,8 @@ class ClaudeAgentRuntime:
                     finally:
                         if session is not None:
                             session.renewing = False
+                            # Under the permit still: a sign-out waits for it, so it drops this reading too.
+                            report(self.quota_read, session.reading)
                         before_cleanup()
                         files.stop_worker()
                 result.timings["cleanup"] = elapsed() - cleanup_started

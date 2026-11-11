@@ -20,12 +20,12 @@ from packages.resume_core.editing.text_rewrite import PlainTextReply
 from resume_api.cli import qualification
 from resume_api.cli.process_runner import ProcessRunner
 from resume_api.providers.claude import profile as rules
-from resume_api.providers.base import ConnectionFailure
+from resume_api.providers.base import ConnectionFailure, Quota
 from resume_api.providers.claude.connection import ClaudeConnectionAdapter
 from resume_api.inference_admission import INFERENCE
 from resume_api.lifecycle import OperationFiles
 from resume_api.providers.claude import catalog as claude_catalog
-from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
+from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport, window_quota
 from resume_api.providers.content import ContentFailure, ContentInput, GenerationPolicy
 from resume_api.providers.shared import SYSTEM_PROMPT
 
@@ -702,3 +702,60 @@ def test_a_repaired_call_sums_the_numbers_of_both_runs(fake):
     claude = result.usage.detail["claude"]
     assert len(starts) == 2 and (claude["output"], claude["cacheWrite1h"], claude["numTurns"]) == (14, 6, 4)
     assert claude["assistantMessages"] == 2 and claude["costUsd"] == pytest.approx(0.02)
+
+
+@pytest.mark.parametrize(("windows", "quota"), [
+    ({"fiveHour": {"utilization": 0.25, "resetsAt": 1800000000},
+      "sevenDay": {"utilization": 0.05, "resetsAt": 1800500000}}, Quota("available", 25.0, 1800000000)),
+    # The Max account names the seven-day window only.
+    ({"sevenDay": {"utilization": 0.61, "resetsAt": 1794459600}}, Quota("available", 61.0, 1794459600)),
+    ({"fiveHour": {"utilization": 1.0, "resetsAt": 5}, "sevenDay": {"utilization": 0.4, "resetsAt": 9}},
+     Quota("exhausted", 100.0, 5)),
+    ({"fiveHour": {"utilization": 1.3}, "sevenDay": {"utilization": 0.615}}, Quota("exhausted", 100.0, None)),
+    ({"sevenDay": {"resetsAt": 1794459600}}, Quota("unknown", None, 1794459600)),
+    # A reset past 2100 is no number the client takes, and nothing else is named.
+    ({"fiveHour": {"resetsAt": 4_102_444_801}}, None),
+    ({}, None),
+])
+def test_the_windows_fold_into_the_higher_use_and_the_nearest_reset(windows, quota):
+    assert window_quota(windows) == quota
+
+
+def reported(fake, case="valid", **config):
+    """The quotas one call handed to Settings (T9), with its result or its failure's code."""
+    cli, root, _directory, configure, _audit = fake
+    configure(case, **config)
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    readings = []
+    provider.quota_read = readings.append
+    with OperationFiles(root).open() as files:
+        try:
+            outcome = provider.generate(request(), files, threading.Event()).value
+        except ContentFailure as error:
+            outcome = error.code
+    return readings, outcome
+
+
+def test_each_run_hands_the_window_it_was_sent_to_settings_and_a_refused_one_too(fake):
+    sent = Quota("available", 25.0, 1800000000)
+    assert reported(fake) == ([sent], Summary(summary="Synthetic summary"))
+    # A repaired call is two runs of the CLI, each with its own event.
+    assert reported(fake, "repair") == ([sent, sent], Summary(summary="Synthetic summary"))
+    assert reported(fake, "rate_limit") == ([sent], "RATE_LIMITED")
+
+
+@pytest.mark.parametrize("detail", ["malformed", "none"])
+def test_a_run_whose_event_names_no_readable_window_hands_nothing(fake, detail):
+    assert reported(fake, detail=detail) == ([], Summary(summary="Synthetic summary"))
+
+
+def test_a_failing_reading_never_changes_the_call(fake):
+    cli, root, _directory, _configure, _audit = fake
+    provider = ClaudeCliProvider(cli, fixture_transport=FixtureTransport(cli))
+
+    def broken(_quota):
+        raise RuntimeError("synthetic registry failure")
+    provider.quota_read = broken
+    with OperationFiles(root).open() as files:
+        result = provider.generate(request(), files, threading.Event())
+    assert result.value == Summary(summary="Synthetic summary") and result.usage.input_tokens == 20

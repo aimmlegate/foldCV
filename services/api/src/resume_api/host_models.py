@@ -57,6 +57,8 @@ class QuotaPayload(Transport):
     state: Literal["unknown", "available", "exhausted", "not_provided"]
     usedPercent: float | None = Field(default=None, ge=0, le=100)
     resetsAt: int | None = Field(default=None, ge=0)
+    # When the numbers were read, in Unix seconds: Codex's status check, or the call that sent Claude's window.
+    readAt: int | None = Field(default=None, ge=0)
 
 
 ConnectionState = Literal["unchecked", "detached", "cli_missing", "launcher_unsupported", "unsupported_version",

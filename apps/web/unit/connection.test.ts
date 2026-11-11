@@ -38,6 +38,10 @@ test("connection response rejects arbitrary models, quotas and production readin
   assert.equal(validConnection({ ...ready, models: ["evil command --flag"] }), false);
   assert.equal(validConnection({ ...ready, selectedModel: "other" }), false);
   assert.equal(validConnection({ ...ready, quota: { ...(ready.quota as object), usedPercent: Infinity } }), false);
+  // When the numbers were read (T9): absent, null or Unix seconds.
+  for (const readAt of [null, 1794398400]) assert.equal(validConnection(reply([{ ...codex, quota: { ...(codex.quota as object), readAt } }])), true);
+  for (const readAt of [-1, 1.5, "12:41", Number.MAX_SAFE_INTEGER + 2])
+    assert.equal(validConnection(reply([{ ...codex, quota: { ...(codex.quota as object), readAt } }])), false, String(readAt));
   // A catalog model must belong to a provider that is on.
   assert.equal(validConnection({ ...ready, models: ["gpt-6-luna", "claude-sonnet-5-5"] }), false);
   assert.equal(validConnection(reply([{ ...codex, ...off, state: "launcher_unsupported" }])), true);

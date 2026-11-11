@@ -71,7 +71,8 @@ async def test_claude_connection_states(tmp_path, claude, case, version, state):
         assert result["state"] == state
         if state == "connected":
             assert result["versionStatus"] == "supported" and result["plan"] == "max"
-            assert result["quota"] == {"state": "not_provided", "usedPercent": None, "resetsAt": None}
+            # The status check reads no usage: not provided until a call sends a window (T9, test_claude_quota).
+            assert result["quota"] == {"state": "not_provided", "usedPercent": None, "resetsAt": None, "readAt": None}
             assert "claude-sonnet-5-5" in result["models"] and result["modelReasoning"]["claude-sonnet-5-5"]["default"]
         assert summary(result["providers"][1]) == {"kind": "claude_cli", "display": "Claude", "subscription": "Claude",
                                                    "publisher": "Anthropic", "loginCode": True,

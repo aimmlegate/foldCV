@@ -143,10 +143,28 @@ test("an update offer has its own row and the update button in the card's head (
 });
 
 test("the usage line says the share used and the reset, or that the provider reports none", () => {
-  assert.equal(quotaText({ state: "not_provided", usedPercent: null, resetsAt: null }), "Расход не сообщается");
-  assert.equal(quotaText({ state: "available", usedPercent: 12, resetsAt: null }), "Использовано 12 %");
-  assert.equal(quotaText({ state: "unknown", usedPercent: null, resetsAt: null }), "Расход неизвестен");
-  assert.match(quotaText({ state: "exhausted", usedPercent: 100, resetsAt: Date.UTC(2026, 10, 5, 9, 0) / 1000 }), /^Использовано 100 % · лимит исчерпан · сброс \d+ нояб\./u);
+  const before = Date.UTC(2026, 10, 5, 8, 0);
+  assert.equal(quotaText({ state: "not_provided", usedPercent: null, resetsAt: null }, before), "Расход не сообщается");
+  assert.equal(quotaText({ state: "available", usedPercent: 12, resetsAt: null }, before), "Использовано 12 %");
+  assert.equal(quotaText({ state: "unknown", usedPercent: null, resetsAt: null }, before), "Расход неизвестен");
+  assert.match(quotaText({ state: "exhausted", usedPercent: 100, resetsAt: Date.UTC(2026, 10, 5, 9, 0) / 1000 }, before), /^Использовано 100 % · лимит исчерпан · сброс \d+ нояб\./u);
+});
+
+test("a reading names when it was read, and once its reset has passed the use is unknown until the next one (T9)", () => {
+  // Midday UTC keeps the reading and `now` on one local day in the zones the tests run in.
+  const now = Date.UTC(2026, 10, 11, 12, 30), readAt = Date.UTC(2026, 10, 11, 12, 0) / 1000;
+  const spent = { state: "exhausted" as const, usedPercent: 100, resetsAt: Date.UTC(2026, 10, 12, 12, 0) / 1000, readAt };
+  assert.match(quotaText(spent, now), /^Использовано 100 % · лимит исчерпан · сброс \d+ нояб\., \d\d:\d\d · данные на \d\d:\d\d$/u);
+  const passed = { state: "available" as const, usedPercent: 61, resetsAt: Date.UTC(2026, 10, 11, 12, 15) / 1000, readAt };
+  assert.match(quotaText(passed, now), /^Расход неизвестен · сброс прошёл · данные на \d\d:\d\d$/u);
+  assert.equal(quotaText({ ...spent, resetsAt: passed.resetsAt }, now), quotaText(passed, now), "a passed reset ends «лимит исчерпан» too");
+  // A reading of another day carries its date.
+  assert.match(quotaText({ ...passed, resetsAt: null, readAt: readAt - 86_400 }, now), /^Использовано 61 % · данные на \d+ нояб\., \d\d:\d\d$/u);
+  // The card's bar shows the share while it holds and goes with the reset.
+  const card = (resetsAt: number) => connections({ ...provider, state: "connected", quota: { ...passed, resetsAt } });
+  assert.match(card(4_000_000_000), /quota-bar/u);
+  assert.ok(!card(1_000_000_000).includes("quota-bar"));
+  assert.match(card(1_000_000_000), /Расход неизвестен · сброс прошёл/u);
 });
 
 test("a signed-in card names its account and offers the sign-out; a signed-out one offers the clearing (D158)", () => {

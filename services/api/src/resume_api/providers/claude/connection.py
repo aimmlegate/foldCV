@@ -22,7 +22,8 @@ STATES = {"AUTH_REQUIRED": "LOGIN_REQUIRED", "AUTH_MODE_MISMATCH": "API_KEY_MODE
           "METADATA_FAILED": "METADATA_FAILED", "CANCELLED": "CANCELLED", "DEADLINE_EXCEEDED": "DEADLINE_EXCEEDED",
           "PROCESS_CLEANUP_FAILED": "PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED": "CLEANUP_FAILED",
           "TEMP_FAILED": "TEMP_FAILED"}
-# No CLI-mediated usage read exists; credential files are never read for it (decision 15).
+# The status check reads no usage and credential files are never read for it (decision 15); Settings shows the last
+# window a call sent instead (T9), beside this quota, which the gate keeps reading.
 NOT_PROVIDED = Quota("not_provided")
 LOGIN_SECONDS = 300
 LOGOUT_SECONDS = 60

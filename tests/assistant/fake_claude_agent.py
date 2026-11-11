@@ -12,7 +12,8 @@ import urllib.error
 import urllib.request
 
 base = Path(__file__).resolve().parent
-case = json.loads((base / "fixture.json").read_text())["case"]
+fixture = json.loads((base / "fixture.json").read_text())
+case = fixture["case"]
 args = sys.argv[1:]
 runs = len((base / "audit.jsonl").read_text().splitlines()) + 1 if (base / "audit.jsonl").exists() else 1
 if case == "renewal":
@@ -68,7 +69,9 @@ emit({"type": "system", "subtype": "init", "cwd": os.getcwd(), "session_id": "s-
       "permissionMode": option("--permission-mode"), "slash_commands": [], "apiKeySource": "none",
       "claude_code_version": "2.1.308", "output_style": "default", "agents": [], "skills": [], "plugins": [],
       "capabilities": ["interrupt_receipt_v1"], "analytics_disabled": True})
-emit({"type": "rate_limit_event", "rate_limit_info": {"status": "allowed"}})
+# The subscription windows the event names when the fixture gives them (T9).
+windows = {"unifiedWindows": fixture["windows"]} if "windows" in fixture else {}
+emit({"type": "rate_limit_event", "rate_limit_info": {"status": "allowed", **windows}})
 emit({"type": "system", "subtype": "thinking_tokens", "estimated_tokens": 64, "estimated_tokens_delta": 64})
 usage = {"input_tokens": 100, "cache_creation_input_tokens": 20, "cache_read_input_tokens": 30, "output_tokens": 40}
 

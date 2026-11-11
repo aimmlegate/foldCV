@@ -25,6 +25,7 @@ from resume_api.providers.claude.profile import ClaudeCliProfile, ClaudeProfileE
 from resume_api.inference_admission import CALLS, INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.profile_ownership import native_profile
+from resume_api.providers.base import Quota
 from resume_api.providers.claude import catalog as claude_catalog
 from resume_api.providers.shared import (MAX_SCHEMA, MODEL, PLAN, REPAIR_FEEDBACK, InvalidFinal, _combine, amount,
                                          mapping, natural, strict_json)
@@ -55,6 +56,8 @@ STREAM_MULTIPLE = 8
 # call reads it (T1). Rewrite previews too: a measured pair read nothing from the cache and cost 43 % less without it.
 PREVIEWS_CACHED = False
 UNCACHED = {"DISABLE_PROMPT_CACHING": "1"}
+# The latest reset time Settings takes (2100-01-01, as for Codex): the client reads only safe integers.
+LAST_RESET = 4_102_444_800
 LOG = logging.getLogger(__name__)
 
 
@@ -91,7 +94,7 @@ def _numbers(event: dict) -> dict[str, int | float]:
     return {key: value for key, value in values.items() if value is not None}
 
 
-def _windows(event: dict) -> dict[str, dict[str, int | float]]:
+def subscription_windows(event: dict) -> dict[str, dict[str, int | float]]:
     """The subscription windows a `rate_limit_event` carries, as far as they are readable."""
     windows = mapping(mapping(event.get("rate_limit_info")).get("unifiedWindows"))
     found = {}
@@ -101,6 +104,28 @@ def _windows(event: dict) -> dict[str, dict[str, int | float]]:
         if any(value is not None for value in values.values()):
             found[name] = {field: value for field, value in values.items() if value is not None}
     return found
+
+
+def window_quota(windows: dict[str, dict[str, int | float]]) -> Quota | None:
+    """The windows as the one quota Settings shows (T9), folded as Codex's two are: the higher use and the nearest
+    reset. Claude sends the use as a share of one; None when no window names a number."""
+    used = [min(100.0, round(window["utilization"] * 100, 1)) for window in windows.values() if "utilization" in window]
+    resets = [window.get("resetsAt") for window in windows.values()]
+    resets = [reset for reset in resets if reset is not None and reset <= LAST_RESET]
+    if not used and not resets:
+        return None
+    state = "unknown" if not used else "exhausted" if max(used) >= 100 else "available"
+    return Quota(state, max(used, default=None), min(resets, default=None))
+
+
+def report(read: Callable[[Quota], None] | None, quota: Quota | None) -> None:
+    """Hand a run's last window to Settings. It is only shown, so a failure there never changes the call."""
+    if read is None or quota is None:
+        return
+    try:
+        read(quota)
+    except Exception:
+        pass
 
 
 class ClaudeEvents:
@@ -117,6 +142,8 @@ class ClaudeEvents:
         self.counted = ReportedUsage()
         self.numbers: dict[str, int | float] = {}
         self.windows: dict[str, dict[str, int | float]] = {}
+        # The quota of the run's last `rate_limit_event` that named a window, for Settings (T9).
+        self.reading: Quota | None = None
         self.message_ids: set[str] = set()
         self.unnamed_messages = 0
         self.tool_ids: set[str] = set()
@@ -147,7 +174,9 @@ class ClaudeEvents:
         kind, subtype = event["type"], event.get("subtype")
         if kind == "rate_limit_event" or kind == "system" and subtype in NOTICES:
             if kind == "rate_limit_event":
-                self.windows.update(_windows(event))
+                windows = subscription_windows(event)
+                self.windows.update(windows)
+                self.reading = window_quota(windows) or self.reading
             return
         if kind not in MODEL_EVENTS and not (kind == "system" and (subtype == "init" or subtype in FORBIDDEN)):
             skipped(self.skipped, f"system/{subtype}" if kind == "system" else kind)
@@ -311,6 +340,8 @@ class ClaudeCliProvider:
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock, held=INFERENCE.importing)
         self.model_started = None
+        # Set by the app: takes the quota of each run's last window (T9).
+        self.quota_read: Callable[[Quota], None] | None = None
         self.process = ProcessRunner(self.executable, clock=clock, launch=self._launch,
                                      workdir=getattr(profile, "workdir", None))
 
@@ -628,6 +659,7 @@ class ClaudeCliProvider:
                     finally:
                         usages.append(events.usage)
                         raw_return = events.text
+                        report(self.quota_read, events.reading)
                     consumed_output += events.final_bytes + len(errors)
                     observed("completed" if events.complete else "incomplete")
                     with measure("decode"):

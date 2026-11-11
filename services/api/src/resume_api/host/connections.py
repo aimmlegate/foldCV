@@ -29,8 +29,10 @@ from ..app_log import EVENTS, failure
 from fastapi.responses import JSONResponse
 
 CANCEL_GRACE_SECONDS = 0.5
-# "not_provided": the provider has no sanctioned usage read (decision 15); runs stay allowed.
+# "not_provided": the provider's status check reads no usage (decision 15); runs stay allowed.
 USABLE_QUOTA = frozenset({"available", "not_provided"})
+# The quota states a status check read from the provider; it gets the check's time.
+MEASURED_QUOTA = frozenset({"available", "exhausted"})
 # The jobs that end a sign-in: the CLI's own sign-out, and the clearing of the profile's data after it.
 LEAVING = frozenset({"logout", "clear"})
 # The sign-out's own refusals; after one, the status check still says who is signed in.
@@ -45,7 +47,7 @@ class HostConnections:
 
     def __init__(self, *, registry, slots, states, epochs, connection_kinds, temp_root, preferences_store, rules_store,
                  content_provider, unsafe_cleanup, problem, max_concurrent, model_stop_seconds,
-                 check_wait_seconds):
+                 check_wait_seconds, wall=time.time):
         self.registry, self.slots, self.states, self.epochs = registry, slots, states, epochs
         self.connection_kinds, self.temp_root = connection_kinds, temp_root
         self.preferences_store, self.rules_store, self.content_provider = preferences_store, rules_store, content_provider
@@ -72,6 +74,13 @@ class HostConnections:
         self.release_lookups: dict[str, asyncio.Task] = {}
         self.enabled = set()
         self.intake = self.rewrite = self.projects = self.assistant = self.template_assistant = None
+        self.wall = wall
+        # The last quota a provider's calls sent, with its time (Claude's windows, T9): only shown, never a gate. The
+        # calls report from their worker threads.
+        self.readings: dict[str, QuotaPayload] = {}
+        self.readings_lock = threading.Lock()
+        for kind in slots:
+            self.observe(kind)
 
     def stored_preferences(self):
         try:
@@ -278,6 +287,33 @@ class HostConnections:
         self.cancellation_pending.discard(done)
         self.active -= 1
 
+    def observe(self, kind):
+        """Let the slot's calls and assistant runs report the window their CLI sent (Claude's `rate_limit_event`); no
+        call is made only to read it. A rebound slot has new objects, so a finished install calls this again."""
+        slot = self.slots[kind]
+        for reader in (slot.provider, slot.runtime):
+            if hasattr(reader, "quota_read"):
+                reader.quota_read = lambda quota, kind=kind: self.read_quota(kind, quota)
+
+    def read_quota(self, kind, quota):
+        reading = QuotaPayload(state=quota.state, usedPercent=quota.used_percent, resetsAt=quota.resets_at,
+                               readAt=int(self.wall()))
+        with self.readings_lock:
+            self.readings[kind] = reading
+
+    def drop_reading(self, kind):
+        # The reading belongs to the account that signed out.
+        with self.readings_lock:
+            self.readings.pop(kind, None)
+
+    def shown_quota(self, kind) -> QuotaPayload:
+        """The quota Settings shows: the status check's, or where the check reads none, the last window a call sent.
+        The gate (`connected`) reads the check's, so a full window shown never blocks the calls that refresh it."""
+        quota = self.states[kind].quota
+        with self.readings_lock:
+            reading = self.readings.get(kind)
+        return reading if quota.state == "not_provided" and reading is not None else quota
+
     def provider_summaries(self) -> list[ProviderSummary]:
         summaries = []
         for item in self.registry.listed():
@@ -290,7 +326,8 @@ class HostConnections:
                          else executable is not None and executable.is_file() if getattr(slot.profile, "managed", False)
                          else discovered(item, executable))
             sign_in = self.sign_ins.get(item.kind)
-            summaries.append(ProviderSummary(**state.model_dump(), kind=item.kind, display=item.display,
+            summaries.append(ProviderSummary(**state.model_dump(exclude={"quota"}), quota=self.shown_quota(item.kind),
+                                             kind=item.kind, display=item.display,
                                              subscription=item.subscription, publisher=item.publisher,
                                              loginCode=item.login_code,
                                              loginUrl=sign_in.url if sign_in and state.state == "login_pending" else None,
@@ -305,7 +342,7 @@ class HostConnections:
         owners, model = self.catalog(), self.processing_model()
         state, slot = self.states[kind], self.slots[kind]
         payload = ConnectionPayload(provider=kind, providers=self.provider_summaries(), state=state.state, version=state.version,
-                                    versionStatus=state.versionStatus, plan=state.plan, quota=state.quota,
+                                    versionStatus=state.versionStatus, plan=state.plan, quota=self.shown_quota(kind),
                                     installation=slot.installation.snapshot() if slot.installation else None,
                                     models=list(owners), modelReasoning=self.catalog_reasoning(owners),
                                     selectedModel=model if model in owners else None, metadataReady=bool(owners),
@@ -411,6 +448,7 @@ class HostConnections:
                     current = self.slots[kind]
                     if isinstance(result, Path) and current.profile is not None and current.rebind is not None:
                         self.slots[kind] = current.rebind(current, result)
+                        self.observe(kind)
                         if epoch == self.epochs[kind]:
                             self.states[kind] = ProviderState(state="unchecked")
                     return self.connection_response(kind)
@@ -421,10 +459,12 @@ class HostConnections:
                     return self.connection_response(kind)
                 if isinstance(result, SignedOut):
                     self.states[kind] = ProviderState(state="login_required", version=result.version)
+                    self.drop_reading(kind)
                     return self.connection_response(kind)
                 assert isinstance(result, Metadata)
                 quota = QuotaPayload(state=result.quota.state, usedPercent=result.quota.used_percent,
-                                     resetsAt=result.quota.resets_at)
+                                     resetsAt=result.quota.resets_at,
+                                     readAt=int(self.wall()) if result.quota.state in MEASURED_QUOTA else None)
                 state = ("unchecked" if job == "discover" else "quota_exhausted" if quota.state == "exhausted"
                          else "unknown_limits" if quota.state == "unknown" else "connected")
                 self.states[kind] = ProviderState(state=state, version=result.version, plan=result.plan,
@@ -465,6 +505,8 @@ class HostConnections:
                           "METADATA_FAILED": "metadata_failed"}
                 state = mapped.get(error.code, "login_failed" if job == "login" else "metadata_failed")
                 self.states[kind] = ProviderState(state=state, version=error.version)
+                if state == "login_required":
+                    self.drop_reading(kind)
                 return self.connection_response(kind)
         except SpikeError as error:
             if job == "install":
