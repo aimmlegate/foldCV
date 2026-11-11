@@ -19,17 +19,17 @@ def display_text(raw):
     return canonical(raw).decode()
 
 
-def own_evidence(raw, evidence, units, captured):
+def own_evidence(raw, evidence, text_of):
     """The cited spans that are this value's own. A derived citation lists every line that states the value and a
-    list-level entry every line of its list; shown whole, each value would repeat the lines of the others."""
+    list-level entry every line of its list; shown whole, each value would repeat the lines of the others. text_of
+    gives a span's captured text, or None when none is captured."""
     if len(evidence) < 2:
         return evidence
     table = {}
     for index, span in enumerate(evidence):
-        unit = units.get((span.source_id, span.source_revision, span.unit_id, span.unit_revision))
-        if unit is None or span.start < unit.start or span.end > unit.end:
+        text = text_of(span)
+        if text is None:
             return evidence
-        text = captured[digest(unit)][span.start - unit.start:span.end - unit.start]
         table[str(index)] = EvidenceOption(ref=str(index), span=span, text=text)
     value = raw.strip()
     exact = [ref for ref, option in table.items() if option.text.strip() == value]
@@ -69,24 +69,39 @@ def verbatim(value, source):
     return bool(sentences) and all(sentence in plain for sentence in sentences)
 
 
+def _unit_key(span):
+    return span.source_id, span.source_revision, span.unit_id, span.unit_revision
+
+
+def captured_text(offered, key, start, end):
+    """The text of [start, end) of one unit from the captured spans: one that holds it, or adjacent ones that cover it
+    together (a review the map trimmed offers a unit by its lines, T4); None when they do not cover it."""
+    spans = sorted(((span, text) for span, text in offered if _unit_key(span) == key), key=lambda pair: pair[0].start)
+    for span, text in spans:
+        if span.start <= start and end <= span.end:
+            return text[start - span.start:end - span.start]
+    pieces, position = [], start
+    for span, text in spans:
+        if span.start <= position < span.end:
+            stop = min(end, span.end)
+            pieces.append(text[position - span.start:stop - span.start])
+            position = stop
+            if position >= end:
+                return ''.join(pieces)
+    return None
+
+
 def source_wording(review, field, raw):
     """The exact source text a value cites, or the input its effective cells hold."""
     if field.evidence:
         offered = ([(option.span, option.text) for option in review.evidence] if review.schema_version == 2
             else [(span, review.source_texts[digest(span)]) for span in review.source_spans])
-        units, captured = {}, {}
-        for span, text in offered:
-            key = (span.source_id, span.source_revision, span.unit_id, span.unit_revision)
-            captured[digest(span)] = text
-            current = units.get(key)
-            if current is None or span.start <= current.start and span.end >= current.end:
-                units[key] = span
+        units = list(dict.fromkeys(_unit_key(span) for span, _text in offered))
         grouped = {}
-        for span in own_evidence(raw, field.evidence, units, captured):
-            key = (span.source_id, span.source_revision, span.unit_id, span.unit_revision)
-            grouped.setdefault(key, []).append((span.start, span.end))
+        for span in own_evidence(raw, field.evidence, lambda span: captured_text(offered, _unit_key(span), span.start, span.end)):
+            grouped.setdefault(_unit_key(span), []).append((span.start, span.end))
         texts = []
-        for key, unit in units.items():
+        for key in units:
             intervals = sorted(set(grouped.pop(key, [])))
             merged = []
             for start, end in intervals:
@@ -94,11 +109,11 @@ def source_wording(review, field, raw):
                     merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
                 else:
                     merged.append((start, end))
-            text = captured[digest(unit)]
-            if any(start < unit.start or end > unit.end for start, end in merged):
+            found = [captured_text(offered, key, start, end) for start, end in merged]
+            if any(value is None for value in found):
                 raise ValueError('source wording exceeds captured context')
             # Cited lines end with their line break; it ends the line, it is not part of the wording.
-            texts.extend(value.rstrip('\r\n') or value for value in (text[start - unit.start:end - unit.start] for start, end in merged))
+            texts.extend(value.rstrip('\r\n') or value for value in found)
         if grouped:
             raise ValueError('source wording lacks captured context')
         return '\n'.join(texts)

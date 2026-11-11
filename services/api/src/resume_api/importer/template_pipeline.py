@@ -20,7 +20,7 @@ from packages.resume_core.importing.template_admission import admit_proposal, ta
 from packages.resume_core.importing.template_builtin_admission import current_handles
 from packages.resume_core.editing.template_effective import effective_cells
 from packages.resume_core.template_capture import item_identities, prepare_builtin_identities
-from packages.resume_core.sources import capture_span, line_spans, source_slice
+from packages.resume_core.sources import line_spans, source_slice
 from packages.resume_core.importing.template_identity import (empty_value, evidence_options, offered_evidence,
                                                               offered_references)
 from packages.resume_core.importing.template_entries import (closed_state, entry_part, entry_records, grouped,
@@ -49,8 +49,9 @@ from packages.resume_core.templates.operations import operation_value
 from packages.resume_core.templates.replies import (BOOKKEEPING_KEYS, OUTLINE_PROTOCOL, OUTLINE_REVIEW_PROTOCOL,
     map_repair_schema, map_schema, outline_review_schema, outline_schema, proposal_protocol, proposal_schema,
     review_schema, PROPOSAL_PROTOCOL)
-from packages.resume_core.importing.template_map import (apply_repair, map_choices, map_input, map_repair_input,
-                                                         map_task, parse_map)
+from packages.resume_core.importing.template_map import (apply_repair, block_evidence, map_choices, map_input,
+                                                         map_repair_input, map_task, mapped_review, parse_map,
+                                                         reads_whole_cv, source_map, whole_source)
 
 from .. import import_usage
 from ..inference_admission import CALLS
@@ -325,8 +326,7 @@ def value_lines(sources, raw, evidence):
     lines = list({digest(span): span for span in lines}.values())
     if len(lines) < 2 or not isinstance(raw, str) or not raw.strip():
         return lines, len(lines) == 1
-    whole = {key: capture_span(source, unit) for key, (source, unit) in units.items()}
-    own = own_evidence(raw.strip(), lines, whole, {digest(span): units[key][1].text for key, span in whole.items()})
+    own = own_evidence(raw.strip(), lines, lambda span: source_slice(sources, span))
     return own, len(own) < len(lines)
 
 
@@ -699,19 +699,24 @@ class TemplatePipeline:
             value.cell_id for value in allocation.canonical_fields.values()}]
             for allocation, record in builtins for identifier in [record.id]}
         source_requested = any(value.kind == 'source' for value in selectors)
+        # T4: a model block reads the lines the map gave it; one that rewrites a summary of the CV reads all of it.
+        mapped = source_map(operation) if source_requested and task.kind in {'extract', 'rewrite'} else None
+        if mapped is not None and reads_whole_cv(task, declaration, data.template_package.definition):
+            mapped = None
         # Whole units, and each line of a multi-line unit, so a reply can cite one claim without its neighbours.
-        spans = [span for source in data.sources for unit in source.units
-            for span in [capture_span(source, unit), *line_spans(source, unit)]] if source_requested else []
+        spans = whole_source(data.sources) if source_requested and mapped is None else []
         spans += [span for cell in cells for span in cell.evidence]
         spans += [span for result in dependencies for span in result.source_spans]
         spans = list({digest(span): span for span in spans}.values())
+        options = (evidence_options(spans, data.sources) if mapped is None
+            else block_evidence(*mapped, task.block_id, spans, data.sources))
         value = {'protocol': 'template_import_v1', 'tools': [], 'replyProtocol': PROPOSAL_PROTOCOL,
             'packageHash': data.template_package.package_hash,
             'allowTextRewrite': operation.capture.allow_text_rewrite,
             'formattingAsOf': operation.capture.formatting_as_of.model_dump(mode='json', by_alias=True),
             'modelInstructions': data.template_package.definition.model.model_dump(mode='json', by_alias=True),
             'declaration': declaration.model_dump(mode='json', by_alias=True),
-            'evidence': [option.model_dump(mode='json', by_alias=True) for option in evidence_options(spans, data.sources)],
+            'evidence': [option.model_dump(mode='json', by_alias=True) for option in options],
             'effectiveCells': [cell.model_dump(mode='json', by_alias=True) for cell in cells],
             'manualScopes': [scope.model_dump(mode='json', by_alias=True) for scope in data.facts.manual_scopes
                 if scope.id in {cell.manual_scope_id for cell in cells}],
@@ -725,7 +730,7 @@ class TemplatePipeline:
             'relations': [relation.model_dump(mode='json', by_alias=True) for relation in data.facts.relations if relation.active
                 and relation.subject_id in selected],
             'dependencies': [result.model_dump(mode='json', by_alias=True) for result in dependencies],
-            'allowedHandles': sorted(handles)}
+            'allowedHandles': sorted(handles), **({'mapped': True} if mapped is not None else {})}
         return value, sorted(handles)
 
     async def execute_task(self, project, operation_id, task_id, deadline, cancel):
@@ -742,6 +747,10 @@ class TemplatePipeline:
         if task.state == 'pending' and not any(value.task_id == task_id for value in operation.task_inputs):
             with import_usage.timed('tasks', 'taskInput'):
                 value, handles = self.task_input(operation, task, data)
+            if value.get('mapped') and not any(value[key] for key in ('evidence', 'effectiveRecords', 'dependencies')):
+                # T4: the map gave the block no line and it reads nothing else: it ends empty without a call.
+                await self.finish_task(project, operation_id, task_id, {'map': 'no_lines'}, [], [], 'empty', [])
+                return
             workspace = await self.step(project, operation_id, 'taskInput',
                 lambda value_op, _data, _workspace: capture_task_input(value_op, task_id, value, handles, self.wall(),
                     id_factory=self.id_factory, check=False))
@@ -876,6 +885,9 @@ class TemplatePipeline:
                         'otherBlocks': other_blocks(operation, task, data.template_package)},
                     # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                     previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
+                if prior_review is None and task_input.get('mapped'):
+                    # T4: the review reads what the trimmed request read, and the lines the reply cites.
+                    review = mapped_review(review, proposal, attempt.request_value)
             review_attempt = next((value for value in reversed(operation.attempts) if value.task_id == task_id
                 and value.slot in {'review', 'replacement_review'} and value.input_hash == digest(review)
                 and value.state != 'released' and not stopped_call(operation, value)), None)

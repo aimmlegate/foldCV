@@ -98,7 +98,7 @@ def by_reference(answer, value):
         result['results'] = [converted for converted in (review_entry(entry, value, table) for entry in result['results'])
             if converted is not None]
         if review_protocol(value) in {'template-review-protocol-3', 'template-review-protocol-4', 'template-review-protocol-5',
-                'template-review-protocol-6'}:
+                'template-review-protocol-6', 'template-review-protocol-7'}:
             # Protocol 3 lists only failing checks, or ones with a reason or evidence; an unlisted check holds. Only a
             # clean answer is shortened: an extra, repeated or conflicting entry stays for the test to refuse.
             answered = [entry.get('check') for entry in result['results'] if isinstance(entry, dict)]

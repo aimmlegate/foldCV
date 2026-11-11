@@ -21,7 +21,7 @@ LEADING = ('protocol', 'evidence', 'replyProtocol', 'modelInstructions', 'allowT
     'references', 'effectiveCells', 'effectiveRecords', 'manualScopes', 'relations', 'dependencies')
 # Identities, hashes and spans a reply cannot use: it selects items, cells, relations and checks by reference.
 HIDDEN = {'allowedHandles', 'capturedHandles', 'capturedRelations', 'tools', 'packageHash', 'handleMap', 'targets',
-    'policy', 'proposalHash', 'sourceSpans', 'sourceTexts', 'settled'}
+    'policy', 'proposalHash', 'sourceSpans', 'sourceTexts', 'settled', 'mapped'}
 
 
 # What a model can read in a cell: its identity, wording, value and standing; spans and receipts stay stored.

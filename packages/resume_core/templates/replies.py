@@ -110,6 +110,23 @@ REVIEW_PROTOCOL = {'version': 'template-review-protocol-6', 'rules': [
     'reason is one short sentence in Russian that names the defect or what is missing; evidence lists the refs that support the disposition, or []. actionable is true only when a corrected proposal could fix it from the offered evidence.']}
 
 
+# T4: the review of a request the map of the CV trimmed. Its evidence is the block's lines, not the whole CV, and an
+# entry's employer, job title and period come from the map's header lines. Other requests keep protocol 6.
+MAPPED_REVIEW_PROTOCOL = {'version': 'template-review-protocol-7', 'rules': [
+    *REVIEW_PROTOCOL['rules'][:5],
+    'The scope target checks coverage. evidence offers the source lines of this block: a map of the CV chose them, and '
+    'other blocks read the rest of the CV. Every statement in these lines that belongs to the block declaration is '
+    'extracted, or they state none. Text outside the declared content is not a coverage gap, nor is a statement that '
+    'fits a block in semanticContext.otherBlocks better: that block shows it. A declaration that selects or limits '
+    'content (a short summary, chosen entries, a list already at its maximum item count) has a gap only when it misses a '
+    'statement it requires. A gap reason names every missing statement, not examples.',
+    'When semanticContext.taskInput.entry is given, the proposal extracts only the lines entry.lines names, and the scope '
+    'target checks coverage of those lines only. The employer, job title and period of each part of entry.parts are the '
+    'coordinator\'s, cited from the lines that state them, which may lie outside entry.lines; any other value read from '
+    'a line outside entry.lines fails claim_ownership or evidence_identity.',
+    REVIEW_PROTOCOL['rules'][7]]}
+
+
 # D117: a block declared per_entry is outlined first, then each entry is extracted by its own request. Protocol 2 and
 # outline review protocol 2: evidence entries as in proposal protocol 6.
 OUTLINE_PROTOCOL = {'version': 'template-outline-protocol-2', 'rules': [
@@ -224,12 +241,13 @@ def review_protocol(review):
 
 # Protocols whose reply lists failing checks only; an unlisted check holds.
 FAILING_ONLY_PROTOCOLS = frozenset({'template-review-protocol-3', 'template-review-protocol-4', 'template-review-protocol-5',
-    REVIEW_PROTOCOL['version']})
+    REVIEW_PROTOCOL['version'], MAPPED_REVIEW_PROTOCOL['version']})
 
 # Protocols whose requests the model reads in the compact form (template_prompt). A stored request reads as the protocol
 # it was captured with says, so each version stays named here when a newer one comes.
 COMPACT_PROTOCOLS = frozenset({'template-proposal-protocol-6', 'template-review-protocol-6', 'template-outline-protocol-2',
-    'template-outline-review-protocol-2', 'template-map-protocol-1', 'template-map-repair-protocol-1'})
+    'template-outline-review-protocol-2', 'template-map-protocol-1', 'template-map-repair-protocol-1',
+    'template-review-protocol-7'})
 
 
 def model_targets(review):

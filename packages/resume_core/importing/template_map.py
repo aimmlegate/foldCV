@@ -13,10 +13,11 @@ the same refs.
 
 import re
 
-from ..models.template_import import MapRepairReply, MapReply
+from ..hashing import digest
+from ..models.template_import import MapRepairReply, MapReply, ReviewInput
 from ..sources import capture_span, line_spans
 from ..templates.compiler import splits_entries
-from ..templates.replies import MAP_PROTOCOL, MAP_REPAIR_PROTOCOL
+from ..templates.replies import MAP_PROTOCOL, MAP_REPAIR_PROTOCOL, MAPPED_REVIEW_PROTOCOL
 from ..template_source_cleanup import without_contacts
 from .template_entries import _bounds, line_options
 from .template_identity import evidence_options, offered_evidence
@@ -271,6 +272,63 @@ def apply_repair(value, payload, offered, sources):
         raise ValueError('map repair leaves lines of a block of entries out')
     result['unused'] = unused(result, lines)
     return result
+
+
+def reads_whole_cv(task, block, definition):
+    """Whether a block reads the whole CV whatever the map says (T4, point 8, recommendation A): a block that rewrites
+    and is neither extracted entry by entry nor the candidate's identity (the summary and the career highlights)."""
+    candidate = {value.id for value in definition.fact_types if value.builtin_kind == 'candidate'}
+    return (task.kind == 'rewrite' and not splits_entries(block)
+        and not any(binding.semantic_type in candidate for binding in block.bindings))
+
+
+def _units(lines, chosen):
+    """The refs of whole units of several lines whose every line is chosen: such a unit is offered whole too."""
+    whole = set()
+    for ref in lines.offered:
+        if ref in lines.index:
+            continue
+        try:
+            start, end = lines.bounds(ref)
+        except ValueError:
+            continue
+        if all(lines.lines[position].ref in chosen for position in range(start, end + 1)):
+            whole.add(ref)
+    return whole
+
+
+def block_evidence(value, offered, block_id, extra, sources):
+    """A block's evidence when the map is used (T4, point 2): the lines the map gave it under the map's refs, a whole
+    unit only when all its lines are the block's, then what else the block reads (cell evidence, dependency results)."""
+    lines = Lines(offered, sources)
+    chosen = set(value['blocks'].get(block_id, []))
+    chosen |= _units(lines, chosen)
+    wanted = {digest(span) for span in extra}
+    options = evidence_options(extra, sources, base=list(offered.values()))
+    return [option for option in options if option.ref in chosen or option.ref not in offered or digest(option.span) in wanted]
+
+
+def entry_evidence(parent, offered, spans, sources):
+    """An entry's evidence (T4, point 9): of its block's offered evidence, the entry's own lines and the whole units in
+    them, and what is not a line of the CV (cell evidence, dependency results)."""
+    lines = Lines(offered, sources)
+    own = {digest(span) for span in spans}
+    chosen = {ref for ref, option in offered.items() if digest(option.span) in own}
+    chosen |= _units(lines, chosen)
+    return [option for option in parent.values() if option.ref in chosen or option.ref not in offered]
+
+
+def mapped_review(review, proposal, request):
+    """The review of a request the map trimmed (T4): it offers what the request offered and the lines the reply cites,
+    not the whole CV, under the review protocol of trimmed requests."""
+    offered = set(offered_evidence(request) or {})
+    cited = {digest(span) for field in proposal.resolved_fields for span in field.evidence}
+    cited |= {digest(span) for relation in proposal.reply.relations for span in relation.evidence}
+    value = review.model_dump(mode='json', by_alias=True)
+    value['evidence'] = [option.model_dump(mode='json', by_alias=True) for option in review.evidence
+        if option.ref in offered or digest(option.span) in cited]
+    value['semanticContext'] = {**review.semantic_context, 'replyProtocol': MAPPED_REVIEW_PROTOCOL}
+    return ReviewInput.model_validate(value)
 
 
 def map_task(operation):
