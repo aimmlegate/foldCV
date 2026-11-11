@@ -15,6 +15,7 @@ from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.repository.project_repository import decode_project
 from packages.resume_core.reasoning import ReasoningEffort
 from packages.resume_core.import_failure import TemplateImportFailure
+from packages.resume_core.importing.template_import import spent_calls
 
 from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
@@ -66,6 +67,20 @@ def outcome(task, result):
     return 'succeeded', None
 
 
+def usage_detail(operation):
+    """The calls and tokens of the import's notice (T9), summed over the operation's attempts as its record holds them;
+    nothing before the first call. A released attempt never ran, and a count its provider did not report adds none."""
+    attempts = getattr(operation, 'attempts', None)
+    calls = spent_calls(operation) if attempts else 0
+    if not calls:
+        return {}
+
+    def total(name):
+        return sum(getattr(attempt.usage, name) or 0 for attempt in attempts)
+    return {'usage': {'calls': calls, 'inputTokens': total('input_tokens'),
+        'cachedInputTokens': total('cached_input_tokens'), 'outputTokens': total('output_tokens')}}
+
+
 class ImportService:
     def __init__(self, projects, pipeline=None, *, commands=None, admission=INFERENCE,
                  wall=lambda: datetime.now(timezone.utc)):
@@ -108,16 +123,34 @@ class ImportService:
                         await asyncio.to_thread(self._settle, project_id, held['operation'], held['permit'])
                         self.queue_moved = self.wall()
             state, error = outcome(task, result)
-            detail = {'operationId': getattr(result, 'id', request.client_request_id)}
+            detail = {'operationId': getattr(result, 'id', request.client_request_id), **usage_detail(result)}
         except (ProjectFailure, RepositoryFailure, TemplateImportFailure) as failure:
             code = getattr(failure, 'code', 'PROCESS_FAILED')
             state, error = ('cancelled', None) if code == 'CANCELLED' else ('failed', code)
+            detail = await self._spent(project_id, held.get('operation'))
         except Exception:
             LOG.exception('import task failed')
+            detail = await self._spent(project_id, held.get('operation'))
         finally:
             self.runners.pop(task.id, None)
             self.projects.tasks.finish(task.id, state, error=error, detail=detail)
             started.set()
+
+    async def _spent(self, project_id, operation_id):
+        """The usage of an import that ended by raising (an account stop, a failed commit): its record still holds
+        what its calls spent. Nothing when the record cannot be read."""
+        reader = getattr(self.pipeline, 'read', None)
+        if reader is None or operation_id is None:
+            return {}
+
+        def read():
+            workspace = reader(project_id)
+            owner = workspace.project or workspace.pre_draft
+            return usage_detail(next((item for item in owner.template_operations if item.id == operation_id), None))
+        try:
+            return await asyncio.to_thread(read)
+        except Exception:
+            return {}
 
     async def run(self, task, request, started, held):
         project_id = task.project_id

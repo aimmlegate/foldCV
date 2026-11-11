@@ -254,3 +254,85 @@ def test_the_import_read_cache_keeps_a_few_projects(tmp_path):
         for value, _sources in projects:
             pipeline.read(value.project_id)
         assert list(pipeline.read_cache) == [value.project_id for value, _sources in projects[-CACHED_READS:]]
+
+
+class Spending:
+    """The controlled transport with each call reporting its own token counts, as a CLI provider would."""
+
+    def __init__(self, inner, counts):
+        self.inner, self.counts = inner, iter(counts)
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def generate(self, request, cancel):
+        from dataclasses import replace
+        from resume_api.providers.content import ReportedUsage
+        usage = ReportedUsage(*next(self.counts), True)
+        return self.inner.generate(replace(request, on_return=lambda frame: request.on_return(replace(frame,
+            usage=usage))), cancel)
+
+
+def summed(rows):
+    return {key: sum(row[key] or 0 for row in rows) for key in ('inputTokens', 'cachedInputTokens', 'outputTokens')}
+
+
+@pytest.mark.asyncio
+async def test_a_finished_import_reports_the_calls_and_tokens_its_record_and_usage_file_hold(tmp_path):
+    import json
+    from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
+    fixture = RuntimeFixture(tmp_path)
+    fixture.transport = Spending(fixture.transport, [(615_234, 33_456, 30_900), (1_200, 0, 85)])
+    fixture.pipeline = fixture.fresh_pipeline()
+    done = await import_task(fixture)
+    assert done['state'] == 'succeeded', done
+    record = fixture.current().project.template_operations[0]
+    rows = [attempt.usage.model_dump(by_alias=True, exclude={'complete'}) for attempt in record.attempts]
+    usage_file = fixture.root / 'store' / 'diagnostics' / 'import-usage' / (record.id + '.json')
+    reported = [row['reported'] for row in json.loads(usage_file.read_text())['attempts']]
+    assert done['detail']['usage'] == {'calls': 2, **summed(rows)} == {'calls': len(reported), **summed(reported)}
+    assert done['detail']['usage'] == {'calls': 2, 'inputTokens': 616_434, 'cachedInputTokens': 33_456,
+        'outputTokens': 30_985}
+    assert done['detail']['operationId'] == record.id
+
+
+@pytest.mark.asyncio
+async def test_an_import_the_account_stopped_still_reports_what_its_call_spent(tmp_path):
+    from resume_api.providers.content import ContentFailure, ReportedUsage
+    from tests.templates.template_runtime_fixtures import RuntimeFixture, import_task
+    fixture = RuntimeFixture(tmp_path)
+
+    def exhausted(_request, _cancel):
+        raise ContentFailure('QUOTA_EXHAUSTED', logical_attempts=1, usage=ReportedUsage(500, 120, 0, True),
+            cleanup_verified=True, dispatch_witness={'transport': 'controlled'})
+    fixture.transport.generate = exhausted
+    done = await import_task(fixture)
+    # The pipeline ends this run by raising; the task reads what the call spent from the record.
+    assert (done['state'], done['error']) == ('failed', 'QUOTA_EXHAUSTED')
+    assert done['detail']['usage'] == {'calls': 1, 'inputTokens': 500, 'cachedInputTokens': 120, 'outputTokens': 0}
+
+
+def test_an_import_without_a_call_reports_no_usage(tmp_path):
+    with v2_app(tmp_path, [papers()]) as (client, application):
+        service = application.state.projects
+        service.imports.pipeline, service.imports.commands = HoldingPipeline(), None
+        task_id = start(client, 'request-1').json()['id']
+        client.post('/v2/projects/' + PROJECT + '/import', json={'kind': 'cancel', 'taskId': task_id})
+        done = finished(client, task_id)
+        assert done['state'] == 'cancelled' and 'usage' not in done['detail']
+
+
+def attempt(state, *counts):
+    return SimpleNamespace(state=state, usage=SimpleNamespace(input_tokens=counts[0], cached_input_tokens=counts[1],
+        output_tokens=counts[2]))
+
+
+def test_the_usage_counts_only_attempts_that_ran_and_takes_an_unreported_count_as_none():
+    from resume_api.projects.imports import usage_detail
+    # A released attempt never ran; one whose outcome is unknown may have, and its provider reported nothing.
+    operation = SimpleNamespace(attempts=[attempt('released', None, None, None), attempt('returned', 900, 0, 40),
+        attempt('outcome_unknown', None, None, None)])
+    assert usage_detail(operation) == {'usage': {'calls': 2, 'inputTokens': 900, 'cachedInputTokens': 0,
+        'outputTokens': 40}}
+    assert usage_detail(SimpleNamespace(attempts=operation.attempts[:1])) == {}
+    assert usage_detail(SimpleNamespace(id='operation-hold', state='cancelled')) == usage_detail(None) == {}

@@ -22,7 +22,7 @@ export function TaskNotices({ entries, activeId, titleOf, stop, close, open }: {
       {notices.map(notice => <div className={`notice task-notice${notice.state === "failed" || notice.state === "stalled" ? " error" : ""}`}
         role="status" key={notice.projectId}>
         <p><strong>{notice.title}</strong><span>{notice.text}{(notice.state === "running" || notice.state === "queued")
-          && <> · <Elapsed startedAt={notice.startedAt} /></>}</span></p>
+          && <> · <Elapsed startedAt={notice.startedAt} /></>}</span>{notice.usage && <span>{notice.usage}</span>}</p>
         <div className="task-notice-actions">
           {notice.projectId !== activeId && <button type="button" className="text-button" onClick={() => open(notice.projectId)}>Открыть</button>}
           {notice.state === "running" || notice.state === "queued"
