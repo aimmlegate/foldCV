@@ -16,7 +16,8 @@ pytestmark = pytest.mark.slow
 # Model calls, and characters of every prompt and reply schema, of one import with rewriting at width 1. Width 1 runs
 # the tasks in declaration order; at a higher width a review made before the role branch is decided lists the blocks
 # of both branches, so its size would follow the timing.
-PINS = {'F01': (28, 303569), 'F07': (28, 1671595), 'F10': (30, 361142)}
+# T4: the map is one more call; a block the map gives no line makes none (F01 seven blocks, F07 five, F10 one).
+PINS = {'F01': (15, 176319), 'F07': (19, 718824), 'F10': (29, 338946)}
 BELOW = 0.02
 
 
@@ -39,7 +40,8 @@ async def test_a_scripted_import_sends_no_more_and_not_much_less_than_its_pinned
             return script(request, value)
         return measured
 
-    _fixture, result, _workspace, _originals = await generic_import(tmp_path, name, wrap=wrap)
+    # New imports map the CV first (T4); an import without a map sends today's requests byte for byte.
+    _fixture, result, _workspace, _originals = await generic_import(tmp_path, name, wrap=wrap, source_map=True)
     assert result.state == 'published'
     calls, pinned = PINS[name]
     prompt, schema = sum(size[0] for size in sizes), sum(size[1] for size in sizes)
