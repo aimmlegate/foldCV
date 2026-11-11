@@ -1,5 +1,6 @@
 """What a CLI prints while it signs in: the address of its sign-in page, which Settings offers when the browser the CLI
-opens does not appear (seen on Windows), and a local log of each run that the user can send."""
+opens does not appear (seen on Windows), and a local log of each run that the user can send; sign-outs and clearings
+are logged there too."""
 
 from __future__ import annotations
 
@@ -23,6 +24,12 @@ ADDRESS = re.compile(rb"https://[!-~]+(?=\s)")
 MAX_URL = 4096
 LOG_NAME = "sign-in.log"
 LOG_BYTES = 262_144
+# A subcommand as both CLIs list it in their help. A CLI without `logout` would take the word as a prompt (Codex).
+LOGOUT = re.compile(rb"^[ \t]+logout\b", re.MULTILINE)
+
+
+def lists_logout(help_text: bytes) -> bool:
+    return LOGOUT.search(help_text) is not None
 
 
 def sign_in_url(kind: str, raw: str) -> str | None:
@@ -40,12 +47,16 @@ def sign_in_url(kind: str, raw: str) -> str | None:
 
 
 class SignInOutput:
-    """One sign-in run's output, fed by the runner's reading thread; `url` is set once the page address appears."""
+    """One sign-in run's output, fed by the runner's reading thread; `url` is set once the page address appears.
+    `action` names the run in the log; `outcome`, when set, is logged in place of OK, and `ended` is what was logged."""
 
-    def __init__(self, kind: str, log: Path | None = None):
-        self.kind, self.log = kind, log
+    def __init__(self, kind: str, log: Path | None = None, action: str = "sign-in"):
+        self.kind, self.log, self.action = kind, log, action
         self.streams = {"stdout": bytearray(), "stderr": bytearray()}
         self.url: str | None = None
+        self.outcome: str | None = None
+        self.ended: str | None = None
+        self.notes: list[str] = []
 
     def feed(self, stream: str, chunk: bytes) -> None:
         buffer = self.streams[stream]
@@ -66,13 +77,17 @@ class SignInOutput:
         except BaseException as error:
             self.write(failure(error))
             raise
-        self.write("OK")
+        self.write(self.outcome or "OK")
 
     def write(self, outcome: str) -> None:
+        self.ended = outcome
         if self.log is None:
             return
-        lines = [f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} {self.kind} sign-in: {outcome}",
-                 f"system: {platform.platform()}", f"page address found: {'yes' if self.url else 'no'}"]
+        lines = [f"{datetime.now(timezone.utc).isoformat(timespec='seconds')} {self.kind} {self.action}: {outcome}",
+                 f"system: {platform.platform()}"]
+        if self.action == "sign-in":
+            lines.append(f"page address found: {'yes' if self.url else 'no'}")
+        lines += self.notes
         for name, buffer in self.streams.items():
             if buffer:
                 text = masked(buffer.decode("utf-8", "replace")).rstrip()

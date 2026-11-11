@@ -8,11 +8,12 @@ from typing import Callable
 
 from resume_api.cli.process_runner import ProcessExit
 from resume_api.providers.claude.profile import ClaudeCliProfile, ClaudeProfileError
-from resume_api.providers.base import ConnectionFailure, Metadata, Quota
+from resume_api.providers.base import ConnectionFailure, Metadata, Quota, account_label
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.claude.content import ClaudeCliProvider, FixtureTransport
 from resume_api.providers.content import ContentFailure
-from resume_api.providers.sign_in import SignInOutput
+from resume_api.providers.shared import strict_json
+from resume_api.providers.sign_in import SignInOutput, lists_logout
 
 
 # Provider codes in the connection vocabulary the Settings state machine already knows.
@@ -24,6 +25,8 @@ STATES = {"AUTH_REQUIRED": "LOGIN_REQUIRED", "AUTH_MODE_MISMATCH": "API_KEY_MODE
 # No CLI-mediated usage read exists; credential files are never read for it (decision 15).
 NOT_PROVIDED = Quota("not_provided")
 LOGIN_SECONDS = 300
+LOGOUT_SECONDS = 60
+STATUS = ("auth", "status", "--json")
 
 
 class ClaudeConnectionAdapter:
@@ -54,7 +57,24 @@ class ClaudeConnectionAdapter:
             raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED"), error.version) from None
         if not full:
             return Metadata(probe.version, (), None, NOT_PROVIDED, version_status=probe.status)
-        return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning), probe.status)
+        return Metadata(probe.version, tuple(probe.reasoning), probe.plan, NOT_PROVIDED, dict(probe.reasoning), probe.status,
+                        self._account(provider, files, cancel))
+
+    def _account(self, provider: ClaudeCliProvider, files: OperationFiles, cancel: threading.Event) -> str | None:
+        """The email and organisation the status names. The probe keeps only the plan and belongs to generation, so
+        the status is read once more here; a reply without them names nobody."""
+        try:
+            stdout, _ = provider.process.run(files, STATUS, deadline=time.monotonic() + 15, cancel=cancel)
+            body = strict_json(stdout)
+        except (ProcessExit, ContentFailure):
+            return None
+        except SpikeError as error:
+            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
+        except ClaudeProfileError as error:
+            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
+        if not isinstance(body, dict) or body.get("loggedIn") is not True:
+            return None
+        return account_label(body.get("email"), body.get("orgName"))
 
     def login(self, files: OperationFiles, cancel: threading.Event,
               code: Callable[[], str | None] | None = None, output: SignInOutput | None = None) -> None:
@@ -84,6 +104,31 @@ class ClaudeConnectionAdapter:
                                  on_output=output.feed if output is not None else None)
         except ProcessExit:
             raise ConnectionFailure("CLI_FAILED") from None
+        except SpikeError as error:
+            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
+        except ClaudeProfileError as error:
+            raise ConnectionFailure(error.code) from None
+
+    def logout(self, files: OperationFiles, cancel: threading.Event, *, output: SignInOutput | None = None) -> None:
+        """The CLI's own sign-out, in the profile and sandbox of the sign-in: it removes the keychain entry of the FoldCV
+        config directory. It runs only on a CLI that qualifies and lists the command; the caller checks the status."""
+        provider = self._provider()
+        deadline = time.monotonic() + LOGOUT_SECONDS
+        try:
+            provider.capabilities(files, cancel, deadline)
+        except ContentFailure as error:
+            raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED"), error.version) from None
+        try:
+            try:
+                listing, _ = provider.process.run(files, ("auth", "--help"), deadline=deadline, cancel=cancel)
+            except ProcessExit:
+                raise ConnectionFailure("SIGN_OUT_UNSUPPORTED") from None
+            if not lists_logout(listing):
+                raise ConnectionFailure("SIGN_OUT_UNSUPPORTED")
+            provider.process.run(files, ("auth", "logout"), deadline=deadline, cancel=cancel, max_output=65_536,
+                                 on_output=output.feed if output is not None else None)
+        except ProcessExit:
+            raise ConnectionFailure("SIGN_OUT_FAILED") from None
         except SpikeError as error:
             raise ConnectionFailure(STATES.get(error.code, "CLI_FAILED")) from None
         except ClaudeProfileError as error:

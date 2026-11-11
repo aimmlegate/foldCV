@@ -18,6 +18,8 @@ if args[0] == "--version":
     sys.stderr.write("cannot start: state=one-time-value\\n"); sys.exit(3)
 if args[0] == "-p":
     sys.stdin.read(); sys.stderr.write("synthetic resume text\\n"); sys.exit(2)
+if args[0] == "logout":
+    sys.stderr.write("Error logging out: storage refused\\n"); sys.exit(1)
 print("fine")
 """
 
@@ -61,6 +63,14 @@ def test_cli_runs_are_logged_with_outcome_and_only_told_error_output(tmp_path, c
     assert lines[3].startswith("absent auth status: CLI_MISSING")
     text = "\n".join(lines)
     assert "synthetic" not in text and "one-time-value" not in text
+
+
+def test_a_failed_sign_out_logs_the_end_of_its_error_output(tmp_path, cli, caplog):
+    caplog.set_level(logging.INFO, logger="foldcv")
+    with pytest.raises(ProcessExit):
+        run(tmp_path / "logout", cli, ("logout",))
+    line = next(record.getMessage() for record in caplog.records if record.name == "foldcv.cli")
+    assert line.startswith("claude logout: exit 1 in ") and line.endswith("\nError logging out: storage refused")
 
 
 def test_failures_name_codes_system_errors_and_what_they_replaced():

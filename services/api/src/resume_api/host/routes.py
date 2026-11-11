@@ -7,5 +7,6 @@ def mount_host_routes(app, connections):
                           ("detach", connections.detach), ("cancel-login", connections.cancel_login),
                           ("install", connections.install_cli), ("cancel-install", connections.cancel_install),
                           ("release-check", connections.release_check),
-                          ("enable", connections.enable), ("login-code", connections.send_login_code)):
+                          ("enable", connections.enable), ("login-code", connections.send_login_code),
+                          ("logout", connections.logout), ("clear-data", connections.clear_data)):
         app.add_api_route(f"/v1/host/{path}", handler, methods=["POST"])

@@ -215,6 +215,19 @@ class ExperimentalCliProfile:
         command = ("-p", self._policy(owned, args), str(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, env
 
+    def clear(self) -> list[str]:
+        """Remove the CLI's own folders (home, CODEX_HOME with its sign-in, working directory) of a profile already
+        signed out. The root stays with its marker, lock and cleanup latch, and `prepare` makes the folders again."""
+        _safe_directory(self.root, create=False)
+        if not (self.root / MARKER).is_file() or (self.root / MARKER).is_symlink():
+            raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
+        folders = [path for path in (self.home, self.codex_home, self.workdir) if os.path.lexists(path)]
+        if any(path.is_symlink() or not path.is_dir() for path in folders):
+            raise ExperimentalProfileError("CLI_PROFILE_UNSAFE")
+        for path in folders:
+            host.remove_tree(path)
+        return [path.name for path in folders]
+
 
 def installed_profile(root: Path, *, managed_only: bool = False) -> ExperimentalCliProfile:
     """The macOS app passes managed_only: it uses only the runtime it installs, on every Mac the same way."""

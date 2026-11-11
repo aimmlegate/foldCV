@@ -16,13 +16,14 @@ from resume_api.providers.codex.profile import ExperimentalCliProfile, Experimen
 from resume_api.lifecycle import OperationFiles, SpikeError
 from resume_api.providers.codex.content import ACTION_METHODS
 from resume_api.providers.shared import MODEL, PLAN, strict_json
-from resume_api.providers.sign_in import SignInOutput
+from resume_api.providers.sign_in import SignInOutput, lists_logout
 from resume_api.providers.codex.pins import REQUIRED_FLAGS, check_features, overrides, qualify
 from resume_api.cli.qualification import QualificationError, missing_flags
-from ..base import ConnectionFailure, Metadata, Quota
+from ..base import ConnectionFailure, Metadata, Quota, account_label
 
 
 MAX_MODELS = 100
+LOGOUT_SECONDS = 60
 
 
 
@@ -165,6 +166,7 @@ class ConnectionAdapter:
         models: tuple[str, ...] = ()
         reasoning = {}
         plan: str | None = None
+        label: str | None = None
         quota = Quota()
 
         def request(identifier: int, method: str, params: dict[str, object] | None = None) -> bytes:
@@ -174,7 +176,7 @@ class ConnectionAdapter:
             return (json.dumps(value, separators=(",", ":")) + "\n").encode()
 
         def accept(raw: bytes) -> bytes | None:
-            nonlocal stage, models, plan, quota
+            nonlocal stage, models, plan, label, quota
             try:
                 message = strict_json(raw)
             except Exception:
@@ -216,6 +218,7 @@ class ConnectionAdapter:
                     if not isinstance(raw_plan, str) or not PLAN.fullmatch(raw_plan):
                         raise ConnectionFailure("METADATA_FAILED")
                     plan = raw_plan
+                label = account_label(account.get("email"))
                 stage = 2
                 return request(2, "model/list", {"includeHidden": False, "limit": MAX_MODELS})
             if stage == 2:
@@ -246,7 +249,7 @@ class ConnectionAdapter:
                   on_line=accept, interactive=True)
         if stage != 4:
             raise ConnectionFailure("METADATA_FAILED")
-        return Metadata(version, models, plan, quota, reasoning, self.version_status)
+        return Metadata(version, models, plan, quota, reasoning, self.version_status, label)
 
     def inspect(self, files: OperationFiles, cancel: threading.Event, *, full: bool = True) -> Metadata:
         deadline = time.monotonic() + 15
@@ -276,3 +279,19 @@ class ConnectionAdapter:
         # The CLI owns the browser flow and credential storage; only diagnostics are local.
         self._run(files, ("login", "--config", "log_dir=" + json.dumps(str(logs))), cancel,
                   deadline, max_output=65_536, on_output=output.feed if output is not None else None)
+
+    def logout(self, files: OperationFiles, cancel: threading.Event, *, output: SignInOutput | None = None) -> None:
+        """The CLI's own sign-out of the profile's CODEX_HOME, once its help lists the command; the caller checks the
+        status. Without the app's profile the CLI runs with the user's HOME and would sign out their own CLI."""
+        if self.experimental_profile is None:
+            raise ConnectionFailure("SIGN_OUT_NOT_AVAILABLE")
+        deadline = time.monotonic() + LOGOUT_SECONDS
+        self.version(files, cancel, deadline)
+        listing, _ = self._run(files, ("--help",), cancel, deadline)
+        if not lists_logout(listing):
+            raise ConnectionFailure("SIGN_OUT_UNSUPPORTED")
+        try:
+            self._run(files, ("logout",), cancel, deadline, max_output=65_536,
+                      on_output=output.feed if output is not None else None)
+        except ConnectionFailure as error:
+            raise ConnectionFailure("SIGN_OUT_FAILED" if error.code == "CLI_FAILED" else error.code) from None

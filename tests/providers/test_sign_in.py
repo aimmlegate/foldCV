@@ -7,7 +7,7 @@ import sys
 import pytest
 
 from resume_api.lifecycle import SpikeError
-from resume_api.providers.sign_in import LOG_BYTES, SignInOutput, sign_in_url
+from resume_api.providers.sign_in import LOG_BYTES, SignInOutput, lists_logout, sign_in_url
 
 PAGE = "https://claude.com/cai/oauth/authorize?code=true&client_id=c&state=one-time&code_challenge=one-time-too"
 
@@ -51,6 +51,31 @@ def test_the_log_records_the_outcome_without_one_time_values(tmp_path):
     assert "claude_cli sign-in: OK" in text and "claude_cli sign-in: DEADLINE_EXCEEDED" in text
     assert "page address found: yes" in text and "page address found: no" in text and "--- stderr\nLogin failed" in text
     assert "one-time" not in text and "state=…" in text and "client_id=c" in text
+
+
+def test_a_sign_out_and_a_clearing_are_logged_by_their_outcome_without_a_page_line(tmp_path):
+    log = tmp_path / "logs" / "sign-in.log"
+    output = SignInOutput("codex_cli", log, "sign-out")
+    with output.recording():
+        output.feed("stderr", b"Error logging out\n")
+        output.outcome = "SIGN_OUT_FAILED"
+    clearing = SignInOutput("claude_cli", log, "clearing")
+    with clearing.recording():
+        clearing.notes.append("cleared: claude, cwd")
+    assert (output.ended, clearing.ended) == ("SIGN_OUT_FAILED", "OK")
+    text = log.read_text()
+    assert "codex_cli sign-out: SIGN_OUT_FAILED" in text and "--- stderr\nError logging out" in text
+    assert "claude_cli clearing: OK" in text and "cleared: claude, cwd" in text and "page address" not in text
+
+
+@pytest.mark.parametrize(("listing", "found"), [
+    (b"Commands:\n  login [options]   Sign in\n  logout            Log out from your account\n", True),
+    (b"Commands:\n  exec        Run non-interactively\n  logout      Remove stored credentials\n", True),
+    (b"Commands:\n  login       Manage login (see logout)\n", False), (b"logout\n", False),
+    (b"Commands:\n  logouts     Something else\n", False), (b"", False),
+])
+def test_only_a_listed_logout_command_counts(listing, found):
+    assert lists_logout(listing) is found
 
 
 def test_a_full_log_moves_aside_and_an_unwritable_one_is_skipped(tmp_path):

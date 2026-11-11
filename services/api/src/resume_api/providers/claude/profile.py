@@ -222,6 +222,20 @@ class ClaudeCliProfile:
         command = ("-p", self.policy(owned, args, network=network), os.path.realpath(executable), *args)
         return Path("/usr/bin/sandbox-exec"), command, self.environment(owned)
 
+    def clear(self) -> list[str]:
+        """Remove the CLI's own folders (config, working directory, Windows home) of a profile already signed out. The
+        root stays with its marker, lock and cleanup latch, and `prepare` makes the folders again. On macOS the sign-in
+        is the keychain entry of the config directory, which a folder at the same path finds again."""
+        _private_directory(self.root, create=False)
+        if not (self.root / MARKER).is_file() or (self.root / MARKER).is_symlink():
+            raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
+        folders = [path for path in (self.config_dir, self.workdir, self.windows_home) if os.path.lexists(path)]
+        if any(path.is_symlink() or not path.is_dir() for path in folders):
+            raise ClaudeProfileError("CLI_PROFILE_UNSAFE")
+        for path in folders:
+            host.remove_tree(path)
+        return [path.name for path in folders]
+
     def wipe(self) -> list[str]:
         """Remove sessions, caches, logs and backups; keep only the config file and credentials."""
         removed = []

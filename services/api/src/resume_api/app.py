@@ -53,7 +53,7 @@ CHECK_WAIT_SECONDS = 30
 MODEL_STOP_SECONDS = 65
 POST_ONLY_PATHS = frozenset({"session/exchange", "host/discover", "host/status", "host/login", "host/detach", "host/models",
                             "host/select", "host/cancel-login", "host/install", "host/cancel-install",
-                            "host/release-check", "host/enable", "host/login-code"})
+                            "host/release-check", "host/enable", "host/login-code", "host/logout", "host/clear-data"})
 JSON_POST_PATHS = frozenset("/v1/" + path for path in POST_ONLY_PATHS)
 TEMPLATE_CONFIG_PATH = "/v1/rich/template-config/"
 TEMPLATE_ASSISTANT_PATH = "/v2/templates/assistant/"

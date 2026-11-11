@@ -19,7 +19,9 @@ count = int(calls.read_text()) + 1 if calls.exists() else 1
 if generation:
     calls.write_text(str(count))
 with (base / "audit.jsonl").open("a") as audit:
-    audit.write(json.dumps({"generation": generation, "args": args}) + "\n")
+    audit.write(json.dumps({"generation": generation, "args": args, "config": os.environ.get("CLAUDE_CONFIG_DIR")}) + "\n")
+# A sign-in leaves `signed-in` with the account's email, if the fixture names one; a sign-out leaves `signed-out`.
+signed_in, signed_out_marker = base / "signed-in", base / "signed-out"
 FLAGS = ("--print --output-format --verbose --json-schema --model --effort --restricted --tools "
          "--strict-mcp-config --mcp-config --disable-slash-commands --settings --no-session-persistence "
          "--permission-mode --permission-prompts --system-prompt --allowedTools --include-partial-messages")
@@ -47,16 +49,40 @@ if args == ["auth", "login", "--claudeai"]:
         if sys.stdin.readline().strip() != "synthetic-code":
             print("Login failed: invalid code")
             sys.exit(1)
-    (base / "signed-in").touch()
+    signed_in.write_text(config.get("login_email", ""))
+    signed_out_marker.unlink(missing_ok=True)
     print("Login successful.")
     sys.exit(0)
+if args == ["auth", "--help"]:
+    print("Usage: claude auth [options] [command]\n\nManage authentication\n\nCommands:\n"
+          "  login [options]   Sign in to your Anthropic account\n"
+          + ("" if case == "no_logout" else "  logout            Log out from your Anthropic account\n")
+          + "  status [options]  Show authentication status")
+    sys.exit(0)
+if args == ["auth", "logout"]:
+    if case == "logout_fails":
+        print("Failed to log out: synthetic keychain error", file=sys.stderr)
+        sys.exit(1)
+    if case == "slow_logout":
+        (base / "logout_ready").touch()
+        for _ in range(1000):
+            if (base / "logout_release").exists():
+                break
+            time.sleep(0.01)
+    if case != "logout_ignored":
+        signed_in.unlink(missing_ok=True)
+        signed_out_marker.touch()
+    print("Successfully logged out from your Anthropic account.")
+    sys.exit(0)
 if args == ["auth", "status", "--json"]:
-    signed_out = case in {"logged_out", "login_code"} and not (base / "signed-in").exists()
+    signed_out = (case in {"logged_out", "login_code"} and not signed_in.exists()) or signed_out_marker.exists()
     status = {"loggedIn": not signed_out and case != "api_key", "authMethod": "claude.ai",
               "apiProvider": "firstParty", "configDirectory": os.environ.get("CLAUDE_CONFIG_DIR", "/fixture"),
-              "subscriptionType": config.get("subscription", "max")}
+              "subscriptionType": config.get("subscription", "max"),
+              "email": (signed_in.read_text() if signed_in.exists() else "") or config.get("email", "fictional@example.invalid"),
+              "orgName": config.get("org", "Fictional Team")}
     if signed_out:
-        status.update(authMethod="none", subscriptionType=None)
+        status.update(authMethod="none", subscriptionType=None, email=None, orgName=None)
     if case == "api_key":
         status.update(loggedIn=True, authMethod="api_key")
     print(json.dumps(status, indent=2))

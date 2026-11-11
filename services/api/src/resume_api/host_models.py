@@ -74,6 +74,8 @@ class ProviderState(Transport):
     modelReasoning: dict[str, ModelReasoning] = Field(default_factory=dict)
     quota: QuotaPayload = Field(default_factory=lambda: QuotaPayload(state="unknown"))
     metadataReady: bool = False
+    # Who is signed in, from the last status check: the email, and Claude's organisation when it says more.
+    account: str | None = Field(default=None, max_length=512)
 
 
 class ProviderSummary(ProviderState):
@@ -88,6 +90,8 @@ class ProviderSummary(ProviderState):
     installed: bool
     enabled: bool = False
     installation: CliInstallationPayload | None = None
+    # The CLI runs in a profile of the app's own, so a sign-out and a clearing touch only that profile.
+    ownProfile: bool = False
 
 
 class ConnectionPayload(Transport):

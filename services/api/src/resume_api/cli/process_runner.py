@@ -22,8 +22,9 @@ MAX_OUTPUT = 262_144
 MAX_LINE = 65_536
 # The log names a run by its program and leading words such as `auth status` or `-p`; prompts and values never match.
 WORD = re.compile(r"-{0,2}[a-z][a-z0-9-]{0,30}")
-# Runs whose error output is about the program, not about content: version, help, sign-in, flags, downloads.
-TOLD = frozenset({"--version", "--help", "auth", "login", "features"})
+# Runs whose error output is about the program, not about content: version, help, sign-in and sign-out, flags,
+# downloads.
+TOLD = frozenset({"--version", "--help", "auth", "login", "logout", "features"})
 TOLD_PROGRAMS = frozenset({"curl"})
 TAIL = 1000
 

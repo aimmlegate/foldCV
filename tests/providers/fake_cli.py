@@ -15,7 +15,9 @@ case = config.get("case", "valid")
 args = sys.argv[1:]
 generation = bool(args and args[0] == "exec" and "--help" not in args)
 with (base / "audit.jsonl").open("a") as audit:
-    audit.write(json.dumps({"generation": generation, "args": args}) + "\n")
+    audit.write(json.dumps({"generation": generation, "args": args, "home": os.environ.get("CODEX_HOME")}) + "\n")
+# A sign-in leaves `signed-in` with the account's email, if the fixture names one; a sign-out leaves `signed-out`.
+signed_in, signed_out = base / "signed-in", base / "signed-out"
 
 
 def emit(event):
@@ -41,8 +43,28 @@ if args[:2] == ["features", "list"]:
     print("unified_exec                             stable             true")
     print("code_mode                                under development  false")
     sys.exit(0)
+if args == ["--help"]:
+    print("Codex CLI\n\nUsage: codex [OPTIONS] [PROMPT]\n       codex [OPTIONS] <COMMAND> [ARGS]\n\nCommands:\n"
+          "  exec        Run Codex non-interactively [aliases: e]\n  login       Manage login\n"
+          + ("" if case == "no_logout" else "  logout      Remove stored authentication credentials\n")
+          + "  help        Print this message or the help of the given subcommand(s)")
+    sys.exit(0)
+if args == ["logout"]:
+    if case == "logout_fails":
+        print("Error logging out: synthetic storage error", file=sys.stderr)
+        sys.exit(1)
+    if case != "logout_ignored":
+        signed_in.unlink(missing_ok=True)
+        signed_out.touch()
+    print("Successfully logged out", file=sys.stderr)
+    sys.exit(0)
+if args[:2] == ["login", "--config"]:
+    signed_in.write_text(config.get("login_email", ""))
+    signed_out.unlink(missing_ok=True)
+    print("Successfully logged in", file=sys.stderr)
+    sys.exit(0)
 if args == ["login", "status"]:
-    if case == "missing_login":
+    if case == "missing_login" or signed_out.exists():
         print("Not logged in", file=sys.stderr)
         sys.exit(1)
     if case == "login_failure":
@@ -73,13 +95,17 @@ if args and args[0] == "app-server":
         elif method == "account/read":
             assert event["params"] == {"refreshToken": False}
             emit({"method": "account/updated", "params": {"authMode": "apikey" if case == "metadata_api_key" else "chatgpt"}})
-            emit({"id": event["id"], "result": {"account": {"type": "chatgpt", "email": "fictional@example.invalid"}}})
+            email = (signed_in.read_text() if signed_in.exists() else "") or "fictional@example.invalid"
+            emit({"id": event["id"], "result": {"account": {"type": "chatgpt", "email": email}}})
             if case == "metadata_account_only":
                 sys.exit(0)
         elif method == "model/list":
             emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": e} for e in config.get("efforts", ["low", "medium", "high"])], "defaultReasoningEffort": "medium"}], "nextCursor": None}})
             if case == "metadata_duplicate_catalog":
                 emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna"}], "nextCursor": None}})
+        elif method == "account/rateLimits/read":
+            emit({"id": event["id"], "result": {"rateLimits": {"primary": {"usedPercent": 25, "resetsAt": 1800000000},
+                                                               "secondary": None, "rateLimitReachedType": None}}})
         else:
             sys.exit(92)
     sys.exit(0)

@@ -498,7 +498,9 @@ The routes are listed under [Storage and transport](#routes). Rules for all of t
 - Cancellation stops local work and closes the upstream request best effort;
   consumed inference may still count. Do not promise exactly-once charging.
 - Host connection routes (`/v1/host/*`) expose typed options, never command
-  strings. Detach must not run a global CLI logout.
+  strings. Detach must not run a global CLI logout. The sign-out (D158, T8) runs
+  the CLI's own logout only in a profile of the app's own, and the server refuses
+  it and the clearing of a provider's data for a provider without one.
 - Errors carry a public code, `retryable` and `stage`, never raw prompts or upstream
   response bodies. Every code has a Russian text in `contracts/error-messages.ru.json`;
   `tests/settings/test_error_messages.py` checks the coverage.

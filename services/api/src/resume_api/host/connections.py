@@ -1,5 +1,5 @@
 """The model connections of the service: provider state, the shared worker and model slots, and the host
-operations (discover, status, sign-in, install, select, detach, enable) the Settings page calls."""
+operations (discover, status, sign-in, install, select, detach, enable, sign-out, clearing) the Settings page calls."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from packages.resume_core.rules import RulesFailure
 
 from ..providers.codex.profile import ExperimentalProfileError
 from ..providers.claude.profile import ClaudeProfileError
-from ..providers.base import ConnectionFailure, Metadata
+from ..providers.base import ConnectionFailure, Metadata, SignedOut
 from ..host_models import (ConnectionPayload, EnableProviderRequest, HostRequest, LoginCodeRequest, ProviderState,
                            ProviderSummary, QuotaPayload, SelectModelRequest)
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled, AdmissionTimeout
@@ -31,6 +31,12 @@ from fastapi.responses import JSONResponse
 CANCEL_GRACE_SECONDS = 0.5
 # "not_provided": the provider has no sanctioned usage read (decision 15); runs stay allowed.
 USABLE_QUOTA = frozenset({"available", "not_provided"})
+# The jobs that end a sign-in: the CLI's own sign-out, and the clearing of the profile's data after it.
+LEAVING = frozenset({"logout", "clear"})
+# The sign-out's own refusals; after one, the status check still says who is signed in.
+SIGN_OUT_REFUSALS = frozenset({"SIGN_OUT_FAILED", "SIGN_OUT_UNSUPPORTED", "SIGN_OUT_NOT_AVAILABLE"})
+# Failures after which a sign-out checks nothing more: the job was stopped, or a process may still live.
+FINAL = frozenset({"CANCELLED", "PROCESS_CLEANUP_FAILED", "CLEANUP_FAILED"})
 
 
 class HostConnections:
@@ -57,6 +63,8 @@ class HostConnections:
         self.connection_namespace = secrets.token_hex(12)
         self.login_tasks: dict[str, asyncio.Task] = {}
         self.install_tasks: dict[str, asyncio.Task] = {}
+        # Providers whose sign-out or clearing runs, from the stop of model work to its last check.
+        self.leaving: set[str] = set()
         self.login_codes: dict[str, list[str]] = {}
         self.login_code_lock = threading.Lock()
         self.sign_ins: dict[str, SignInOutput] = {}
@@ -287,7 +295,8 @@ class HostConnections:
                                              loginCode=item.login_code,
                                              loginUrl=sign_in.url if sign_in and state.state == "login_pending" else None,
                                              installed=installed, enabled=self.on(item.kind),
-                                             installation=slot.installation.snapshot() if slot.installation else None))
+                                             installation=slot.installation.snapshot() if slot.installation else None,
+                                             ownProfile=slot.profile is not None))
         return summaries
 
     def connection_response(self, kind=None) -> JSONResponse:
@@ -318,8 +327,10 @@ class HostConnections:
             if job == "install" and (installation is None or kind in self.login_tasks or (self.states[kind].state not in {
                     "cli_missing", "unsupported_version", "launcher_unsupported"} and not installation.snapshot()["update"])):
                 return self.problem("INSTALL_NOT_AVAILABLE", 409, "host")
-            # Beside the provider's own sign-in or install a check starts nothing: the reply is that job's state.
-            if job not in {"login", "install"} and (kind in self.login_tasks or kind in self.install_tasks):
+            # Beside the provider's own sign-in, install, sign-out or clearing a check starts nothing: the reply is that
+            # job's state.
+            if job not in {"login", "install", *LEAVING} and (kind in self.login_tasks or kind in self.install_tasks
+                                                               or kind in self.leaving):
                 return self.connection_response(kind)
             # One connection job per provider; jobs and model work take turns at the exclusive permit (D121).
             if self.cancellation_pending or self.active >= self.max_concurrent() or self.busy(kind):
@@ -333,7 +344,7 @@ class HostConnections:
                 installation.cancel = cancel
                 installation.update(state="downloading", downloadedBytes=0, error=None)
 
-            wait = self.model_stop_seconds() if job in {"login", "install"} else self.check_wait_seconds()
+            wait = self.model_stop_seconds() if job in {"login", "install", "logout"} else self.check_wait_seconds()
 
             def admitted():
                 return INFERENCE.hold(cancel, deadline=time.monotonic() + wait, exclusive=True)
@@ -351,7 +362,8 @@ class HostConnections:
                 except BaseException as error:
                     EVENTS.info("%s %s: %s after %.1f s", job, kind, failure(error), time.monotonic() - started)
                     raise
-                found = (f", {result.version}, plan {result.plan}, {len(result.models)} models"
+                found = ((", still signed in" if job in LEAVING else
+                          f", {result.version}, plan {result.plan}, {len(result.models)} models")
                          if isinstance(result, Metadata) else "")
                 EVENTS.info("%s %s: done in %.1f s%s", job, kind, time.monotonic() - started, found)
                 return result
@@ -375,19 +387,19 @@ class HostConnections:
             self.connection_work[task] = (files, cancel)
             self.connection_kinds[task] = kind
             task.add_done_callback(self.operation_done)
-            if job in {"login", "install"}:
+            if job in {"login", "install", "logout"}:
                 self.connection_epoch += 1
                 self.epochs[kind] += 1
                 epoch = self.epochs[kind]
-                # An import may use both providers, so a new sign-in or CLI on either stops all model work (D119). The
-                # job's thread starts after this, and its exclusive permit then waits for that work to end.
+                # An import may use both providers, so a new sign-in, sign-out or CLI on either stops all model work
+                # (D119). The job's thread starts after this, and its exclusive permit then waits for that work to end.
                 self.assistant.stop_all()
                 self.template_assistant.stop_all()
                 self.rewrite.request_shutdown()
                 self.projects.imports.stop_all()
                 if job == "install":
                     self.install_tasks[kind] = task
-                else:
+                elif job == "login":
                     self.login_tasks[kind] = task
                     if sign_in is not None:
                         self.sign_ins[kind] = sign_in
@@ -407,6 +419,9 @@ class HostConnections:
                 if job == "login":
                     self.states[kind] = ProviderState(state="login_required", version=self.states[kind].version)
                     return self.connection_response(kind)
+                if isinstance(result, SignedOut):
+                    self.states[kind] = ProviderState(state="login_required", version=result.version)
+                    return self.connection_response(kind)
                 assert isinstance(result, Metadata)
                 quota = QuotaPayload(state=result.quota.state, usedPercent=result.quota.used_percent,
                                      resetsAt=result.quota.resets_at)
@@ -414,7 +429,8 @@ class HostConnections:
                          else "unknown_limits" if quota.state == "unknown" else "connected")
                 self.states[kind] = ProviderState(state=state, version=result.version, plan=result.plan,
                                              versionStatus=result.version_status, models=list(result.models), quota=quota,
-                                             modelReasoning=result.reasoning, metadataReady=job != "discover")
+                                             modelReasoning=result.reasoning, metadataReady=job != "discover",
+                                             account=result.account)
                 return self.connection_response(kind)
         except (AdmissionTimeout, AdmissionCancelled) as error:
             if job == "install":
@@ -681,6 +697,98 @@ class HostConnections:
         if code is not None or self.unsafe_cleanup:
             self.states[kind] = ProviderState(state="cleanup_blocked")
         return self.connection_response(kind)
+
+    def leaving_target(self, payload: HostRequest):
+        """The provider of a sign-out or clearing, refused unless its CLI runs in a profile of the app's own: without
+        one it runs with the user's HOME, so a sign-out would sign out the user's own CLI. Hiding the button is not
+        enough. One job of the provider runs at a time."""
+        kind, refused = self.target(payload)
+        if refused:
+            return kind, refused
+        if self.slots[kind].profile is None:
+            return kind, self.problem("SIGN_OUT_NOT_AVAILABLE", 409, "host")
+        if kind in self.leaving or kind in self.login_tasks or kind in self.install_tasks:
+            return kind, self.problem("BUSY", 429, "host", True)
+        return kind, None
+
+    @staticmethod
+    def status_after(adapter, files, cancel):
+        """The status check that ends a sign-out or clearing: SignedOut when the CLI names no account, else its
+        metadata."""
+        try:
+            return adapter.inspect(files, cancel)
+        except ConnectionFailure as error:
+            if error.code != "LOGIN_REQUIRED":
+                raise
+            return SignedOut(error.version)
+
+    async def leave(self, kind, job, work, record: SignInOutput, failed: str):
+        """Runs a sign-out or clearing as a connection job of the provider. Unless the status after it confirmed it,
+        the reply is the refusal and the state is what that status read."""
+        self.leaving.add(kind)
+        try:
+            if job == "logout":
+                # As at a detach: nothing keeps calling the model under the account that signs out.
+                stopped = await self.stop_provider(kind, "unchecked")
+                if self.states[kind].state == "cleanup_blocked":
+                    return stopped
+            reply = await self.connection_job(job, kind, work)
+        finally:
+            self.leaving.discard(kind)
+        if reply.status_code != 200 or self.states[kind].state == "cleanup_blocked" or record.ended == "OK":
+            return reply
+        return self.problem(record.outcome or failed, 409, "host")
+
+    async def logout(self, payload: HostRequest):
+        """Signs the provider's own profile out (D158), the user's own act, never a detach or a way around a quota: all
+        model work stops first, then the CLI's own command runs, and the status after it decides."""
+        kind, refused = self.leaving_target(payload)
+        if refused:
+            return refused
+        adapter, record = self.slots[kind].connection, SignInOutput(kind, self.sign_in_log, "sign-out")
+
+        def work(files, cancel):
+            with record.recording():
+                try:
+                    adapter.logout(files, cancel, output=record)
+                except ConnectionFailure as error:
+                    if error.code in FINAL:
+                        raise
+                    record.outcome = error.code if error.code in SIGN_OUT_REFUSALS else "SIGN_OUT_FAILED"
+                result = self.status_after(adapter, files, cancel)
+                # The status decides: an account it no longer names is signed out, whatever the command said.
+                record.outcome = None if isinstance(result, SignedOut) else record.outcome or "SIGN_OUT_FAILED"
+                return result
+        return await self.leave(kind, "logout", work, record, "SIGN_OUT_FAILED")
+
+    async def clear_data(self, payload: HostRequest):
+        """Removes the provider's data in its own profile, only once the status says signed out: on macOS Claude's
+        sign-in is a keychain entry of the config directory, not a file, so clearing a signed-in profile signs nobody
+        out. Model work goes on; the clearing waits for the permit as a check does."""
+        kind, refused = self.leaving_target(payload)
+        if refused:
+            return refused
+        if self.states[kind].state != "login_required":
+            return self.problem("SIGN_OUT_REQUIRED", 409, "host")
+        slot = self.slots[kind]
+        adapter, profile, record = slot.connection, slot.profile, SignInOutput(kind, self.sign_in_log, "clearing")
+
+        def work(files, cancel):
+            with record.recording():
+                before = self.status_after(adapter, files, cancel)
+                if not isinstance(before, SignedOut):
+                    record.outcome = "SIGN_OUT_REQUIRED"
+                    return before
+                try:
+                    record.notes.append("cleared: " + (", ".join(profile.clear()) or "nothing"))
+                except OSError:
+                    record.outcome = "CLEAR_FAILED"
+                profile.prepare()
+                after = self.status_after(adapter, files, cancel)
+                if not isinstance(after, SignedOut):
+                    record.outcome = "SIGN_OUT_REQUIRED"
+                return after
+        return await self.leave(kind, "clear", work, record, "CLEAR_FAILED")
 
     async def enable(self, payload: EnableProviderRequest):
         kind = payload.provider
