@@ -165,3 +165,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D160 Each import writes its usage to a diagnostics file; Claude content calls run without prompt caching; Codex execs drop the CLI's unused notes and tools (T0.1 and T1 of D158)
 - D161 History files no import record names are removed (R8 of D158)
 - D162 A refused or overloaded call gets one more call and the run's width halves; at most eight Claude calls in flight; the preflight snapshot holds through an import (R3 and R4 of D158)
+- D163 The model reads whole units by their line range and other blocks by title; the gate gets a tolerance (T2 and T3 of D158)
