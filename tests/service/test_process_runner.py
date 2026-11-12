@@ -74,7 +74,8 @@ def test_a_child_silent_for_the_idle_limit_ends_as_stalled_and_a_talking_one_run
     with pytest.raises(SpikeError, match="STALLED"):
         run(tmp_path / "silent", "import time;time.sleep(4)", idle_seconds=0.5)
     assert time.monotonic() - started < 3
-    result, _ = run(tmp_path / "talking", "import sys,time\nfor _ in range(4):\n sys.stdout.write('tick\\n');sys.stdout.flush();time.sleep(0.2)",
+    # Bytes, not text: a text stdout on Windows writes \r\n.
+    result, _ = run(tmp_path / "talking", "import sys,time\nfor _ in range(4):\n sys.stdout.buffer.write(b'tick\\n');sys.stdout.buffer.flush();time.sleep(0.2)",
                     idle_seconds=0.5)
     assert result == b"tick\n" * 4
 
@@ -103,5 +104,5 @@ def test_the_windows_pipe_threads_end_a_silent_child_as_stalled_too():
     with pytest.raises(SpikeError, match="STALLED"):
         exchange("import time;time.sleep(4)")
     assert time.monotonic() - started < 3
-    result, _ = exchange("import sys,time\nfor _ in range(4):\n sys.stdout.write('tick\\n');sys.stdout.flush();time.sleep(0.2)")
+    result, _ = exchange("import sys,time\nfor _ in range(4):\n sys.stdout.buffer.write(b'tick\\n');sys.stdout.buffer.flush();time.sleep(0.2)")
     assert result == b"tick\n" * 4
