@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "foldcv"
-version = "0.2.0"
+version = "1.0.0"
 requires-python = ">=3.13"
 
 [tool.setuptools.packages.find]

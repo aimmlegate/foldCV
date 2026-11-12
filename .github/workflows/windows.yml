@@ -70,12 +70,12 @@ jobs:
           python tools\desktop\package_windows_tauri.py apps\desktop-tauri\target\release\foldcv-beta.exe $helper output\windows
           Expand-Archive (Get-ChildItem output\windows\*.zip).FullName "$env:RUNNER_TEMP\app"
       - name: Helper smoke check with both CLIs
-        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\foldCV Beta\helper" --cli
+        run: python tools\desktop\check_helper.py "$env:RUNNER_TEMP\app\foldCV\helper" --cli
       - name: App start, second start, close and kill
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'foldcv-root'
           $env:FOLDCV_DESKTOP_ROOT = $root
-          $exe = "$env:RUNNER_TEMP\app\foldCV Beta\foldCV Beta.exe"
+          $exe = "$env:RUNNER_TEMP\app\foldCV\foldCV.exe"
           $port = Join-Path $root 'desktop-port'
           Add-Type -Namespace Win32 -Name User -MemberDefinition @'
           [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string className, string title);
@@ -116,7 +116,7 @@ jobs:
             # The window shows when the page has loaded, at the latest 10 s after it opened; WebView2's first start on a
             # fresh runner can take a while.
             $deadline = (Get-Date).AddMinutes(2)
-            while (-not [Win32.User]::IsWindowVisible([Win32.User]::FindWindow('Tauri Window', 'foldCV Beta'))) {
+            while (-not [Win32.User]::IsWindowVisible([Win32.User]::FindWindow('Tauri Window', 'foldCV'))) {
               if ($app.HasExited -or (Get-Date) -gt $deadline) { throw 'The app window was not shown' }
               Start-Sleep -Seconds 1
             }
@@ -129,7 +129,7 @@ jobs:
               [System.Drawing.Graphics]::FromImage($bitmap).CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
               $bitmap.Save("$env:RUNNER_TEMP\app-window.png")
             } catch { Write-Warning "No screenshot: $_" }
-            if ([Win32.User]::FindWindow('#32770', 'foldCV Beta') -ne [IntPtr]::Zero) { throw 'The app shows an error box' }
+            if ([Win32.User]::FindWindow('#32770', 'foldCV') -ne [IntPtr]::Zero) { throw 'The app shows an error box' }
             # A second start hands over to the running app and ends.
             $second = Start-Process -FilePath $exe -PassThru
             if (-not $second.WaitForExit(30000)) { Stop-Process -Id $second.Id -Force; throw 'A second start kept running' }
@@ -137,7 +137,7 @@ jobs:
             # Closing the window quits the app, which stops the helper through its stdin. Tauri's hidden windows
             # make Process.CloseMainWindow unreliable, so the window is found by its class and title (an error box
             # has the title too).
-            $window = [Win32.User]::FindWindow('Tauri Window', 'foldCV Beta')
+            $window = [Win32.User]::FindWindow('Tauri Window', 'foldCV')
             if ($window -eq [IntPtr]::Zero) { throw 'No app window' }
             [void][Win32.User]::PostMessage($window, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
             if (-not $app.WaitForExit(60000)) { Stop-Process -Id $app.Id -Force; throw 'The app did not close' }

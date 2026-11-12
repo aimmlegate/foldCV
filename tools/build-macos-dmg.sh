@@ -30,7 +30,7 @@ PYTHON=${FOLDCV_PYTHON:-/Library/Frameworks/Python.framework/Versions/3.13/bin/p
 [[ -x $PYTHON && $($PYTHON -c 'import sys; print(sys.version_info[:2] == (3, 13))') == True ]] \
   || fail "Python 3.13 is missing; install it from python.org or set FOLDCV_PYTHON"
 
-NAME="foldCV Beta"
+NAME="foldCV"
 # Monterey is the oldest macOS whose Safari updates bring the WebKit the page needs (pdf.js: Safari 17.4).
 MINIMUM_MACOS=12.0
 VERSION=$(node -p 'require("./apps/desktop-tauri/tauri.conf.json").version')

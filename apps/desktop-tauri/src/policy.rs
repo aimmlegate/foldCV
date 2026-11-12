@@ -5,6 +5,7 @@ use tauri::Url;
 
 // Its own folder, so the app runs next to the FoldCV Local builds and shows none of their data. The Electron builds
 // use the same one.
+// The data folder keeps the beta's name, so the beta's projects and sign-ins carry over (D169).
 pub const DATA_FOLDER: &str = "foldCV Beta";
 
 // Windows variables the frozen service and its workers need; everything else, PATH and PYTHON* included, stays out.
@@ -167,8 +168,8 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn the_helper_runs_from_the_bundle_with_the_system_path_only() {
-        let command = helper_command(Path::new("/Applications/foldCV Beta.app/Contents/Resources"), Path::new("/data/root"));
-        assert_eq!(command.executable, Path::new("/Applications/foldCV Beta.app/Contents/Resources/../Helpers/FoldCV Helper.app/Contents/MacOS/foldcv-helper"));
+        let command = helper_command(Path::new("/Applications/foldCV.app/Contents/Resources"), Path::new("/data/root"));
+        assert_eq!(command.executable, Path::new("/Applications/foldCV.app/Contents/Resources/../Helpers/FoldCV Helper.app/Contents/MacOS/foldcv-helper"));
         assert_eq!(command.args, ["serve", "/data/root"]);
         let environment = helper_environment(|name| (name == "TMPDIR").then(|| "/var/folders/t/".into()), Path::new("/Users/a"));
         assert_eq!(environment, [("PATH".into(), "/usr/bin:/bin:/usr/sbin:/sbin".into()), ("HOME".into(), "/Users/a".into()),
@@ -179,9 +180,9 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn the_helper_runs_the_embedded_python_with_the_system_path_only() {
-        let command = helper_command(Path::new(r"C:\Apps\foldCV Beta"), Path::new(r"C:\Users\a\AppData\Local\foldCV Beta"));
-        assert_eq!(command.executable, Path::new(r"C:\Apps\foldCV Beta\helper\python\python.exe"));
-        assert_eq!(command.args, ["-X", "utf8", r"C:\Apps\foldCV Beta\helper\app\packaging\helper_entry.py", "serve",
+        let command = helper_command(Path::new(r"C:\Apps\foldCV"), Path::new(r"C:\Users\a\AppData\Local\foldCV Beta"));
+        assert_eq!(command.executable, Path::new(r"C:\Apps\foldCV\helper\python\python.exe"));
+        assert_eq!(command.args, ["-X", "utf8", r"C:\Apps\foldCV\helper\app\packaging\helper_entry.py", "serve",
             r"C:\Users\a\AppData\Local\foldCV Beta"]);
         let user = [("SystemRoot", r"C:\Windows"), ("TEMP", r"C:\Users\a\Temp"), ("USERNAME", ""),
             ("PATH", r"C:\Python;C:\Windows"), ("PYTHONHOME", r"C:\Python")];

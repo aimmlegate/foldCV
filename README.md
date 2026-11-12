@@ -28,22 +28,22 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 
 ## macOS app
 
-`tools/build-macos-dmg.sh` builds `foldCV Beta.app` and its DMG from this checkout in one step: the frontend, the
+`tools/build-macos-dmg.sh` builds `foldCV.app` and its DMG from this checkout in one step: the frontend, the
 local service frozen with PyInstaller, and the Tauri window around it (`apps/desktop-tauri`), which shows the page in
 the system WebKit. It needs Apple Silicon, arm64 Node 22, python.org Python 3.13 and Rust from
 [rustup](https://rustup.rs), and writes to `output/foldcv-macos-<version>-<commit>/`. The app runs on macOS 12 or later
 with Safari 17.4 or later, whose WebKit it uses. It keeps its data in `~/Library/Application Support/foldCV Beta`, as
-the earlier Electron builds did, apart from the browser service's `FoldCV` root. The signature is ad hoc: on another
+the beta builds did (so their projects and sign-ins carry over), apart from the browser service's `FoldCV` root. The signature is ad hoc: on another
 Mac, allow the app once in System Settings → Privacy & Security.
 
 ## Windows app
 
-The `Windows` workflow builds the portable `foldCV-Beta-<version>-win-x64.zip` on a Windows runner and checks it there
+The `Windows` workflow builds the portable `foldCV-<version>-win-x64.zip` on a Windows runner and checks it there
 (helper, both CLIs, app start, second start, close and kill; artifact `foldcv-windows`): the frontend, the python.org
 embeddable Python with the service's Windows wheels, and the Tauri window (`apps/desktop-tauri`), which shows the page in
 the system WebView2 that Windows 11 has. Its shell needs the Windows toolchain, so the zip is built on the runner only.
-Unpack the zip anywhere and run `foldCV Beta.exe`; there is no installer. Data stays in `%LOCALAPPDATA%\foldCV Beta`, so
-a newer zip in another folder keeps projects and sign-ins. The zip is not signed: Windows SmartScreen asks once (More
+Unpack the zip anywhere and run `foldCV.exe`; there is no installer. Data stays in `%LOCALAPPDATA%\foldCV Beta`, the
+beta's folder, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed: Windows SmartScreen asks once (More
 info → Run anyway). Codex and Claude run in a Job Object that lets them start no other program and ends them with the
 app; unlike the macOS sandbox it does not limit which files they read or write.
 

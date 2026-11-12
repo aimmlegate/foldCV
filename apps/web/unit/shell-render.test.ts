@@ -38,7 +38,7 @@ test("the export dialog offers DOCX and PDF; DOCX is chosen first and the print 
 });
 
 test("Settings and Templates show the way back in the header; the resume screen does not", () => {
-  const props = { title: "Настройки", subtitle: "foldCV Beta", collapsed: false, expand: () => {}, status: "Сохранено", ready: false,
+  const props = { title: "Настройки", subtitle: "foldCV", collapsed: false, expand: () => {}, status: "Сохранено", ready: false,
     busy: false, save: () => {}, exportFile: () => {} };
   const away = renderToStaticMarkup(createElement(Header, { ...props, back: () => {} }));
   assert.match(away, /class="button header-back"[^>]*aria-keyshortcuts="Escape"/u);
