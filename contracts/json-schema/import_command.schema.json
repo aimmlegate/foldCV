@@ -44,6 +44,11 @@
       "title": "Kind",
       "type": "string"
     },
+    "lite": {
+      "default": false,
+      "title": "Lite",
+      "type": "boolean"
+    },
     "operationId": {
       "anyOf": [
         {

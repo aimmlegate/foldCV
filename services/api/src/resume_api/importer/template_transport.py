@@ -8,6 +8,7 @@ from packages.resume_core.importing.template_import import CleanupProof
 from packages.resume_core.hashing import digest
 from ..lifecycle import OperationFiles
 from ..providers.content import ContentFailure, outcome_state
+from . import lite_import
 
 
 # The running job's inference permit; set by the template job runtime around one pipeline run.
@@ -33,7 +34,20 @@ class ProviderTemplateTransport:
         return LaunchOwner(reservationId='reservation-' + uuid.uuid4().hex, incarnationId=self.incarnation, generation=1,
             leaseId='lease-' + uuid.uuid4().hex, processStartWitness=None, transportSessionId=None, transportTurnId=None, pid=None)
 
+    def lite_calls(self, model, cancel, remaining):
+        """The calls a lite import's scheme makes itself: the captured model on its provider, under the job's permit."""
+        selected = self.model_provider(model.model) if self.model_provider else self.provider_factory()
+        if selected is None or selected[1] != model.model:
+            raise ContentFailure('CONNECTION_REQUIRED' if selected is None else 'MODEL_DENIED', cleanup_verified=True,
+                dispatch_witness={'neverDispatched': True})
+        return lite_import.LiteCalls(selected[0], model.adapter, model.model, model.effort, self.temp_root, cancel,
+            remaining, JOB_PERMIT.get())
+
     def generate(self, request, cancel):
+        lite = lite_import.LITE.get()
+        if lite is not None and request.request_value is not None:
+            # A lite import: its scheme already read the CV, and this request is answered from its result.
+            return lite_import.generate(request, lite)
         try:
             selected = self.model_provider(request.policy.model) if self.model_provider else self.provider_factory()
         except Exception as error:

@@ -17,6 +17,7 @@ from packages.resume_core.reasoning import ReasoningEffort
 from packages.resume_core.import_failure import TemplateImportFailure
 from packages.resume_core.importing.template_import import spent_calls
 
+from ..importer.lite_import import STAGES as LITE_STAGES
 from ..importer.template_transport import JOB_PERMIT
 from ..inference_admission import INFERENCE, AdmissionBlocked, AdmissionCancelled
 from .errors import ProjectFailure
@@ -38,6 +39,8 @@ class ImportCommand(BaseModel):
     task_id: str | None = Field(default=None, alias='taskId')
     # The import model's effort for this start; None keeps its catalog default. The capture checks it in the catalog.
     effort: ReasoningEffort | None = None
+    # The lite import: the CV moved word for word with its facts extracted; it never rewrites.
+    lite: bool = False
 
 
 class _Stop:
@@ -157,7 +160,7 @@ class ImportService:
         command = request
         if self.commands is not None and request.kind == 'start':
             command = await asyncio.to_thread(self.commands, project_id, request.client_request_id,
-                request.allow_text_rewrite, request.effort)
+                request.allow_text_rewrite, request.effort, request.lite)
 
         async def admitted():
             operation_id = request.operation_id or request.client_request_id
@@ -294,6 +297,10 @@ class ImportService:
                 'progress': import_progress(operation, data.template_package, stage=task.stage, now=self.wall(),
                     started_at=task.started_at, queued_at=task.detail.get('queuedAt'),
                     admitted_at=task.detail.get('admittedAt'), queue_moved_at=self.queue_moved)}
+            # A lite import reads the CV by its own scheme before any task starts: name what it is doing.
+            lite = getattr(self.pipeline, 'lite_stages', {}).get((project_id, operation.id if operation is not None else None))
+            if lite is not None and isinstance(details['progress'], dict):
+                details['progress']['current'] = [LITE_STAGES.get(lite, lite)]
             # Only an admitted task moves between processing and publication; the runner owns the earlier stages.
             stage = None
             if task.stage in {'processing', 'publication'}:

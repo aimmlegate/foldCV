@@ -24,7 +24,8 @@ export type ImportProgress = {
   phase: ImportPhase; done: number; total: number; current: string[]; events: { at: string; text: string }[];
   lastEventAt: string | null; lastModelAt: string | null; quietSeconds: number; quietLimitSeconds: number; stalled: boolean;
 };
-export type ImportOptions = { allowTextRewrite: boolean; effort: ReasoningEffort | null };
+/** `lite`: the lite import, which moves the CV word for word and never rewrites. */
+export type ImportOptions = { allowTextRewrite: boolean; effort: ReasoningEffort | null; lite?: boolean };
 /** A template new resumes can use: `bundled` when the app ships its id, `edited` when its current version is not the
  * shipped one. */
 export type TemplateEntry = { id: string; name: string; revision: string; packageHash: string; bundled: boolean; edited: boolean };
@@ -75,8 +76,9 @@ export function openFoldcv(file: File, fetcher: Fetcher = browserFetch): Promise
 
 /** A null effort keeps the import model's catalog default; the service checks a chosen one against the catalog. */
 export function startImport(projectId: string, body: { clientRequestId: string } & ImportOptions, fetcher?: Fetcher): Promise<ProjectTask> {
-  const { effort, ...rest } = body;
-  return v2Request<ProjectTask>(projectPath(projectId, "/import"), "POST", { kind: "start", ...rest, ...(effort ? { effort } : {}) }, fetcher);
+  const { effort, lite, ...rest } = body;
+  return v2Request<ProjectTask>(projectPath(projectId, "/import"), "POST",
+    { kind: "start", ...rest, ...(effort ? { effort } : {}), ...(lite ? { lite: true } : {}) }, fetcher);
 }
 
 export function resumeImport(projectId: string, operationId: string, fetcher?: Fetcher): Promise<ProjectTask> {

@@ -1,0 +1,520 @@
+[
+ {
+  "kind": "map",
+  "block": "map",
+  "reply": {
+   "blocks": [
+    {
+     "block": "identity",
+     "ranges": [
+      {
+       "first": "S1",
+       "last": "S2"
+      }
+     ]
+    },
+    {
+     "block": "location",
+     "ranges": [
+      {
+       "first": "S3",
+       "last": "S3"
+      }
+     ]
+    },
+    {
+     "block": "focus",
+     "ranges": [
+      {
+       "first": "S7",
+       "last": "S7"
+      }
+     ]
+    },
+    {
+     "block": "programming",
+     "ranges": [
+      {
+       "first": "S7",
+       "last": "S7"
+      },
+      {
+       "first": "S26",
+       "last": "S26"
+      },
+      {
+       "first": "S30",
+       "last": "S30"
+      }
+     ]
+    },
+    {
+     "block": "data_and_tools",
+     "ranges": [
+      {
+       "first": "S7",
+       "last": "S7"
+      },
+      {
+       "first": "S26",
+       "last": "S26"
+      },
+      {
+       "first": "S30",
+       "last": "S30"
+      }
+     ]
+    },
+    {
+     "block": "infrastructure",
+     "ranges": [
+      {
+       "first": "S7",
+       "last": "S7"
+      }
+     ]
+    },
+    {
+     "block": "education",
+     "ranges": [
+      {
+       "first": "S9",
+       "last": "S10"
+      }
+     ]
+    },
+    {
+     "block": "courses",
+     "ranges": [
+      {
+       "first": "S12",
+       "last": "S15"
+      }
+     ]
+    },
+    {
+     "block": "projects",
+     "ranges": [
+      {
+       "first": "S17",
+       "last": "S22"
+      },
+      {
+       "first": "S24",
+       "last": "S31"
+      }
+     ]
+    },
+    {
+     "block": "opensource",
+     "ranges": [
+      {
+       "first": "S27",
+       "last": "S27"
+      },
+      {
+       "first": "S31",
+       "last": "S31"
+      }
+     ]
+    },
+    {
+     "block": "portfolio",
+     "ranges": [
+      {
+       "first": "S5",
+       "last": "S5"
+      }
+     ]
+    },
+    {
+     "block": "languages",
+     "ranges": [
+      {
+       "first": "S33",
+       "last": "S33"
+      }
+     ]
+    }
+   ],
+   "entries": [
+    {
+     "block": "projects",
+     "title": "ООО «Первый шаг»",
+     "first": "S20",
+     "last": "S22",
+     "employer": {
+      "value": "ООО «Первый шаг»",
+      "line": "S17"
+     },
+     "job_title": {
+      "value": "Стажёр-разработчик",
+      "line": "S18"
+     },
+     "period": {
+      "value": "Июнь 2025 — август 2025",
+      "line": "S19"
+     }
+    },
+    {
+     "block": "projects",
+     "title": "Бот «Расписание»",
+     "first": "S24",
+     "last": "S27",
+     "employer": null,
+     "job_title": null,
+     "period": null
+    },
+    {
+     "block": "projects",
+     "title": "Сайт «Книжная полка»",
+     "first": "S28",
+     "last": "S31",
+     "employer": null,
+     "job_title": null,
+     "period": null
+    }
+   ],
+   "hidden": [
+    {
+     "first": "S4",
+     "last": "S4"
+    },
+    {
+     "first": "S6",
+     "last": "S6"
+    },
+    {
+     "first": "S8",
+     "last": "S8"
+    },
+    {
+     "first": "S11",
+     "last": "S11"
+    },
+    {
+     "first": "S16",
+     "last": "S16"
+    },
+    {
+     "first": "S23",
+     "last": "S23"
+    },
+    {
+     "first": "S32",
+     "last": "S32"
+    }
+   ]
+  },
+  "usage": [
+   4930,
+   0,
+   887
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "identity",
+  "reply": {
+   "name": "Тимур Начинающий",
+   "profession": "Младший Python-разработчик",
+   "role_family": "other"
+  },
+  "usage": [
+   1586,
+   0,
+   113
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "focus",
+  "reply": {
+   "items": [
+    {
+     "technology": "Python",
+     "experience": null
+    },
+    {
+     "technology": "Django",
+     "experience": null
+    },
+    {
+     "technology": "SQL",
+     "experience": null
+    },
+    {
+     "technology": "Git",
+     "experience": null
+    },
+    {
+     "technology": "Docker",
+     "experience": null
+    },
+    {
+     "technology": "HTML",
+     "experience": null
+    },
+    {
+     "technology": "CSS",
+     "experience": null
+    }
+   ]
+  },
+  "usage": [
+   1634,
+   0,
+   154
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "education",
+  "reply": {
+   "items": [
+    {
+     "institution": "Уфимский университет науки и техники",
+     "specialization": "прикладная математика",
+     "degree": "бакалавр",
+     "city": null,
+     "year": "2025"
+    },
+    {
+     "institution": "Уфимский колледж информатики",
+     "specialization": "программирование в компьютерных системах",
+     "degree": null,
+     "city": null,
+     "year": "2021"
+    }
+   ]
+  },
+  "usage": [
+   1799,
+   0,
+   158
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "courses",
+  "reply": {
+   "items": [
+    {
+     "school": "Онлайн-школа «Старт»",
+     "title": "Python-разработчик",
+     "year": "2024"
+    },
+    {
+     "school": "Онлайн-школа «Старт»",
+     "title": "Базы данных и SQL",
+     "year": "2024"
+    },
+    {
+     "school": "Учебный центр «Опора»",
+     "title": "Основы Docker",
+     "year": "2025"
+    },
+    {
+     "school": "Летняя школа «Код»",
+     "title": "Алгоритмы и структуры данных",
+     "year": "2023"
+    }
+   ]
+  },
+  "usage": [
+   1652,
+   0,
+   202
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "location",
+  "reply": {
+   "city": "Уфа",
+   "country": null,
+   "timezone": null
+  },
+  "usage": [
+   1455,
+   0,
+   98
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "languages",
+  "reply": {
+   "items": [
+    {
+     "name": "Английский",
+     "level": "B1",
+     "comment": null
+    }
+   ]
+  },
+  "usage": [
+   1530,
+   0,
+   72
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "opensource",
+  "reply": {
+   "items": [
+    {
+     "name": null,
+     "url": "github.com/timur-example/raspisanie-bot"
+    },
+    {
+     "name": null,
+     "url": "github.com/timur-example/polka"
+    }
+   ]
+  },
+  "usage": [
+   1501,
+   0,
+   104
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "portfolio",
+  "reply": {
+   "items": [
+    {
+     "name": null,
+     "url": "github.com/timur-example"
+    }
+   ]
+  },
+  "usage": [
+   1467,
+   0,
+   72
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.0",
+  "reply": {
+   "project": null,
+   "role": null,
+   "role_details": null,
+   "technologies": [
+    "CSV"
+   ],
+   "tasks": [
+    "Писал модульные тесты для сервиса уведомлений",
+    "Исправил 20 мелких дефектов в панели администратора",
+    "Добавил выгрузку отчёта в CSV"
+   ],
+   "results": []
+  },
+  "usage": [
+   2430,
+   0,
+   279
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.1",
+  "reply": {
+   "project": {
+    "name": "Бот «Расписание»",
+    "description": "Телеграм-бот с расписанием занятий для студентов факультета. github.com/timur-example/raspisanie-bot"
+   },
+   "role": null,
+   "role_details": null,
+   "technologies": [
+    "Python",
+    "aiogram",
+    "SQLite"
+   ],
+   "tasks": [],
+   "results": []
+  },
+  "usage": [
+   2408,
+   0,
+   377
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.2",
+  "reply": {
+   "project": {
+    "name": "Сайт «Книжная полка»",
+    "description": "Каталог прочитанных книг с оценками и поиском. github.com/timur-example/polka"
+   },
+   "role": null,
+   "role_details": null,
+   "technologies": [
+    "Python",
+    "Django",
+    "PostgreSQL"
+   ],
+   "tasks": [],
+   "results": []
+  },
+  "usage": [
+   2402,
+   0,
+   401
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "programming",
+  "reply": {
+   "items": [
+    "Python",
+    "Django",
+    "SQL",
+    "HTML",
+    "CSS",
+    "aiogram"
+   ]
+  },
+  "usage": [
+   1533,
+   0,
+   203
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "data_and_tools",
+  "reply": {
+   "items": [
+    "SQLite",
+    "PostgreSQL"
+   ]
+  },
+  "usage": [
+   1562,
+   0,
+   252
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "infrastructure",
+  "reply": {
+   "items": [
+    "Git",
+    "Docker"
+   ]
+  },
+  "usage": [
+   1538,
+   0,
+   59
+  ]
+ }
+]

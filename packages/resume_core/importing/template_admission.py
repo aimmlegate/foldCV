@@ -94,6 +94,7 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
             value.target_id == cell_id and value.disposition == 'violation' for value in receipt.reply.results) else 'uncertain'
         observation.receipt_ids = [*observation.receipt_ids, receipt_id]
     records, builtins, builtin_cells, complete_handles, accepted_handles = [], {}, {}, set(), set()
+    bare = set()
     raw_texts = {allocations[field.item_handle].cell_ids[field.field_key]: display_raw_input(review.value, field,
         payload_value(proposal.reply.payload, field.pointer)) for field in proposal.resolved_fields
         if allocations[field.item_handle].cell_ids[field.field_key] in admitted_cells}
@@ -106,6 +107,11 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
                 admitted_cells, sources, working, declarations, list(candidate_relations.values()), raw_texts=raw_texts)
             if record is not None:
                 builtins[handle], builtin_cells[handle] = record, applied
+            if record is not None and not applied and handle not in current:
+                # A new job with no stated employer, role or period: kept while something admitted belongs to it.
+                bare.add(handle)
+                accepted_handles.add(handle)
+                complete_handles.add(handle)
             if applied:
                 accepted_handles.add(handle)
                 if all(empty_value(payload_value(proposal.reply.payload, field.pointer)) or
@@ -180,6 +186,14 @@ def admit_proposal(operation, proposal_id, receipt_id, package, sources, facts, 
                 accepted_handles.difference_update(handle for handle, record in incoming.items() if record.id == relation.subject_id)
         if before == accepted_handles:
             break
+    # A bare job nothing accepted belongs to states nothing at all: no record.
+    owned = {relation.target_id for relation in proposal.resolved_relations
+        if relation.kind in {'owned_by', 'extension_of'} and relation.id in admitted_relations
+        and any(record.id == relation.subject_id and handle in accepted_handles for handle, record in incoming.items())}
+    for handle in bare:
+        if handle in accepted_handles and incoming[handle].id not in owned:
+            accepted_handles.discard(handle)
+            complete_handles.discard(handle)
     for field in proposal.resolved_fields:
         withheld = field.item_handle not in accepted_handles or field.item_handle in builtin_cells and (
             allocations[field.item_handle].cell_ids[field.field_key] not in builtin_cells[field.item_handle])

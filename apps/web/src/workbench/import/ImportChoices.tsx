@@ -31,3 +31,10 @@ export function RewriteField({ rewrite, disabled, change }: { rewrite: boolean; 
     checked={rewrite} disabled={disabled} aria-describedby="import-rewrite-help" onChange={event => change(event.currentTarget.checked)} />
     <span>Переписывать текст<small id="import-rewrite-help">{rewrite ? "Модель улучшит формулировки." : "Только оформление."}</small></span></label>;
 }
+
+/** The lite import: the résumé moved into the template word for word, with its facts; it never rewrites. */
+export function LiteField({ lite, disabled, change }: { lite: boolean; disabled: boolean; change: (value: boolean) => void }) {
+  return <label className="import-rewrite" htmlFor="import-lite"><input className="switch" id="import-lite" type="checkbox" role="switch"
+    checked={lite} disabled={disabled} aria-describedby="import-lite-help" onChange={event => change(event.currentTarget.checked)} />
+    <span>Быстрый импорт<small id="import-lite-help">{lite ? "Текст переносится как есть, быстрее." : "Прежний импорт."}</small></span></label>;
+}

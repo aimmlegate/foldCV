@@ -58,6 +58,7 @@ from .. import import_usage
 from ..inference_admission import CALLS
 from ..providers.content import ContentFailure, ContentInput, ContentTransportReturn, GenerationPolicy, outcome_state
 from ..providers.dynamic_result import dynamic_result
+from . import lite_import
 from .template_sidecar import OperationSidecar
 
 
@@ -191,6 +192,18 @@ def unused_text(texts):
     quotes = ', '.join('«' + (text if len(text) <= 80 else text[:79].rstrip() + '…') + '»' for text in texts[:UNUSED_QUOTED])
     more = ' и ещё ' + str(len(texts) - UNUSED_QUOTED) if len(texts) > UNUSED_QUOTED else ''
     return UNUSED_MESSAGE.format(count=len(texts), quotes=quotes + more + '.')
+
+
+def other_issues(id_factory, task, fingerprint):
+    """The notice of a lite import's block: the source lines whose words no field took. They are kept, not shown."""
+    lite = lite_import.LITE.get()
+    texts = lite.other_of(task.block_id) if lite is not None else []
+    if not texts:
+        return []
+    return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task.id, targetIds=['scope-' + task.id], blockIds=[],
+        category='uncertain_interpretation', code='IMPORT_SOURCE_UNUSED', message=lite_import.other_text(texts),
+        importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
+        retiredByAction=None)]
 
 
 def header_issues(id_factory, task, fingerprint):
@@ -388,6 +401,8 @@ class TemplatePipeline:
         # Each running import's own width, by (project, operation id): the captured one, halved after a call the
         # provider refused as rate-limited or overloaded (R3). The record keeps the captured one.
         self.widths = {}
+        # (project, operation) -> the stage of a lite import's own scheme while it runs, for the progress view.
+        self.lite_stages = {}
 
     def close(self):
         """Release the call threads at shutdown; a call still running ends on its own thread."""
@@ -595,12 +610,39 @@ class TemplatePipeline:
                     lambda value, _data, _workspace: admit_operation(value, self.wall()))
                 operation = operation_in(workspace, operation.id)
                 deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
-                await self.run_tasks(project, operation, deadline, cancel,
-                    implicit=implicit_dependencies(owner(workspace).template_package, operation))
-                operation = operation_in(await self.view(project), operation.id)
-                if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
-                    return operation
-                return await self.finalize(project, operation.id, cancel) if finalize else operation
+                token = None
+                if operation.capture.policy.lite and len(operation.task_results) < len(operation.tasks):
+                    token = lite_import.LITE.set(await self.lite(project, operation, owner(workspace), deadline, cancel))
+                try:
+                    await self.run_tasks(project, operation, deadline, cancel,
+                        implicit=implicit_dependencies(owner(workspace).template_package, operation))
+                    operation = operation_in(await self.view(project), operation.id)
+                    if cancel.is_set() or operation.state in {'cancelled', 'fenced'}:
+                        return operation
+                    return await self.finalize(project, operation.id, cancel) if finalize else operation
+                finally:
+                    if token is not None:
+                        lite_import.LITE.reset(token)
+
+    async def lite(self, project, operation, data, deadline, cancel):
+        """The lite scheme's own run: its calls on the import's model, before the tasks. The tasks' requests are then
+        answered from its result (the transport reads it from the context). A resumed import runs it again: the
+        result is kept in memory only."""
+        key = (project, operation.id)
+        calls = self.transport.lite_calls(operation.capture.primary, cancel,
+            lambda: max(0.0, deadline.remaining(operation, self.wall(), self.elapsed())))
+
+        def stage(name):
+            self.lite_stages[key] = name
+        try:
+            result = await asyncio.to_thread(contextvars.copy_context().run, lite_import.run, data.sources,
+                data.template_package, calls, stage)
+        finally:
+            self.lite_stages.pop(key, None)
+        if result.stop is not None and result.state != 'succeeded':
+            # The account stopped the scheme (no quota, signed out): the import stops with that, as any call would.
+            raise AccountStop(result.stop)
+        return result
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
         """Tasks start in declaration order once the tasks they depend on ended; up to the captured concurrency run
@@ -989,7 +1031,8 @@ class TemplatePipeline:
             *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
         fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
         issues = [*unbound_issues(self.id_factory, task_id, proposal, fingerprint),
-            *header_issues(self.id_factory, task_in(operation, task_id), fingerprint)]
+            *header_issues(self.id_factory, task_in(operation, task_id), fingerprint),
+            *other_issues(self.id_factory, task_in(operation, task_id), fingerprint)]
         await self.finish_task(project, operation_id, task_id, None, (), handles,
             'empty' if empty_value(proposal.reply.payload) else 'admitted', issues)
 

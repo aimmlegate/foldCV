@@ -1,0 +1,420 @@
+[
+ {
+  "kind": "map",
+  "block": "map",
+  "reply": {
+   "blocks": [
+    {
+     "block": "identity",
+     "ranges": [
+      {
+       "first": "S1",
+       "last": "S2"
+      }
+     ]
+    },
+    {
+     "block": "location",
+     "ranges": [
+      {
+       "first": "S3",
+       "last": "S3"
+      }
+     ]
+    },
+    {
+     "block": "focus",
+     "ranges": [
+      {
+       "first": "S6",
+       "last": "S6"
+      }
+     ]
+    },
+    {
+     "block": "projects",
+     "ranges": [
+      {
+       "first": "S8",
+       "last": "S28"
+      }
+     ]
+    },
+    {
+     "block": "programming",
+     "ranges": [
+      {
+       "first": "S6",
+       "last": "S6"
+      },
+      {
+       "first": "S27",
+       "last": "S27"
+      }
+     ]
+    },
+    {
+     "block": "data_and_tools",
+     "ranges": [
+      {
+       "first": "S6",
+       "last": "S6"
+      },
+      {
+       "first": "S17",
+       "last": "S18"
+      }
+     ]
+    },
+    {
+     "block": "infrastructure",
+     "ranges": [
+      {
+       "first": "S6",
+       "last": "S6"
+      }
+     ]
+    },
+    {
+     "block": "education",
+     "ranges": [
+      {
+       "first": "S30",
+       "last": "S30"
+      }
+     ]
+    }
+   ],
+   "entries": [
+    {
+     "block": "projects",
+     "title": "АО «Северная линия»",
+     "first": "S10",
+     "last": "S14",
+     "employer": {
+      "value": "АО «Северная линия»",
+      "line": "S8"
+     },
+     "job_title": {
+      "value": "Руководитель группы разработки",
+      "line": "S10"
+     },
+     "period": {
+      "value": "Март 2023 — по настоящее время",
+      "line": "S11"
+     }
+    },
+    {
+     "block": "projects",
+     "title": "АО «Северная линия»",
+     "first": "S15",
+     "last": "S19",
+     "employer": {
+      "value": "АО «Северная линия»",
+      "line": "S8"
+     },
+     "job_title": {
+      "value": "Ведущий разработчик",
+      "line": "S15"
+     },
+     "period": {
+      "value": "Январь 2020 — февраль 2023",
+      "line": "S16"
+     }
+    },
+    {
+     "block": "projects",
+     "title": "АО «Северная линия»",
+     "first": "S20",
+     "last": "S23",
+     "employer": {
+      "value": "АО «Северная линия»",
+      "line": "S8"
+     },
+     "job_title": {
+      "value": "Разработчик",
+      "line": "S20"
+     },
+     "period": {
+      "value": "Сентябрь 2017 — декабрь 2019",
+      "line": "S21"
+     }
+    },
+    {
+     "block": "projects",
+     "title": "Томский технический лицей",
+     "first": "S24",
+     "last": "S28",
+     "employer": {
+      "value": "Томский технический лицей",
+      "line": "S24"
+     },
+     "job_title": {
+      "value": "Преподаватель курса по Java (по совместительству)",
+      "line": "S25"
+     },
+     "period": {
+      "value": "Сентябрь 2021 — май 2023",
+      "line": "S26"
+     }
+    }
+   ],
+   "hidden": [
+    {
+     "first": "S4",
+     "last": "S5"
+    },
+    {
+     "first": "S7",
+     "last": "S7"
+    },
+    {
+     "first": "S29",
+     "last": "S29"
+    }
+   ]
+  },
+  "usage": [
+   4866,
+   0,
+   1550
+  ]
+ },
+ {
+  "kind": "split",
+  "block": "projects.0",
+  "reply": {
+   "starts": [
+    "S10"
+   ]
+  },
+  "usage": [
+   1749,
+   0,
+   295
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "identity",
+  "reply": {
+   "name": "Нина Ростова",
+   "profession": "Руководитель группы разработки",
+   "role_family": "other"
+  },
+  "usage": [
+   1584,
+   0,
+   111
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "focus",
+  "reply": {
+   "items": [
+    {
+     "technology": "Java",
+     "experience": null
+    },
+    {
+     "technology": "Spring Boot",
+     "experience": null
+    },
+    {
+     "technology": "PostgreSQL",
+     "experience": null
+    },
+    {
+     "technology": "Kafka",
+     "experience": null
+    },
+    {
+     "technology": "Kubernetes",
+     "experience": null
+    }
+   ]
+  },
+  "usage": [
+   1644,
+   0,
+   137
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "education",
+  "reply": {
+   "items": [
+    {
+     "institution": "Томский институт радиоэлектроники",
+     "specialization": "программная инженерия",
+     "degree": null,
+     "city": null,
+     "year": "2017"
+    }
+   ]
+  },
+  "usage": [
+   1761,
+   0,
+   102
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "location",
+  "reply": {
+   "city": "Томск",
+   "country": null,
+   "timezone": null
+  },
+  "usage": [
+   1454,
+   0,
+   97
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.0",
+  "reply": {
+   "project": null,
+   "role": null,
+   "role_details": {
+    "scope": "Руковожу группой из семи разработчиков биллинга",
+    "involvement": null
+   },
+   "technologies": [],
+   "tasks": [
+    "Планирую кварталы и распределяю задачи"
+   ],
+   "results": [
+    "Провела переход группы на трёхнедельные релизы"
+   ]
+  },
+  "usage": [
+   2483,
+   0,
+   232
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.1",
+  "reply": {
+   "project": {
+    "name": null,
+    "description": null
+   },
+   "role": null,
+   "role_details": null,
+   "technologies": [
+    "Kafka",
+    "Oracle",
+    "PostgreSQL"
+   ],
+   "tasks": [
+    "Спроектировала сервис тарификации на Kafka",
+    "Перевела расчёты с Oracle на PostgreSQL",
+    "Наставляла трёх младших разработчиков"
+   ],
+   "results": []
+  },
+  "usage": [
+   2461,
+   0,
+   381
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.2",
+  "reply": {
+   "project": null,
+   "role": null,
+   "role_details": null,
+   "technologies": [],
+   "tasks": [
+    "Разрабатывала модули личного кабинета абонента",
+    "Писала интеграцию с платёжным шлюзом"
+   ],
+   "results": []
+  },
+  "usage": [
+   2437,
+   0,
+   203
+  ]
+ },
+ {
+  "kind": "entry",
+  "block": "projects.3",
+  "reply": {
+   "project": {
+    "name": null,
+    "description": null
+   },
+   "role": null,
+   "role_details": null,
+   "technologies": [
+    "Java"
+   ],
+   "tasks": [
+    "Вела вечерний курс по Java для старшеклассников",
+    "Подготовила 30 практических заданий"
+   ],
+   "results": []
+  },
+  "usage": [
+   2466,
+   0,
+   212
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "programming",
+  "reply": {
+   "items": [
+    "Java",
+    "Spring Boot"
+   ]
+  },
+  "usage": [
+   1531,
+   0,
+   62
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "data_and_tools",
+  "reply": {
+   "items": [
+    "PostgreSQL",
+    "Kafka",
+    "Oracle"
+   ]
+  },
+  "usage": [
+   1586,
+   0,
+   168
+  ]
+ },
+ {
+  "kind": "fill",
+  "block": "infrastructure",
+  "reply": {
+   "items": [
+    "Kubernetes"
+   ]
+  },
+  "usage": [
+   1548,
+   0,
+   59
+  ]
+ }
+]

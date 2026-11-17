@@ -144,8 +144,13 @@ def make_builtin_candidate(operation, allocation, declaration, fields, payload, 
     if previous is not None and previous.kind != declaration.builtin_kind:
         raise ValueError('builtin replacement changes canonical type')
     kind = declaration.builtin_kind
+    # A new job the source states no employer, role or period for (a study project, a project of one's own) is still
+    # a job: its record is made with every field unknown, so that the project, the tasks and the technologies it owns
+    # have their owner. The caller drops it again when nothing admitted belongs to it.
+    bare = previous is None and kind == 'employment' and all(
+        empty_value(payload_value(payload, field.pointer)) for field in fields)
     if previous is None:
-        if not any(allocation.canonical_fields[field.field_key].cell_id in admitted_cells
+        if not bare and not any(allocation.canonical_fields[field.field_key].cell_id in admitted_cells
                 and not empty_value(payload_value(payload, field.pointer)) for field in fields):
             return None, set()
         data = {'id': allocation.record_id, 'revision': 1, 'origin': 'source', 'evidence': [],
@@ -202,7 +207,7 @@ def make_builtin_candidate(operation, allocation, declaration, fields, payload, 
         if target.period_id is not None and (previous is None or not any(
                 period.id == target.period_id for period in previous.periods)):
             period['evidence'] = list({str(span): span for span in [*period['evidence'], *evidence]}.values())
-    if previous is None and not applied:
+    if previous is None and not applied and not bare:
         return None, set()
     return RECORD.validate_python(data), applied
 

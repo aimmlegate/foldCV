@@ -157,13 +157,13 @@ class TemplateIntake:
             except Exception:
                 pass
 
-    def command(self, project_id, client_request_id, allow_text_rewrite, effort=None, *, workspace):
+    def command(self, project_id, client_request_id, allow_text_rewrite, effort=None, lite=False, *, workspace):
         pre = workspace.pre_draft
         if workspace.schema_version != 7 or workspace.project is not None or pre is None or pre.template_package is None:
             raise ProjectFailure('IMPORT_PROTOCOL_MISMATCH', 409)
         if not pre.sources or not any(unit.text.strip() for source in pre.sources for unit in source.units):
             raise ProjectFailure('NO_USABLE_TEXT', 409)
-        capture = self.capture(workspace, allow_text_rewrite, effort=effort)
+        capture = self.capture(workspace, allow_text_rewrite, effort=effort, lite=lite)
         return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
             capture=capture)
 
@@ -179,7 +179,7 @@ class TemplateIntake:
                 raise
             return primary
 
-    def capture(self, workspace, allow_text_rewrite, models=None, *, effort=None):
+    def capture(self, workspace, allow_text_rewrite, models=None, *, effort=None, lite=False):
         data = workspace.project or workspace.pre_draft
         package, sources = data.template_package, {source.id: source.byte_sha256 for source in data.sources}
         if models is not None:
@@ -198,12 +198,17 @@ class TemplateIntake:
             factRevisions={record.id: record.revision for record in [*data.facts.records, *data.facts.extensions]
                 if getattr(record, 'active', True)},
             authorityHash=digest({'project': workspace.project_id, **models}),
-            dependencyHash=digest({'package': package.package_hash, 'sources': sources}), allowTextRewrite=allow_text_rewrite,
+            dependencyHash=digest({'package': package.package_hash, 'sources': sources}),
+            # A lite import never rewrites.
+            allowTextRewrite=allow_text_rewrite and not lite,
             primary=primary, fallback=fallback, review=review, formattingAsOf=workspace.formatting_as_of,
+            # A lite import has its own map and its own calls; the pipeline's tasks are answered by code, one by one,
+            # each block whole (no outline, no entry tasks).
             policy=RuntimePolicy(callCap=self.call_cap,
-                concurrency=import_width(primary, fallback) if self.concurrency is None else self.concurrency,
+                concurrency=1 if lite else import_width(primary, fallback) if self.concurrency is None else self.concurrency,
                 processingSeconds=import_seconds(), cleanupSeconds=5,
-                finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1, sourceMap=True))
+                finalizationSeconds=finalization_seconds(), primaryRepairs=1, fallbackRepairs=1, sourceMap=not lite,
+                lite=lite))
 
     def validate(self, operation, workspace):
         data = workspace.project or workspace.pre_draft
@@ -219,7 +224,7 @@ class TemplateIntake:
             # A new operation carries the effort its start chose; the catalog must still offer it.
             expected = self.capture(workspace, operation.capture.allow_text_rewrite,
                 models=(operation.capture.primary, operation.capture.fallback, operation.capture.review) if stored else None,
-                effort=None if stored else operation.capture.primary.effort)
+                effort=None if stored else operation.capture.primary.effort, lite=operation.capture.policy.lite)
         except ProjectFailure:
             raise TemplateImportFailure('IMPORT_CAPTURE_STALE') from None
         # D117 raised the launcher's call cap: an import saved with the old one resumes with it; one saved before T4

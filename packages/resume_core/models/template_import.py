@@ -403,6 +403,8 @@ class RuntimePolicy(Wire):
     fallback_repairs: Literal[1]
     # T4: the import maps the CV first and each block reads its own lines; captures made before read the whole CV.
     source_map: bool = Field(default=False, exclude_if=lambda value: not value)
+    # The lite import: its own scheme reads the CV and code answers every request of the pipeline (importer/lite_import).
+    lite: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class ImportCapture(Wire):

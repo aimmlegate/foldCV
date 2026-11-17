@@ -7,7 +7,7 @@ import { shownTemplate, templateImportStatus, type ImportOptions, type TemplateE
 import { ModelOptions } from "../settings/ModelSelect";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
-import { chosenEffort, EffortField, RewriteField } from "./ImportChoices";
+import { chosenEffort, EffortField, LiteField, RewriteField } from "./ImportChoices";
 
 /** A new resume from one file (PDF, DOCX, TXT, Markdown) with a template, the import model, its effort and the rewrite
  * choice. Without the template list the upload uses the default template. `active`: shown, not behind Settings. */
@@ -16,7 +16,7 @@ export function SourceForm({ active, busy, process, connection }: {
   connection: ConnectionSnapshot | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null), [rewrite, setRewrite] = useState(true);
+  const [file, setFile] = useState<File | null>(null), [rewrite, setRewrite] = useState(true), [lite, setLite] = useState(true);
   const [importModel, setImportModel] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   const [effort, setEffort] = useState<ReasoningEffort | null>(null);
   const [templates, setTemplates] = useState<TemplateEntry[]>([]), [templateId, setTemplateId] = useState<string | null>(null);
@@ -66,9 +66,10 @@ export function SourceForm({ active, busy, process, connection }: {
           <ModelOptions groups={modelGroups(connection)} value={importModel} />
         </select></div>
       <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} />
-      <RewriteField rewrite={rewrite} disabled={busy} change={setRewrite} />
+      <LiteField lite={lite} disabled={busy} change={setLite} />
+      <RewriteField rewrite={rewrite && !lite} disabled={busy || lite} change={setRewrite} />
       <Button className="import-process-button" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!file}
-        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite, effort: chosenEffort(effort, reasoning) }, templateId); }}>Обработать<Icon name="arrow" /></Button>
+        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite && !lite, effort: chosenEffort(effort, reasoning), lite }, templateId); }}>Обработать<Icon name="arrow" /></Button>
     </div>
     {modelError && <p className="notice error" role="alert">{modelError}</p>}
   </div></section>;

@@ -465,8 +465,9 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         concurrency=template_import_concurrency)
     intake.ready = v2_pipeline is not None
 
-    def import_command(identifier, request_id, allow_text_rewrite, effort=None):
-        return intake.command(identifier, request_id, allow_text_rewrite, effort, workspace=project_repository.read(identifier))
+    def import_command(identifier, request_id, allow_text_rewrite, effort=None, lite=False):
+        return intake.command(identifier, request_id, allow_text_rewrite, effort, lite,
+            workspace=project_repository.read(identifier))
     projects.imports = ImportService(projects, v2_pipeline, commands=import_command)
 
     async def render_export(request):

@@ -1240,6 +1240,7 @@ export type Cleanupseconds = 5;
 export type Concurrency = number;
 export type Fallbackrepairs = 1;
 export type Finalizationseconds = number;
+export type Lite = boolean;
 export type Primaryrepairs = 1;
 export type Processingseconds = number;
 export type Sourcemap = boolean;
@@ -3802,6 +3803,7 @@ export type Allowtextrewrite3 = boolean;
 export type Clientrequestid3 = string;
 export type Effort2 = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
 export type Kind105 = "start" | "resume" | "cancel";
+export type Lite1 = boolean;
 export type Operationid6 = string | null;
 export type Taskid6 = string | null;
 export type Automaticanalysis = boolean;
@@ -5911,6 +5913,7 @@ export interface RuntimePolicy {
   concurrency: Concurrency;
   fallbackRepairs: Fallbackrepairs;
   finalizationSeconds: Finalizationseconds;
+  lite?: Lite;
   primaryRepairs: Primaryrepairs;
   processingSeconds: Processingseconds;
   sourceMap?: Sourcemap;
@@ -7755,6 +7758,7 @@ export interface ImportCommand {
   clientRequestId?: Clientrequestid3;
   effort?: Effort2;
   kind: Kind105;
+  lite?: Lite1;
   operationId?: Operationid6;
   taskId?: Taskid6;
 }

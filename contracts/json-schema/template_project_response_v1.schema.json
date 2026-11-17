@@ -11011,6 +11011,11 @@
           "title": "Finalizationseconds",
           "type": "integer"
         },
+        "lite": {
+          "default": false,
+          "title": "Lite",
+          "type": "boolean"
+        },
         "primaryRepairs": {
           "const": 1,
           "title": "Primaryrepairs",
