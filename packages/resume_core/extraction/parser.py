@@ -377,7 +377,7 @@ def extract(data: bytes, original_name: str, pasted: bool = False) -> ExtractRes
     elif extension in {".doc", ".docm", ".dot", ".dotm"}:
         raise ExtractFailure("EXTRACT_UNSUPPORTED")
     elif extension == ".pdf" and data.startswith(b"%PDF-"):
-        kind, mime, parser, version = "pdf", "application/pdf", "pymupdf", pymupdf.VersionBind + "/layout2"
+        kind, mime, parser, version = "pdf", "application/pdf", "pymupdf", pymupdf.VersionBind + "/layout3"
     elif extension == ".docx" and data.startswith(b"PK\x03\x04"):
         kind, mime, parser, version = "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "ooxml", "3"
     elif extension in {".txt", ".md", ".markdown"} and not data.startswith((b"%PDF-", b"PK\x03\x04", b"\xd0\xcf\x11\xe0")):

@@ -174,3 +174,28 @@ def test_absent_structure_keeps_legacy_source_unit_serialization_and_hash_inputs
     assert all(u.structure is None for u in source.units)
     assert source.model_dump(by_alias=True)["units"] == legacy["units"]
     assert Source.model_validate(source.model_dump(by_alias=True)) == source
+
+
+def test_pdf_columns_with_a_narrow_gutter_under_spanning_titles_are_read_column_by_column():
+    # The gutter is narrower than a clear column gap and two title lines cross it: the page was read by rows.
+    side = [f"Side line {i} fills the bar" for i in range(8)]
+    main = [f"Main line {i} of the wide column with more text in it" for i in range(10)]
+    right = 40 + max(pymupdf.get_text_length(text, "helv", 10) for text in side) + 12
+    titles = ["Candidate name set across both columns of the page here", "A profession line that also runs across both of the columns"]
+    rows = [(0, 40, 40 + i * 16, text, True) for i, text in enumerate(titles)]
+    rows += [(0, 40, 80 + i * 14, text, False) for i, text in enumerate(side)]
+    rows += [(0, right, 85 + i * 14, text, False) for i, text in enumerate(main)]
+    result, units = view(pdf(rows), "narrow-gutter.pdf")
+    assert "".join(u.text for u in result.units).splitlines() == [*titles, *side, *main]
+    assert all(unit.structure.column == 1 for unit in units if "Side line" in unit.text)
+    assert all(unit.structure.column == 2 for unit in units if "Main line" in unit.text)
+
+
+def test_pdf_list_marker_drawn_lower_than_its_line_is_read_before_it():
+    rows = []
+    for i in range(3):
+        rows += [(0, 60, 100 + i * 30, f"Item {i} opens on this line", False), (0, 50, 102 + i * 30, "*", False),
+                 (0, 60, 112 + i * 30, f"and item {i} goes on here", False)]
+    result, _units = view(pdf(rows), "markers.pdf")
+    expected = [text for i in range(3) for text in ("*", f"Item {i} opens on this line", f"and item {i} goes on here")]
+    assert "".join(u.text for u in result.units).splitlines() == expected
