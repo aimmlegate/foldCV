@@ -1858,6 +1858,41 @@
       "title": "ObservedUsage",
       "type": "object"
     },
+    "OtherLines": {
+      "additionalProperties": false,
+      "description": "Source lines of a lite import that no field of the template shows: kept with the import, word for word, and\nnot in the document. «no_field»: no field took the line's words; «hidden»: the map hid the line; «dropped»: the\nadmission dropped the value read from it.",
+      "properties": {
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Lines",
+          "type": "array"
+        },
+        "owner": {
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "no_field",
+            "hidden",
+            "dropped"
+          ],
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "reason",
+        "lines"
+      ],
+      "title": "OtherLines",
+      "type": "object"
+    },
     "PartialDate": {
       "additionalProperties": false,
       "properties": {
@@ -3171,6 +3206,25 @@
         }
       ],
       "title": "Lastobservedat"
+    },
+    "liteReading": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Litereading"
+    },
+    "otherLines": {
+      "items": {
+        "$ref": "#/$defs/OtherLines"
+      },
+      "title": "Otherlines",
+      "type": "array"
     },
     "projectId": {
       "minLength": 1,

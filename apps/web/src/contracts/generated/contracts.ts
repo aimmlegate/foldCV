@@ -1303,6 +1303,14 @@ export type Targetids = string[];
 export type Taskid2 = string;
 export type Issues1 = ImportIssue[];
 export type Lastobservedat = string | null;
+export type Litereading = string | null;
+/**
+ * @minItems 1
+ */
+export type Lines = [string, ...string[]];
+export type Owner = string;
+export type Reason1 = "no_field" | "hidden" | "dropped";
+export type Otherlines = OtherLines[];
 export type Projectid9 = string;
 export type Admittedcellids = string[];
 export type Admittedrelationids = string[];
@@ -1374,7 +1382,7 @@ export type Id46 = string;
 export type Actionable = boolean;
 export type Disposition2 = "satisfied" | "violation" | "uncertain";
 export type Evidence18 = SourceSpan[];
-export type Reason1 = string;
+export type Reason2 = string;
 export type Ruleid2 = string;
 export type Targetid2 = string;
 export type Results = ReviewDisposition[];
@@ -1422,7 +1430,7 @@ export type Actionable1 = boolean;
 export type Disposition3 = "satisfied" | "violation" | "uncertain";
 export type Evidence20 = SourceSpan[];
 export type Origin14 = "verbatim" | "reused";
-export type Reason2 = string;
+export type Reason3 = string;
 export type Ruleid3 = string;
 export type Targetid4 = string;
 export type Settled = SettledCheck[];
@@ -1523,6 +1531,10 @@ export type Operation = string | null;
 export type PerEntry = boolean;
 export type Fields3 = string[];
 export type Instructions1 = string[];
+/**
+ * Rules of wording for this block, in the language of the résumé.
+ */
+export type Rules1 = string[];
 export type Id56 = string;
 export type Kind35 = "source" | "fact_type" | "block" | "operation";
 export type Selectors = InputRef[];
@@ -1556,6 +1568,10 @@ export type FactTypes = FactType[];
 export type Extract1 = string[];
 export type Permission = "allowTextRewrite";
 export type Rewrite1 = string[];
+/**
+ * Rules of wording for every block, in the language of the résumé.
+ */
+export type Rules2 = string[];
 export type DependsOn1 = string[];
 export type Id58 = string;
 export type Inputs = InputRef[];
@@ -2001,7 +2017,7 @@ export type Exports = ExportAttempt[];
 export type Blockids2 = string[];
 export type Disposition5 = "accepted" | "fallback" | "source_only" | "multiple_views";
 export type Itemhandle8 = string | null;
-export type Reason3 = string | null;
+export type Reason4 = string | null;
 export type Importcoverage = SpanCoverage[];
 export type Operationid5 = string;
 export type Sha2565 = string;
@@ -3813,6 +3829,7 @@ export type Automaticanalysis = boolean;
 export type Enabledproviders =
   [] | ["codex_cli" | "claude_cli"] | ["codex_cli" | "claude_cli", "codex_cli" | "claude_cli"];
 export type Importminutes = number;
+export type Legacyimport = boolean;
 export type Projectmegabytes = number;
 export type Rewritereasoningeffort =
   ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
@@ -4518,6 +4535,7 @@ export type Stage2 = "rules";
 export type Requiredheadings = ("## Preset: shorten" | "## Preset: clarify")[];
 export type Automaticanalysis1 = boolean;
 export type Model3 = string | null;
+export type Legacyimport1 = boolean;
 export type Importminutes1 = number;
 export type Projectmegabytes1 = number;
 export type Baserevision5 = number;
@@ -4623,11 +4641,12 @@ export interface FoldCVContracts {
   rich_document_v1: RichDocumentV1;
   rich_document_v2: RichDocumentV2;
   rich_panel_request: RichPanelRequest;
-  rules: Rules1;
+  rules: Rules3;
   rules_settings: RulesSettings;
   rules_settings_error: RulesSettingsError;
   save_analysis_preference: SaveAnalysisPreference;
   save_import_model_preference: SaveImportModelPreference;
+  save_legacy_import_preference: SaveLegacyImportPreference;
   save_limits_preference: SaveLimitsPreference;
   save_rules_request: SaveRulesRequest;
   task_status_v1: TaskStatusV1;
@@ -5242,7 +5261,7 @@ export interface WorkspaceV7 {
   project: ProjectV6 | null;
   projectId: Projectid11;
   projectRevision: Projectrevision2;
-  rulesUsed: Rules1 | null;
+  rulesUsed: Rules3 | null;
   schemaVersion: Schemaversion21;
   sourceObservedAt: PartialDate | null;
   syncRecords: Syncrecords;
@@ -5795,6 +5814,8 @@ export interface ImportOperation {
   inferenceClosed?: Inferenceclosed;
   issues?: Issues1;
   lastObservedAt: Lastobservedat;
+  liteReading?: Litereading;
+  otherLines?: Otherlines;
   projectId: Projectid9;
   proposals: Proposals;
   publication: PublicationOutcome;
@@ -5995,6 +6016,16 @@ export interface ImportIssue {
   targetIds: Targetids;
   taskId: Taskid2;
 }
+/**
+ * Source lines of a lite import that no field of the template shows: kept with the import, word for word, and
+ * not in the document. «no_field»: no field took the line's words; «hidden»: the map hid the line; «dropped»: the
+ * admission dropped the value read from it.
+ */
+export interface OtherLines {
+  lines: Lines;
+  owner: Owner;
+  reason: Reason1;
+}
 export interface ProposalRecord {
   admittedCellIds?: Admittedcellids;
   admittedRecordRevisions?: Admittedrecordrevisions;
@@ -6115,7 +6146,7 @@ export interface ReviewDisposition {
   actionable: Actionable;
   disposition: Disposition2;
   evidence: Evidence18;
-  reason: Reason1;
+  reason: Reason2;
   ruleId: Ruleid2;
   targetId: Targetid2;
 }
@@ -6182,7 +6213,7 @@ export interface SettledCheck {
   disposition: Disposition3;
   evidence: Evidence20;
   origin: Origin14;
-  reason: Reason2;
+  reason: Reason3;
   ruleId: Ruleid3;
   targetId: Targetid4;
 }
@@ -6340,6 +6371,7 @@ export interface Block {
   per_entry?: PerEntry;
   placement: Placement;
   rewrite: Rewrite;
+  rules?: Rules1;
   selectors: Selectors;
   view: View;
   when: Condition | null;
@@ -6401,6 +6433,7 @@ export interface ModelInstructions {
   extract: Extract1;
   permission: Permission;
   rewrite: Rewrite1;
+  rules?: Rules2;
 }
 export interface PartitionOperation {
   depends_on: DependsOn1;
@@ -6837,7 +6870,7 @@ export interface SpanCoverage {
   blockIds: Blockids2;
   disposition: Disposition5;
   itemHandle: Itemhandle8;
-  reason: Reason3;
+  reason: Reason4;
   span: SourceSpan;
 }
 /**
@@ -6858,7 +6891,7 @@ export interface RichRenderSnapshot {
   rendererVersion: Rendererversion;
   templateSha256: Templatesha256;
 }
-export interface Rules1 {
+export interface Rules3 {
   markdown: Markdown;
   revision: Revision46;
   sha256: Sha2566;
@@ -7766,6 +7799,7 @@ export interface Preferences {
   automaticAnalysis: Automaticanalysis;
   enabledProviders?: Enabledproviders;
   importMinutes?: Importminutes;
+  legacyImport?: Legacyimport;
   projectMegabytes?: Projectmegabytes;
   rewriteReasoningEffort?: Rewritereasoningeffort;
   schemaVersion: Schemaversion27;
@@ -7890,6 +7924,9 @@ export interface SaveAnalysisPreference {
 }
 export interface SaveImportModelPreference {
   model: Model3;
+}
+export interface SaveLegacyImportPreference {
+  legacyImport: Legacyimport1;
 }
 export interface SaveLimitsPreference {
   importMinutes: Importminutes1;

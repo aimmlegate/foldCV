@@ -1,0 +1,14 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "legacyImport": {
+      "title": "Legacyimport",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "legacyImport"
+  ],
+  "title": "SaveLegacyImportPreference",
+  "type": "object"
+}

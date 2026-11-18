@@ -282,6 +282,14 @@
         "rewrite": {
           "$ref": "#/$defs/Rewrite"
         },
+        "rules": {
+          "description": "Rules of wording for this block, in the language of the résumé.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
         "schema": {
           "description": "A type (text, date, string, boolean, integer, number or a content definition), [type] for a list, {list: type, maxItems: n}, a mapping of fields with \"name?\" for an optional object, or a JSON schema."
         },
@@ -937,6 +945,14 @@
             "type": "string"
           },
           "title": "Rewrite",
+          "type": "array"
+        },
+        "rules": {
+          "description": "Rules of wording for every block, in the language of the résumé.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rules",
           "type": "array"
         }
       },

@@ -245,6 +245,14 @@
         "rewrite": {
           "$ref": "#/$defs/Rewrite"
         },
+        "rules": {
+          "description": "Rules of wording for this block, in the language of the résumé.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
         "selectors": {
           "items": {
             "$ref": "#/$defs/InputRef"
@@ -858,6 +866,14 @@
             "type": "string"
           },
           "title": "Rewrite",
+          "type": "array"
+        },
+        "rules": {
+          "description": "Rules of wording for every block, in the language of the résumé.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Rules",
           "type": "array"
         }
       },

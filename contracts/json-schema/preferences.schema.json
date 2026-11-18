@@ -24,6 +24,11 @@
       "title": "Importminutes",
       "type": "integer"
     },
+    "legacyImport": {
+      "default": false,
+      "title": "Legacyimport",
+      "type": "boolean"
+    },
     "projectMegabytes": {
       "default": 64,
       "maximum": 256,

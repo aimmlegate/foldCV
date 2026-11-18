@@ -370,7 +370,11 @@
     "agentStoreFull": "Диалог помощника слишком большой. Начните новый диалог.",
     "providerInactive": "Этот провайдер выключен. Включите его в настройках и повторите.",
     "providerUnavailable": "Этот провайдер пока недоступен в foldCV.",
-    "importSourceUnused": "Часть строк резюме не попала ни в один раздел. Проверьте, не потерялось ли содержание."
+    "importSourceUnused": "Часть строк резюме не попала ни в один раздел. Проверьте, не потерялось ли содержание.",
+    "importTextGenerated": "Этот текст написан моделью по данным резюме: в исходном файле такого раздела нет. Проверьте его.",
+    "importLinesNoField": "Строки исходного резюме, для которых в шаблоне нет поля. В документ они не попали.",
+    "importLinesDropped": "Строки исходного резюме, значение из которых импорт отбросил. В документ они не попали.",
+    "importLinesHidden": "Строки исходного резюме, которые импорт скрыл как служебные. В документ они не попали."
   },
   "codes": {
     "ASSISTANT_UNSUPPORTED_TASK": "assistantUnsupported",
@@ -1237,7 +1241,11 @@
     "PROVIDER_UNAVAILABLE": "providerUnavailable",
     "IMPORT_MAP_INVALID": "importResult",
     "IMPORT_MAP_INCOMPLETE": "importResult",
-    "IMPORT_SOURCE_UNUSED": "importSourceUnused"
+    "IMPORT_SOURCE_UNUSED": "importSourceUnused",
+    "IMPORT_TEXT_GENERATED": "importTextGenerated",
+    "IMPORT_LINES_NO_FIELD": "importLinesNoField",
+    "IMPORT_LINES_DROPPED": "importLinesDropped",
+    "IMPORT_LINES_HIDDEN": "importLinesHidden"
   },
   "nonErrorSymbols": {
     "CLOCK_BOOTTIME": "Operating-system clock identifier",
