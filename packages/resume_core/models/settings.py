@@ -60,6 +60,9 @@ class Preferences(Wire):
     # The model of selected-text rewriting; None follows the processing model.
     selected_rewrite_model: str | None = None
     rewrite_reasoning_effort: ReasoningEffort | None = None
+    # The legacy import (the pipeline's own model calls, with rewriting at import), kept for the move to the fast
+    # import and to be removed; off unless the user turns it on.
+    legacy_import: bool = False
     import_minutes: int = Field(default=IMPORT_MINUTES[0], ge=IMPORT_MINUTES[1], le=IMPORT_MINUTES[2])
     project_megabytes: int = Field(default=PROJECT_MEGABYTES[0], ge=PROJECT_MEGABYTES[1], le=PROJECT_MEGABYTES[2])
     # Providers that may run (D119); each model choice runs on the provider whose catalog lists it.
@@ -79,8 +82,13 @@ class SaveAnalysisPreference(Wire):
     automatic_analysis: bool
 
 
+class SaveLegacyImportPreference(Wire):
+    legacy_import: bool
+
+
 SETTINGS_CONTRACTS = {
     "rules": Rules, "rules_settings": RulesSettings, "rules_settings_error": RulesSettingsError,
     "save_rules_request": SaveRulesRequest, "preferences": Preferences,
     "save_import_model_preference": SaveImportModelPreference, "save_limits_preference": SaveLimitsPreference,
+    "save_legacy_import_preference": SaveLegacyImportPreference,
 }

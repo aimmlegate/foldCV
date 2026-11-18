@@ -114,6 +114,16 @@ class PreferencesStore:
         except (StorageFailure, OSError):
             raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
 
+    def save_legacy_import(self, enabled):
+        try:
+            with locked_root(self.root, '.preferences.lock'):
+                value = self._read()
+                value.legacy_import = enabled
+                self._write(value)
+                return value
+        except (StorageFailure, OSError):
+            raise PreferencesFailure('PREFERENCES_SAVE_FAILED') from None
+
     def save_limits(self, import_minutes, project_megabytes):
         try:
             with locked_root(self.root, '.preferences.lock'):

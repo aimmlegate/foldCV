@@ -24,8 +24,8 @@ def test_private_preferences_keep_defaults_model_and_unrelated_fields_on_restart
     assert PreferencesStore(root).load() == selected and selected.automatic_analysis == initial.automatic_analysis
     assert stat.S_IMODE(root.stat().st_mode) == 0o700 and stat.S_IMODE(store.path.stat().st_mode) == 0o600
     assert set(json.loads(store.path.read_text())) == {'schemaVersion', 'automaticAnalysis', 'theme', 'selectedModel',
-        'selectedImportModel', 'selectedFallbackModel', 'selectedRewriteModel', 'rewriteReasoningEffort', 'importMinutes',
-        'projectMegabytes', 'enabledProviders'}
+        'selectedImportModel', 'selectedFallbackModel', 'selectedRewriteModel', 'rewriteReasoningEffort', 'legacyImport',
+        'importMinutes', 'projectMegabytes', 'enabledProviders'}
 
 
 def test_preferences_from_before_providers_turn_codex_on(tmp_path):

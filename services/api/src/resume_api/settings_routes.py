@@ -8,7 +8,7 @@ from typing import Callable
 from fastapi.responses import JSONResponse
 
 from packages.resume_core.models.settings import (RulesSettings, RulesSettingsError, SaveAnalysisPreference,
-    SaveImportModelPreference, SaveLimitsPreference, SaveRulesRequest)
+    SaveImportModelPreference, SaveLegacyImportPreference, SaveLimitsPreference, SaveRulesRequest)
 from packages.resume_core.repository.preferences import PreferencesFailure, PreferencesStore
 from packages.resume_core.project_limits import apply_preferences as apply_limits
 from packages.resume_core.rules import PRESET_HEADINGS, RulesFailure, RulesStore, presets
@@ -83,6 +83,16 @@ def mount_settings_routes(app, ctx: SettingsContext):
         try:
             rules_store.load()
             value = preferences_store.save_analysis(payload.automatic_analysis)
+            return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
+        except (PreferencesFailure, RulesFailure) as error:
+            return problem(error.code, 409, "settings")
+
+    @app.put("/v1/settings/legacy-import")
+    async def save_legacy_import(payload: SaveLegacyImportPreference):
+        # Whether the app starts the legacy import instead of the fast one; the import forms read it.
+        try:
+            rules_store.load()
+            value = preferences_store.save_legacy_import(payload.legacy_import)
             return JSONResponse(value.model_dump(mode="json", by_alias=True), headers={"Cache-Control": "no-store"})
         except (PreferencesFailure, RulesFailure) as error:
             return problem(error.code, 409, "settings")
