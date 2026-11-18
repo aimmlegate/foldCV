@@ -172,3 +172,8 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D167 A project technology its entry's lines do not name is respelled or dropped by code, with no model repair (follow-up of D165)
 - D168 A block is repaired once: no second try on the import model (D126's retry ends)
 - D169 The app is foldCV 1.0.0; the data folder and the identifier keep the beta's names
+- D170 The import is the fast one; the legacy import stays behind a switch in Settings
+- D171 Rules of wording live in each template; a value may have a form; a block the CV left empty is written
+- D172 The résumé is compared with the original both ways
+- D173 A block is reworded on the user's request, by a prompt the user sees
+- D174 The app is foldCV 1.1.0
