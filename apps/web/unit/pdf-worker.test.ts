@@ -17,6 +17,19 @@ test("the PDF worker entry brings what pdf.js needs to the JavaScript of Safari 
     return [...new Uint8Array(moved)];
   };
   assert.deepEqual([cut(2), cut(), cut(5)], [[1, 2], [1, 2, 3], [1, 2, 3, 0, 0]]);
+  // pdf.js reads the text of a page with `for await` over a stream: WebKit has no such iteration.
+  const stream = (cancelled: unknown[] = []) => new ReadableStream<number>({
+    start(controller) { for (const value of [1, 2, 3]) controller.enqueue(value); controller.close(); },
+    cancel(reason) { cancelled.push(reason); },
+  });
+  const read: number[] = [];
+  for await (const value of stream()) read.push(value);
+  assert.deepEqual(read, [1, 2, 3]);
+  // A loop left early gives the stream up.
+  const cancelled: unknown[] = [], left = stream(cancelled);
+  for await (const value of left) if (value === 1) break;
+  assert.equal(cancelled.length, 1);
+  assert.equal(left.locked, false);
   // The pdf.js worker itself loaded after them.
   assert.equal(typeof Reflect.get(globalThis, "pdfjsWorker"), "object");
 });

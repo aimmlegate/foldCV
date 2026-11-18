@@ -14,6 +14,9 @@ const newer: [object | null, string[]][] = [
 /** Leaves this process with the JavaScript of Safari 16.4. A test file runs in its own process, so nothing else sees it. */
 export function removeNewerJavaScript(): void {
   for (const [target, names] of newer) for (const name of names) if (target) Reflect.deleteProperty(target, name);
+  // No WebKit iterates a stream with `for await` yet, the current one included.
+  Reflect.deleteProperty(ReadableStream.prototype, Symbol.asyncIterator);
+  Reflect.deleteProperty(ReadableStream.prototype, "values");
 }
 
 /** Calls a method the TypeScript library of this project does not know yet. */
