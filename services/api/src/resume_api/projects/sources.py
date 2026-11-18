@@ -9,10 +9,19 @@ from urllib.parse import quote
 from fastapi.responses import Response
 
 from packages.resume_core.repository.project_repository import blob_path
+from packages.resume_core.repository.source_diff import additions, removals
 from packages.resume_core.extraction.parser import MAX_SOURCE
 
 from .blobs import read_owned
 from .errors import ProjectFailure
+
+
+def beyond_original(service, project_id):
+    """The present document against the original: the words each shown field has and its source lines lack (the
+    editor marks them as added), and the words of those lines the document no longer shows (marked in the original)."""
+    session = service.repository.open(project_id)
+    with session.lock:
+        return {'added': additions(session.workspace), 'removed': removals(session.workspace)}
 
 
 def original(service, project_id, source_id, *, download=False):

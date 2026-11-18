@@ -14,7 +14,7 @@ from packages.resume_core.models.projects import (ClipboardCaptureRequestV1, Del
     HistoryRequestV1, RenameRequestV1, RewritePreviewRequestV1, RewriteCancelRequestV1)
 from packages.resume_core.project_limits import ARCHIVE_BYTES
 
-from . import clipboard, editing, focus_icons, images, rewrite, sources
+from . import clipboard, editing, focus_icons, images, reword, rewrite, sources
 from .archive import ArchiveDownload, export_archive, import_archive
 from .errors import ProjectFailure, mount_errors
 from .exports import ExportCommand, ExportRetry
@@ -84,6 +84,22 @@ def mount_projects_v2(app, service):
     @app.post(PREFIX + '/{project_id}/rewrite/cancel')
     async def cancel_rewrite(project_id: str, payload: RewriteCancelRequestV1):
         return json_reply(await asyncio.to_thread(rewrite.cancel, service, project_id, payload))
+
+    @app.get(PREFIX + '/{project_id}/source-diff')
+    async def source_diff(project_id: str):
+        return json_reply(await asyncio.to_thread(sources.beyond_original, service, project_id))
+
+    @app.get(PREFIX + '/{project_id}/reword/blocks')
+    async def reword_blocks(project_id: str):
+        return json_reply(await asyncio.to_thread(reword.blocks, service, project_id))
+
+    @app.post(PREFIX + '/{project_id}/reword/preview')
+    async def reword_preview(project_id: str, payload: reword.RewordPreviewRequest):
+        return model_reply(await reword.preview(service, project_id, payload))
+
+    @app.post(PREFIX + '/{project_id}/reword/apply')
+    async def reword_apply(project_id: str, payload: reword.RewordApplyRequest):
+        return model_reply(await asyncio.to_thread(reword.apply, service, project_id, payload))
 
     @app.post(PREFIX + '/{project_id}/import')
     async def import_task(project_id: str, payload: ImportCommand):

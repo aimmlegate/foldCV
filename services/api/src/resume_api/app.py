@@ -360,6 +360,7 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
         temp_root=temp_root, worker_slot=model_slot, cleanup_error=lifecycle_code, reasoning=reasoning_of,
         unavailable=lambda: unavailable_code("selected_rewrite_model"))
     projects.rewrite_text, projects.rewrite_cancel = rewrite.text, rewrite.cancel
+    projects.rewrite_reply = rewrite.reply
     mount_projects_v2(app, projects)
 
     from .assistant.runs import AssistantService

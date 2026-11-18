@@ -27,6 +27,13 @@ class TemplateRewrite:
         self.early, self.registry = OrderedDict(), threading.Lock()
 
     async def text(self, identifier, request_id, instruction, source, admitted=lambda: None):
+        response = await self.reply(identifier, request_id, lambda _provider: (plain_prompt(instruction, source), PlainTextReply),
+            admitted)
+        return PlainTextReply.model_validate(response).text
+
+    async def reply(self, identifier, request_id, make, admitted=lambda: None):
+        """One counted generation on the rewrite model. make(provider) gives the prompt and the reply type; the reply's
+        value is returned as the provider decoded it."""
         key, cancel, files = (identifier, request_id), threading.Event(), OperationFiles(self.temp_root)
         with self.registry:
             if self.early.pop(key, False):
@@ -49,7 +56,8 @@ class TemplateRewrite:
                 effort = None
             if effort is None and metadata is not None:
                 effort = metadata.default
-            request = ContentInput(plain_prompt(instruction, source), PlainTextReply, GenerationPolicy(model=selected[1],
+            prompt, result_type = make(selected[0])
+            request = ContentInput(prompt, result_type, GenerationPolicy(model=selected[1],
                 timeout_seconds=180, allow_repair=False, reasoning_effort=effort))
             def run():
                 with files.open():
@@ -58,7 +66,7 @@ class TemplateRewrite:
                 response = await asyncio.to_thread(run)
             if cancel.is_set():
                 raise ContentFailure('CANCELLED')
-            return PlainTextReply.model_validate(response.value).text
+            return response.value
         except AdmissionCancelled:
             raise ProjectFailure('CANCELLED', 409) from None
         except SpikeError as error:
