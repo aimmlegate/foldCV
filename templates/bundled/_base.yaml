@@ -32,6 +32,12 @@ model:
     and technology names in their accepted spelling. Write lengths of time in words (1 год, 2 года, 5 лет, с марта 2025
     года).
   permission: allowTextRewrite
+  rules:
+  - 'Имена и официальные названия компаний, продуктов и технологий — в принятом написании: FastAPI, Node.js, GitLab
+    CI/CD, Kubernetes.'
+  - 'Цифры, сроки, уровни и масштаб ответственности — только из исходных данных. Уровень Senior или Lead — только если
+    он есть в исходных данных.'
+  - 'Сроки: «1 год», «2 года», «5 лет».'
 layout:
   regions:
   - id: header

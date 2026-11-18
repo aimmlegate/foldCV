@@ -23,7 +23,7 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = '563579f19191b95a6968e9cb23ff3db1307e8b44ec2061451dc8a718896c670f'
+TWO_COLUMN_HASH = 'd6035e8907f3a3bfc8866ce6b99df408dadb0fd1c8ef3f58462650617e5083b3'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 PUBLIC = ['generic-two-column', 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
 
@@ -37,6 +37,25 @@ def test_the_two_column_package_keeps_its_exact_hash_in_the_shared_folder():
     # Captured projects and the template store name this hash; moving the files must not change a byte of it.
     assert next(iter(BUNDLED_TEMPLATES)) == 'generic-two-column' and BUNDLED_TEMPLATE == BUNDLED_TEMPLATES['generic-two-column']
     assert compile_template(BUNDLED_TEMPLATE).package_hash == TWO_COLUMN_HASH
+
+
+@pytest.mark.parametrize('template', PUBLIC)
+def test_every_public_template_carries_the_unified_rules_of_wording_as_its_own_copy(template):
+    from packages.resume_core.importing.lite.rules import BLOCKS, STYLE
+    definition = bundled_package(template).definition
+    assert definition.model.rules == STYLE
+    assert {block.id: block.rules for block in definition.blocks if block.rules} == BLOCKS
+
+
+def test_a_template_without_rules_of_wording_keeps_its_hash_and_the_short_form_takes_them():
+    from packages.resume_core.templates.shorthand import expand
+    block = {'id': 'jobs', 'region': 'main', 'order': 1, 'view': {'nodes': []}, 'schema': [{'name': 'string'}]}
+    assert 'rules' not in expand({'schema_version': 4, 'blocks': [block]})['blocks'][0]
+    assert expand({'schema_version': 4, 'blocks': [{**block, 'rules': ['Коротко.']}]})['blocks'][0]['rules'] == ['Коротко.']
+    # The rules are left out of a package that has none, so packages captured before them verify as before.
+    definition = bundled_package('generic-two-column').definition
+    dumped = definition.model_copy(update={'model': definition.model.model_copy(update={'rules': []})}).model_dump(by_alias=True)
+    assert 'rules' not in dumped['model'] and 'rules' in definition.model_dump(by_alias=True)['model']
 
 
 @pytest.mark.parametrize('template', list(BUNDLED_TEMPLATES))

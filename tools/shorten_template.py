@@ -163,6 +163,8 @@ def block(item, definitions):
         result['effort'] = item['effort']
     if item.get('per_entry'):
         result['per_entry'] = True
+    if item.get('rules'):
+        result['rules'] = item['rules']
     if item['when'] is not None:
         result['when'] = item['when']['operation'] + ' = ' + item['when']['equals']
     if item['depends_on']:

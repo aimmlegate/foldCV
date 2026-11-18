@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-skills-table
-  revision: 1.1.0
+  revision: 1.2.0
   name: Таблица навыков
   default_locale: ru
 model:
@@ -37,6 +37,12 @@ model:
     and technology names in their accepted spelling. Write lengths of time in words (1 год, 2 года, 5 лет, с марта 2025
     года).
   permission: allowTextRewrite
+  rules:
+  - 'Имена и официальные названия компаний, продуктов и технологий — в принятом написании: FastAPI, Node.js, GitLab
+    CI/CD, Kubernetes.'
+  - 'Цифры, сроки, уровни и масштаб ответственности — только из исходных данных. Уровень Senior или Lead — только если
+    он есть в исходных данных.'
+  - 'Сроки: «1 год», «2 года», «5 лет».'
 blocks:
 - id: identity
   region: header
@@ -107,6 +113,9 @@ blocks:
     not what one project achieved.
   - Include leadership, architecture and professional interests only when supported by the source.
   - When rewriting is disabled, use the original professional summary or leave this block empty.
+  rules:
+  - 'О себе: 2–3 предложения о специализации, релевантном опыте и ключевой экспертизе.'
+  - 'Подробности и метрики остаются в карточках опыта.'
   rewrite:
     fields:
     - /text
@@ -446,6 +455,14 @@ blocks:
   - Separate specific duties and performed work (tasks) from achieved changes and effects (results).
   - Link each technology, task and result to the entry it belongs to; leave out a claim whose entry is unknown.
   - Do not invent outcomes or reassign company-wide or career-wide achievements to this entry.
+  rules:
+  - 'Описание проекта — 1–2 предложения: что это за продукт и для кого он.'
+  - 'Задачи: один пункт описывает одну зону ответственности. Пример: «Подготовка ежемесячных отчётов по продажам и
+    сверка данных с CRM».'
+  - 'Результаты: личный вклад и подтверждённый эффект. Пример: «Автоматизировал сверку данных и сократил подготовку
+    отчёта с двух дней до четырёх часов». Если эффект неизвестен, описать выполненную работу.'
+  - 'Обязанности — в задачах, назначение продукта или проекта — в описании.'
+  - 'В русском тексте — «проверка кода», «развёртывание», «в реальном времени».'
   rewrite:
     fields:
     - /*/project/description
@@ -561,6 +578,9 @@ blocks:
   extract:
   - Preserve explicitly career-wide achievements in their own optional block.
   - Do not duplicate project results or attach an achievement to an employer without source support.
+  rules:
+  - 'Достижения: личный вклад и подтверждённый эффект, один пункт — одно достижение. Если эффект неизвестен, описать
+    выполненную работу.'
   rewrite:
     fields:
     - /items

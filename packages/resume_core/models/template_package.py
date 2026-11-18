@@ -173,9 +173,15 @@ class SourcePolicy(Definition):
 
 
 class ModelInstructions(Definition):
+    # extract and rewrite are the legacy import's instructions; the fast import does not read them.
     extract: list[str]
     rewrite: list[str]
     permission: Literal["allowTextRewrite"]
+    # The template's own rules of wording, for every block, in the user's language: the fast import writes a block the
+    # CV has no text for by them, and the editor offers them as the text of a rewording request. A package without
+    # them keeps its hash.
+    rules: list[str] = Field(default_factory=list, exclude_if=lambda value: not value,
+        description='Rules of wording for every block, in the language of the résumé.')
 
 
 class RelationDeclaration(Definition):
@@ -384,6 +390,9 @@ class Block(Definition):
     bindings: list[Binding]
     extract: list[str]
     rewrite: Rewrite
+    # This block's own rules of wording, read before the rules for every block (ModelInstructions.rules).
+    rules: list[str] = Field(default_factory=list, exclude_if=lambda value: not value,
+        description='Rules of wording for this block, in the language of the résumé.')
     checks: list[Check]
     depends_on: list[Id]
     operation: Id | None

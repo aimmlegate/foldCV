@@ -30,7 +30,7 @@ EXTENSIONS = {'.ttf': ('font', 'font/ttf', 'allowed'), '.otf': ('font', 'font/ot
     '.jpeg': ('icon', 'image/jpeg', 'not_applicable'), '.json': ('catalog', 'application/json', 'not_applicable'),
     '.txt': ('catalog', 'text/plain', 'not_applicable')}
 RELATIONS = ('extension_of', 'owned_by', 'related_to')
-BLOCK_KEYS = {'id', 'effort', 'per_entry', 'mode', 'selectors', 'schema', 'content_schema', 'facts', 'bindings', 'extract', 'rewrite',
+BLOCK_KEYS = {'id', 'effort', 'per_entry', 'rules', 'mode', 'selectors', 'schema', 'content_schema', 'facts', 'bindings', 'extract', 'rewrite',
     'review', 'checks', 'depends_on', 'operation', 'when', 'region', 'order', 'placement', 'view'}
 FACT_TYPE_KEYS = {'id', 'schema_version', 'fields', 'schema', 'builtin', 'builtin_kind', 'relations', 'builtin_fields'}
 
@@ -199,6 +199,8 @@ def expand_block(item, definitions, path):
         result['effort'] = item['effort']
     if 'per_entry' in item:
         result['per_entry'] = item['per_entry']
+    if item.get('rules'):
+        result['rules'] = item['rules']
     result.update({'mode': item.get('mode', 'model'),
         'selectors': expand_inputs(item.get('selectors', ['source:all']), path + '/selectors'),
         'content_schema': schema,

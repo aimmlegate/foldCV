@@ -27,9 +27,13 @@ All of these are required: `schema_version`, `template`, `model`, `blocks`,
 - `template`: `id`, `revision`, `name`, `default_locale` (`ru`). The id uses
   letters, digits, `.`, `_`, `-` and starts with a letter or digit. A saved
   template keeps its id; a changed text needs a new revision.
-- `model`: `extract` and `rewrite` are lists of instructions for every block;
-  `permission: allowTextRewrite` is the only value. Rewrite instructions apply
-  only when the user allows rewriting at import.
+- `model`: `rules` is a list of rules of wording for every block, in the
+  language of the resume (short sentences a user can read). The import writes
+  a missing summary by them, and the editor offers them as the text of a
+  rewording request. `extract` and `rewrite` are lists of instructions of the
+  legacy import only (the one Settings turns on); the app's import does not
+  read them. Keep them as they are in a template that has them; put new
+  wording rules into `rules`. `permission: allowTextRewrite` is the only value.
 - `source`: `retain_original: true` and `retain_unmapped_facts: true`, fixed.
 - `provenance`: free notes (a mapping). Keep it; it does not change the result.
 
@@ -55,7 +59,7 @@ All of these are required: `schema_version`, `template`, `model`, `blocks`,
 ## Blocks
 
 A block is one section of the document. Keys: `id`, `region`, `order`,
-`schema`, `facts`, `extract`, `rewrite`, `review`, `checks`, `mode`,
+`schema`, `facts`, `rules`, `extract`, `rewrite`, `review`, `checks`, `mode`,
 `operation`, `when`, `per_entry`, `selectors`, `depends_on`, `view`. `id`,
 `region`, `order`, `schema` and `view` are always needed; unknown keys are
 refused.
@@ -65,8 +69,13 @@ refused.
   `layout.regions`. `order`: an integer; blocks of one region show in order.
   Two blocks in one region with the same order are refused, unless both have a
   `when` on the same operation with different values (only one of them shows).
-- `extract`: instructions for this block. `rewrite`: `fields` (pointers such as
-  `/text` or `/*/tasks`) and `instructions` for rewriting those fields.
+- `rules`: this block's own rules of wording, read before `model.rules`.
+- `rewrite`: `fields` (pointers such as `/text` or `/*/tasks`) names the values
+  a model may reword in the editor. Its `instructions`, and `extract`,
+  `review` and `checks`, belong to the legacy import.
+- The app's import fills the blocks of the shipped templates only (by `id`,
+  with their schemas). A block with a new id, or a shipped block with a changed
+  schema, stays empty at import: say so when the user asks for one.
 - `mode`: `model` by default (a model reads the imported document). `derived`
   takes its content from an operation (`other_projects` in the shipped
   templates).
