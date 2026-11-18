@@ -151,7 +151,7 @@ def test_experimental_entrypoint_stops_on_unsafe_profile_before_server(tmp_path:
     env.pop("FOLDCV_CODEX_EXECUTABLE", None)
     # A temporary home keeps the entrypoint away from the real FoldCV profile.
     env["HOME"] = str(tmp_path / "home")
-    env["CODEX_HOME"] = str(tmp_path / "home/Library/Application Support/FoldCV/cli-experiment")
+    env["CODEX_HOME"] = str(tmp_path / "home/Library/Application Support/FoldCV Dev/cli-experiment")
     result = run_local("--experimental-cli", "--no-open", ready=True, env=env)
     assert result.returncode != 0
     assert "CLI_PROFILE_UNSAFE" in result.stderr

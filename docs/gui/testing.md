@@ -86,7 +86,7 @@ and the flaky `test_template_pipeline.py::test_two_findings_on_an_admitted_block
   quotes and Cyrillic) and `fixture_random`.
 - Data roots: every test uses `tmp_path` or `temp_root`, and every app, launcher or store a test
   starts gets an explicit temporary root. Never the default data root
-  (`~/Library/Application Support/FoldCV`), which is the user's store. For a full run, a
+  (`~/Library/Application Support/FoldCV Dev`), which is the user's store. For a full run, a
   temporary `HOME` is an extra guard: `HOME="$(mktemp -d)" .venv/bin/python -m pytest ...`.
 - `tests/architecture/test_imports.py` (AST only) fails when `packages/resume_core` imports
   `resume_api`, and when a core module imports a higher layer (models with extraction and the

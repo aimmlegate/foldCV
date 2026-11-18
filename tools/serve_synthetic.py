@@ -327,7 +327,7 @@ async def assistant_script(value, cancel, emit):
         return RuntimeResult(state='completed', text=text, native_started=True, tool_calls=counter[0])
 
 
-LIVE_PROFILE = Path.home() / 'Library/Application Support/FoldCV/cli-experiment'
+LIVE_PROFILE = Path.home() / 'Library/Application Support/FoldCV Dev/cli-experiment'
 LEDGER = ROOT / 'docs/gui/handoffs/SIMPLIFY/logs/sr08-live-ledger.jsonl'
 LIVE_LIMIT = 20
 OUTCOMES = ROOT / 'docs/gui/handoffs/SIMPLIFY/logs/sr08-live-outcomes.jsonl'

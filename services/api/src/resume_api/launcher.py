@@ -85,13 +85,13 @@ async def launch(*, port: int = 0, open_browser: bool = True,
         actual_port = listener.getsockname()[1]
         origin = f"http://127.0.0.1:{actual_port}"
         secret = secrets.token_urlsafe(32)
-        profile = (installed_profile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+        profile = (installed_profile(Path.home() / "Library/Application Support/FoldCV Dev/cli-experiment")
                    if experimental_cli else None)
-        app_log.configure(Path.home() / "Library/Application Support/FoldCV")
+        app_log.configure(Path.home() / "Library/Application Support/FoldCV Dev")
         app = create_app(origin=origin, secret=secret, temp_root=temp_root, dist=dist,
                          cli_executable=profile.executable if profile else cli_executable,
                          experimental_profile=profile, template_import_call_cap=TEMPLATE_IMPORT_CALL_CAP,
-                         provider_slots={"claude_cli": claude_slot(Path.home() / "Library/Application Support/FoldCV",
+                         provider_slots={"claude_cli": claude_slot(Path.home() / "Library/Application Support/FoldCV Dev",
                                                                    temp_root)}
                          if experimental_cli else None)
         tune_garbage_collector()

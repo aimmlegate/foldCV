@@ -114,7 +114,7 @@ and protocol layers are gone; only version 7 projects open.
 
 ### Data root
 
-`storage.data_root()` is `~/Library/Application Support/FoldCV` unless the launcher
+`storage.data_root()` is `~/Library/Application Support/FoldCV Dev` unless the launcher
 passes another root. Tests and `tools/serve_synthetic.py` always use a temporary root.
 
 ```text

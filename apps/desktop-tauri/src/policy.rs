@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 use tauri::Url;
 
-// Its own folder, so the app runs next to the FoldCV Local builds and shows none of their data. The Electron builds
-// use the same one.
-// The data folder keeps the beta's name, so the beta's projects and sign-ins carry over (D169).
-pub const DATA_FOLDER: &str = "foldCV Beta";
+// The app's own folder. The service started from the source keeps another one (`FoldCV Dev`): a name that differs
+// only by case is the same folder on macOS and Windows. The betas and 1.0.0-1.1.0 used `foldCV Beta`; nothing is moved
+// from it.
+pub const DATA_FOLDER: &str = "foldCV";
 
 // Windows variables the frozen service and its workers need; everything else, PATH and PYTHON* included, stays out.
 #[cfg(windows)]
@@ -147,9 +147,9 @@ mod tests {
     #[test]
     fn the_data_root_is_the_apps_own_folder_unless_qa_names_an_absolute_one() {
         let support = Path::new("/Users/a/Library/Application Support");
-        assert_eq!(data_root(None, support), support.join("foldCV Beta"));
-        assert_eq!(data_root(Some(OsStr::new("relative/root")), support), support.join("foldCV Beta"));
-        assert_eq!(data_root(Some(OsStr::new("")), support), support.join("foldCV Beta"));
+        assert_eq!(data_root(None, support), support.join("foldCV"));
+        assert_eq!(data_root(Some(OsStr::new("relative/root")), support), support.join("foldCV"));
+        assert_eq!(data_root(Some(OsStr::new("")), support), support.join("foldCV"));
         assert_eq!(data_root(Some(OsStr::new("/private/tmp/qa")), support), Path::new("/private/tmp/qa"));
     }
 
@@ -157,9 +157,9 @@ mod tests {
     #[test]
     fn the_data_root_is_the_apps_own_folder_unless_qa_names_a_drive_or_network_path() {
         let local = Path::new(r"C:\Users\a\AppData\Local");
-        assert_eq!(data_root(None, local), local.join("foldCV Beta"));
+        assert_eq!(data_root(None, local), local.join("foldCV"));
         for relative in [r"relative\root", r"\no-drive", "C:no-root", ""] {
-            assert_eq!(data_root(Some(OsStr::new(relative)), local), local.join("foldCV Beta"), "{relative}");
+            assert_eq!(data_root(Some(OsStr::new(relative)), local), local.join("foldCV"), "{relative}");
         }
         assert_eq!(data_root(Some(OsStr::new(r"D:\qa")), local), Path::new(r"D:\qa"));
         assert_eq!(data_root(Some(OsStr::new(r"\\server\share\qa")), local), Path::new(r"\\server\share\qa"));
@@ -180,10 +180,10 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn the_helper_runs_the_embedded_python_with_the_system_path_only() {
-        let command = helper_command(Path::new(r"C:\Apps\foldCV"), Path::new(r"C:\Users\a\AppData\Local\foldCV Beta"));
+        let command = helper_command(Path::new(r"C:\Apps\foldCV"), Path::new(r"C:\Users\a\AppData\Local\foldCV"));
         assert_eq!(command.executable, Path::new(r"C:\Apps\foldCV\helper\python\python.exe"));
         assert_eq!(command.args, ["-X", "utf8", r"C:\Apps\foldCV\helper\app\packaging\helper_entry.py", "serve",
-            r"C:\Users\a\AppData\Local\foldCV Beta"]);
+            r"C:\Users\a\AppData\Local\foldCV"]);
         let user = [("SystemRoot", r"C:\Windows"), ("TEMP", r"C:\Users\a\Temp"), ("USERNAME", ""),
             ("PATH", r"C:\Python;C:\Windows"), ("PYTHONHOME", r"C:\Python")];
         let variable = |name: &str| user.iter().find(|(key, _)| *key == name).map(|(_, value)| OsString::from(value));

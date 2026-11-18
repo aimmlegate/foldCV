@@ -4,7 +4,8 @@ Local resume editor. It imports a PDF, DOCX, TXT or Markdown resume, extracts it
 facts into a template, lets you edit and rewrite the text, and exports DOCX, or PDF
 through the system print window.
 
-Projects stay on your computer in `~/Library/Application Support/FoldCV`. Model work
+Projects stay on your computer: the apps keep them in their `foldCV` data folder, the service run from source in
+`~/Library/Application Support/FoldCV Dev`. Model work
 runs through your own Codex or Claude CLI sign-in. FoldCV has no server of its own
 and uses no API keys.
 
@@ -32,8 +33,9 @@ with Ctrl-C. Without `--experimental-cli` the app works with no model calls. See
 local service frozen with PyInstaller, and the Tauri window around it (`apps/desktop-tauri`), which shows the page in
 the system WebKit. It needs Apple Silicon, arm64 Node 22, python.org Python 3.13 and Rust from
 [rustup](https://rustup.rs), and writes to `output/foldcv-macos-<version>-<commit>/`. The app runs on macOS 12 or later
-with Safari 17.4 or later, whose WebKit it uses. It keeps its data in `~/Library/Application Support/foldCV Beta`, as
-the beta builds did (so their projects and sign-ins carry over), apart from the browser service's `FoldCV` root. The signature is ad hoc: on another
+with Safari 17.4 or later, whose WebKit it uses. It keeps its data in `~/Library/Application Support/foldCV`, apart
+from the `FoldCV Dev` root of the service run from source (the betas and versions up to 1.1.0 used `foldCV Beta`; nothing
+is moved from it). The signature is ad hoc: on another
 Mac, allow the app once in System Settings → Privacy & Security.
 
 ## Windows app
@@ -42,8 +44,8 @@ The `Windows` workflow builds the portable `foldCV-<version>-win-x64.zip` on a W
 (helper, both CLIs, app start, second start, close and kill; artifact `foldcv-windows`): the frontend, the python.org
 embeddable Python with the service's Windows wheels, and the Tauri window (`apps/desktop-tauri`), which shows the page in
 the system WebView2 that Windows 11 has. Its shell needs the Windows toolchain, so the zip is built on the runner only.
-Unpack the zip anywhere and run `foldCV.exe`; there is no installer. Data stays in `%LOCALAPPDATA%\foldCV Beta`, the
-beta's folder, so a newer zip in another folder keeps projects and sign-ins. The zip is not signed: Windows SmartScreen asks once (More
+Unpack the zip anywhere and run `foldCV.exe`; there is no installer. Data stays in `%LOCALAPPDATA%\foldCV`, so a newer
+zip in another folder keeps projects and sign-ins (versions up to 1.1.0 used `foldCV Beta`). The zip is not signed: Windows SmartScreen asks once (More
 info → Run anyway). Codex and Claude run in a Job Object that lets them start no other program and ends them with the
 app; unlike the macOS sandbox it does not limit which files they read or write.
 

@@ -75,7 +75,7 @@ def test_the_launcher_is_ready_before_it_prints_its_url(tmp_path):
     finally:
         stop_server(process)
     # The default data root follows HOME, so the run never reaches the user's store.
-    assert (tmp_path / "home/Library/Application Support/FoldCV").is_dir()
+    assert (tmp_path / "home/Library/Application Support/FoldCV Dev").is_dir()
 
 
 def test_sigterm_during_a_live_child_stops_its_group_and_removes_the_directory(tmp_path):

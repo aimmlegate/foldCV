@@ -64,7 +64,7 @@ configuration. CLI login availability does not open model work by itself.
 The opt-in launcher now starts when Codex is missing. Open Settings → Model and
 connection and click **Install Codex**. FoldCV downloads the official pinned
 `0.162.0-alpha.17.2` macOS arm64 package (about 133 MB), checks its SHA-256, and
-installs into `~/Library/Application Support/FoldCV/cli-runtime`. The download
+installs into `~/Library/Application Support/FoldCV Dev/cli-runtime`. The download
 shows actual byte progress and supports cancellation and retry. Terminal setup,
 Node.js, Homebrew and administrator access are not required for this CLI step.
 
@@ -95,7 +95,7 @@ binary or missing sandbox stops the mode. `--check --experimental-cli` checks
 the separate profile without generating text.
 
 The experiment uses private `HOME` and `CODEX_HOME` directories under
-`~/Library/Application Support/FoldCV/cli-experiment`. The CLI owns its sign-in
+`~/Library/Application Support/FoldCV Dev/cli-experiment`. The CLI owns its sign-in
 there; the app never reads or copies the auth file. Detach stops this app's
 active CLI work but keeps that sign-in for the next launch. The macOS sandbox
 denies reads of other user homes, volumes and temporary data, and denies child

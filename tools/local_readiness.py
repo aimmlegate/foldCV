@@ -149,7 +149,7 @@ def check_experimental_cli() -> str:
     from resume_api.launcher import trusted_temp_root
     from resume_api.lifecycle import OperationFiles, SpikeError
 
-    profile = installed_profile(Path.home() / "Library/Application Support/FoldCV/cli-experiment")
+    profile = installed_profile(Path.home() / "Library/Application Support/FoldCV Dev/cli-experiment")
     try:
         profile.prepare_directories()
         if not profile.executable.is_file():

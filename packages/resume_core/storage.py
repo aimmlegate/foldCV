@@ -18,7 +18,7 @@ class StorageFailure(Exception):
 
 def data_root(override: Path | None = None) -> Path:
     return (override if override is not None else
-            Path.home() / "Library/Application Support/FoldCV").absolute()
+            Path.home() / "Library/Application Support/FoldCV Dev").absolute()
 
 
 def private_directory(path: Path) -> Path:
