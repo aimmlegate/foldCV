@@ -7,16 +7,17 @@ import { shownTemplate, templateImportStatus, type ImportOptions, type TemplateE
 import { ModelOptions } from "../settings/ModelSelect";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
-import { chosenEffort, EffortField, LiteField, RewriteField } from "./ImportChoices";
+import { chosenEffort, EffortField, RewriteField } from "./ImportChoices";
 
-/** A new resume from one file (PDF, DOCX, TXT, Markdown) with a template, the import model, its effort and the rewrite
- * choice. Without the template list the upload uses the default template. `active`: shown, not behind Settings. */
+/** A new resume from one file (PDF, DOCX, TXT, Markdown) with a template, the import model and its effort. With the
+ * legacy import turned on in Settings the form also asks whether to rewrite the text. Without the template list the
+ * upload uses the default template. `active`: shown, not behind Settings. */
 export function SourceForm({ active, busy, process, connection }: {
   active: boolean; busy: boolean; process: (file: File, options: ImportOptions, templateId: string | null) => void;
   connection: ConnectionSnapshot | null;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null), [rewrite, setRewrite] = useState(true), [lite, setLite] = useState(true);
+  const [file, setFile] = useState<File | null>(null), [legacy, setLegacy] = useState(false), [rewrite, setRewrite] = useState(true);
   const [importModel, setImportModel] = useState<string | null>(null), [loaded, setLoaded] = useState(false);
   const [effort, setEffort] = useState<ReasoningEffort | null>(null);
   const [templates, setTemplates] = useState<TemplateEntry[]>([]), [templateId, setTemplateId] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function SourceForm({ active, busy, process, connection }: {
   useEffect(() => {
     if (!active) return;
     let alive = true;
-    void preferencesRequest().then(value => { if (alive) setImportModel(value.selectedImportModel ?? null); })
+    void preferencesRequest().then(value => { if (alive) { setImportModel(value.selectedImportModel ?? null); setLegacy(value.legacyImport ?? false); } })
       .catch((error: unknown) => { if (alive) setModelError(errorMessage(error)); }).finally(() => { if (alive) setLoaded(true); });
     void templateImportStatus().then(value => {
       if (!alive) return;
@@ -65,11 +66,10 @@ export function SourceForm({ active, busy, process, connection }: {
           <option value="">{connection?.selectedModel ? `Модель обработки · ${connection.selectedModel}` : "Модель обработки"}</option>
           <ModelOptions groups={modelGroups(connection)} value={importModel} />
         </select></div>
-      <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} />
-      <LiteField lite={lite} disabled={busy} change={setLite} />
-      <RewriteField rewrite={rewrite && !lite} disabled={busy || lite} change={setRewrite} />
+      <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} legacy={legacy} />
+      {legacy && <RewriteField rewrite={rewrite} disabled={busy} change={setRewrite} />}
       <Button className="import-process-button" variant="primary" busy={busy} busyLabel="Подготовка…" disabled={!file}
-        onClick={() => { if (file) process(file, { allowTextRewrite: rewrite && !lite, effort: chosenEffort(effort, reasoning), lite }, templateId); }}>Обработать<Icon name="arrow" /></Button>
+        onClick={() => { if (file) process(file, { effort: chosenEffort(effort, reasoning), ...(legacy ? { rewrite } : {}) }, templateId); }}>Обработать<Icon name="arrow" /></Button>
     </div>
     {modelError && <p className="notice error" role="alert">{modelError}</p>}
   </div></section>;

@@ -85,14 +85,13 @@ test("a technology chip's dialog is the panel's own, outside the aside whose Esc
   assert.ok(panel.indexOf("</aside>") < panel.indexOf("<FactDialog"));
 });
 
-test("a pre-draft without an operation asks for the rewrite and effort choice, with rewriting off", () => {
+test("a pre-draft without an operation asks for the effort only: every import is the lite one", () => {
   const form = (ask: boolean) => renderToStaticMarkup(createElement(PreDraft, { ask, busy: false, connection: null, resume: () => {} }));
   const asked = form(true);
-  assert.match(asked, /Переписывать текст/u);
   assert.match(asked, /Уровень рассуждений импорта/u);
   assert.match(asked, /Продолжить импорт/u);
-  assert.ok(!/id="import-rewrite"[^>]*checked/u.test(asked) && !/checked=""[^>]*id="import-rewrite"/u.test(asked), "rewriting is not on by default");
-  assert.ok(!form(false).includes("Переписывать текст"), "an operation already holds the choices");
+  assert.ok(!/import-rewrite|import-lite|Переписывать текст|Быстрый импорт/u.test(asked), "rewriting and the lite import are no choices");
+  assert.ok(!form(false).includes("Уровень рассуждений импорта"), "an operation already holds the choice");
 });
 
 test("the composer marks a saved model the service refused, in the reply the server really sends", () => {

@@ -162,6 +162,12 @@ export function problemLine(source: string, pointer: string): number {
 export type SectionTab = "template" | "model" | "blocks" | "style" | "service";
 export const sectionTabs: readonly { id: SectionTab; label: string }[] = [{ id: "template", label: "Шаблон" }, { id: "model", label: "Правила" },
   { id: "blocks", label: "Блоки" }, { id: "style", label: "Стили" }, { id: "service", label: "Служебные" }];
+/** A tab's note on what the import reads of it. The fast import words a block by `rules` and fills only the blocks of
+ * the shipped templates; the other instructions are the legacy import's. */
+export const sectionNotes: Readonly<Partial<Record<SectionTab, string>>> = {
+  model: "rules — правила формулировок: по ним импорт пишет недостающий текст, а редактор предлагает их как запрос. extract и rewrite читает только прежний импорт (включается в настройках).",
+  blocks: "Импорт заполняет блоки встроенных шаблонов: новый блок или изменённая схема останутся пустыми. rules блока — его правила формулировок. extract, инструкции rewrite, review и checks читает только прежний импорт.",
+};
 const keyTabs: Readonly<Record<string, SectionTab>> = { schema_version: "template", template: "template", model: "model", blocks: "blocks", style: "style" };
 export function sectionTab(key: string): SectionTab { return Object.hasOwn(keyTabs, key) ? keyTabs[key] as SectionTab : "service"; }
 

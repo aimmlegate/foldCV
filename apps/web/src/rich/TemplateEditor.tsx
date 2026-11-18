@@ -9,6 +9,7 @@ import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
 import type { AssistantFinding, AssistantSelection } from "../assistant/controller";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
 import { ComparisonWorkspace, WorkspaceViews, type WorkspaceView } from "../workbench/editor/ComparisonWorkspace";
+import { unshownLines, withChanged, type ChangedLine } from "../workbench/editor/unshown";
 import { SourceDialog } from "../workbench/editor/SourceDialog";
 import type { PaneOrder } from "../workbench/settings/interface";
 import { BlockedInputNotice } from "../workbench/editor/BlockedInputNotice";
@@ -18,6 +19,8 @@ import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { RemarkTip } from "../workbench/editor/RemarkTip";
 import { SelectionAction } from "../workbench/editor/SelectionAction";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
+import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
+import { rewordTarget, type RewordChange, type RewordPreview } from "../workbench/editor/reword";
 import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
@@ -50,6 +53,7 @@ export type TemplateEditorHandle = { background: boolean; flush: () => Promise<T
   focusFinding: (anchor: AssistantFinding["anchors"][number]) => boolean };
 type ShownBlock = NonNullable<TemplateProjectResponseV1["workspace"]["project"]>["document"]["regions"][number]["blocks"][number];
 const factsWidths = { fallback: 300, minimum: 240, maximum: 560 };
+const noBlocks: ReadonlySet<string> = new Set();
 
 function blockRevisions(response: TemplateProjectResponseV1): Map<string, number> {
   const revisions = new Map<string, number>();
@@ -110,6 +114,21 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const [rewriteAnchor, setRewriteAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
   // A bound link's URL is edited through Python, which changes its URL cell and target together.
   const [linkTarget, setLinkTarget] = useState<{ blockId: string; occurrenceId: string; href: string } | null>(null);
+  // A whole block reworded by the template's rules, in the same panel: one preview at a time, the facts change only
+  // through its Apply.
+  const [rewordRules, setRewordRules] = useState<Readonly<Record<string, string>>>({});
+  const rewordIds = useMemo<ReadonlySet<string>>(() => new Set(Object.keys(rewordRules)), [rewordRules]);
+  // The words each shown field has beyond its source lines, by cell ID; marked green while the marks are on.
+  const [beyond, setBeyond] = useState<ReadonlyMap<string, readonly string[]>>(new Map());
+  // The source lines of shown values with the words the document no longer shows; marked red in the original.
+  const [changedLines, setChangedLines] = useState<readonly ChangedLine[]>([]);
+  const [rewordOpen, setRewordOpen] = useState(false), rewordBlock = useRef(""), [rewordShown, setRewordShown] = useState("");
+  const [rewordInstruction, setRewordInstruction] = useState(""), rewordInstructionNow = useRef("");
+  rewordInstructionNow.current = rewordInstruction;
+  const [rewordPreview, setRewordPreview] = useState<RewordPreview | null>(null);
+  const [rewordError, setRewordError] = useState("");
+  const [rewordActivity, setRewordActivity] = useState<RewriteActivity | null>(null);
+  const [rewordAnchor, setRewordAnchor] = useState<{ left: number; top: number; bottom: number } | null>(null);
   const callbacks = useRef({ onStatus, onShown });
   callbacks.current = { onStatus, onShown };
   // The compiled presentation of the verified state; decorations read the latest one.
@@ -123,9 +142,27 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // Remarks and doubtful values of the verified state, marked in the text while the switch is on.
   const marks = useMemo(() => {
     const value = shown.workspace.project;
-    return value ? remarkMarks(value.document, value.importIssues, value.facts) : null;
-  }, [shown]);
+    return value ? { ...remarkMarks(value.document, value.importIssues, value.facts), beyond } : null;
+  }, [shown, beyond]);
   const [marking, setMarking] = useState(readRemarkMarks);
+  // The lines of the original the resume does not show, marked in the original while the same switch is on.
+  // The same lines keep the same array, so the original is not read and marked again after every saved edit.
+  const unshownHeld = useRef<ReturnType<typeof withChanged>>([]);
+  const unshown = useMemo(() => {
+    const next = marking ? withChanged(unshownLines(shown.workspace.project?.importIssues ?? []), changedLines) : [];
+    if (JSON.stringify(next) !== JSON.stringify(unshownHeld.current)) unshownHeld.current = next;
+    return unshownHeld.current;
+  }, [shown, marking, changedLines]);
+  // The blocks the template lets a model reword and the words beyond the original, read again when the saved state
+  // changes (a fact edited in the panel changes the page too).
+  const savedRevision = shown.workspace.projectRevision;
+  useEffect(() => {
+    let live = true;
+    void connection.rewordBlocks().then(rules => { if (live) setRewordRules(rules); }, () => { if (live) setRewordRules({}); });
+    void connection.sourceDiff().then(diff => { if (live) { setBeyond(new Map(Object.entries(diff.added))); setChangedLines(diff.removed); } },
+      () => { if (live) { setBeyond(new Map()); setChangedLines([]); } });
+    return () => { live = false; };
+  }, [connection, savedRevision]);
   const marked = useRef<RemarkMarks | null>(null);
   marked.current = marking ? marks : null;
   const remarkPlugin = useMemo(() => remarkMarksPlugin(() => marked.current), []);
@@ -282,7 +319,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   }
   const command = (value: ToolbarCommand) => {
     if (value === "undo" || value === "redo") { void session.navigate(value); return; }
-    if (value === "rewrite") { openRewrite(); return; }
+    if (value === "rewrite") {
+      const block = session.rewriteSource() === null ? caretBlock() : null;
+      if (block) openReword(block); else { setRewordOpen(false); openRewrite(); }
+      return;
+    }
     if (value === "bold" || value === "italic" || value === "underline") { editor.toggleStyles({ [value]: true }); editor.focus(); return; }
     if (value === "facts") { setFactsVisible(visible => !visible); return; }
     if (value === "remarks") { saveRemarkMarks(!marking); setMarking(!marking); return; }
@@ -294,6 +335,45 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     const link = session.linkAtCaret();
     if (!link) return;
     event.preventDefault(); event.stopPropagation(); setLinkTarget(link);
+  }
+  const rewords = useMemo(() => new RewriteRequests<RewordPreview>({
+    preview: (requestId, stage) => session.rewordPreview(requestId, rewordBlock.current, rewordInstructionNow.current, stage),
+    cancel: requestId => session.cancelRewrite(requestId), activity: setRewordActivity,
+    done: setRewordPreview, failed: setRewordError, cancelFailed: error => setWarning(errorMessage(error)),
+  }), [session]);
+  /** The block the caret stands in that the template lets a model reword; null when there is none. */
+  function caretBlock(): string | null {
+    try {
+      const id = editor.getTextCursorPosition().block.id;
+      return rewordTarget(document.querySelector(`.cv-document [data-id="${CSS.escape(id)}"]`), rewordIds)?.getAttribute("data-id") ?? null;
+    } catch { return null; }
+  }
+  function openReword(blockId: string) {
+    const rect = document.querySelector(`.cv-document [data-id="${CSS.escape(blockId)}"]`)?.getBoundingClientRect();
+    // Beside the block's first line, to the right of it while the window has the room.
+    setRewordAnchor(rect ? { left: rect.right + 12, top: rect.top + 28, bottom: rect.top - 8 } : null);
+    setRewriteOpen(false);
+    // A panel hidden during a request or with a preview reopens on it; another block replaces it.
+    if ((rewords.running || rewordPreview) && blockId === rewordBlock.current) { setRewordOpen(true); return; }
+    rewordBlock.current = blockId;
+    // The request starts as the unified rules of this kind of block, in the field where the user reads and edits them;
+    // their own text stays.
+    const typed = rewordInstructionNow.current;
+    if (!typed.trim() || Object.values(rewordRules).includes(typed)) setRewordInstruction(rewordRules[blockId] ?? "");
+    rewords.supersede();
+    setRewordShown(blockId); setRewordPreview(null); setRewordError(""); setRewordOpen(true);
+  }
+  function submitReword() { setRewordError(""); void rewords.submit(); }
+  async function applyReword(changes: RewordChange[]) {
+    if (!rewordPreview || changes.length === 0) return;
+    setRewordError("");
+    setRewordActivity({ actionId: rewordPreview.requestId, stage: "applying", startedAt: Date.now(), finishedAt: null, detail: null });
+    try {
+      const result = await session.applyReword(rewordBlock.current, changes, rewordPreview.touched);
+      setRewordOpen(false); setRewordPreview(null); editor.focus();
+      showChanges(result.changedBlockIds);
+    } catch (error) { setRewordError(error instanceof ProjectApiFailure ? error.code : error instanceof Error ? error.message : "INVALID_RESULT"); }
+    finally { setRewordActivity(null); }
   }
   async function applyLinkTarget(target: { blockId: string; occurrenceId: string }, href: string) {
     try { await session.linkTarget(target, href); }
@@ -335,6 +415,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   return <div className="contents uir-editor-session">
     <SelectionAction anchor={selectionAnchor} open={openRewrite} />
     <RemarkTip host={paperScroll} openFact={openFact} />
+    <BlockRewordButton host={paperScroll} blockIds={locked || rewordOpen || rewriteOpen || dragging || selecting ? noBlocks : rewordIds}
+      open={openReword} />
+    <BlockRewritePanel open={rewordOpen} close={() => setRewordOpen(false)} instruction={rewordInstruction} change={setRewordInstruction}
+      rules={rewordRules[rewordShown] ?? ""} submit={submitReword} apply={changes => void applyReword(changes)} preview={rewordPreview} busy={rewordActivity !== null}
+      error={rewordError} activity={rewordActivity} cancel={id => { void rewords.cancel(id); }} anchor={rewordAnchor} />
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
       submit={submitRewrite} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
       preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
@@ -357,15 +442,15 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       {/* The layout host: the facts panel is docked beside the document. */}
       <ComparisonWorkspace view={workspaceView} order={paneOrder} original={sourceVisited && <SourceDialog projectId={initial.workspace.projectId} sources={sources}
         expanded={workspaceView === "original"} toggle={() => changeWorkspaceView(workspaceView === "original" ? "compare" : "original")}
-        close={() => { changeWorkspaceView("layout"); editor.focus(); }} />} layout={<div className="document-workspace" data-facts={factsVisible ? "open" : "closed"}
+        close={() => { changeWorkspaceView("layout"); editor.focus(); }} unshown={unshown} />} layout={<div className="document-workspace" data-facts={factsVisible ? "open" : "closed"}
         style={{ "--facts-width": `${String(factsWidth)}px`, "--document-zoom": String(zoom) } as CSSProperties}>
         <fieldset className="contents uir-editor-controls" disabled={locked}>
-          <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={selecting}
+          <Toolbar command={command} textStyle={formatBlocks} factsVisible={factsVisible} selecting={selecting || (!locked && caretBlock() !== null)} rewriteBlock={!selecting}
             style={blockStyle(textBlocks[0])} canUndo={session.canUndo} canRedo={session.canRedo}
             blocks={textBlocks.length > 0 && !formatting} marks={markable(editor._tiptapEditor.state)} bold={heavier}
             active={{ bold: styles.bold === true, italic: styles.italic === true, underline: styles.underline === true,
               list: listed("bullet_list"), numbered: listed("numbered_list") }}
-            remarks={marks && (marks.cells.size > 0 || marks.scoped.size > 0 || marks.blocks.size > 0) ? marking : null}
+            remarks={marks && (marks.cells.size > 0 || marks.scoped.size > 0 || marks.blocks.size > 0 || beyond.size > 0) ? marking : null}
             layoutControls={<div className="layout-controls"><select className="toolbar-select" aria-label="Масштаб листа" value={String(zoomChoice)}
               onChange={event => { const next = parseZoom(event.currentTarget.value); setZoomChoice(next); saveZoom(next); }}>
               <option value="fit">По ширине</option>{zoomLevels.map(level => <option key={level} value={String(level)}>{level * 100}%</option>)}

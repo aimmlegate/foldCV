@@ -2,15 +2,21 @@ import { useState } from "react";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 import { Icon } from "../ui/Icon";
 import { OriginalPreview } from "./OriginalPreview";
-import { originalUrl } from "./original-source";
+import { originalKind, originalUrl } from "./original-source";
+import { unshownClass, unshownLabels, type Unshown, type UnshownReason } from "./unshown";
 
 type SourceFile = { id: string; originalName: string; byteSha256: string };
 
-export function SourceDialog({ projectId, sources, expanded, toggle, close }: {
-  projectId: string; sources: SourceFile[]; expanded: boolean; toggle: () => void; close: () => void;
+const reasons: readonly UnshownReason[] = ["no_field", "hidden", "dropped", "changed"];
+
+/** `unshown`: the lines of the original the resume does not show; a PDF and a DOCX mark them. */
+export function SourceDialog({ projectId, sources, expanded, toggle, close, unshown }: {
+  projectId: string; sources: SourceFile[]; expanded: boolean; toggle: () => void; close: () => void; unshown: readonly Unshown[];
 }) {
   const [id, setId] = useState(sources[0]?.id ?? "");
   const source = sources.find(item => item.id === id) ?? sources[0];
+  const kind = source ? originalKind(source.originalName) : "unsupported";
+  const marked = kind === "pdf" || kind === "docx" ? reasons.filter(reason => unshown.some(line => line.reason === reason)) : [];
   return <div id="original-source-panel" className="source-viewer"
     onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
     <div className="workspace-pane-heading">
@@ -24,8 +30,10 @@ export function SourceDialog({ projectId, sources, expanded, toggle, close }: {
       </select> : <span title={source?.originalName}>{source?.originalName ?? "Нет файла"}</span>}
       <span className="source-file-type">{source?.originalName.split(".").pop()?.toUpperCase()}</span>
     </div>
+    {marked.length > 0 && <p className="source-unshown-legend"><span><i className={`${unshownClass}-key`} />Красным — то, чего нет в резюме:</span>
+      {marked.map(reason => unshownLabels[reason]).join(", ")}</p>}
     {source && <ErrorBoundary key={`${projectId}:${source.id}:${source.byteSha256}`}
       fallback={<p className="source-viewer-message" role="alert">Не удалось показать оригинал. Скачайте его.</p>}>
-      <OriginalPreview projectId={projectId} source={source} /></ErrorBoundary>}
+      <OriginalPreview projectId={projectId} source={source} unshown={unshown} /></ErrorBoundary>}
   </div>;
 }

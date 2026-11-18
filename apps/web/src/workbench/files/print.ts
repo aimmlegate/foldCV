@@ -89,7 +89,7 @@ function measured(paper: HTMLElement, page: PrintPage): { root: HTMLElement; cop
   for (const element of copy.querySelectorAll("style, .uir-empty-region")) element.remove();
   for (const element of copy.querySelectorAll("[contenteditable]")) element.removeAttribute("contenteditable");
   for (const element of copy.querySelectorAll(".fcv-remark, .ProseMirror-selectednode, .selectedCell"))
-    element.classList.remove("fcv-remark", "ProseMirror-selectednode", "selectedCell");
+    element.classList.remove("fcv-remark", "fcv-added", "ProseMirror-selectednode", "selectedCell");
   linkCopy(copy);
   root.append(rules, copy);
   document.body.append(root);

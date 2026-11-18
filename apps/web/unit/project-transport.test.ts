@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { TemplateProjectResponseV1 } from "../src/contracts/generated/contracts";
-import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, shownTemplate, templateImportStatus } from "../src/projects/api";
+import { catalogFlag, createProject, deleteProject, listProjects, openFoldcv, parseTemplateCatalog, shownTemplate, startImport, templateImportStatus } from "../src/projects/api";
 import { ProjectApiFailure, ProjectEditorConnection, type Fetcher } from "../src/rich/v7-connection";
 
 const base = JSON.parse(readFileSync(new URL("../../../tests/fixtures/synthetic/projects/v7-response.json", import.meta.url), "utf8")) as TemplateProjectResponseV1;
@@ -18,6 +18,25 @@ async function sha256(payload: Uint8Array<ArrayBuffer>): Promise<string> {
 function connection(fetcher: Fetcher): ProjectEditorConnection {
   return new ProjectEditorConnection(base.workspace.projectId, "editor-token", structuredClone(base), { undo: null, redo: null }, fetcher);
 }
+
+test("an import starts as the fast one, with no rewriting, at the chosen effort; the legacy one only when the form says so", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const fetcher: Fetcher = async (_path, init) => {
+    bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    return Response.json({ id: "task-1" });
+  };
+  await startImport("project-1", { clientRequestId: "request-1", effort: "low" }, fetcher);
+  await startImport("project-1", { clientRequestId: "request-2", effort: null }, fetcher);
+  // The legacy import (Settings turned it on) carries its choice of rewriting.
+  await startImport("project-1", { clientRequestId: "request-3", effort: null, rewrite: true }, fetcher);
+  await startImport("project-1", { clientRequestId: "request-4", effort: "high", rewrite: false }, fetcher);
+  assert.deepEqual(bodies, [
+    { kind: "start", clientRequestId: "request-1", allowTextRewrite: false, lite: true, effort: "low" },
+    { kind: "start", clientRequestId: "request-2", allowTextRewrite: false, lite: true },
+    { kind: "start", clientRequestId: "request-3", allowTextRewrite: true, lite: false },
+    { kind: "start", clientRequestId: "request-4", allowTextRewrite: false, lite: false, effort: "high" },
+  ]);
+});
 
 test("rename, export and .foldcv use the open editor token and the current revisions", async () => {
   const calls: { path: string; body: Record<string, unknown> }[] = [];

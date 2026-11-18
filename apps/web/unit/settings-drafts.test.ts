@@ -33,6 +33,8 @@ function setup() {
       server.preferences.selectedImportModel = model; return structuredClone(server.preferences); },
     selectFallback: async model => { calls.push({ part: "fallback", value: model }); if (fail.has("fallback")) throw new Error("unavailable");
       server.preferences.selectedFallbackModel = model; return structuredClone(server.preferences); },
+    saveLegacyImport: async enabled => { calls.push({ part: "legacy", value: enabled }); if (fail.has("legacy")) throw new Error("unavailable");
+      server.preferences.legacyImport = enabled; return structuredClone(server.preferences); },
     saveLimits: async value => { calls.push({ part: "limits", value });
       if (fail.has("limits") || !Number.isInteger(value.importMinutes) || !Number.isInteger(value.projectMegabytes))
         throw Object.assign(new Error("invalid"), { code: "INVALID_REQUEST" });
@@ -151,6 +153,19 @@ test("the fallback model saves on its own, clears to none and leaves the import 
   assert.equal(h.controller.state.draft.fallbackModel, null); assert.ok(h.controller.state.errors.fallback);
   h.fail.delete("fallback"); await h.controller.save();
   assert.equal(h.server.preferences.selectedFallbackModel, null); assert.deepEqual(h.controller.dirty, []);
+});
+
+test("the legacy import is off until the user turns it on, and saves at once on its own", async () => {
+  const h = setup(); await h.controller.load();
+  assert.equal(h.controller.state.draft.legacyImport, false);
+  await h.controller.commit("legacyImport", true);
+  assert.deepEqual(h.calls, [{ part: "legacy", value: true }]);
+  assert.equal(h.server.preferences.legacyImport, true); assert.deepEqual(h.controller.dirty, []);
+  // A refused save keeps the choice in the form with its error; the saved value stays.
+  h.fail.add("legacy"); await h.controller.commit("legacyImport", false);
+  assert.equal(h.controller.state.draft.legacyImport, false); assert.ok(h.controller.state.errors.legacy);
+  assert.equal(h.server.preferences.legacyImport, true);
+  h.controller.cancel(); assert.equal(h.controller.state.draft.legacyImport, true);
 });
 
 test("failed import saves keep the choice while other settings save successfully", async () => {

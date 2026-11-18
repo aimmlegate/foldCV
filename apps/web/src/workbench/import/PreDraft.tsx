@@ -6,18 +6,18 @@ import type { ImportOptions } from "../../projects/api";
 import { Button } from "../ui/Button";
 import { chosenEffort, EffortField, RewriteField } from "./ImportChoices";
 
-/** A pre-draft whose import stopped. With an operation the service knows the choices; without one they are asked again,
- * and rewriting stays off until the user turns it on. */
+/** A pre-draft whose import stopped. With an operation the service knows the choices; without one the effort is asked
+ * again, and with the legacy import turned on, its rewriting, off until the user turns it on. */
 export function PreDraft({ ask, busy, connection, resume }: {
   ask: boolean; busy: boolean; connection: ConnectionSnapshot | null; resume: (options?: ImportOptions) => void;
 }) {
-  const [rewrite, setRewrite] = useState(false), [effort, setEffort] = useState<ReasoningEffort | null>(null);
+  const [effort, setEffort] = useState<ReasoningEffort | null>(null), [legacy, setLegacy] = useState(false), [rewrite, setRewrite] = useState(false);
   const [importModel, setImportModel] = useState<string | null>(null);
   useEffect(() => {
     if (!ask) return;
     let alive = true;
     // Without the saved model the form falls back to the processing model, as the import itself does.
-    void preferencesRequest().then(value => { if (alive) setImportModel(value.selectedImportModel ?? null); }).catch(() => {});
+    void preferencesRequest().then(value => { if (alive) { setImportModel(value.selectedImportModel ?? null); setLegacy(value.legacyImport ?? false); } }).catch(() => {});
     return () => { alive = false; };
   }, [ask]);
   if (!ask) return <section className="progress-screen"><div className="progress-content">
@@ -29,10 +29,10 @@ export function PreDraft({ ask, busy, connection, resume }: {
   return <section className="new-screen" aria-label="Импорт не завершён"><div className="source-form">
     <h2>Импорт не завершён</h2><p>Настройки импорта не сохранились. Выберите их снова.</p>
     <div className="source-bottom import-options">
-      <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} />
-      <RewriteField rewrite={rewrite} disabled={busy} change={setRewrite} />
+      <EffortField effort={effort} reasoning={reasoning} disabled={busy} change={setEffort} legacy={legacy} />
+      {legacy && <RewriteField rewrite={rewrite} disabled={busy} change={setRewrite} />}
       <Button className="import-process-button" variant="primary" busy={busy} busyLabel="Подготовка…"
-        onClick={() => resume({ allowTextRewrite: rewrite, effort: chosenEffort(effort, reasoning) })}>Продолжить импорт</Button>
+        onClick={() => resume({ effort: chosenEffort(effort, reasoning), ...(legacy ? { rewrite } : {}) })}>Продолжить импорт</Button>
     </div>
   </div></section>;
 }

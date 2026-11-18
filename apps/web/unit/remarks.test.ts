@@ -3,7 +3,7 @@ import test from "node:test";
 import { Schema, type Node } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
 import { DecorationSet, type Decoration } from "@tiptap/pm/view";
-import { doubtfulValue, remarkMarks, remarkMarksPlugin, remarkMessagesAttribute, type RemarkMarks } from "../src/rich/remarks";
+import { beyondMessage, doubtfulValue, remarkMarks, remarkMarksPlugin, remarkMessagesAttribute, wordRanges, type RemarkMarks } from "../src/rich/remarks";
 import { groupAnchors, type OutlineDocument } from "../src/rich/outline";
 
 type Block = OutlineDocument["regions"][number]["blocks"][number];
@@ -152,6 +152,49 @@ test("the plugin marks a field node and a block's own text, and nothing while th
   assert.deepEqual(found, [[at("Nginx") - 1, at("Nginx") + "Nginx".length + 1], [at("Parent"), at("Parent") + "Parent".length]]);
   assert.deepEqual(decorations(doc, null), []);
   assert.deepEqual(decorations(doc, { cells: new Map(), scoped: new Map(), blocks: new Map() }), []);
+});
+
+test("text the import wrote is marked itself, as added: its heading is not, and a doubt on the same text keeps the doubt's look", () => {
+  const written = { ...issue(["scope-task"], ["summary", "about"], "Этот текст написан моделью."), code: "IMPORT_TEXT_GENERATED" };
+  const marks = remarkMarks(document, [written]);
+  assert.deepEqual(sorted(marks.blocks), [["about", ["Этот текст написан моделью."]]], "the text, not the heading «О СЕБЕ»");
+  assert.deepEqual([...marks.added ?? []], ["Этот текст написан моделью."]);
+  const doc = schema.node("doc", null, schema.node("blockGroup", null, [
+    schema.node("blockContainer", { id: "about" }, schema.node("paragraph", null, schema.text("Backend engineer."))),
+    schema.node("blockContainer", { id: "claim" }, schema.node("paragraph", null, schema.text("Cut latency."))),
+  ]));
+  const classes = (value: RemarkMarks) => decorations(doc, value).map(found =>
+    (found as unknown as { type: { attrs: Record<string, string | undefined> } }).type.attrs["class"]);
+  assert.deepEqual(classes(marks), ["fcv-remark fcv-added"]);
+  // A doubt beside the notice: the place needs a check, so it looks like a doubt.
+  const both = remarkMarks(document, [written, issue(["scope-task"], ["about"], "Показан исходный текст.")]);
+  assert.deepEqual(classes(both), ["fcv-remark"]);
+  assert.deepEqual(classes({ cells: new Map(), scoped: new Map(), blocks: new Map([["claim", ["Под вопросом."]]]) }), ["fcv-remark"]);
+});
+
+test("the words a field has beyond its source lines are marked as added, word by word, in any field", () => {
+  // Whole words, case and «ё» aside; a name written with a dot is one mark; a part of a longer word is none.
+  assert.deepEqual(wordRanges("Около 5 лет, ещё Node.js и нода", ["около", "еще", "Node", "js"]),
+    [{ start: 0, end: 5 }, { start: 13, end: 16 }, { start: 17, end: 24 }]);
+  assert.deepEqual(wordRanges("Подготовка отчётов", ["отчёт"]), []);
+  const field = schema.node("templateField", { cellId: "cell-1" }, schema.text("Вела проект три года"));
+  const other = schema.node("templateField", { cellId: "cell-2" }, schema.text("Вела проект"));
+  const doc = schema.node("doc", null, schema.node("blockGroup", null,
+    schema.node("blockContainer", { id: "line" }, schema.node("paragraph", null, [schema.text("Роль: "), field, schema.text(" "), other]))));
+  let start = -1;
+  doc.descendants((node, pos) => { if (start < 0 && node.type.name === "templateField") start = pos + 1; });
+  const marks: RemarkMarks = { cells: new Map(), scoped: new Map(), blocks: new Map(), beyond: new Map([["cell-1", ["Вела", "года"]]]) };
+  const found = decorations(doc, marks);
+  // Only the named field is marked, though the other one has the same word.
+  assert.deepEqual(found.map(value => [value.from, value.to]), [[start, start + 4], [start + 16, start + 20]]);
+  const attrs = (found[0] as unknown as { type: { attrs: Record<string, string | undefined> } }).type.attrs;
+  assert.equal(attrs["class"], "fcv-remark fcv-added");
+  assert.deepEqual(JSON.parse(attrs[remarkMessagesAttribute] ?? "[]"), [beyondMessage]);
+});
+
+test("a notice that carries unshown source lines marks nothing in the resume", () => {
+  const marks = remarkMarks(document, [{ ...issue(["scope-task"], ["projects", "labs"], "ИНН 7000000000"), code: "IMPORT_LINES_NO_FIELD" }]);
+  assert.equal(marks.blocks.size + marks.cells.size + marks.scoped.size, 0);
 });
 
 const tip = (value: Decoration): unknown => {

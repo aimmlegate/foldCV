@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { remarkMessagesAttribute, remarkRecordAttribute } from "../../rich/remarks";
+import { addedClass, remarkMessagesAttribute, remarkRecordAttribute } from "../../rich/remarks";
 
-type Shown = { messages: string[]; recordId: string | null; left: number; top: number; bottom: number };
+type Shown = { messages: string[]; recordId: string | null; added: boolean; left: number; top: number; bottom: number };
 
 /** Reads what a marked element carries; null for an element that is no mark. */
-export function remarkOf(element: Element | null): { messages: string[]; recordId: string | null } | null {
+export function remarkOf(element: Element | null): { messages: string[]; recordId: string | null; added: boolean } | null {
   const mark = element?.closest<HTMLElement>(".fcv-remark");
   if (!mark) return null;
   let messages: string[] = [];
@@ -12,7 +12,7 @@ export function remarkOf(element: Element | null): { messages: string[]; recordI
     const parsed: unknown = JSON.parse(mark.getAttribute(remarkMessagesAttribute) ?? "[]");
     messages = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim() !== "") : [];
   } catch { messages = []; }
-  return messages.length ? { messages, recordId: mark.getAttribute(remarkRecordAttribute) } : null;
+  return messages.length ? { messages, recordId: mark.getAttribute(remarkRecordAttribute), added: mark.classList.contains(addedClass) } : null;
 }
 
 /** What a yellow mark means, shown beside it while the pointer rests on it, with a way to the fact it names (D127). The marks
@@ -62,8 +62,9 @@ export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | nu
     element.style.top = `${below + rect.height < innerHeight - 8 ? below : Math.max(8, shown.top - rect.height - 6)}px`;
   }, [shown]);
   if (!shown) return null;
-  return <div ref={tip} className="remark-tip" role="note" aria-label="Что проверить">
-    <strong>Что проверить</strong>
+  const title = shown.added ? "Нет в оригинале" : "Что проверить";
+  return <div ref={tip} className="remark-tip" role="note" aria-label={title}>
+    <strong>{title}</strong>
     {shown.messages.map(message => <p key={message}>{message}</p>)}
     {shown.recordId && <button type="button" className="text-button" onMouseDown={event => event.preventDefault()}
       onClick={() => { const id = shown.recordId; setShown(null); if (id) openFact(id); }}>Открыть в фактах</button>}

@@ -33,6 +33,9 @@ export function saveImportModelRequest(model: string | null): Promise<Preference
 export function saveFallbackModelRequest(model: string | null): Promise<Preferences> {
   return request<Preferences>("/v1/settings/fallback-model", "PUT", { model });
 }
+export function saveLegacyImportRequest(enabled: boolean): Promise<Preferences> {
+  return request<Preferences>("/v1/settings/legacy-import", "PUT", { legacyImport: enabled });
+}
 export function saveLimitsRequest(body: SaveLimitsPreference): Promise<Preferences> {
   return request<Preferences>("/v1/settings/limits", "PUT", body);
 }

@@ -8,7 +8,7 @@ import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
 import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
 import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, problemTab, readTemplateCatalog, readTemplateConfig, resetTemplateConfig,
-  saveTemplateConfig, sectionTab, sectionTabs, setDefaultTemplate, topLevelSections, withState, type SectionTab, type TemplateConfigState,
+  saveTemplateConfig, sectionNotes, sectionTab, sectionTabs, setDefaultTemplate, topLevelSections, withState, type SectionTab, type TemplateConfigState,
   type TemplateProblem, type TemplateSave } from "./config";
 import { downloadName, draftLabel, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
 import { TemplateToolbar } from "./TemplateToolbar";
@@ -196,6 +196,8 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
           <div className="template-tab-row">{present.size > 0 && <Tabs.List className="template-tab-list" aria-label="Разделы шаблона">
             {sectionTabs.map(item => <Tabs.Trigger key={item.id} value={item.id} disabled={!present.has(item.id)}>{item.label}</Tabs.Trigger>)}
           </Tabs.List>}<span className="template-assistant-slot" ref={setAssistantSlot} /></div>
+          {/* What the app's import reads of these sections; the rest is the legacy import's (Settings turns it on). */}
+          {sectionNotes[tab] && <p className="template-section-note">{sectionNotes[tab]}</p>}
           {/* The assistant pane sits under the toolbar beside the editor; on a narrow window it lies over the editor only. */}
           <div className="template-work">
             {/* One editor for every tab: the panel follows the chosen tab instead of holding a copy per tab. */}

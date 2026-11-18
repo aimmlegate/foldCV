@@ -48,6 +48,7 @@
 .templates-editor .template-status > .text-button { flex: 0 0 auto; padding: 0; color: var(--accent); font-size: var(--ui-small); }
 /* Tabs by top-level key: the chosen tab's keys stay open, the others fold. One panel holds the one editor. */
 .template-tabs { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.template-section-note { flex: none; margin: 0; padding: 6px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: var(--ui-small); line-height: 1.45; }
 .template-tab-row { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 32px; }
 .template-assistant-slot { display: flex; flex: 0 0 auto; margin-left: auto; }
 .template-assistant-toggle[aria-pressed="true"] { border-color: var(--wash-strong); background: var(--wash); }

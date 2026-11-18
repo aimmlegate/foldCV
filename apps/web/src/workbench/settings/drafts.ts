@@ -12,8 +12,10 @@ export const limitRanges = { importMinutes: preferencesSchema.properties.importM
 type Limit = keyof typeof limitRanges;
 function limit(preferences: Preferences, key: Limit): string { return String(preferences[key] ?? limitRanges[key].default); }
 
-export type SettingsPart = "reasoning" | "model" | "rewrite" | "import" | "fallback" | "limits" | "assistant" | "rules";
-export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; rewriteModel: string | null; importModel: string | null; fallbackModel: string | null; agentEnabled: boolean; agentModel: string | null; agentEffort: NonNullable<AgentSettings["reasoningEffort"]> | null; markdown: string;
+export type SettingsPart = "reasoning" | "model" | "rewrite" | "import" | "fallback" | "legacy" | "limits" | "assistant" | "rules";
+export type SettingsValues = { reasoning: NonNullable<Preferences["rewriteReasoningEffort"]> | null; model: string | null; rewriteModel: string | null; importModel: string | null; fallbackModel: string | null;
+  /** The legacy import (the one before the fast import), kept for a while; off unless the user turns it on. */
+  legacyImport: boolean; agentEnabled: boolean; agentModel: string | null; agentEffort: NonNullable<AgentSettings["reasoningEffort"]> | null; markdown: string;
   importMinutes: string; projectMegabytes: string };
 export type SettingsApi = {
   preferences: () => Promise<Preferences>; rules: () => Promise<RulesSettings>; assistant: () => Promise<AgentSettings>;
@@ -21,6 +23,7 @@ export type SettingsApi = {
   selectRewrite: (model: string | null) => Promise<Preferences>;
   selectImport: (model: string | null) => Promise<Preferences>;
   selectFallback: (model: string | null) => Promise<Preferences>;
+  saveLegacyImport: (enabled: boolean) => Promise<Preferences>;
   saveReasoning: (model: string | null, effort: SettingsValues["reasoning"]) => Promise<Preferences>;
   saveLimits: (value: SaveLimitsPreference) => Promise<Preferences>;
   saveRules: (value: SaveRulesRequest) => Promise<RulesSettings>; saveAssistant: (value: AgentSettingsRequest) => Promise<AgentSettings>;
@@ -37,7 +40,7 @@ export type SettingsState = {
 /** The parts a changed value saves at once (D147). The processing model also saves a chosen level, which belongs to
  * the model rewriting runs on; the rewrite model leaves the level to Python, which drops one the new model lacks. */
 export const commitParts: Readonly<Record<keyof SettingsValues, readonly SettingsPart[]>> = { model: ["model", "reasoning"], rewriteModel: ["rewrite"],
-  reasoning: ["reasoning"], importModel: ["import"], fallbackModel: ["fallback"], agentEnabled: ["assistant"], agentModel: ["assistant"],
+  reasoning: ["reasoning"], importModel: ["import"], fallbackModel: ["fallback"], legacyImport: ["legacy"], agentEnabled: ["assistant"], agentModel: ["assistant"],
   agentEffort: ["assistant"], markdown: ["rules"], importMinutes: ["limits"], projectMegabytes: ["limits"] };
 function message(error: unknown, part: SettingsPart): string {
   const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "";
@@ -51,7 +54,7 @@ function message(error: unknown, part: SettingsPart): string {
 
 export class SettingsDrafts {
   state: SettingsState = { preferences: null, rules: null, assistant: null,
-    draft: { reasoning: null, model: null, rewriteModel: null, importModel: null, fallbackModel: null, agentEnabled: true, agentModel: null, agentEffort: null, markdown: "",
+    draft: { reasoning: null, model: null, rewriteModel: null, importModel: null, fallbackModel: null, legacyImport: false, agentEnabled: true, agentModel: null, agentEffort: null, markdown: "",
       importMinutes: String(limitRanges.importMinutes.default), projectMegabytes: String(limitRanges.projectMegabytes.default) },
     loading: false, saving: false, staleRules: false, comparison: false, saved: [], errors: {}, message: "", pending: [], focus: {}, marks: {} };
   private closed = false;
@@ -75,6 +78,7 @@ export class SettingsDrafts {
         && (draft.rewriteModel ?? draft.model) !== (preferences.selectedRewriteModel ?? preferences.selectedModel))) result.push("reasoning");
     if (preferences && draft.importModel !== (preferences.selectedImportModel ?? null)) result.push("import");
     if (preferences && draft.fallbackModel !== (preferences.selectedFallbackModel ?? null)) result.push("fallback");
+    if (preferences && draft.legacyImport !== (preferences.legacyImport ?? false)) result.push("legacy");
     if (preferences && (draft.importMinutes !== limit(preferences, "importMinutes") || draft.projectMegabytes !== limit(preferences, "projectMegabytes")))
       result.push("limits");
     if (assistant && (draft.agentEnabled !== assistant.enabled || draft.agentModel !== assistant.selectedAgentModel
@@ -140,6 +144,7 @@ export class SettingsDrafts {
         draft.rewriteModel = preferences.value.selectedRewriteModel ?? null;
         draft.importModel = preferences.value.selectedImportModel ?? null;
         draft.fallbackModel = preferences.value.selectedFallbackModel ?? null;
+        draft.legacyImport = preferences.value.legacyImport ?? false;
         draft.reasoning = preferences.value.rewriteReasoningEffort ?? null;
         draft.importMinutes = limit(preferences.value, "importMinutes"); draft.projectMegabytes = limit(preferences.value, "projectMegabytes");
         this.publish({ preferences: preferences.value }); delete errors.model; }
@@ -162,6 +167,7 @@ export class SettingsDrafts {
       rewriteModel: preferences ? preferences.selectedRewriteModel ?? null : draft.rewriteModel,
       importModel: preferences ? preferences.selectedImportModel ?? null : draft.importModel,
       fallbackModel: preferences ? preferences.selectedFallbackModel ?? null : draft.fallbackModel,
+      legacyImport: preferences ? preferences.legacyImport ?? false : draft.legacyImport,
       importMinutes: preferences ? limit(preferences, "importMinutes") : draft.importMinutes,
       projectMegabytes: preferences ? limit(preferences, "projectMegabytes") : draft.projectMegabytes,
       agentEnabled: assistant?.enabled ?? draft.agentEnabled, agentModel: assistant ? assistant.selectedAgentModel : draft.agentModel,
@@ -180,6 +186,7 @@ export class SettingsDrafts {
     if (!dirty.includes("reasoning")) draft.reasoning = preferences.rewriteReasoningEffort ?? null;
     if (!dirty.includes("import")) draft.importModel = preferences.selectedImportModel ?? null;
     if (!dirty.includes("fallback")) draft.fallbackModel = preferences.selectedFallbackModel ?? null;
+    if (!dirty.includes("legacy")) draft.legacyImport = preferences.legacyImport ?? false;
     if (!dirty.includes("limits")) { draft.importMinutes = limit(preferences, "importMinutes"); draft.projectMegabytes = limit(preferences, "projectMegabytes"); }
     this.publish({ preferences, draft });
   }
@@ -261,6 +268,11 @@ export class SettingsDrafts {
           const model = preferences.selectedFallbackModel ?? null;
           if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, selectedFallbackModel: model },
             draft: { ...this.state.draft, fallbackModel: this.state.draft.fallbackModel === submitted.fallbackModel ? model : this.state.draft.fallbackModel } });
+        } else if (part === "legacy") {
+          const preferences = await this.api.saveLegacyImport(submitted.legacyImport);
+          const enabled = preferences.legacyImport ?? false;
+          if (this.state.preferences) this.publish({ preferences: { ...this.state.preferences, legacyImport: enabled },
+            draft: { ...this.state.draft, legacyImport: this.state.draft.legacyImport === submitted.legacyImport ? enabled : this.state.draft.legacyImport } });
         } else if (part === "limits") {
           // Invalid text goes to Python as is; its rejection is shown on this section.
           const preferences = await this.api.saveLimits({ importMinutes: Number(submitted.importMinutes), projectMegabytes: Number(submitted.projectMegabytes) });

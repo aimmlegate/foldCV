@@ -16,7 +16,7 @@ function harness() {
     tasks: async projectId => { calls.push(`tasks:${projectId}`); if (failing) throw new Error("REQUEST_FAILED"); const value = current.get(projectId); return value ? [value] : []; },
     cancel: async (projectId, taskId) => { calls.push(`cancel:${projectId}:${taskId}`); const value = task(projectId, taskId, "cancelled"); current.set(projectId, value); return value; },
     resume: async (projectId, operation) => { calls.push(`resume:${projectId}:${operation}`); const value = task(projectId, `${projectId}-resumed`); current.set(projectId, value); return value; },
-    start: async (projectId, body) => { calls.push(`start:${projectId}:${body.allowTextRewrite}:${body.effort}`); const value = task(projectId, `${projectId}-started`); current.set(projectId, value); return value; },
+    start: async (projectId, body) => { calls.push(`start:${projectId}:${body.effort}`); const value = task(projectId, `${projectId}-started`); current.set(projectId, value); return value; },
     operation: async projectId => { calls.push(`operation:${projectId}`); return null; },
   };
   const tracker = new ImportTracker(entries => { snapshot = entries; }, entry => finished.push(entry),
@@ -80,9 +80,9 @@ test("Retry of a stalled run stops it, then continues the operation; a failed st
   assert.deepEqual(calls, ["cancel:a:a-1", "resume:a:op-a"]);
   assert.equal(entries().get("a")?.task.id, "a-resumed");
   calls.length = 0;
-  tracker.track("b", task("b", "b-1", "failed", {}), "b.pdf", { allowTextRewrite: false, effort: "high" });
+  tracker.track("b", task("b", "b-1", "failed", {}), "b.pdf", { effort: "high" });
   await tracker.retry("b");
-  assert.deepEqual(calls, ["operation:b", "start:b:false:high"], "the start keeps the user's own choices");
+  assert.deepEqual(calls, ["operation:b", "start:b:high"], "the start keeps the user's own choice");
   tracker.close();
 });
 

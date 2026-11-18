@@ -6,13 +6,22 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { currentMarker, needsCheck, userCorrected } from "./fact-fields";
 import { allSpans, field, isFrame, ownSpans, subtree, type OutlineBlock, type OutlineDocument } from "./outline";
 
-type IssueInput = { state: string; message: string; targetIds: readonly string[]; blockIds: readonly string[] };
+type IssueInput = { state: string; message: string; targetIds: readonly string[]; blockIds: readonly string[]; code?: string };
+/** The notice of text the import wrote itself, for a section the source file does not have. */
+export const writtenTextCode = "IMPORT_TEXT_GENERATED";
+/** Notices that carry source lines the document does not show: the original beside the resume marks them, the resume
+ * marks nothing for them (workbench/editor/unshown.ts). */
+const unshownCodes: ReadonlySet<string> = new Set(["IMPORT_LINES_NO_FIELD", "IMPORT_LINES_DROPPED", "IMPORT_LINES_HIDDEN"]);
 type FactsInput = { records: readonly unknown[] };
 
 /** The marked places with the remarks on each: shown fields by cell ID, fields marked only inside one block (by block ID,
  * then cell ID), and blocks whose own text is marked. */
 export type RemarkMarks = { cells: ReadonlyMap<string, readonly string[]>;
-  scoped: ReadonlyMap<string, ReadonlyMap<string, readonly string[]>>; blocks: ReadonlyMap<string, readonly string[]> };
+  scoped: ReadonlyMap<string, ReadonlyMap<string, readonly string[]>>; blocks: ReadonlyMap<string, readonly string[]>;
+  /** The messages that say «the import wrote this text»: a mark with only such messages shows as added, not as a doubt. */
+  added?: ReadonlySet<string>;
+  /** By cell ID, the words a shown field has and its source lines lack (Python compares): marked as added, word by word. */
+  beyond?: ReadonlyMap<string, readonly string[]> };
 
 /** What a doubtful value's mark says: it names the value, so the tip speaks of the place it is on (D130). */
 export function doubtfulValue(rawText: unknown, what: "value" | "date" | "present" | "datedEnd" = "value"): string {
@@ -87,6 +96,7 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
     }
   }
   const cells = new Map<string, string[]>(), scoped = new Map<string, Map<string, string[]>>(), marked = new Map<string, string[]>();
+  const added = new Set<string>();
   const add = (into: Map<string, string[]>, id: string, message: string) => {
     const messages = into.get(id) ?? [];
     if (!messages.includes(message)) into.set(id, [...messages, message]);
@@ -96,6 +106,7 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
   const lines = (block: OutlineBlock): string[] => isFrame(block) ? block.children.flatMap(lines) : [block.id];
   for (const issue of issues) {
     const message = issue.message.trim();
+    if (issue.code !== undefined && unshownCodes.has(issue.code)) continue;
     if (issue.state !== "active" || !message || !issue.targetIds.length) continue;
     const fields = issue.targetIds.filter(id => shown.has(id));
     if (fields.length) {
@@ -108,6 +119,12 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
       continue;
     }
     const named = issue.blockIds.flatMap(id => { const block = blocks.get(id); return block ? [block] : []; });
+    if (issue.code === writtenTextCode) {
+      // The written text itself is marked, not the heading that stands for a section in a remark.
+      added.add(message);
+      for (const block of named) if (block.type !== "heading") lines(block).forEach(id => add(marked, id, message));
+      continue;
+    }
     const valued = issue.targetIds.some(id => remarkRecord(id) !== null);
     if (valued && new Set(named.map(block => sections.get(block.id) ?? block.id)).size > 1) continue;
     const headings = new Set(named.filter(block => block.type === "heading").map(block => block.id));
@@ -118,7 +135,7 @@ export function remarkMarks(document: OutlineDocument, issues: readonly IssueInp
     }
   }
   for (const [id, message] of doubtfulCells(facts)) if (shown.has(id)) add(cells, id, message);
-  return { cells, scoped, blocks: marked };
+  return { cells, scoped, blocks: marked, added };
 }
 
 /** The fact a cell ID names, for the tip's way into Facts; a block mark names none. */
@@ -131,17 +148,36 @@ export function remarkRecord(cellId: string): string | null {
 
 /** The tip beside a mark reads its messages from the element; a native title stayed unseen (D127). */
 export const remarkMessagesAttribute = "data-fcv-remark", remarkRecordAttribute = "data-fcv-record";
-const markAttributes = (messages: readonly string[], recordId: string | null) => ({ class: "fcv-remark",
+export const addedClass = "fcv-added";
+const markAttributes = (messages: readonly string[], recordId: string | null, added?: ReadonlySet<string>) => ({
+  class: added && messages.every(message => added.has(message)) ? `fcv-remark ${addedClass}` : "fcv-remark",
   [remarkMessagesAttribute]: JSON.stringify(messages), ...(recordId ? { [remarkRecordAttribute]: recordId } : {}) });
 /** A field's remarks: the ones on it anywhere, then the ones on it inside its block. */
 const fieldMessages = (marks: RemarkMarks, block: unknown, cell: string): string[] => [...new Set([...marks.cells.get(cell) ?? [],
   ...typeof block === "string" ? marks.scoped.get(block)?.get(cell) ?? [] : []])];
 
+/** What the mark on a word beyond the original says. */
+export const beyondMessage = "Этих слов нет в строках оригинала, из которых взято значение.";
+const beyondAttributes = { class: `fcv-remark ${addedClass}`, [remarkMessagesAttribute]: JSON.stringify([beyondMessage]) };
+const fold = (word: string): string => word.toLowerCase().replaceAll("ё", "е");
+
+/** The ranges of the given words in a text: whole words, case aside. Words that touch through punctuation alone
+ * («Node.js») make one range. */
+export function wordRanges(text: string, words: readonly string[]): { start: number; end: number }[] {
+  const wanted = new Set(words.map(fold)), found: { start: number; end: number }[] = [];
+  for (const match of text.matchAll(/[\p{L}\p{N}]+/gu)) {
+    if (!wanted.has(fold(match[0]))) continue;
+    const last = found.at(-1), start = match.index, end = start + match[0].length;
+    if (last && !/\s/u.test(text.slice(last.end, start)) && start - last.end <= 2) last.end = end; else found.push({ start, end });
+  }
+  return found;
+}
+
 /** Decorations for the marks `current` returns; null shows none. */
 export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
   return new Plugin({ key: new PluginKey(remarkMarksMeta), props: { decorations: state => {
     const marks = current();
-    if (!marks || (!marks.cells.size && !marks.scoped.size && !marks.blocks.size)) return DecorationSet.empty;
+    if (!marks || (!marks.cells.size && !marks.scoped.size && !marks.blocks.size && !marks.beyond?.size)) return DecorationSet.empty;
     const decorations: Decoration[] = [];
     // A block's own fields come before its nested blocks, so the last container passed holds the field.
     let container: unknown = null;
@@ -150,7 +186,11 @@ export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
       if (name === "templateField" || name === "boundLink") {
         const cell: unknown = node.attrs["cellId"], messages = typeof cell === "string" ? fieldMessages(marks, container, cell) : [];
         if (messages.length && node.content.size) decorations.push(Decoration.node(position, position + node.nodeSize,
-          markAttributes(messages, typeof cell === "string" ? remarkRecord(cell) : null)));
+          markAttributes(messages, typeof cell === "string" ? remarkRecord(cell) : null, marks.added)));
+        const words = typeof cell === "string" ? marks.beyond?.get(cell) : undefined;
+        // The field's text starts one step inside its node; its text nodes follow one another with no gap.
+        if (words?.length) for (const range of wordRanges(node.textContent, words))
+          decorations.push(Decoration.inline(position + 1 + range.start, position + 1 + range.end, beyondAttributes));
         return false;
       }
       if (name !== "blockContainer") return true;
@@ -158,7 +198,7 @@ export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
       container = id;
       const size = node.firstChild?.content.size ?? 0;
       // The block's own content starts inside its content node, one step past the container's start.
-      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages, null)));
+      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages, null, marks.added)));
       return true;
     });
     return DecorationSet.create(state.doc, decorations);

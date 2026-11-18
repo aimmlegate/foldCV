@@ -4,13 +4,14 @@ import { loadOriginal, originalKind, originalUrl } from "./original-source";
 import { DocxOriginal } from "./DocxOriginal";
 import { TextOriginal } from "./TextOriginal";
 import { OperationStatus } from "../ui/OperationStatus";
+import type { Unshown } from "./unshown";
 
 const PdfOriginal = lazy(() => import("./PdfOriginal"));
 
 type Loaded = { blob: Blob; text: string };
 
-export function OriginalPreview({ projectId, source }: {
-  projectId: string; source: { id: string; originalName: string; byteSha256: string };
+export function OriginalPreview({ projectId, source, unshown }: {
+  projectId: string; source: { id: string; originalName: string; byteSha256: string }; unshown: readonly Unshown[];
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null), [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -29,8 +30,8 @@ export function OriginalPreview({ projectId, source }: {
   }, [projectId, source.id, source.byteSha256, kind, attempt]);
   if (error) return <div className="source-viewer-message" role="alert">{errorMessage(error)}<button className="text-button" onClick={() => setAttempt(value => value + 1)}>Повторить</button></div>;
   if (!loaded) return <div className="source-viewer-message"><OperationStatus label="Открываем оригинал" timed /></div>;
-  if (kind === "pdf") return <Suspense fallback={<div className="source-viewer-message"><OperationStatus label="Открываем PDF" timed /></div>}><PdfOriginal blob={loaded.blob} /></Suspense>;
-  if (kind === "docx") return <DocxOriginal blob={loaded.blob} />;
+  if (kind === "pdf") return <Suspense fallback={<div className="source-viewer-message"><OperationStatus label="Открываем PDF" timed /></div>}><PdfOriginal blob={loaded.blob} unshown={unshown} /></Suspense>;
+  if (kind === "docx") return <DocxOriginal blob={loaded.blob} unshown={unshown} />;
   if (kind === "text" || kind === "markdown") return <TextOriginal text={loaded.text} markdown={kind === "markdown"} />;
   return <p className="source-viewer-message">Этот формат можно только скачать.</p>;
 }

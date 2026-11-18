@@ -6,6 +6,7 @@ import "./pdf-polyfills";
 import { getDocument, GlobalWorkerOptions, type PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "./pdf.worker?worker&url";
 import { OperationStatus } from "../ui/OperationStatus";
+import { pdfBoxes, unshownClass, unshownLabels, type PdfBox, type PdfRun, type Unshown } from "./unshown";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -28,9 +29,20 @@ function clear(host: HTMLElement) {
   host.replaceChildren();
 }
 
-function PdfPage({ page, total, width, near }: { page: PDFPageProxy; total: number; width: number; near: boolean }) {
+function PdfPage({ page, total, width, near, unshown }: { page: PDFPageProxy; total: number; width: number; near: boolean; unshown: readonly Unshown[] }) {
   const host = useRef<HTMLDivElement>(null), [shown, setShown] = useState(false), [failed, setFailed] = useState(false);
   const scale = width / page.getViewport({ scale: 1 }).width, size = page.getViewport({ scale });
+  // The lines the resume does not show, as boxes over the page: its text is read once, the boxes follow the zoom.
+  const [boxes, setBoxes] = useState<PdfBox[]>([]);
+  useEffect(() => {
+    let active = true;
+    if (!unshown.length) { setBoxes([]); return; }
+    void page.getTextContent().then(content => {
+      const runs = content.items.filter((item): item is typeof item & PdfRun => "str" in item && "transform" in item);
+      if (active) setBoxes(pdfBoxes(runs, unshown));
+    }).catch(() => { if (active) setBoxes([]); });
+    return () => { active = false; };
+  }, [page, unshown]);
   useEffect(() => {
     const container = host.current;
     if (!container) return;
@@ -51,12 +63,21 @@ function PdfPage({ page, total, width, near }: { page: PDFPageProxy; total: numb
   }, [page, scale, near, total]);
   return <div className="source-pdf-page" data-page={page.pageNumber} style={{ width: size.width, height: size.height }}>
     <div ref={host} className="source-pdf-canvas" />
+    {shown && boxes.map((box, index) => {
+      const corner = (x: number, y: number): [number, number] => {
+        const point: unknown[] = size.convertToViewportPoint(x, y);
+        return [Number(point[0]), Number(point[1])];
+      };
+      const [x1, y1] = corner(box.left, box.bottom), [x2, y2] = corner(box.right, box.top);
+      return <div key={index} className={`${unshownClass}-box ${unshownClass}-${box.reason}`} title={`Нет в резюме: ${unshownLabels[box.reason]}`}
+        style={{ left: Math.min(x1, x2), top: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) }} />;
+    })}
     {failed ? <p className="source-viewer-message" role="alert">Не удалось показать страницу {page.pageNumber}. Скачайте оригинал.</p>
       : near && !shown && <div className="source-render-status"><OperationStatus label={`Показываем страницу ${page.pageNumber}`} /></div>}
   </div>;
 }
 
-export default function PdfOriginal({ blob }: { blob: Blob }) {
+export default function PdfOriginal({ blob, unshown }: { blob: Blob; unshown: readonly Unshown[] }) {
   const [pages, setPages] = useState<PDFPageProxy[]>([]), [near, setNear] = useState<ReadonlySet<number>>(() => new Set());
   const [zoom, setZoom] = useState(1), [width, setWidth] = useState(0), [current, setCurrent] = useState(1), [error, setError] = useState("");
   const scroll = useRef<HTMLDivElement>(null), anchor = useRef<Anchor | null>(null), restored = useRef(-1), measured = width > 0;
@@ -125,7 +146,7 @@ export default function PdfOriginal({ blob }: { blob: Blob }) {
     <div ref={scroll} className="source-pdf-scroll" onScroll={track}>
       {!error && !pages.length && <div className="source-render-status"><OperationStatus label="Читаем PDF" /></div>}
       {measured && pages.map(page => <PdfPage key={page.pageNumber} page={page} total={pages.length} width={width * zoom}
-        near={near.has(page.pageNumber)} />)}
+        near={near.has(page.pageNumber)} unshown={unshown} />)}
     </div>
   </>;
 }

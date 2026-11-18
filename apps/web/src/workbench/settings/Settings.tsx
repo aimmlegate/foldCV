@@ -2,7 +2,7 @@ import { errorMessage } from "../../errors/messages";
 import { useEffect, useState } from "react";
 import { ConnectionWorkflow, modelGroups, type ConnectionView } from "../../connection/workflow";
 import { assistantSettings, saveAssistantSettings } from "../../assistant/api";
-import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
+import { preferencesRequest, rulesRequest, saveRulesRequest, saveImportModelRequest, saveFallbackModelRequest, saveLegacyImportRequest, saveLimitsRequest, saveRewriteModelRequest, saveRewriteReasoningRequest } from "../../api/client";
 import { SettingsDrafts, limitRanges, type SettingsPart, type SettingsState, type SettingsValues } from "./drafts";
 import { Connections } from "./Connection";
 import { ModelSelect } from "./ModelSelect";
@@ -15,11 +15,11 @@ import { CommandsSettings } from "./Commands";
 import { RowState, SettingsGroup, SettingsRow } from "./Rows";
 import { settingsSections, type SettingsSection } from "./sections";
 
-const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", limits: "лимиты", assistant: "помощник", rules: "команды" };
+const partNames: Record<SettingsPart, string> = { reasoning: "рассуждения при правке", model: "модель обработки", rewrite: "модель правки", import: "модель импорта", fallback: "резервная модель", legacy: "прежний импорт", limits: "лимиты", assistant: "помощник", rules: "команды" };
 // The parts that save at once from a row; their state shows on the row of the value that sent them.
-const rowBound: readonly SettingsPart[] = ["model", "rewrite", "reasoning", "import", "fallback", "assistant"];
+const rowBound: readonly SettingsPart[] = ["model", "rewrite", "reasoning", "import", "fallback", "legacy", "assistant"];
 const firstKeys: Partial<Record<SettingsPart, keyof SettingsValues>> = { model: "model", rewrite: "rewriteModel", reasoning: "reasoning",
-  import: "importModel", fallback: "fallbackModel", assistant: "agentEnabled" };
+  import: "importModel", fallback: "fallbackModel", legacy: "legacyImport", assistant: "agentEnabled" };
 const leads: Record<SettingsSection, string> = { connection: "Модели включённых провайдеров доступны во всех списках моделей.",
   models: "Каждый выбор сохраняется сразу.", assistant: "Чат по резюме и по шаблонам. Каждый выбор сохраняется сразу.",
   rules: "Тексты команд «Сократить» и «Сделать яснее» в правке текста.", appearance: "Сохраняется сразу. Страница резюме остаётся светлой при любой теме." };
@@ -39,7 +39,7 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
   const [controller] = useState(() => {
     return new SettingsDrafts({ preferences: preferencesRequest, rules: rulesRequest, assistant: () => assistantSettings(),
       saveRules: saveRulesRequest, saveAssistant: value => saveAssistantSettings(value),
-      selectRewrite: saveRewriteModelRequest, selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
+      selectRewrite: saveRewriteModelRequest, selectImport: saveImportModelRequest, selectFallback: saveFallbackModelRequest, saveLegacyImport: saveLegacyImportRequest, saveReasoning: saveRewriteReasoningRequest, saveLimits: saveLimitsRequest,
       select: async model => {
         if (!model || !workflow.view.snapshot.metadataReady || !workflow.view.snapshot.models.includes(model)) throw new Error("MODEL_UNAVAILABLE");
         if (!await workflow.select(model)) throw new Error("MODEL_SAVE_FAILED");
@@ -105,9 +105,14 @@ export function Settings({ open, request = null, connectionChanged, paneOrder, c
         <SettingsRow label="Модель импорта" htmlFor="import-model-select" note={rowNote("importModel")}>
           {rowState("importModel")}<ModelSelect id="import-model-select" label="Модель импорта" labelled={false} value={current.draft.importModel} groups={groups}
             defaultLabel="Как модель обработки" disabled={modelsOff} change={value => void controller.commit("importModel", value)} /></SettingsRow>
-        <SettingsRow label="Резервная модель" hint="Повторит блок, если основная модель не справится." htmlFor="fallback-model-select" note={rowNote("fallbackModel")}>
+        <SettingsRow label="Прежний импорт (устаревший)" hint="Старый способ разбора: дольше и дороже, умеет переписывать текст при импорте. Оставлен на время перехода и будет убран."
+          htmlFor="legacy-import" note={rowNote("legacyImport")}>
+          {rowState("legacyImport")}<input className="switch" id="legacy-import" role="switch" type="checkbox" checked={current.draft.legacyImport}
+            disabled={!current.preferences || current.loading} onChange={event => void controller.commit("legacyImport", event.currentTarget.checked)} /></SettingsRow>
+        {/* Only the legacy import repairs a block on a second model. */}
+        {current.draft.legacyImport && <SettingsRow label="Резервная модель" hint="Повторит блок, если основная модель не справится. Только для прежнего импорта." htmlFor="fallback-model-select" note={rowNote("fallbackModel")}>
           {rowState("fallbackModel")}<ModelSelect id="fallback-model-select" label="Резервная модель" labelled={false} value={current.draft.fallbackModel} groups={groups}
-            defaultLabel="Нет" disabled={modelsOff} change={value => void controller.commit("fallbackModel", value)} /></SettingsRow>
+            defaultLabel="Нет" disabled={modelsOff} change={value => void controller.commit("fallbackModel", value)} /></SettingsRow>}
       </SettingsGroup></>}
       {section === "assistant" && <SettingsGroup>
         <SettingsRow label="Включить помощника" htmlFor="assistant-enabled" note={rowNote("agentEnabled")}>

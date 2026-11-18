@@ -1,3 +1,4 @@
+import type { RewordChange, RewordPreview } from "../workbench/editor/reword";
 import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
 import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
@@ -128,6 +129,30 @@ export class ProjectEditorConnection {
       { editorToken: token, clientMutationId, allowEdits }, this.fetcher), true);
     if (result.edit) this.adopt(result.edit);
     return result;
+  }
+
+  /** The document blocks the template lets a model reword (a trial), each with the unified rules of its kind of block:
+   * the text the panel's «По правилам» puts into the request. */
+  async rewordBlocks(): Promise<Record<string, string>> {
+    return (await v2Request<{ rules: Record<string, string> }>(this.path("/reword/blocks"), "GET", undefined, this.fetcher)).rules;
+  }
+
+  /** The present document against the original: by cell ID, the words a shown field has and its source lines lack; and
+   * the source lines of shown values with the words the document no longer shows (null: the whole line). */
+  async sourceDiff(): Promise<{ added: Record<string, string[]>; removed: { text: string; words: string[] | null }[] }> {
+    return v2Request(this.path("/source-diff"), "GET", undefined, this.fetcher);
+  }
+
+  /** One block reworded by the request the user saw: a preview only, nothing is written. */
+  async rewordPreview(requestId: string, blockId: string, instruction: string): Promise<RewordPreview> {
+    return this.editing(token => v2Request<RewordPreview>(this.path("/reword/preview"), "POST",
+      { editorToken: token, requestId, blockId, instruction }, this.fetcher));
+  }
+
+  /** The user's Apply of a reworded block: the kept values become fact updates, one undo action. */
+  async rewordApply(clientMutationId: string, blockId: string, changes: RewordChange[], touched: Record<string, string>): Promise<EditResult> {
+    return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/reword/apply"), "POST",
+      { editorToken: token, clientMutationId, blockId, changes, touched }, this.fetcher), true));
   }
 
   async capture(clientCaptureId: string, snapshot: Snapshot, selection: Selection): Promise<{ clipboardCaptureId: string }> {

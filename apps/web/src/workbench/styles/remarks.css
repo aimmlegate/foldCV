@@ -2,6 +2,9 @@
    The chip selector outranks a chip's own shade. */
 .fcv-sheet .fcv-remark, .fcv-sheet [data-fcv-chip].fcv-remark { background-color: #f8e3a0; border-radius: 1.5pt;
   -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Text the original does not have (a block the import wrote, a word beyond a value's source lines): green, as an added
+   line in a comparison of two versions, so it reads as added, not as a doubt. */
+.fcv-sheet .fcv-remark.fcv-added, .fcv-sheet [data-fcv-chip].fcv-remark.fcv-added { background-color: #abf2bc; }
 /* A Facts group's jump to its section, in the summary row before the fold mark; the section lands below the page top. */
 .fact-group-frame { position: relative; }
 .fact-group-jump { position: absolute; top: 9px; right: 16px; width: 26px; height: 26px; padding: 5px; }
@@ -20,3 +23,28 @@
   box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 14%, transparent); }
 .selection-action:hover { background: var(--wash); }
 .selection-action svg { width: 14px; height: 14px; color: var(--accent); }
+/* Lines of the original the resume does not show (a trial of the look): boxes over a PDF page, marks inside a DOCX (their
+   rules travel with the frame), and the legend above. One red for all of them, as a removed line in a comparison of two
+   versions; the page under a box stays readable. The colour stands on the original's white page. */
+.source-unshown-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; padding: 7px 16px; color: var(--muted);
+  font-size: 12px; line-height: 1.4; border-bottom: 1px solid var(--line); }
+.source-unshown-legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.unshown-key { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.unshown-box { position: absolute; border-radius: 2px; mix-blend-mode: multiply; pointer-events: auto; }
+.unshown-key, .unshown-box { background: #ffc9c5; }
+/* A block reworded on the user's request: a plain button beside the block, and the panel of «Изменить текст» with one
+   comparison per value of the block. */
+.block-reword { z-index: 150; }
+.uir-rewrite.reword-panel { width: min(440px, calc(100vw - 24px)); display: flex; flex-direction: column; }
+.reword-panel .reword-values { display: grid; gap: 10px; min-height: 0; max-height: min(52dvh, 460px); margin: 0 0 10px; padding-right: 4px; overflow-y: auto; }
+.reword-panel .reword-value { padding: 8px 10px 10px; border: 1px solid var(--line); border-radius: 7px; }
+.reword-panel .reword-value[data-skipped] { opacity: .55; }
+.reword-panel .reword-pick { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.reword-panel .reword-refused .reword-pick { display: block; color: var(--muted); cursor: default; }
+/* In the list the marks say which text is which: «Было» and «Станет» stay for a screen reader only. */
+.reword-panel .reword-value:not(.reword-refused) :is(.rewrite-before h3, .rewrite-result label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.reword-panel .reword-value .rewrite-before h3 { margin: 6px 0 2px; }
+.reword-panel .reword-value .rewrite-source { margin: 6px 0; }
+.reword-panel .reword-value .rewrite-result { margin: 0; }
+.reword-panel .reword-note { margin: 0 0 10px; color: var(--muted); }
+.reword-panel .rewrite-chips button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-text); }

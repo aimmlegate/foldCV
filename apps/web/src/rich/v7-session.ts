@@ -1,8 +1,9 @@
+import type { RewordChange, RewordPreview } from "../workbench/editor/reword";
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
-import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
+import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type EditResult, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
 import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import { contentText, responseBlocks } from "./v7-response";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
@@ -311,6 +312,47 @@ export class TemplateEditorSession {
       this.panelBusy = false;
       this.lock(!this.writable);
       if (focused && this.editor?.isEditable) this.editor.focus();
+    }
+  }
+
+  /** A block reworded by the template's rules, with the user's own instruction beside them when there is one. Typing is
+   * saved first, so the model reads what the page shows; `stage` hears the save, the send and the server's stages, as a
+   * rewrite of a selection does. Nothing is written. */
+  async rewordPreview(requestId: string, blockId: string, instruction: string, stage: (stage: RewriteStage) => void = () => {}): Promise<RewordPreview> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    stage("saving");
+    try {
+      await this.flush();
+      if (this.cancelledRewrites.has(requestId)) throw new ProjectApiFailure("CANCELLED", 409);
+      stage("starting");
+      const stop = this.followRewrite(requestId, stage);
+      return await this.connection.rewordPreview(requestId, blockId, instruction.trim()).finally(stop);
+    } finally { this.cancelledRewrites.delete(requestId); }
+  }
+
+  /** The user's Apply of a reworded block, as an assistant proposal is applied: input locks, the editor shows Python's
+   * committed result, one undo action takes it back. */
+  async applyReword(blockId: string, changes: RewordChange[], touched: Record<string, string>): Promise<EditResult> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    await this.flush();
+    this.panelBusy = true;
+    this.lock(true);
+    try {
+      this.boundary();
+      const mutationId = crypto.randomUUID();
+      let result: EditResult;
+      try { result = await this.connection.rewordApply(mutationId, blockId, changes, touched); }
+      catch (error) {
+        if (error instanceof ProjectApiFailure && error.code === "EDITOR_REPLACED") { this.setMode("read_only"); throw error; }
+        if (error instanceof ProjectApiFailure && error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
+        result = await this.connection.rewordApply(mutationId, blockId, changes, touched);
+      }
+      this.queue.template.adoptDurable(result.response);
+      await this.reproject();
+      return result;
+    } finally {
+      this.panelBusy = false;
+      this.lock(!this.writable);
     }
   }
 
