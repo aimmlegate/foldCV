@@ -92,6 +92,12 @@ def lean_declaration(declaration, omitted):
     return {key: value for key, value in declaration.items() if key not in omitted}
 
 
+def unruled(value):
+    """A block's declaration or the template's model section without the rules of wording: the fast import and the
+    block reword read them, these requests never do."""
+    return {key: part for key, part in value.items() if key != 'rules'}
+
+
 def block_titles(blocks):
     """The other blocks by id and title: a coverage finding needs only to know which block shows a statement (D107)."""
     return [{key: value for key, value in block.items() if key in {'block', 'title'}} if isinstance(block, dict) else block
@@ -115,6 +121,9 @@ def lean_context(context, short=False):
     if isinstance(context.get('taskInput'), dict):
         lean['taskInput'] = {key: value for key, value in context['taskInput'].items()
             if key not in HIDDEN and key not in {'replyProtocol', 'evidence'}}
+        for part in ('declaration', 'modelInstructions'):
+            if isinstance(lean['taskInput'].get(part), dict):
+                lean['taskInput'][part] = unruled(lean['taskInput'][part])
         if short and isinstance(lean['taskInput'].get('declaration'), dict):
             lean['taskInput']['declaration'] = lean_declaration(lean['taskInput']['declaration'], REVIEW_OMITS)
     if short and isinstance(context.get('otherBlocks'), list):
@@ -131,6 +140,8 @@ def lean_part(key, value, request=None):
     short = request is not None and compact(request)
     if key == 'evidence':
         return paired_evidence(value) if short else lean_evidence(value)
+    if key in ('declaration', 'modelInstructions') and isinstance(value, dict):
+        value = unruled(value)
     if short and key == 'declaration' and isinstance(value, dict):
         return lean_declaration(value, EXTRACTION_OMITS)
     if short and key == 'otherBlocks' and isinstance(value, list):
