@@ -7,7 +7,8 @@ Code keeps a text only when it states no number and no name that its value and i
 the project: the result is a list of before and after, and the user's Apply sends the chosen ones as fact updates
 (assistant_compiler), so a fact changes only by the user's action."""
 
-from dataclasses import dataclass, field
+import dataclasses
+from dataclasses import dataclass
 
 from pydantic import Field
 
@@ -59,7 +60,7 @@ class Target:
     field: str
     kind: str
     text: str
-    source: list[str] = field(default_factory=list)
+    source: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclass
