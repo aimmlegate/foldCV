@@ -38,6 +38,8 @@ def _now():
 # Reviews read a finished reply against its evidence; low is enough and keeps them short (D116: at the proposal's
 # effort the projects review took 67-81 s on Sol).
 REVIEW_EFFORT = 'low'
+# The level a fast import runs at when its start chose none (the owner, 2026-11-18).
+LITE_EFFORT = 'medium'
 # Calls one new import runs at once, by the adapter of its models (D154): a stand ran up to nine Claude calls at once
 # without a rate-limit reply; Codex calls timed out when several started together. Another adapter gets Codex's.
 IMPORT_WIDTHS = {'claude_cli': 8, 'codex_cli': 3}
@@ -167,6 +169,16 @@ class TemplateIntake:
         return StartTemplateImportV1(kind='start_new_import', protocol='template_import_v1', clientRequestId=client_request_id,
             capture=capture)
 
+    def lite_model(self):
+        """The capture of a fast import that chose no level: LITE_EFFORT where the model's catalog offers it (measured:
+        a higher level gives the same result later), else the model's own default. One rule for every model."""
+        try:
+            return self.model(effort=LITE_EFFORT)
+        except ProjectFailure as error:
+            if error.code != 'IMPORT_EFFORT_UNSUPPORTED':
+                raise
+            return self.model(effort=None)
+
     def review_model(self, primary):
         """The capture reviews run with: the import model at REVIEW_EFFORT when its catalog offers it (D116), else the
         primary capture itself."""
@@ -185,8 +197,10 @@ class TemplateIntake:
         if models is not None:
             primary, fallback, review = models
         else:
-            primary = self.model(effort=effort)
-            fallback = self.fallback(primary) if self.fallback else None
+            primary = self.lite_model() if lite and effort is None else self.model(effort=effort)
+            # Only the legacy import repairs on a second model: a fast import does not ask for it, so a saved
+            # fallback that is gone cannot refuse its start.
+            fallback = self.fallback(primary) if self.fallback and not lite else None
             review = self.review_model(primary)
         models = {'model': primary.model_dump(mode='json', by_alias=True)}
         if fallback is not None:

@@ -6,14 +6,21 @@ is answered here from that result: a block's extraction with the block's content
 Admission, receipts, the document and the publication stay the pipeline's own."""
 
 import contextvars
+from copy import deepcopy
 import json
 import threading
 import time
 
+from packages.resume_core.importing.lite.checks import cues
+from packages.resume_core.importing.lite.lines import CV
 from packages.resume_core.importing.lite.scheme import Import
+from packages.resume_core.importing.lite.words import line_words, words
 from packages.resume_core.importing.template_identity import _binding_instances, empty_value
 from packages.resume_core.importing.template_import import ACCOUNT_STOP
-from packages.resume_core.templates.projection import pointer_tokens
+from jsonschema import Draft202012Validator
+
+from packages.resume_core.templates.projection import (FORMAT_CHECKER, OFFLINE_REGISTRY, SchemaFailure, pointer_tokens,
+    validate_payload)
 from packages.resume_core.templates.source_spans import payload_value
 from ..inference_admission import CALLS, AdmissionCancelled
 from ..lifecycle import OperationFiles
@@ -27,8 +34,8 @@ INVALID = '{"payload": {"not": "a reply"}}'
 WITNESS = {'transport': 'lite'}
 # The scheme's stages, as the import's progress names them.
 STAGES = {'map': 'Разметка резюме', 'entries': 'Записи опыта', 'blocks': 'Разделы резюме'}
-OTHER_MESSAGE = 'Строки резюме без поля в шаблоне: {count}. {quotes} Они сохранены и в документе не показаны.'
-OTHER_QUOTED = 3
+WRITTEN_MESSAGE = ('Этот текст написан моделью по данным резюме: в исходном файле такого раздела нет. '
+                   'Проверьте его и поправьте, если нужно.')
 
 
 def root_model(schema):
@@ -56,12 +63,14 @@ class LiteCalls:
         row = {'kind': kind, 'block': block, 'errorCode': None, 'usage': None, 'seconds': None}
         started, payload, usage = time.monotonic(), None, None
         try:
-            seconds = self.remaining()
-            if self.cancel.is_set() or seconds <= 0:
-                raise ContentFailure('CANCELLED' if self.cancel.is_set() else 'DEADLINE_EXCEEDED')
-            request = ContentInput(prompt, dynamic_result(schema) if self.envelope else root_model(schema),
-                GenerationPolicy(self.model, timeout_seconds=seconds, allow_repair=False, reasoning_effort=self.effort))
             with CALLS.hold(self.adapter, self.cancel):
+                # The time left is read after the wait for a place, so a call that waited does not run past the import's
+                # deadline.
+                seconds = self.remaining()
+                if self.cancel.is_set() or seconds <= 0:
+                    raise ContentFailure('CANCELLED' if self.cancel.is_set() else 'DEADLINE_EXCEEDED')
+                request = ContentInput(prompt, dynamic_result(schema) if self.envelope else root_model(schema),
+                    GenerationPolicy(self.model, timeout_seconds=seconds, allow_repair=False, reasoning_effort=self.effort))
                 with OperationFiles(self.temp_root).open() as files:
                     owned = getattr(self.provider, 'generate_owned', None)
                     if self.permit is not None and owned is not None:
@@ -70,6 +79,12 @@ class LiteCalls:
                         result = self.provider.generate(request, files, self.cancel)
             value, usage = result.value, result.usage
             payload = value.payload if hasattr(value, 'payload') else value.model_dump(mode='json')
+            try:
+                # The whole reply against its schema, nested values too: the root model of the Claude path checks only
+                # the top keys, and the scheme reads the reply without further checks.
+                validate_payload(schema, payload)
+            except SchemaFailure:
+                payload, row['errorCode'] = None, 'INVALID_RESULT'
         except ContentFailure as error:
             usage, row['errorCode'] = error.usage, error.code
         except AdmissionCancelled:
@@ -86,13 +101,77 @@ class LiteCalls:
 class LiteResult:
     """What the transport answers from: each block's content and cited spans, and the usage of the scheme's calls."""
 
+    # What snapshot() keeps: the reading as plain data. The lines' texts and order come from the sources again.
+    KEPT = ('state', 'failure', 'table', 'failed', 'other', 'written', 'hidden', 'lack', 'forms', 'placed', 'kept', 'live',
+            'cited', 'shown', 'spent')
+
+    def snapshot(self):
+        """The reading as JSON text, for the import's record: an import that stopped continues from it."""
+        plain = lambda value: sorted(value) if isinstance(value, (set, frozenset)) else value
+        value = {name: plain(getattr(self, name)) for name in self.KEPT}
+        value['table'] = {block: [payload, evidence] for block, (payload, evidence) in self.table.items()}
+        value['shown'] = {block: sorted(found) for block, found in self.shown.items()}
+        value['spent'] = [[key, held] for key, held in self.spent.items()]
+        return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+
+    @classmethod
+    def restored(cls, text, sources, package, answered=()):
+        """The reading an earlier run of this import kept. answered: the blocks whose tasks already have results; the
+        tokens of the scheme's calls were reported with them."""
+        value, self = json.loads(text), cls.__new__(cls)
+        for name in cls.KEPT:
+            setattr(self, name, value[name])
+        self.table = {block: (payload, evidence) for block, (payload, evidence) in value['table'].items()}
+        self.failed, self.hidden, self.forms, self.kept = (set(value[name]) for name in ('failed', 'hidden', 'forms', 'kept'))
+        self.live = None if value['live'] is None else set(value['live'])
+        self.shown = {block: set(found) for block, found in value['shown'].items()}
+        lines = CV(sources).lines
+        self.texts = {line.ref: ' '.join(line.text.split()) for line in lines}
+        self.order = {line.ref: index for index, line in enumerate(lines)}
+        self.notes, self.stop = {'dropped': []}, None
+        self.blocks = {block.id: block for block in package.definition.blocks}
+        self.schemas = {block.id: block.full_schema for block in package.blocks}
+        self.lock, self.answered = threading.Lock(), set(answered)
+        # What is left to report: the calls of the blocks not answered yet (the map's went with the first answer).
+        self.spent = {key: held for key, held in value['spent'] if key not in self.answered and (key is not None or not self.answered)}
+        return self
+
     def __init__(self, importer, calls, package):
         self.state = importer.state
         self.table, self.failed = dict(importer.table), set(importer.failed)
         self.other, self.notes = list(importer.other), importer.notes
+        # Blocks the source has no text for, written by the scheme from its lines: {block: [pointer]}.
+        self.written = dict(importer.written)
         self.texts = {line.ref: ' '.join(line.text.split()) for line in importer.lines}
+        self.order = {line.ref: index for index, line in enumerate(importer.lines)}
+        self.hidden = set(importer.hidden)
+        self.live = None if importer.live is None else {*importer.live, 'projects'}
+        self.lack = dict(importer.lack)
+        # Hidden lines that are form, not content: a label of a list («Задачи:») and a section heading of the CV.
+        cue = cues(importer.data)
+        self.forms = {ref for ref in self.hidden if label_like(self.texts[ref]) and ref in importer.labels
+                      or heading_like(self.texts[ref], cue[ref])}
+        placed = (importer.map or {}).get('blocks') or {}
+        self.placed = {ref: block for block, refs in placed.items() for ref in reversed(refs)}
+        self.kept = {ref for item in self.other for ref in item['refs']}
+        # Each block's lines that the scheme's values cite, and the words those values show.
+        units = {}
+        for line in importer.lines:
+            span = line.span.model_dump(mode='json', by_alias=True)
+            units.setdefault((span['sourceId'], span['unitId']), []).append((span['start'], span['end'], line.ref))
         self.blocks = {block.id: block for block in package.definition.blocks}
         self.schemas = {block.id: block.full_schema for block in package.blocks}
+        self.cited, self.shown = {}, {}
+        for block, (payload, evidence) in list(self.table.items()):
+            refs = {ref for spans in evidence.values() for span in spans
+                    for start, end, ref in units.get((span['sourceId'], span['unitId']), ())
+                    if start <= span['start'] and span['end'] <= end}
+            self.cited[block] = sorted(refs, key=self.order.get)
+            self.shown[block] = shown_words(payload)
+            # A list item that breaks the template's own schema (a name with a comma, a value too long) is left out
+            # alone; the whole block would be refused for it. Its lines then count as dropped.
+            if block in self.schemas:
+                self.table[block] = fitted(self.schemas[block], payload, evidence, self.notes, block)
         self.lock, self.answered = threading.Lock(), set()
         # Each block's first answer reports the tokens the scheme spent on it; the map's go with the first block.
         self.spent = {}
@@ -105,6 +184,10 @@ class LiteResult:
             for index, name in enumerate(('input_tokens', 'cached_input_tokens', 'output_tokens')):
                 held[index] += getattr(usage, name, None) or 0
         self.stop = next((row['errorCode'] for row in calls.rows if row['errorCode'] in ACCOUNT_STOP), None)
+        # Why a scheme that read no map failed, as the import's own error code.
+        codes = {row['errorCode'] for row in calls.rows}
+        self.failure = ('CANCELLED' if 'CANCELLED' in codes else 'IMPORT_PROCESSING_EXHAUSTED' if 'DEADLINE_EXCEEDED' in codes
+                        else 'IMPORT_INVALID_RESULT')
 
     def usage(self, block):
         with self.lock:
@@ -115,30 +198,126 @@ class LiteResult:
             self.answered.add(block)
         return ReportedUsage(total[0], total[1], total[2], True)
 
+    def owner(self, name):
+        """The block whose task keeps a line: its own, else identity (a line in no block of the template, or in a
+        block this document does not fill: one of the other role branch)."""
+        name = (name or 'identity').split('.')[0]
+        return name if name in self.blocks and (self.live is None or name in self.live) else 'identity'
+
+    # Each of the three gives rows (text, words): words are the words of the line the document does not show when it
+    # shows the rest of the line, None when it shows nothing of it.
+
     def other_of(self, block):
-        """The texts of the lines kept as «other» that belong to this block (those of no block go with identity)."""
-        found = []
-        for item in self.other:
-            owner = (item['owner'] or 'identity').split('.')[0]
-            if owner not in self.blocks:
-                owner = 'identity'
-            if owner == block:
-                found += [self.texts[ref] for ref in item['refs'] if ref in self.texts]
+        """The lines kept as «other» that belong to this block (those of no block go with identity)."""
+        return [(self.texts[ref], self.lack.get(ref)) for item in self.other if self.owner(item['owner']) == block
+                for ref in item['refs'] if ref in self.texts]
+
+    def dropped_of(self, block, payload):
+        """The lines whose value the scheme read and the admission dropped: the scheme's content showed every word of
+        the line and the admitted content does not."""
+        after, found = shown_words(payload), []
+        for ref in self.cited.get(block, ()):
+            need = line_words(self.texts[ref])
+            if ref not in self.hidden and ref not in self.kept and need and need <= self.shown[block] and not need <= after:
+                found.append((self.texts[ref], sorted(need - after) if need & after else None))
         return found
+
+    def hidden_of(self, block, *, form=True):
+        """The lines the map hid that stand in this block (those of no block go with identity). form=False leaves out
+        the lines that are form: a list's label and a section heading."""
+        return [(self.texts[ref], None) for ref in sorted(self.hidden - self.kept, key=self.order.get)
+                if self.owner(self.placed.get(ref)) == block and any(char.isalnum() for char in self.texts[ref])
+                and (form or ref not in self.forms)]
+
+
+def writing_rules(package):
+    """The rules for each block the scheme may write when the CV has no text for it: the template's rules of wording
+    for that block (lite/rules.py), not the legacy import's prompts. A block the template gives no rewrite field is
+    never written."""
+    from packages.resume_core.importing.lite.prompts import WRITE
+    from packages.resume_core.importing.lite.rules import block_rules
+    return {block.id: block_rules(block.id, package.definition) for block in package.definition.blocks
+            if block.id in WRITE and block.rewrite.fields}
 
 
 def run(sources, package, calls, stage=None):
     """One lite import of these sources; calls: LiteCalls."""
-    importer = Import(sources, calls, envelope=calls.envelope)
+    importer = Import(sources, calls, envelope=calls.envelope, writing=writing_rules(package),
+        blocks=[block.id for block in package.definition.blocks])
     importer.stage = stage
     importer.run()
     return LiteResult(importer, calls, package)
 
 
-def other_text(texts):
-    quotes = ', '.join('«' + (text if len(text) <= 80 else text[:79].rstrip() + '…') + '»' for text in texts[:OTHER_QUOTED])
-    more = ' и ещё ' + str(len(texts) - OTHER_QUOTED) if len(texts) > OTHER_QUOTED else ''
-    return OTHER_MESSAGE.format(count=len(texts), quotes=quotes + more + '.')
+def label_like(text):
+    """A label of a list is a few words («Задачи:», «Tech stack:»); a longer line that ends with a colon is content."""
+    return len(text.rstrip(':').split()) <= 3
+
+
+def fitted(schema, payload, evidence, notes, block):
+    """The content without the list items that break the template's schema, and the cited spans of the items left, under
+    their new numbers. Content with a fault that is no list item's is returned as it is (the block then fails whole)."""
+    validator = Draft202012Validator(schema, format_checker=FORMAT_CHECKER, registry=OFFLINE_REGISTRY)
+    try:
+        errors = list(validator.iter_errors(payload))
+    except Exception:
+        return payload, evidence
+    bad = {}
+    for error in errors:
+        path = list(error.absolute_path)
+        at = next((index for index in range(len(path) - 1, -1, -1) if isinstance(path[index], int)), None)
+        if at is None:
+            return payload, evidence
+        bad.setdefault(tuple(path[:at]), set()).add(path[at])
+    if not bad:
+        return payload, evidence
+    payload, moved = deepcopy(payload), {}
+    for container, gone in bad.items():
+        items = payload
+        for token in container:
+            items = items[token]
+        kept = [index for index in range(len(items)) if index not in gone]
+        moved[tuple(map(str, container))] = {str(old): str(new) for new, old in enumerate(kept)}
+        items[:] = [items[index] for index in kept]
+        notes['dropped'].extend({'block': block, 'pointer': pointer_of([*map(str, container), str(index)]),
+                                 'why': 'breaks the template schema'} for index in sorted(gone))
+    cited = {}
+    for pointer, spans in evidence.items():
+        tokens = pointer_tokens(pointer)
+        for container, numbers in moved.items():
+            size = len(container)
+            if tuple(tokens[:size]) == container and len(tokens) > size:
+                tokens = None if tokens[size] not in numbers else [*tokens[:size], numbers[tokens[size]], *tokens[size + 1:]]
+                break
+        if tokens is not None:
+            cited[pointer_of(tokens)] = spans
+    return payload, cited
+
+
+def heading_like(text, cue):
+    """A hidden line that reads as a section heading: a few words with no number, address or value, set as a heading,
+    in bold or in capitals."""
+    plain = text.strip().rstrip(':').strip()
+    short = 0 < len(plain.split()) <= 5 and not any(char.isdigit() for char in plain) and '@' not in plain and ':' not in plain
+    return short and (cue['heading'] or cue['bold'] or plain.isupper())
+
+
+def shown_words(payload):
+    """The words a block's content shows, as the scheme counts them: a period by its dates, not by its raw text."""
+    found = set()
+
+    def visit(value, key=None):
+        if isinstance(value, dict):
+            for name, part in value.items():
+                if not (key == 'period' and name == 'raw'):
+                    visit(part, name)
+        elif isinstance(value, (list, tuple)):
+            for part in value:
+                visit(part, key)
+        elif value is not None and not isinstance(value, bool):
+            found.update(words(str(value)))
+    visit(payload)
+    return found
 
 
 # ------------------------------------------------------------------------------------------------------- answers
@@ -205,7 +384,9 @@ def raw_answer(value, lite):
     if block is None or value.get('slot') in {'outline', 'map', 'map_repair'}:
         return INVALID, None
     if lite.state != 'succeeded' or block.id in lite.failed:
-        return INVALID, block.id      # the pipeline's own fallback shows the block's source lines
+        # The block is shown as not filled. Its lines are kept and marked by the notices the pipeline makes from
+        # other_of and hidden_of (a failed scheme never comes here: the import stops before its tasks).
+        return INVALID, block.id
     if block.id in lite.table:
         payload, evidence = lite.table[block.id]
     else:

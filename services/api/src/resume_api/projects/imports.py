@@ -37,9 +37,12 @@ class ImportCommand(BaseModel):
     kind: Literal['start', 'resume', 'cancel']
     operation_id: str | None = Field(default=None, alias='operationId')
     task_id: str | None = Field(default=None, alias='taskId')
-    # The import model's effort for this start; None keeps its catalog default. The capture checks it in the catalog.
+    # The import model's effort for this start. None: medium for a fast import where the model offers it, else the
+    # model's catalog default. The capture checks a chosen one in the catalog.
     effort: ReasoningEffort | None = None
-    # The lite import: the CV moved word for word with its facts extracted; it never rewrites.
+    # True: the fast import, the one the app starts: the CV moved word for word with its facts extracted; it never
+    # rewrites. False: the legacy import (the pipeline's own model calls), started by the app only while Settings has
+    # «Прежний импорт» on; it is kept for the move and will be removed.
     lite: bool = False
 
 

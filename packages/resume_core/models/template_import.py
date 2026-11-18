@@ -403,7 +403,8 @@ class RuntimePolicy(Wire):
     fallback_repairs: Literal[1]
     # T4: the import maps the CV first and each block reads its own lines; captures made before read the whole CV.
     source_map: bool = Field(default=False, exclude_if=lambda value: not value)
-    # The lite import: its own scheme reads the CV and code answers every request of the pipeline (importer/lite_import).
+    # The lite (fast) import: its own scheme reads the CV and code answers every request of the pipeline
+    # (importer/lite_import). Without it the import is the legacy one: the pipeline's own calls, kept for the move.
     lite: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
@@ -674,6 +675,15 @@ class ExportAttempt(Wire):
     publication_intent_id: Id | None
 
 
+class OtherLines(Wire):
+    """Source lines of a lite import that no field of the template shows: kept with the import, word for word, and
+    not in the document. «no_field»: no field took the line's words; «hidden»: the map hid the line; «dropped»: the
+    admission dropped the value read from it."""
+    owner: Id
+    reason: Literal["no_field", "hidden", "dropped"]
+    lines: list[str] = Field(min_length=1)
+
+
 class ImportOperation(Wire):
     schema_version: Literal[1]
     id: Id
@@ -703,6 +713,11 @@ class ImportOperation(Wire):
     issues: list[ImportIssue] = Field(default_factory=list, exclude_if=lambda value: not value)
     captured_relation_revisions: dict[str, Revision] = Field(default_factory=dict, exclude_if=lambda value: not value)
     captured_items: list[CapturedItemIdentity] = Field(default_factory=list, exclude_if=lambda value: not value)
+    other_lines: list[OtherLines] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # What a lite import's scheme read from the CV (LiteResult.snapshot, as JSON text), kept while tasks still wait for
+    # it: an import that stopped continues from this reading and calls no model for it again. A string, so a saved
+    # step does not walk it; dropped when every task has its result.
+    lite_reading: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def identity(self):

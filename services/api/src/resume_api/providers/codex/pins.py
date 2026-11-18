@@ -95,6 +95,11 @@ LEAN = (
     'features.code_mode.excluded_tool_namespaces=["functions","clock"]',
     "tools.experimental_request_user_input.enabled=false",
 )
+# The CLI's «Fast» service tier. A content call takes it when the model's catalog entry lists it and the CLI is seen
+# to take the key: measured replies came 1.4-2.7 times sooner, a long reply most. The catalog says which models spend
+# more of the plan's quota in it. Exec only.
+FAST_TIER = "priority"
+FAST = ('service_tier=' + json.dumps(FAST_TIER),)
 # No CLI knows this key: the probe's control run, which the CLI must refuse before it reads the instructions file.
 UNKNOWN = "foldcv_probe_unknown_key=true"
 

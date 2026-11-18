@@ -366,6 +366,39 @@ def test_a_cli_that_refuses_a_lean_key_imports_with_todays_arguments_after_one_p
     assert list(root.iterdir()) == [keep]
 
 
+def test_a_model_that_lists_the_fast_tier_is_called_in_it(fake) -> None:
+    from resume_api.providers.codex.pins import FAST
+    cli, root, keep, configure, starts = fake
+    configure(tiers=["flex", "priority"])
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    for _ in range(2):
+        with OperationFiles(root).open() as files:
+            provider.generate(request(), files, threading.Event())
+    rows, pairs = audit_rows(cli), [*lean_pairs(), "--config", *FAST]
+    calls = [row["args"] for row in rows if row.get("generation")]
+    assert len(calls) == starts() == 2 and all(args[-1 - len(pairs):-1] == pairs for args in calls)
+    # One more probe for the binary: the key alone, after the control key and the LEAN keys.
+    probes = [row["args"] for row in rows if row.get("probe")]
+    assert len(probes) == 3 and probes[2][-3:-1] == ["--config", *FAST] and not set(FAST) & {*probes[0], *probes[1]}
+    others = [row["args"] for row in rows if "args" in row and not row["generation"] and not row["probe"]]
+    assert not any(set(FAST) & set(args) for args in others) and list(root.iterdir()) == [keep]
+
+
+@pytest.mark.parametrize("settings", [{"tiers": ["flex"]}, {"tiers": ["priority"], "unknown_keys": ["service_tier"]}])
+def test_a_call_goes_without_the_fast_tier_when_the_model_or_the_cli_lacks_it(fake, settings) -> None:
+    from resume_api.providers.codex.pins import FAST
+    cli, root, keep, configure, starts = fake
+    configure(**settings)
+    provider = CodexCliProvider(cli, fixture_transport=FixtureTransport(cli))
+    with OperationFiles(root).open() as files:
+        result = provider.generate(request(), files, threading.Event())
+    assert result.value.summary == "Fictional engineer builds small services."
+    args, = (row["args"] for row in audit_rows(cli) if row.get("generation"))
+    # The LEAN keys stay: the two are asked apart.
+    assert not set(FAST) & set(args) and args[-1 - len(lean_pairs()):-1] == lean_pairs()
+    assert starts() == 1 and list(root.iterdir()) == [keep]
+
+
 def test_a_cli_that_reads_the_instructions_file_before_the_keys_is_not_given_them(fake) -> None:
     from resume_api.providers.codex.pins import LEAN
     cli = fake[0]

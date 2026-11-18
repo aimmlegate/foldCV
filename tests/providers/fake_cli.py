@@ -26,7 +26,7 @@ KNOWN = {"model_provider", "forced_login_method", "approval_policy", "web_search
          "project_doc_max_bytes", "developer_instructions", "mcp_servers", "analytics.enabled", "otel.log_user_prompt",
          "shell_environment_policy.inherit", "log_dir", "sqlite_home", "model_instructions_file",
          "model_reasoning_effort", "include_permissions_instructions", "include_collaboration_mode_instructions",
-         "include_environment_context", "tools.experimental_request_user_input.enabled"}
+         "include_environment_context", "tools.experimental_request_user_input.enabled", "service_tier"}
 refused = {*config.get("unknown_keys", []), *(["model_instructions_file"] if case == "unknown_instructions_key" else [])}
 
 
@@ -116,7 +116,8 @@ if args and args[0] == "app-server":
             if case == "metadata_account_only":
                 sys.exit(0)
         elif method == "model/list":
-            emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": e} for e in config.get("efforts", ["low", "medium", "high"])], "defaultReasoningEffort": "medium"}], "nextCursor": None}})
+            emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna", "supportedReasoningEfforts": [{"reasoningEffort": e} for e in config.get("efforts", ["low", "medium", "high"])], "defaultReasoningEffort": "medium",
+                "serviceTiers": [{"id": tier, "name": tier} for tier in config.get("tiers", [])]}], "nextCursor": None}})
             if case == "metadata_duplicate_catalog":
                 emit({"id": event["id"], "result": {"data": [{"model": "gpt-6-luna"}], "nextCursor": None}})
         elif method == "account/rateLimits/read":

@@ -1,5 +1,10 @@
 """The template import coordinator: proposals, reviews and publication through the project repository, with the
-running steps in the operation sidecar (D109)."""
+running steps in the operation sidecar (D109).
+
+Two imports run through it. The fast (lite) import reads the CV by its own scheme and answers every request here by
+code; it is the one the app starts. The legacy import makes the requests itself (map, outline, extraction, review,
+repair, rewriting); it is kept for the move, started only while Settings has it on, and will be removed. Admission,
+receipts, the document and the publication serve both."""
 
 import asyncio
 from collections import OrderedDict
@@ -15,7 +20,7 @@ from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.repository.project_repository import decode_project, rich_snapshot_bytes, verifying
 from packages.resume_core.storage import strict_json
 from packages.resume_core.models.template_import import (CleanupOutcome, ImportIssue, ImportOperation, ObservedUsage,
-    PublicationOutcome, ReferenceTable, ReviewInputRecord, TaskResultRecord)
+    OtherLines, PublicationOutcome, ReferenceTable, ReviewInputRecord, TaskResultRecord)
 from packages.resume_core.importing.template_admission import admit_proposal, task_facts_digest
 from packages.resume_core.importing.template_builtin_admission import current_handles
 from packages.resume_core.editing.template_effective import effective_cells
@@ -27,7 +32,7 @@ from packages.resume_core.importing.template_entries import (closed_state, entry
                                                              header_dropped, line_options, map_entry_part,
                                                              ordered_entries, outline_part, parse_outline,
                                                              parse_outline_review, reorder_records, splits_entries)
-from packages.resume_core.importing.template_import import (GENERATION_SLOTS, TRANSIENT, CleanupProof, ProcessingDeadline,
+from packages.resume_core.importing.template_import import (ACCOUNT_STOP, GENERATION_SLOTS, TRANSIENT, CleanupProof, ProcessingDeadline,
                                                             add_entry_tasks, add_outline_review, admit_operation,
                                                             attempt_in, authorization, cancel_operation,
                                                             capture_finalization, capture_task_input, checked,
@@ -194,14 +199,48 @@ def unused_text(texts):
     return UNUSED_MESSAGE.format(count=len(texts), quotes=quotes + more + '.')
 
 
-def other_issues(id_factory, task, fingerprint):
-    """The notice of a lite import's block: the source lines whose words no field took. They are kept, not shown."""
+def other_lines(task, payload):
+    """A lite import's source lines that this block's document does not show: lines no field took, lines of values the
+    admission dropped, and lines the map hid. Two views of them: what is kept with the import, and the rows the editor
+    marks in the original, by reason (a hidden line that is form, a heading or a label, is not marked)."""
     lite = lite_import.LITE.get()
-    texts = lite.other_of(task.block_id) if lite is not None else []
-    if not texts:
+    if lite is None or task.entry is not None:
+        return [], {}
+    block = task.block_id
+    rows = {'no_field': lite.other_of(block), 'dropped': lite.dropped_of(block, payload)}
+    kept = {**rows, 'hidden': lite.hidden_of(block)}
+    marked = {**rows, 'hidden': lite.hidden_of(block, form=False)}
+    return ([OtherLines(owner=block, reason=reason, lines=[text for text, _words in found]) for reason, found in kept.items() if found],
+            {reason: found for reason, found in marked.items() if found})
+
+
+# A trial of the look (the owner, 2026-11-17): the editor marks these lines in the original, beside the resume. One
+# notice per reason carries them, one per text line; after a tab stand the words to mark when the document shows the
+# rest of the line.
+KEPT_CODES = {'no_field': 'IMPORT_LINES_NO_FIELD', 'dropped': 'IMPORT_LINES_DROPPED', 'hidden': 'IMPORT_LINES_HIDDEN'}
+
+
+def other_issues(id_factory, task, fingerprint, marked):
+    """The notices of a lite import's block that carry the source lines its document does not show, by reason."""
+    return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task.id, targetIds=['scope-' + task.id], blockIds=[],
+        category='uncertain_interpretation', code=KEPT_CODES[reason],
+        message='\n'.join(text + ('\t' + ' '.join(words) if words else '') for text, words in rows),
+        importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
+        retiredByAction=None) for reason, rows in marked.items()]
+
+
+def written_pointers(task):
+    """The pointers of text a lite import wrote for this block because the source has none."""
+    lite = lite_import.LITE.get()
+    return lite.written.get(task.block_id, ()) if lite is not None and task.entry is None else ()
+
+
+def written_issues(id_factory, task, fingerprint, payload):
+    """The notice of a block a lite import wrote from the CV's data: the editor marks its text as added."""
+    if not written_pointers(task) or empty_value(payload):
         return []
     return [ImportIssue(id=id_factory('issue'), ruleId=None, taskId=task.id, targetIds=['scope-' + task.id], blockIds=[],
-        category='uncertain_interpretation', code='IMPORT_SOURCE_UNUSED', message=lite_import.other_text(texts),
+        category='uncertain_interpretation', code='IMPORT_TEXT_GENERATED', message=lite_import.WRITTEN_MESSAGE,
         importedFingerprint=fingerprint, reviewInputHash=None, lifecycleId=id_factory('issue-lifecycle'), state='active',
         retiredByAction=None)]
 
@@ -612,7 +651,20 @@ class TemplatePipeline:
                 deadline = ProcessingDeadline.capture(operation, self.wall(), self.elapsed())
                 token = None
                 if operation.capture.policy.lite and len(operation.task_results) < len(operation.tasks):
-                    token = lite_import.LITE.set(await self.lite(project, operation, owner(workspace), deadline, cancel))
+                    data = owner(workspace)
+                    if operation.lite_reading is None:
+                        result = await self.lite(project, operation, data, deadline, cancel)
+                        # The reading is kept with the import before any task is answered from it: a run that stops
+                        # later continues from this one reading and calls no model for it again.
+                        reading = result.snapshot()
+                        workspace = await self.step(project, operation.id, 'lite_reading',
+                            lambda value, _data, _workspace: value.model_copy(update={'lite_reading': reading}))
+                        operation = operation_in(workspace, operation.id)
+                    else:
+                        done = {value.task_id for value in operation.task_results}
+                        result = lite_import.LiteResult.restored(operation.lite_reading, data.sources, data.template_package,
+                            answered={task.block_id for task in operation.tasks if task.id in done})
+                    token = lite_import.LITE.set(result)
                 try:
                     await self.run_tasks(project, operation, deadline, cancel,
                         implicit=implicit_dependencies(owner(workspace).template_package, operation))
@@ -626,11 +678,15 @@ class TemplatePipeline:
 
     async def lite(self, project, operation, data, deadline, cancel):
         """The lite scheme's own run: its calls on the import's model, before the tasks. The tasks' requests are then
-        answered from its result (the transport reads it from the context). A resumed import runs it again: the
-        result is kept in memory only."""
+        answered from its result (the transport reads it from the context). The caller keeps the result with the
+        import, so a resumed import does not come here again."""
         key = (project, operation.id)
-        calls = self.transport.lite_calls(operation.capture.primary, cancel,
-            lambda: max(0.0, deadline.remaining(operation, self.wall(), self.elapsed())))
+        try:
+            calls = self.transport.lite_calls(operation.capture.primary, cancel,
+                lambda: max(0.0, deadline.remaining(operation, self.wall(), self.elapsed())))
+        except ContentFailure as error:
+            # No provider or model for the scheme's calls (signed out, the model gone): the import stops with that code.
+            raise (AccountStop if error.code in ACCOUNT_STOP else TemplateImportFailure)(error.code) from None
 
         def stage(name):
             self.lite_stages[key] = name
@@ -639,9 +695,13 @@ class TemplatePipeline:
                 data.template_package, calls, stage)
         finally:
             self.lite_stages.pop(key, None)
-        if result.stop is not None and result.state != 'succeeded':
-            # The account stopped the scheme (no quota, signed out): the import stops with that, as any call would.
+        if result.stop is not None:
+            # The account stopped a call of the scheme (no quota, signed out): the import stops with that, as any call
+            # would, whatever the scheme read before it. Nothing is published from a part of the CV.
             raise AccountStop(result.stop)
+        if result.state != 'succeeded':
+            # No usable map: there is nothing to answer the tasks from, and an import of no content is no import.
+            raise TemplateImportFailure(result.failure)
         return result
 
     async def run_tasks(self, project, operation, deadline, cancel, *, implicit=None):
@@ -964,7 +1024,8 @@ class TemplatePipeline:
                         'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
                         'otherBlocks': other_blocks(operation, task, data.template_package)},
                     # D115: what the repair left as it was keeps the reviewed reply's receipt results.
-                    previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None)
+                    previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None,
+                    written=written_pointers(task))
                 if prior_review is None and task_input.get('mapped'):
                     # T4: the review reads what the trimmed request read, and the lines the reply cites; a map entry's
                     # project name its lines do not state word for word is a finding.
@@ -1030,11 +1091,13 @@ class TemplatePipeline:
         handles = [handle for handle in [*[field.item_handle for field in proposal.resolved_fields],
             *[parent for link in proposal.lineage for parent in link.parents]] if handle in active_handles]
         fingerprint = digest(next(value for value in operation.task_inputs if value.task_id == task_id).value)
+        kept, marked = other_lines(task_in(operation, task_id), proposal.reply.payload)
         issues = [*unbound_issues(self.id_factory, task_id, proposal, fingerprint),
             *header_issues(self.id_factory, task_in(operation, task_id), fingerprint),
-            *other_issues(self.id_factory, task_in(operation, task_id), fingerprint)]
+            *other_issues(self.id_factory, task_in(operation, task_id), fingerprint, marked),
+            *written_issues(self.id_factory, task_in(operation, task_id), fingerprint, proposal.reply.payload)]
         await self.finish_task(project, operation_id, task_id, None, (), handles,
-            'empty' if empty_value(proposal.reply.payload) else 'admitted', issues)
+            'empty' if empty_value(proposal.reply.payload) else 'admitted', issues, other=kept)
 
     async def outline(self, project, operation_id, task_id, deadline, cancel):
         """The outline call of a block that extracts its entries on their own (D117): what the block task added, or
@@ -1483,9 +1546,11 @@ class TemplatePipeline:
         return reconcile_cleanup(result, CleanupProof(attempt.id, digest(attempt.owner), digest({'unlaunched': attempt.id}),
             'coordinator-never-launched', True), now, check=False)
 
-    async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False):
+    async def finish_task(self, project, operation_id, task_id, value, spans, handles, disposition, issues, *, accepted=False,
+                          other=()):
         def finish(operation, _data, _workspace):
-            operation = fork(operation, tasks={task_id}, lists=('issues', 'task_results'))
+            operation = fork(operation, tasks={task_id}, lists=('issues', 'task_results', 'other_lines'))
+            operation.other_lines.extend(other)
             task = task_in(operation, task_id)
             # A review remark on a block that already has admitted values is not a failed import. The result
             # disposition stays source_fallback so the lines the review named still appear under those values.
@@ -1618,11 +1683,15 @@ class TemplatePipeline:
             message=message,
             importedFingerprint=digest(stored.value), reviewInputHash=receipt.review_input_hash if first else None,
             lifecycleId=self.id_factory('issue-lifecycle'), state='active', retiredByAction=None)]
+        # A lite import's block that got no content (its call failed, or its reply was refused whole) still keeps its
+        # lines and marks them in the original: no line of the CV is lost without a trace.
+        other, marked = other_lines(task, None)
+        issues += other_issues(self.id_factory, task, digest(stored.value), marked)
         await self.finish_task(project, operation_id, task_id,
             {'sourceTexts': {digest(span): source_slice(owner(current).sources, span) for span in spans},
                 'diagnostics': list(errors), 'scope': scope, **({'leftoverOnly': leftover} if leftover else {}),
                 **({'unowned': [digest(span) for span in unowned]} if unowned else {})}, spans,
-            task.allowed_handles, 'source_fallback', issues, accepted=kept)
+            task.allowed_handles, 'source_fallback', issues, accepted=kept, other=other)
 
     async def finalize(self, project, identifier, cancel=None):
         """Publish the import. The publication commit is the point of no return: a cancel seen before it leaves the
@@ -1633,6 +1702,11 @@ class TemplatePipeline:
         operation = operation_in(workspace, identifier)
         if workspace.project is not None and operation.finalization is not None:
             return await asyncio.to_thread(self.record_publication, project, identifier)
+        if operation.lite_reading is not None:
+            # Every task has its result: the scheme's reading is not needed again and does not go into the project.
+            workspace = await self.step(project, identifier, 'lite_reading',
+                lambda value, _data, _workspace: value.model_copy(update={'lite_reading': None}))
+            operation = operation_in(workspace, identifier)
         with import_usage.timed('finalization', 'guard'):
             await asyncio.to_thread(self.guard, project, operation)
         if any(attempt.cleanup.state != 'verified' for attempt in operation.attempts):

@@ -28,8 +28,8 @@ from resume_api.providers.content import (STALL_SECONDS, ContentFailure, Content
 from resume_api.providers.structured_schema import StructuredSchema
 from resume_api.providers.dynamic_result import DynamicResultSpec
 from resume_api.providers.preflight import QUALIFICATION_SECONDS, PreflightCache, _stamp, beside, preflight_key
-from resume_api.providers.codex.pins import (FIXTURE_VERSION, GAPS, LEAN, REQUIRED_FLAGS, UNKNOWN, check_features,
-                                             exec_arguments, loaded, overrides, qualify)
+from resume_api.providers.codex.pins import (FAST, FAST_TIER, FIXTURE_VERSION, GAPS, LEAN, REQUIRED_FLAGS, UNKNOWN,
+                                             check_features, exec_arguments, loaded, overrides, qualify)
 from resume_api.cli.qualification import QualificationError, missing_flags
 from ..shared import (InvalidFinal, MAX_RESULT, MAX_SCHEMA, MODEL, REPAIR_FEEDBACK, SYSTEM_PROMPT, _combine, mapping,
                       natural, strict_json)
@@ -165,6 +165,8 @@ class Probe:
     reasoning: dict[str, ModelReasoning] = field(default_factory=dict)
     # The binary was seen to take the LEAN keys, so its execs carry them (T1).
     lean: bool = False
+    # The models whose execs carry the FAST key: the catalog lists the tier for them and the binary takes the key.
+    fast: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -186,8 +188,9 @@ class CodexCliProvider:
         self.experimental_profile = experimental_profile
         self.clock = clock
         self.preflight_cache = PreflightCache[Probe](clock, held=INFERENCE.importing)
-        # (binary identity, takes the LEAN keys): probed once per binary, not with every qualification.
-        self.lean_binary: tuple[tuple, bool] | None = None
+        # [binary identity, checks keys before the instructions file, takes the LEAN keys, takes the FAST key or
+        # None while not asked]: probed once per binary, not with every qualification.
+        self.keys_binary: list | None = None
         self.model_started = None
         self.process = ProcessRunner(self.executable, clock=clock,
                                      launch=experimental_profile.launch if experimental_profile else None,
@@ -223,12 +226,13 @@ class CodexCliProvider:
         probe = self.probe(files, cancel, deadline=bound)
         if not probe.generation_ready:
             raise ContentFailure("CLI_PROFILE_UNSAFE")
-        metadata = {}
-        models = self.list_models(files, cancel, deadline=bound, reasoning=metadata)
+        metadata, tiered = {}, set()
+        models = self.list_models(files, cancel, deadline=bound, reasoning=metadata, fast=tiered)
         probe = replace(probe, reasoning=metadata)
         if model not in models:
             raise ContentFailure("MODEL_DENIED")
-        return replace(probe, lean=self.takes_lean(files, cancel, bound, model)), models
+        lean, fast = self.takes_keys(files, cancel, bound, model, fast=bool(tiered))
+        return replace(probe, lean=lean, fast=frozenset(tiered) if fast else frozenset()), models
 
     def _renew(self, root, epoch, key, model):
         """The qualification that runs beside the calls before the snapshot ends (R4); it replaces the snapshot."""
@@ -271,14 +275,19 @@ class CodexCliProvider:
             args = args[:at] + args[at + 2:]
         return args
 
-    def takes_lean(self, files: OperationFiles, cancel: threading.Event, deadline: float, model: str) -> bool:
-        """Whether this binary takes the LEAN keys, asked once per binary (T1). It must refuse the control key first:
-        only then does getting as far as the instructions file show that it knew each LEAN key."""
+    def takes_keys(self, files: OperationFiles, cancel: threading.Event, deadline: float, model: str, *,
+                   fast: bool) -> tuple[bool, bool]:
+        """Whether this binary takes the LEAN keys and the FAST key, each asked once per binary (T1). It must refuse
+        the control key first: only then does getting as far as the instructions file show that it knew a key. The
+        FAST key is asked only when a model lists the tier."""
         binary = (str(self.executable), _stamp(self.executable))
-        if self.lean_binary is None or self.lean_binary[0] != binary:
-            self.lean_binary = (binary, not self._loads(files, cancel, deadline, model, (UNKNOWN,))
-                                and self._loads(files, cancel, deadline, model, LEAN))
-        return self.lean_binary[1]
+        if self.keys_binary is None or self.keys_binary[0] != binary:
+            checks = not self._loads(files, cancel, deadline, model, (UNKNOWN,))
+            self.keys_binary = [binary, checks, checks and self._loads(files, cancel, deadline, model, LEAN), None]
+        held = self.keys_binary
+        if fast and held[3] is None:
+            held[3] = held[1] and self._loads(files, cancel, deadline, model, FAST)
+        return held[2], bool(fast and held[3])
 
     def _loads(self, files: OperationFiles, cancel: threading.Event, deadline: float, model: str,
                extra: tuple[str, ...]) -> bool:
@@ -320,7 +329,8 @@ class CodexCliProvider:
         return Probe(version, "chatgpt", fixture_ready or experimental_ready,
                      () if fixture_ready or experimental_ready else GAPS)
 
-    def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None, reasoning=None) -> tuple[str, ...]:
+    def list_models(self, files: OperationFiles, cancel: threading.Event, *, deadline: float | None = None, reasoning=None,
+                    fast: set | None = None) -> tuple[str, ...]:
         end = deadline if deadline is not None else self.clock() + QUALIFICATION_SECONDS
         state = {"id": 0, "models": ()}
 
@@ -363,6 +373,10 @@ class CodexCliProvider:
                 if not isinstance(name, str) or not MODEL.fullmatch(name) or name in models:
                     raise ContentFailure("METADATA_FAILED")
                 models.append(name)
+                tiers = item.get("serviceTiers")
+                if fast is not None and isinstance(tiers, list) and any(
+                        isinstance(tier, dict) and tier.get("id") == FAST_TIER for tier in tiers):
+                    fast.add(name)
                 if reasoning is not None:
                     try:
                         reasoning[name] = model_reasoning(item)
@@ -510,7 +524,8 @@ class CodexCliProvider:
                 attempts += 1
                 try:
                     try:
-                        args = self._exec_arguments(files, policy.model, LEAN if probe.lean else (), plain=plain)
+                        extra = (*(LEAN if probe.lean else ()), *(FAST if policy.model in probe.fast else ()))
+                        args = self._exec_arguments(files, policy.model, extra, plain=plain)
                         if effective_effort is not None:
                             args = (*args[:-1], "--config", "model_reasoning_effort=" + json.dumps(effective_effort), args[-1])
                         began, active = time.perf_counter(), None

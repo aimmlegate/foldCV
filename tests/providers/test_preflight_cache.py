@@ -142,7 +142,7 @@ def test_qualification_inside_a_model_call_stays_bounded_on_codex(fake, seconds)
         reached.append(deadline)
         return Probe("fixture", "chatgpt", True, ())
 
-    def list_models(_files, _cancel, *, deadline, reasoning):
+    def list_models(_files, _cancel, *, deadline, reasoning, fast):
         reached.append(deadline)
         return ("gpt-6-luna",)
 

@@ -200,10 +200,11 @@ def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, p
 
 
 def make_review_input(operation, proposal, package, sources, policy, *, effective_cells, semantic_context,
-                      occurrence_context=None, occurrence_independent=True, previous=None):
+                      occurrence_context=None, occurrence_independent=True, previous=None, written=()):
     """The review of a proposal. previous, for a replacement review, is the reviewed proposal the repair corrects with
     its receipt: the checks of what the repair left unchanged reuse that receipt (D115). The proposal of one entry of
-    a block (D117) settles verbatim values only within the entry's lines."""
+    a block (D117) settles verbatim values only within the entry's lines. written: the pointers of text a lite import
+    wrote for a block the source has no text for; such text shows as written, not as its cited lines."""
     if proposal.state != 'provisional' or proposal.reply is None:
         raise TemplateImportFailure('IMPORT_PROPOSAL_NOT_REVIEWABLE')
     attempt = attempt_in(operation, proposal.attempt_id)
@@ -235,7 +236,8 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         'checks': grouped_checks(review_checks(task, proposal, allocations, asked, refs))}
     if not operation.capture.allow_text_rewrite:
         context['sourceWordingPointers'] = sorted({field.pointer for field in proposal.resolved_fields
-            if any(_matches(pattern, field.pointer) for pattern in block.rewrite.fields)})
+            if any(_matches(pattern, field.pointer) for pattern in block.rewrite.fields)
+            and not any(_matches(pattern, field.pointer) for pattern in written)})
     return ReviewInput(schemaVersion=2, protocol='template_import_v1', proposalHash=proposal.proposal_hash,
         targets=targets, handleMap=allocations, rules=rules, sourceSpans=[], sourceTexts={}, evidence=evidence,
         effectiveCells=effective_cells, relations=proposal.resolved_relations, packageHash=package.package_hash,

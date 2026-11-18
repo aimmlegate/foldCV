@@ -1,8 +1,9 @@
 """One lite import of a CV.
 
 Calls: one map call, then side by side one call per side block that has lines and one per map entry; the role
-branch's blocks start when identity answers; one narrow question for each entry a code check names. No review, no
-repair of a value, no call for summary or career highlights. Code: the map's checks (parse_map), the lines no entry
+branch's blocks start when identity answers; one narrow question for each entry a code check names; one call that
+writes the blocks the CV has no text for. A block or an entry that gave no reply is asked once more. No review, no
+repair of a value. Code: the map's checks (parse_map), the lines no entry
 holds placed, long text copied and joined, every short value found by exact match in its own lines, periods and years
 read, every ref and value checked, a value that fails dropped with a note, every uncited content line of an entry
 added to it as one more plain bullet, and every line whose words no field took kept as «other». The result is each
@@ -15,8 +16,10 @@ import time
 from . import prompts as P
 from .lines import CV
 from .tech import named_in, source_spelling
-from .words import line_words, words
+from packages.resume_core.technologies import resolve_technology
+from .words import line_words, unknown_names, words
 
+from packages.resume_core.importing.template_import import ACCOUNT_STOP
 from packages.resume_core.importing.template_map import parse_map, parse_period, uncovered
 from packages.resume_core.template_source_cleanup import without_form
 
@@ -42,13 +45,29 @@ SUBHEADS = {'обязанности', 'достижения', 'задачи', '�
 ABBREVIATIONS = {'inc', 'ltd', 'corp', 'co', 'llc', 'гг', 'др', 'пр', 'т.д', 'т.п', 'etc', 'jr', 'sr'}
 ZONE_GAP = 6   # header lines of one job stand at most this many lines apart
 OWN_LINES = ('identity', 'education', 'courses', 'location', 'languages', 'opensource', 'portfolio')
+# A written block (prompts.WRITE): a number in it must stand in the CV, and it is a few sentences, not a page.
+NUMBER = re.compile(r'\d+')
+WRITTEN_LIMIT, WRITTEN_ITEM, WRITTEN_LINES = 1500, 400, 10
+# A word of letters of two alphabets («инженerов») is a slip of the model's pen unless the CV writes it so.
+LETTERS = re.compile(r'[^\W\d_]+')
+CYRILLIC, LATIN = re.compile(r'[а-яё]'), re.compile(r'[a-z]')
+NAME_WORD = re.compile(r"[^\W\d_][\w.+#-]*")
 TECHNOLOGY_LISTS = ('programming', 'data_and_tools', 'infrastructure', 'role_tools')
 OWN_PERIOD = 3  # an entry's own period line stands among its first lines
 SEPARATORS = ' \t,;:|·•/–—-'
+# A call that gave no reply is asked once more, unless the account, a cancel or the deadline stopped it. The map and a
+# written block have their own second call.
+ASKED_AGAIN = ('fill', 'entry')
+NO_SECOND_CALL = ACCOUNT_STOP | {'CANCELLED', 'DEADLINE_EXCEEDED'}
+POOL = 8       # calls the scheme runs at once
 LONG_RUN = 15  # this many lines in a row that no entry holds: the map is asked for once more
 COLUMN_MIX = 5  # this many lines of another column in one entry, in no side block: the map is asked for once more
 OWN_ENTRY = 4  # this many lines in a row after a job's header, in no entry, are an entry the map missed
 DURATION = re.compile(r'\(\s*\d[^)]*\)|\b\d+(?:[.,]\d+)?\s*(?:год[а-я]*|лет|месяц[а-я]*|мес\.?|years?|yrs?|months?|mos?)\b', re.I)
+# A stated length in years: a number of one or two digits (so no calendar year) and a year unit.
+YEARS = re.compile(r'(?<![\w.,])(\d{1,2})(?:[.,](\d))?\s*\+?\s*(лет|года|год|г\.?|years?|yrs?)(?![\w])', re.I)
+# Where one list item of a line ends: a semicolon, a bar, a bullet, or a comma that is no decimal comma («1,5 года»).
+ITEMS = re.compile(r'[;|•]|,(?!\d)')
 DATE_WORD = re.compile(r'^(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр|янв|фев|мар|апр|'
                        r'авг|сен|окт|ноя|дек|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|настоящ|наст|время|сейчас|'
                        r'текущ|present|now|current|today|ongoing|till|состоянию)', re.I)
@@ -58,6 +77,37 @@ def pointer(*tokens):
     return ''.join('/' + str(token) for token in tokens)
 
 
+def years(text, russian=None):
+    """A length in years in its one form: (the number, the form) or None. The unit follows the number as its language
+    asks («1 год», «2 года», «5 лет», «1,5 года»; «1 year», «3 years»); every other word is left out. russian: the
+    language of the form; None keeps the language of the unit as written."""
+    found = YEARS.search(str(text or ''))
+    if found is None:
+        return None
+    whole, part, unit = int(found.group(1)), found.group(2), found.group(3).casefold()
+    if unit[0] == 'y' if russian is None else not russian:
+        number = str(whole) + ('.' + part if part else '')
+        return number, number + (' year' if number == '1' else ' years')
+    number = str(whole) + (',' + part if part else '')
+    if part:
+        return number, number + ' года'
+    word = 'год' if whole % 10 == 1 and whole % 100 != 11 else 'года' if whole % 10 in (2, 3, 4) and whole % 100 not in (12, 13, 14) else 'лет'
+    return number, number + ' ' + word
+
+
+def same_tool(name):
+    """One key for the spellings of one tool: its catalog entry, else its letters and digits alone (Win Forms, WinForms)."""
+    resolved = resolve_technology(name)
+    return resolved.canonical_id or ''.join(char.casefold() for char in name if char.isalnum() or char in '+#') or name.casefold()
+
+
+def within(target, text):
+    """Where a folded value stands in a folded text as whole words (never a part of a longer word: Java is not in
+    JavaScript); -1 when it does not."""
+    found = re.search(r'(?<![^\W_])' + re.escape(target) + r'(?![^\W_])', text) if target else None
+    return found.start() if found else -1
+
+
 def fold(text):
     """As the gate folds: case, spacing, dash and quote forms aside."""
     text = QUOTES.sub('"', DASHES.sub('-', str(text).casefold().replace('ё', 'е')))
@@ -65,19 +115,32 @@ def fold(text):
 
 
 class Import:
-    def __init__(self, sources, caller, *, envelope=True, form='text'):
+    def __init__(self, sources, caller, *, envelope=True, form='text', writing=None, blocks=None):
         """caller.call(kind, block, prompt, schema) -> (payload or None, row); envelope: whether the caller's replies
-        come inside {"payload": ...} (the request's example then shows it)."""
-        self.caller, self.envelope, self.form = caller, envelope, form
+        come inside {"payload": ...} (the request's example then shows it). writing: {block: instructions}, the
+        template's own rules for a block the import may write when the CV has no text for it; none, none is written.
+        blocks: the ids of the template's blocks; a block the template lacks is not asked for, and its content does
+        not count as shown. None: every block the scheme knows."""
+        self.caller, self.envelope, self.form, self.writing = caller, envelope, form, dict(writing or {})
+        self.blocks = None if blocks is None else set(blocks)
         self.data = CV(sources)
         self.lines = self.data.lines
+        # The résumé is written in the language most of the CV's letters are of; a value with a form takes its words.
+        letters = ''.join(line.text for line in self.lines).casefold()
+        self.russian = len(CYRILLIC.findall(letters)) >= len(LATIN.findall(letters))
         self.notes = {'invalid': [], 'dropped': [], 'leftover': [], 'respelled': 0, 'map': {}}
         self.table, self.failed = {}, set()
         self.labels = set()  # label-only lines: hidden, still shown to their entry's call
         self.other = []      # text no field took: {owner, kind, refs}; kept for the facts, not shown
+        self.written = {}    # blocks the CV has no text for, written from its lines: {block: [pointer]}
+        self.lack = {}       # of a line kept as «other» that its block shows in part: the words it does not show
         self.stage = None    # called with a short stage name as the import goes on
+        self.live = None     # the blocks that show content in this document, once the branch is known
 
     # ----------------------------------------------------------------------------------------------------- helpers
+
+    def wanted(self, block):
+        return self.blocks is None or block in self.blocks
 
     def text(self, ref):
         return self.data.text(ref)
@@ -123,15 +186,15 @@ class Import:
             for end in range(start, min(len(refs), start + (12 if FIXES else 8))):
                 # Lines next to each other among the block's own lines: a two-column layout sets other lines between.
                 joined = (joined + ' ' + fold(BULLET.sub('', self.text(refs[end]), count=1))).strip()
-                if target in joined or target in fold(self.text(refs[end])):
+                if within(target, joined) >= 0 or within(target, fold(self.text(refs[end]))) >= 0:
                     if best is None or end - start < len(best) - 1:
                         best = refs[start:end + 1]
                     break
         if best and len(best) > 1:
             # Keep only the lines the value reaches into.
-            while len(best) > 1 and target in ' '.join(fold(BULLET.sub('', self.text(ref), count=1)) for ref in best[1:]):
+            while len(best) > 1 and within(target, ' '.join(fold(BULLET.sub('', self.text(ref), count=1)) for ref in best[1:])) >= 0:
                 best = best[1:]
-            while len(best) > 1 and target in ' '.join(fold(BULLET.sub('', self.text(ref), count=1)) for ref in best[:-1]):
+            while len(best) > 1 and within(target, ' '.join(fold(BULLET.sub('', self.text(ref), count=1)) for ref in best[:-1])) >= 0:
                 best = best[:-1]
         return best or []
 
@@ -140,7 +203,7 @@ class Import:
         joined = ' '.join(' '.join(BULLET.sub('', self.text(ref), count=1).split()) for ref in refs)
         folded = QUOTES.sub('"', DASHES.sub('-', joined.casefold().replace('ё', 'е')))
         target = fold(value)
-        at = folded.find(target)
+        at = within(target, folded)
         if len(folded) != len(joined) or at < 0:
             return ' '.join(str(value).split())
         return joined[at:at + len(target)]
@@ -263,7 +326,9 @@ class Import:
         payload = {**payload,
                    'blocks': [{**block, 'ranges': [r for r in map(self.snapped, block.get('ranges') or []) if r]}
                               for block in payload.get('blocks') or []],
-                   'entries': self.apart([r for r in map(self.snapped, payload.get('entries') or []) if r]),
+                   # In CV order, whatever order the reply lists them in: apart() reads them so.
+                   'entries': self.apart(sorted((r for r in map(self.snapped, payload.get('entries') or []) if r),
+                                                key=lambda entry: self.data.order.get(entry.get('first'), len(self.lines)))),
                    'hidden': [r for r in map(self.snapped, payload.get('hidden') or []) if r]}
         payload['blocks'] = [block for block in payload['blocks'] if block['ranges']]
         reply = {
@@ -483,10 +548,15 @@ class Import:
         self.notes['map']['split'] = done
         if not jobs:
             return value
-        pool = ThreadPoolExecutor(8)
-        futures = {number: pool.submit(self.call, 'split', 'projects.' + str(number),
-                                       P.split_request([self.data.by_ref[ref] for ref in case['lines']], case['signs']),
-                                       P.split_schema(case['lines'][1:])) for number, case in jobs.items()}
+        pool = ThreadPoolExecutor(POOL)
+        try:
+            futures = {number: pool.submit(self.call, 'split', 'projects.' + str(number),
+                                           P.split_request([self.data.by_ref[ref] for ref in case['lines']], case['signs']),
+                                           P.split_schema(case['lines'][1:])) for number, case in jobs.items()}
+            replies = {number: future.result() for number, future in futures.items()}
+        finally:
+            # A failure here leaves no call running behind the import.
+            pool.shutdown(wait=True, cancel_futures=True)
         cue, order = map_checks.cues(self.data), self.data.order
         done['refused'] = 0
 
@@ -506,7 +576,7 @@ class Import:
             return False
         entries = []
         for number, entry in enumerate(value['entries']):
-            reply = futures[number].result() if number in futures else None
+            reply = replies.get(number)
             named = [ref for ref in (reply or {}).get('starts') or [] if ref in entry['lines'][1:]]
             starts = [ref for ref in named if stands(ref, jobs[number])]
             done['refused'] += len(named) - len(starts)
@@ -526,7 +596,6 @@ class Import:
             for index, piece in enumerate(pieces):
                 entries.append({**entry, 'lines': piece, 'header': dict(entry['header']),
                                 'title': entry['title'] if index == 0 else self.text(piece[0])})
-        pool.shutdown(wait=True)
         value = {**value, 'entries': entries}
         value['uncovered'] = uncovered(value)
         return value
@@ -677,9 +746,8 @@ class Import:
                 technology = self.technology(block, pointer('items', index, 'technology'), item.get('technology'), scope, evidence)
                 if technology is None:
                     continue
-                experience = self.short(block, pointer('items', index, 'experience'), item.get('experience'), scope, evidence)
-                if experience is not None and not re.search(r'\d', experience):
-                    experience = None
+                experience = self.experience(block, pointer('items', index, 'experience'), technology, item.get('experience'),
+                                             scope, evidence)
                 value = {'technology': technology, 'experience': experience}
                 value = {key: part for key, part in value.items()}
                 items.append(value)
@@ -725,7 +793,8 @@ class Import:
                     items.append(value)
             else:  # technology lists
                 value = self.technology(block, pointer('items', index), item, scope, evidence)
-                if value and value.casefold() not in {other.casefold() for other in items}:
+                # The same tool once, whatever its spelling (Postgres and PostgreSQL): the first one stands.
+                if value and same_tool(value) not in {same_tool(other) for other in items}:
                     items.append(value)
                 elif value:
                     evidence.pop(pointer('items', index), None)
@@ -738,6 +807,35 @@ class Import:
             self.table[block] = (items, evidence)
         else:
             self.table[block] = ({'items': items}, evidence)
+        return None
+
+    def experience(self, block, path, technology, text, scope, evidence):
+        """A technology's stated length of work in its one form, in the résumé's language («5 лет» for «около 5 лет»
+        and for «5 years» in a Russian CV). The number must stand with a year unit in the line that names this
+        technology (or alone on the line under it); the length of another technology is never taken."""
+        if text is None or not str(text).strip():
+            return None
+        asked = years(text)
+        number = asked[0].replace(',', '.') if asked else None
+        refs = list(scope)
+        for index, ref in enumerate(refs if number else ()):
+            line = self.text(ref)
+            # The length stands in the list item that names the technology («Python — 5 лет, Docker — 2 года»).
+            item = next((part for part in ITEMS.split(line) if named_in(technology, [part])), None)
+            if item is None:
+                continue
+            stated = YEARS.search(item)
+            if stated is not None:
+                form, cited = years(stated.group(), self.russian), [ref]
+            elif not YEARS.search(line) and index + 1 < len(refs) and YEARS.fullmatch(self.text(refs[index + 1]).strip(SEPARATORS + '()')):
+                # A narrow column sets the length on the line under the name.
+                form, cited = years(self.text(refs[index + 1]), self.russian), [ref, refs[index + 1]]
+            else:
+                continue
+            if form[0].replace(',', '.') == number:
+                evidence[path] = self.spans(cited)
+                return form[1]
+        self.notes['dropped'].append({'block': block, 'pointer': path, 'why': 'no stated length in years'})
         return None
 
     def date(self, block, path, text, scope, evidence):
@@ -817,10 +915,10 @@ class Import:
             display = self.technology('projects', path, name, own, evidence, cited)
             if display is None:
                 continue
-            if display.casefold() in seen:
+            if same_tool(display) in seen:
                 evidence.pop(path, None)
                 continue
-            seen.add(display.casefold())
+            seen.add(same_tool(display))
             value['technologies'].append({'display': display})
         for key in ('tasks', 'results'):
             for item in reply.get(key) or []:
@@ -896,11 +994,15 @@ class Import:
                     break
         back = set(missing(shown()))
         if L3:
-            # A stack line whose technologies were taken and that has more words stays cited: no bullet repeats it;
-            # keep_other() keeps it as «other».
+            # A stack line whose technologies were taken and that has a few more words stays cited: no bullet repeats
+            # it; keep_other() keeps it as «other». A sentence that only names a technology («… на Kafka») is no stack
+            # line: most of its words are shown nowhere, and it is given back.
             wide = {by_unit.get((span.get('unitId', span.get('unit_id')), span['start']))
                     for path, spans in evidence.items() if '/technologies/' not in path for span in spans}
-            back &= wide
+            have = shown()
+            stack = {ref for ref in back - wide
+                     if len(line_words(self.text(ref)) - have) <= len(line_words(self.text(ref)) & have)}
+            back -= stack
         if extended or back:
             self.notes.setdefault('partial', []).append({'entry': index, 'extended': extended, 'back': len(back)})
         return back
@@ -924,6 +1026,58 @@ class Import:
             if items:
                 self.table['career_highlights'] = ({'items': items}, evidence)
 
+    def written_problem(self, text, refs, limit=WRITTEN_LIMIT):
+        """Why code does not keep a text the model wrote, as (the note's name, the words for the model); (None, None)
+        when it keeps it. The text names lines of the CV to rest on, is no page, and states no number and no name the
+        CV does not state and no word of two alphabets the CV does not have."""
+        stated = {number for line in self.lines for number in NUMBER.findall(line.text)}
+        foreign = sorted(set(NUMBER.findall(text)) - stated)
+        known = {word.casefold() for line in self.lines for word in LETTERS.findall(line.text)}
+        mixed = [word for word in LETTERS.findall(text) if CYRILLIC.search(word.casefold()) and LATIN.search(word.casefold())
+                 and word.casefold() not in known]
+        # A name (an employer, a product, a technology, a level such as Senior) must be one the CV writes.
+        stated_names = {word.casefold() for line in self.lines for word in NAME_WORD.findall(line.text)} | known
+        unknown = unknown_names(text, stated_names)
+        return (('no text', None) if not text
+            else ('no lines', 'it named no line of these lines to rest on.') if not refs
+            else ('too long', 'it was too long.') if len(text) > limit
+            else ('a number the CV lacks', 'it states a number the lines do not state: ' + ', '.join(foreign) + '.') if foreign
+            else ('a word of two alphabets', 'a word in it mixes two alphabets: ' + ', '.join('«' + word + '»' for word in mixed)
+                  + '. Each word is written in one alphabet.') if mixed
+            else ('a name the CV lacks', 'it names what the lines do not name: ' + ', '.join(unknown) + '.') if unknown
+            else (None, None))
+
+    def cited(self, refs):
+        return self.ordered([ref for ref in (refs or [])[:WRITTEN_LINES] if ref in self.data.by_ref and ref not in self.hidden])
+
+    def take_written(self, block, reply):
+        """A block the CV has no text for, written by the model from the CV's lines; what code keeps of it
+        (written_problem). A text block that is refused gives the reason in words for the model (the caller asks once
+        more); a kept block, an empty one and a list block give None: a list item code refuses is left out alone."""
+        reply = reply if isinstance(reply, dict) else {}
+        if P.WRITE[block]['shape'] == 'items':
+            items, evidence = [], {}
+            for item in reply.get('items') or []:
+                text, refs = ' '.join(str(item.get('text') or '').split()), self.cited(item.get('lines'))
+                problem, _told = self.written_problem(text, refs, WRITTEN_ITEM)
+                if problem:
+                    self.notes['invalid'].append({'kind': 'write', 'block': block, 'problem': problem})
+                    continue
+                evidence[pointer('items', len(items))] = self.spans(refs)
+                items.append(text)
+            if items:
+                self.table[block] = ({'items': items}, evidence)
+                self.written[block] = [pointer('items', '*')]
+            return None
+        text, refs = ' '.join(str(reply.get('text') or '').split()), self.cited(reply.get('lines'))
+        problem, told = self.written_problem(text, refs)
+        if problem:
+            self.notes['invalid'].append({'kind': 'write', 'block': block, 'problem': problem})
+            return told
+        self.table[block] = ({'text': text}, {pointer('text'): self.spans(refs)})
+        self.written[block] = [pointer('text')]
+        return None
+
     def keep_other(self):
         """Every line the map did not hide whose words its own block or entry does not show is kept as «other»:
         employer details, words of a side line no field took, a line in no block."""
@@ -940,15 +1094,22 @@ class Import:
             elif value is not None and not isinstance(value, bool):
                 yield str(value)
 
+        # Only the blocks this document has and this role's branch fills show anything: a template without Focus shows
+        # none of its content, and a block of the other branch is never filled.
+        live = self.live = {block for block in [*SIDE, *BRANCH[self.branch], 'summary', 'career_highlights'] if self.wanted(block)}
         shown = {block: set().union(*(words(text) for text in strings(payload)))
-                 for block, (payload, _evidence) in self.table.items() if block != 'projects'}
+                 for block, (payload, _evidence) in self.table.items() if block != 'projects' and block in live}
+        # The same content as text: a line too short to have a counted word («UX») is looked for in it whole.
+        said = {block: fold(' '.join(strings(payload))) for block, (payload, _evidence) in self.table.items()
+                if block != 'projects' and block in live}
         entry_of, number = {}, 0
         for entry in self.map['entries']:
             if entry.get('value') is None:
                 continue
             have = set().union(*(words(text) for text in strings(entry['value'])))
+            text = fold(' '.join(strings(entry['value'])))
             for ref in [*entry['lines'], *(header['line'] for header in entry['header'].values() if header)]:
-                entry_of.setdefault(ref, []).append((number, have))
+                entry_of.setdefault(ref, []).append((number, have, text))
             number += 1
         found = []
         heads, number = [], 0
@@ -968,9 +1129,19 @@ class Import:
             owners = [block for block, refs in blocks.items() if ref in refs and block != 'projects']
             if L3 and 'focus' in owners:
                 owners += [block for block in TECHNOLOGY_LISTS if block not in owners]   # as block_lines gives them
-            have = set().union(*(shown.get(block, set()) for block in owners), *(have for _number, have in entry_of.get(ref, [])))
-            if not line_words(self.text(ref)) - have:
+            owners = [block for block in owners if block in live]
+            have = set().union(*(shown.get(block, set()) for block in owners), *(item[1] for item in entry_of.get(ref, [])))
+            need = line_words(self.text(ref))
+            if not need:
+                # No counted word: the line is shown when its own text stands in the content of its block or entry.
+                own = fold(without_form(self.text(ref)))
+                if not any(char.isalnum() for char in own) or any(within(own, text) >= 0 for text in
+                        [*(said.get(block, '') for block in owners), *(item[2] for item in entry_of.get(ref, []))]):
+                    continue
+            elif not need - have:
                 continue
+            if need & have:
+                self.lack[ref] = sorted(need - have)
             if ref in entry_of:
                 found.append((ref, 'projects.' + str(entry_of[ref][0][0]), 'no field'))
             elif owners or ref in blocks.get('projects', []):
@@ -1002,6 +1173,9 @@ class Import:
 
     def call(self, kind, block, prompt, schema):
         payload, row = self.caller.call(kind, block, prompt, schema)
+        if payload is None and kind in ASKED_AGAIN and row.get('errorCode') not in NO_SECOND_CALL:
+            self.notes['askedAgain'] = self.notes.get('askedAgain', 0) + 1
+            payload, row = self.caller.call(kind, block, prompt, schema)
         if payload is None:
             self.notes['invalid'].append({'kind': kind, 'block': block, 'problem': row.get('errorCode') or 'no reply'})
         return payload
@@ -1020,12 +1194,14 @@ class Import:
             if NO_REPAIR and problem:
                 # Without the repair call a map that code finds unusable is asked for once more; the better one stands.
                 first, first_notes = value, self.notes['map']
+                first_labels, first_page = set(self.labels), list(getattr(self, 'page', []))
                 self.notes['map'] = {}
                 value, again = self.map_once()
                 worse = lambda old, new: (first_notes.get('columnMix', 0) <= self.notes['map'].get('columnMix', 0)
                                           if 'column mix' in (problem, again) else self.out_of_entries(old) <= self.out_of_entries(new))
                 if value is None or (first is not None and again and (again in ('no entries', 'no map') or worse(first, value))):
                     value, again, self.notes['map'] = first, problem, first_notes
+                    self.labels, self.page = first_labels, first_page
                 self.notes['map']['retry'] = {'first': problem, 'second': again}
                 problem = again if value is None or again in ('no entries', 'no map') else None
             if value is None or problem:
@@ -1037,48 +1213,74 @@ class Import:
             self.map, self.hidden = value, set(value['hidden'])
             self.from_map()
             self.tell('blocks')
-            pool = ThreadPoolExecutor(8)
-            jobs = {}
-            for block in SIDE:
-                if self.block_lines(block):
-                    lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
-                    jobs[block] = pool.submit(self.call, 'fill', block, P.block_request(block, lines), P.block_schema(block))
-            for index, entry in enumerate(value['entries']):
-                header = {'employer': (entry['header'].get('employer') or {}).get('value'),
-                          'job_title': (entry['header'].get('jobTitle') or {}).get('value'),
-                          'period': (entry['header'].get('period') or {}).get('value')}
-                lines = [line for line in self.lines if line.ref in set(entry['lines']) and (line.ref not in self.hidden or line.ref in self.labels)]
-                jobs['entry:' + str(index)] = pool.submit(self.call, 'entry', 'projects.' + str(index),
-                                                          P.entry_request(header, lines, self.form), P.entry_schema(self.form))
-            family = None
-            if 'identity' in jobs:
-                reply = jobs.pop('identity').result()
-                if reply is None:
-                    self.failed.add('identity')
-                else:
-                    family = self.take_block('identity', reply)
-            self.branch = 'skills_and_tools' if family in SKILLS_FAMILIES else 'technical'
-            for block in BRANCH[self.branch]:
-                if self.block_lines(block):
-                    lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
-                    jobs[block] = pool.submit(self.call, 'fill', block, P.block_request(block, lines), P.block_schema(block))
-            for key, future in jobs.items():
-                reply = future.result()
-                if key.startswith('entry:'):
-                    if reply is None:
-                        continue  # the entry is lost: its lines show nowhere (B1)
-                    self.take_entry(int(key.split(':')[1]), reply)
-                elif reply is None:
-                    self.failed.add(key)
-                else:
-                    self.take_block(key, reply)
-            pool.shutdown(wait=True)
+            pool = ThreadPoolExecutor(POOL)
+            try:
+                self.fill(value, pool)
+            finally:
+                # A failure here leaves no call running behind the import.
+                pool.shutdown(wait=True, cancel_futures=True)
             self.assemble()
             if FIXES:
                 self.keep_other()
             return self.finish(started, 'succeeded')
         finally:
             P.ENVELOPE.reset(token)
+
+    def fill(self, value, pool):
+        """The calls for the blocks and the entries, side by side, and what code takes of each reply."""
+        jobs = {}
+        for block in SIDE:
+            # Identity is always read: its role family chooses the branch of the technology blocks.
+            if self.block_lines(block) and (self.wanted(block) or block == 'identity'):
+                lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
+                jobs[block] = pool.submit(self.call, 'fill', block, P.block_request(block, lines), P.block_schema(block))
+        for index, entry in enumerate(value['entries']):
+            header = {'employer': (entry['header'].get('employer') or {}).get('value'),
+                      'job_title': (entry['header'].get('jobTitle') or {}).get('value'),
+                      'period': (entry['header'].get('period') or {}).get('value')}
+            lines = [line for line in self.lines if line.ref in set(entry['lines']) and (line.ref not in self.hidden or line.ref in self.labels)]
+            jobs['entry:' + str(index)] = pool.submit(self.call, 'entry', 'projects.' + str(index),
+                                                      P.entry_request(header, lines, self.form), P.entry_schema(self.form))
+        # Every block the CV has no text for and the template lets a model word is written from the CV's lines, in one
+        # call beside the others.
+        empty = [block for block in P.WRITE if block not in self.table and value['entries'] and self.writing.get(block)
+                 and self.wanted(block)]
+        if empty:
+            asked = [line for line in self.lines if line.ref not in self.hidden]
+            jobs['write'] = pool.submit(self.call, 'write', 'write', P.write_request(empty, asked, self.writing),
+                                        P.write_schema(empty))
+        family = None
+        if 'identity' in jobs:
+            reply = jobs.pop('identity').result()
+            if reply is None:
+                self.failed.add('identity')
+            else:
+                family = self.take_block('identity', reply)
+        self.branch = 'skills_and_tools' if family in SKILLS_FAMILIES else 'technical'
+        for block in BRANCH[self.branch]:
+            if self.block_lines(block) and self.wanted(block):
+                lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
+                jobs[block] = pool.submit(self.call, 'fill', block, P.block_request(block, lines), P.block_schema(block))
+        for key, future in jobs.items():
+            reply = future.result()
+            if key.startswith('entry:'):
+                if reply is None:
+                    continue  # no reply twice: the entry is no card, its lines are kept as «other» (keep_other)
+                self.take_entry(int(key.split(':')[1]), reply)
+            elif key == 'write':
+                # No reply, or a text code refuses twice: the block stays empty, as in the CV.
+                refused = {block: told for block in empty for told in [self.take_written(block, (reply or {}).get(block))]
+                           if told} if reply is not None else {}
+                if refused:
+                    # One more call for the refused blocks alone, told what code refused.
+                    again = self.call('write', 'write', P.write_request(list(refused), asked, self.writing, refused),
+                                      P.write_schema(list(refused)))
+                    for block in refused if again is not None else ():
+                        self.take_written(block, again.get(block))
+            elif reply is None:
+                self.failed.add(key)
+            else:
+                self.take_block(key, reply)
 
     def finish(self, started, state):
         self.seconds = round(time.monotonic() - started, 2)
