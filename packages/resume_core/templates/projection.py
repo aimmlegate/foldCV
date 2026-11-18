@@ -79,7 +79,31 @@ def schema_children(node: JsonObject):
                 if isinstance(child, dict): yield f"{key}/{index}", child
 
 
+_VALID: OrderedDict[str, None] = OrderedDict()
+_VALID_LOCK = threading.Lock()
+
+
 def validate_schema(schema: JsonObject) -> None:
+    # An import checks the same block schema once per task and per entry; the meta-schema check is the slow part.
+    try:
+        key = hashlib.sha256(json.dumps(schema, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+            allow_nan=False).encode()).hexdigest()
+    except (TypeError, ValueError):
+        key = None
+    if key is not None:
+        with _VALID_LOCK:
+            if key in _VALID:
+                _VALID.move_to_end(key)
+                return
+    _validate_schema(schema)
+    if key is not None:
+        with _VALID_LOCK:
+            _VALID[key] = None
+            while len(_VALID) > 512:
+                _VALID.popitem(last=False)
+
+
+def _validate_schema(schema: JsonObject) -> None:
     try:
         Draft202012Validator.check_schema(schema)
     except SchemaError as error:

@@ -51,7 +51,7 @@ class LiteTransport(ControlledTransport):
         super().__init__(fixture)
         self.stored, self.model_calls = stored, 0
 
-    def lite_calls(self, _model, _cancel, _remaining):
+    def lite_calls(self, _model, _cancel, _remaining, _cap=None):
         return self.stored
 
     def generate(self, request, cancel):
@@ -74,14 +74,15 @@ class Unwritten(StoredCalls):
         return reply, row
 
 
-def lite_run(tmp_path, name, fail=(), calls=None, lines=None):
-    """lines: {line number: text} replaces lines of the CV as the parser read them; calls: the scheme's calls."""
+def lite_run(tmp_path, name, fail=(), calls=None, lines=None, package=None):
+    """lines: {line number: text} replaces lines of the CV as the parser read them; calls: the scheme's calls;
+    package: the template, the two-column one when none is given."""
     data = (FIXTURES / (name + '.docx')).read_bytes()
     extracted = extract(data, name + '.docx')
     for number, text in (lines or {}).items():
         extracted.units[number - 1].text = text
     source = canonical_source(extracted)
-    fixture = EmploymentFixture(tmp_path, captured=generic_package(), src=source, original_bytes=data, cap=80,
+    fixture = EmploymentFixture(tmp_path, captured=package or generic_package(), src=source, original_bytes=data, cap=80,
                                 fallback=False, concurrency=1)
     fixture.transport = LiteTransport(fixture, calls or StoredCalls(name, fail))
     fixture.pipeline = fixture.fresh_pipeline()
@@ -411,6 +412,42 @@ def test_an_account_stop_in_any_call_of_the_scheme_stops_the_import_unpublished(
     assert [(row['kind'], row['block']) for row in calls.rows].count(('entry', 'projects.1')) == 1
 
 
+def test_the_schemes_calls_are_the_imports_calls_and_keep_its_cap(tmp_path, promotions):
+    import threading
+    from packages.resume_core.importing.template_import import model_calls, spent_calls
+    from resume_api.projects.imports import usage_detail
+    fixture, operation = promotions
+    # The notice counts the calls the scheme made; the tasks, answered by code, spend none of the cap.
+    made = len(fixture.transport.stored.rows)
+    assert operation.lite_calls == made == model_calls(operation) and spent_calls(operation) == 0 and operation.attempts
+    assert usage_detail(operation)['usage']['calls'] == made
+    # A call past the cap is not made, and it is not asked for again.
+
+    class Failing:
+        def generate(self, _request, _files, _cancel):
+            raise ContentFailure('INVALID_RESULT', logical_attempts=1, cleanup_verified=True, dispatch_witness={})
+    calls = lite_import.LiteCalls(Failing(), 'codex_cli', 'model', 'low', tmp_path, threading.Event(), lambda: 60.0, None, cap=2)
+    codes = [calls.call('fill', 'focus', '{}', {'type': 'object', 'properties': {}})[1]['errorCode'] for _ in range(3)]
+    assert codes[2] == 'IMPORT_CALL_CAP' and 'IMPORT_CALL_CAP' not in codes[:2] and calls.started == 2
+    # An import whose scheme ran into the cap stops with that and publishes nothing.
+    capped = Partly('promotions', {('entry', 'projects.2'): 'IMPORT_CALL_CAP'})
+    with pytest.raises(TemplateImportFailure, match='IMPORT_CALL_CAP'):
+        lite_run(tmp_path / 'capped', 'promotions', calls=capped)
+    assert [(row['kind'], row['block']) for row in capped.rows].count(('entry', 'projects.2')) == 1
+
+
+def test_the_task_steps_of_a_lite_import_stay_in_memory_and_are_saved_with_the_steps_that_keep_the_reading(tmp_path, monkeypatch):
+    from resume_api.importer.template_sidecar import OperationSidecar
+    written, write = [], OperationSidecar.write
+    monkeypatch.setattr(OperationSidecar, 'write',
+        lambda self, *args, **options: written.append(len(args[2].task_results)) or write(self, *args, **options))
+    fixture, operation = lite_run(tmp_path, 'promotions')
+    assert operation.state == 'published' and len(operation.task_results) == len(operation.tasks) > 10
+    # Code answers the tasks, so no step of theirs is a file: the reading is saved before them, and the step that
+    # drops it saves every task's result at once.
+    assert written == [0, len(operation.tasks)]
+
+
 def test_a_value_that_breaks_the_templates_schema_is_left_out_alone(tmp_path):
     line = 'Java; Spring Boot, PostgreSQL, Kafka, Kubernetes, управление командой'
 
@@ -442,6 +479,85 @@ def test_a_task_that_names_a_technology_is_still_a_task_when_the_reply_leaves_it
     fixture, _operation = lite_run(tmp_path, 'promotions', calls=Short('promotions'))
     # The line is cited only by the technology it names; it is a sentence, not a stack line, so it goes in as a bullet.
     assert task in document_text(fixture)
+
+
+AWARDS_BLOCK = """- id: awards
+  region: main
+  order: 45
+  schema:
+  - title: text
+    year: date
+  extract:
+  - Extract each award, prize or contest place with its title and the stated year.
+  view:
+    title:
+      ru: НАГРАДЫ
+      en: AWARDS
+    item_gap: 8
+    nodes:
+    - type: join_fields
+      fields: [/title, /year]
+      separator: ', '
+      style: body
+"""
+AWARDS_FACT = """- id: awards
+  fields:
+    title: text
+    year: date
+"""
+
+
+def awards_package():
+    """The two-column template with one block of its author's own."""
+    from packages.resume_core.templates import store
+    from packages.resume_core.templates.compiler import compile_bytes
+    text = store.bundled_source('generic-two-column').decode()
+    at = text.index('\n- id: location\n') + 1
+    text = text[:at] + AWARDS_BLOCK + text[at:]
+    at = text.index('\nfact_types:\n') + len('\nfact_types:\n')
+    text = (text[:at] + AWARDS_FACT + text[at:]).replace('  id: generic-two-column\n', '  id: own-awards\n', 1)
+    return compile_bytes(text.encode(), store.BUNDLED_TEMPLATES['generic-two-column'].parent, original_format='yaml')
+
+
+def test_a_block_of_the_templates_own_is_mapped_read_by_its_schema_and_shown(tmp_path):
+    class Awarded(StoredCalls):
+        """The stored run of a CV whose fourth line states an award: the map gives the line to the template's own
+        block, and the block's call copies one award and makes up another."""
+        prompts = {}
+
+        def call(self, kind, block, prompt, schema):
+            self.prompts[(kind, block)] = (json.loads(prompt), schema)
+            if (kind, block) == ('fill', 'awards'):
+                row = {'kind': kind, 'block': block, 'errorCode': None, 'usage': ReportedUsage(10, 0, 5, True)}
+                self.rows.append(row)
+                return {'items': [{'title': 'Лучший наставник года', 'year': '2022'},
+                                  {'title': 'Премия совета директоров', 'year': None}]}, row
+            reply, row = super().call(kind, block, prompt, schema)
+            if kind == 'map' and reply is not None:
+                hidden = [{'first': 'S5', 'last': value['last']} if value['first'] == 'S4' else value for value in reply['hidden']]
+                reply = {**reply, 'hidden': hidden,
+                         'blocks': [*reply['blocks'], {'block': 'awards', 'ranges': [{'first': 'S4', 'last': 'S4'}]}]}
+            return reply, row
+    calls = Awarded('promotions')
+    fixture, operation = lite_run(tmp_path, 'promotions', calls=calls, lines={4: 'Лучший наставник года, 2022'},
+                                  package=awards_package())
+    assert operation.state == 'published'
+    # The map is told what the block holds in its author's words, and may give it lines.
+    asked, schema = calls.prompts[('map', 'map')]
+    assert {'block': 'awards', 'holds': 'AWARDS / НАГРАДЫ — Extract each award, prize or contest place with its title and '
+                                        'the stated year.'} in asked['blocks']
+    assert 'awards' in schema['properties']['blocks']['items']['properties']['block']['enum']
+    # The block's call follows its schema: a text may be null and a date is asked for as its text.
+    request, shape = calls.prompts[('fill', 'awards')]
+    assert request['instructions'] == ['Extract each award, prize or contest place with its title and the stated year.']
+    item = shape['properties']['items']['items']['properties']
+    assert item == {'title': {'type': ['string', 'null'], 'minLength': 1}, 'year': {'type': ['string', 'null'], 'minLength': 1}}
+    # The award the line states is shown with its year read by code; the one no line states is not.
+    shown = document_text(fixture)
+    assert 'Лучший наставник года' in shown and 'Премия совета директоров' not in shown and 'НАГРАДЫ' in shown
+    award, = [record for record in fixture.current().project.facts.extensions if record.semantic_type == 'foldcv:awards']
+    cells = {cell.field_key: cell.typed_value for cell in award.cells}
+    assert cells['title'] == 'Лучший наставник года' and cells['year']['year'] == 2022
 
 
 def test_a_block_the_template_lacks_is_not_asked_for_and_shows_nothing():
@@ -495,9 +611,9 @@ def test_an_import_that_stopped_continues_from_the_reading_it_kept_and_calls_no_
                 raise ContentFailure('AUTH_REQUIRED', logical_attempts=1, cleanup_verified=True, dispatch_witness={'transport': 'lite'})
             return super().generate(request, cancel)
 
-        def lite_calls(self, model, cancel, remaining):
+        def lite_calls(self, model, cancel, remaining, cap=None):
             self.readings += 1
-            return super().lite_calls(model, cancel, remaining)
+            return super().lite_calls(model, cancel, remaining, cap)
     data = (FIXTURES / 'promotions.docx').read_bytes()
     fixture = EmploymentFixture(tmp_path, captured=generic_package(), src=canonical_source(extract(data, 'promotions.docx')),
                                 original_bytes=data, cap=80, fallback=False, concurrency=1)

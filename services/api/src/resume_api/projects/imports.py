@@ -15,7 +15,7 @@ from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.repository.project_repository import decode_project
 from packages.resume_core.reasoning import ReasoningEffort
 from packages.resume_core.import_failure import TemplateImportFailure
-from packages.resume_core.importing.template_import import spent_calls
+from packages.resume_core.importing.template_import import model_calls
 
 from ..importer.lite_import import STAGES as LITE_STAGES
 from ..importer.template_transport import JOB_PERMIT
@@ -77,7 +77,7 @@ def usage_detail(operation):
     """The calls and tokens of the import's notice (T9), summed over the operation's attempts as its record holds them;
     nothing before the first call. A released attempt never ran, and a count its provider did not report adds none."""
     attempts = getattr(operation, 'attempts', None)
-    calls = spent_calls(operation) if attempts else 0
+    calls = model_calls(operation) if attempts else 0
     if not calls:
         return {}
 

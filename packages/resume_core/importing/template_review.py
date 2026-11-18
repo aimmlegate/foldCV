@@ -200,11 +200,12 @@ def settled_checks(proposal, targets, allocations, sources, *, rewrite_fields, p
 
 
 def make_review_input(operation, proposal, package, sources, policy, *, effective_cells, semantic_context,
-                      occurrence_context=None, occurrence_independent=True, previous=None, written=()):
+                      occurrence_context=None, occurrence_independent=True, previous=None, written=(), whole_source=True):
     """The review of a proposal. previous, for a replacement review, is the reviewed proposal the repair corrects with
     its receipt: the checks of what the repair left unchanged reuse that receipt (D115). The proposal of one entry of
     a block (D117) settles verbatim values only within the entry's lines. written: the pointers of text a lite import
-    wrote for a block the source has no text for; such text shows as written, not as its cited lines."""
+    wrote for a block the source has no text for; such text shows as written, not as its cited lines. whole_source:
+    the review offers the whole CV beside what the proposal cites; a review that code answers needs only the latter."""
     if proposal.state != 'provisional' or proposal.reply is None:
         raise TemplateImportFailure('IMPORT_PROPOSAL_NOT_REVIEWABLE')
     attempt = attempt_in(operation, proposal.attempt_id)
@@ -220,7 +221,7 @@ def make_review_input(operation, proposal, package, sources, policy, *, effectiv
         content_schema=next(value.full_schema for value in package.blocks if value.id == block.id))
     asked = {(value.rule_id, value.target_id) for value in settled}
     asked = [target for target in targets if (target.rule_id, target.target_id) not in asked]
-    spans = [capture_span(source, unit) for source in sources for unit in source.units]
+    spans = [capture_span(source, unit) for source in sources for unit in source.units] if whole_source else []
     spans += [span for field in proposal.resolved_fields for span in field.evidence]
     spans += [span for relation in proposal.reply.relations for span in relation.evidence]
     # References the proposal request offered keep their names, so the proposal reads the same in review.

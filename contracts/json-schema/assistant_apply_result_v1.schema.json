@@ -6463,6 +6463,12 @@
           ],
           "title": "Lastobservedat"
         },
+        "liteCalls": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Litecalls",
+          "type": "integer"
+        },
         "liteReading": {
           "anyOf": [
             {

@@ -99,13 +99,13 @@ async def test_no_step_of_an_import_changes_a_view_and_the_read_cache_keeps_what
     read = OperationSidecar.read
     monkeypatch.setattr(OperationSidecar, 'read', lambda self, *args: parsed.append(args) or read(self, *args))
 
-    def checked_step(project, operation_id, transition):
+    def checked_step(project, operation_id, transition, **options):
         # The project lock holds the other steps off while this one is checked.
         with fixture.repository.open(project).lock:
             before = pipeline.read(project)
             views.append((before, before.model_dump_json(by_alias=True)))
             parsed.clear()
-            result = step(project, operation_id, transition)
+            result = step(project, operation_id, transition, **options)
             assert not parsed and before.model_dump_json(by_alias=True) == views[-1][1]
             assert pipeline.read_cache[project][2] is result and result == fixture.fresh_pipeline().read(project)
             kinds.update(step_kinds(operation_in(before, operation_id), operation_in(result, operation_id)))

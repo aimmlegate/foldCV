@@ -52,16 +52,27 @@ def root_model(schema):
 class LiteCalls:
     """The scheme's own model calls: the import's provider, model and effort, its permit, its cancel and its time."""
 
-    def __init__(self, provider, adapter, model, effort, temp_root, cancel, remaining, permit):
+    def __init__(self, provider, adapter, model, effort, temp_root, cancel, remaining, permit, cap=None):
+        """cap: the most model calls this import may make (its captured call cap); None, no limit."""
         self.provider, self.adapter, self.model, self.effort = provider, adapter, model, effort
         self.temp_root, self.cancel, self.remaining, self.permit = temp_root, cancel, remaining, permit
-        self.rows, self.lock = [], threading.Lock()
+        self.rows, self.lock, self.cap, self.started = [], threading.Lock(), cap, 0
         self.envelope = adapter != 'claude_cli'
 
     def call(self, kind, block, prompt, schema):
         """One call: (the reply's object or None, its row with the usage and an error code)."""
         row = {'kind': kind, 'block': block, 'errorCode': None, 'usage': None, 'seconds': None}
         started, payload, usage = time.monotonic(), None, None
+        with self.lock:
+            # The import's call cap holds for the scheme's calls: one past it is not made, and the import stops.
+            refused = self.cap is not None and self.started >= self.cap
+            if refused:
+                row['errorCode'], row['seconds'] = 'IMPORT_CALL_CAP', 0.0
+                self.rows.append(row)
+            else:
+                self.started += 1
+        if refused:
+            return None, row
         try:
             with CALLS.hold(self.adapter, self.cancel):
                 # The time left is read after the wait for a place, so a call that waited does not run past the import's
@@ -129,6 +140,8 @@ class LiteResult:
         self.texts = {line.ref: ' '.join(line.text.split()) for line in lines}
         self.order = {line.ref: index for index, line in enumerate(lines)}
         self.notes, self.stop = {'dropped': []}, None
+        # The scheme's calls were counted when the reading was kept; a kept reading makes none.
+        self.calls, self.capped = None, False
         self.blocks = {block.id: block for block in package.definition.blocks}
         self.schemas = {block.id: block.full_schema for block in package.blocks}
         self.lock, self.answered = threading.Lock(), set(answered)
@@ -184,6 +197,11 @@ class LiteResult:
             for index, name in enumerate(('input_tokens', 'cached_input_tokens', 'output_tokens')):
                 held[index] += getattr(usage, name, None) or 0
         self.stop = next((row['errorCode'] for row in calls.rows if row['errorCode'] in ACCOUNT_STOP), None)
+        # The calls the scheme made of the import's cap, and whether it ran into the cap.
+        self.calls = getattr(calls, 'started', None)
+        if self.calls is None:
+            self.calls = len(calls.rows)
+        self.capped = any(row['errorCode'] == 'IMPORT_CALL_CAP' for row in calls.rows)
         # Why a scheme that read no map failed, as the import's own error code.
         codes = {row['errorCode'] for row in calls.rows}
         self.failure = ('CANCELLED' if 'CANCELLED' in codes else 'IMPORT_PROCESSING_EXHAUSTED' if 'DEADLINE_EXCEEDED' in codes
@@ -197,6 +215,21 @@ class LiteResult:
                     total[index] += value
             self.answered.add(block)
         return ReportedUsage(total[0], total[1], total[2], True)
+
+    def offered(self, block, options):
+        """Of the evidence a block's request offers, the refs its content needs: for each span the content cites, the
+        smallest offered text that holds it (as evidence_ref finds it when the reply is built)."""
+        units = {}
+        for option in options:
+            units.setdefault((option.span.source_id, option.span.unit_id), []).append(option)
+        needed = set()
+        for spans in self.table.get(block, (None, {}))[1].values():
+            for span in spans:
+                holders = [option for option in units.get((span['sourceId'], span['unitId']), ())
+                           if option.span.start <= span['start'] and span['end'] <= option.span.end]
+                if holders:
+                    needed.add(min(holders, key=lambda option: option.span.end - option.span.start).ref)
+        return needed
 
     def owner(self, name):
         """The block whose task keeps a line: its own, else identity (a line in no block of the template, or in a
@@ -240,10 +273,21 @@ def writing_rules(package):
             if block.id in WRITE and block.rewrite.fields}
 
 
+def custom_blocks(package):
+    """The template's own blocks: the ones a model fills that the scheme has no request of its own for. Each is read
+    by its schema, with what it holds and its instructions in the template author's words."""
+    from packages.resume_core.importing.lite import custom, prompts
+    known = {name for name, _holds in prompts.MAP_BLOCKS}
+    schemas = {block.id: block.full_schema for block in package.blocks}
+    return {block.id: {'holds': custom.described(block), 'schema': schemas[block.id],
+                       'instructions': [*block.extract, *block.rules]}
+            for block in package.definition.blocks if block.mode == 'model' and block.id not in known}
+
+
 def run(sources, package, calls, stage=None):
     """One lite import of these sources; calls: LiteCalls."""
     importer = Import(sources, calls, envelope=calls.envelope, writing=writing_rules(package),
-        blocks=[block.id for block in package.definition.blocks])
+        blocks=[block.id for block in package.definition.blocks], custom=custom_blocks(package))
     importer.stage = stage
     importer.run()
     return LiteResult(importer, calls, package)

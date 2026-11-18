@@ -285,7 +285,18 @@ def add_outline_review(operation, parent_id, *, id_factory=identity, check=True)
 
 
 def spent_calls(operation):
+    """The model calls of the import's cap that its tasks spent. A lite import's tasks spend none: code answers them,
+    and the cap is kept by the scheme's own calls (model_calls)."""
+    if operation.capture.policy.lite:
+        return 0
     return sum(attempt.state != 'released' for attempt in operation.attempts)
+
+
+def model_calls(operation):
+    """The model calls the import made, as its notice counts them."""
+    if operation.capture.policy.lite:
+        return operation.lite_calls
+    return spent_calls(operation)
 
 
 def stops_import(operation, attempt):

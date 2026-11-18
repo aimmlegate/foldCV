@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import re
 import time
 
+from . import custom as C
 from . import prompts as P
 from .lines import CV
 from .tech import named_in, source_spelling
@@ -58,7 +59,7 @@ SEPARATORS = ' \t,;:|·•/–—-'
 # A call that gave no reply is asked once more, unless the account, a cancel or the deadline stopped it. The map and a
 # written block have their own second call.
 ASKED_AGAIN = ('fill', 'entry')
-NO_SECOND_CALL = ACCOUNT_STOP | {'CANCELLED', 'DEADLINE_EXCEEDED'}
+NO_SECOND_CALL = ACCOUNT_STOP | {'CANCELLED', 'DEADLINE_EXCEEDED', 'IMPORT_CALL_CAP'}
 POOL = 8       # calls the scheme runs at once
 LONG_RUN = 15  # this many lines in a row that no entry holds: the map is asked for once more
 COLUMN_MIX = 5  # this many lines of another column in one entry, in no side block: the map is asked for once more
@@ -115,14 +116,17 @@ def fold(text):
 
 
 class Import:
-    def __init__(self, sources, caller, *, envelope=True, form='text', writing=None, blocks=None):
+    def __init__(self, sources, caller, *, envelope=True, form='text', writing=None, blocks=None, custom=None):
         """caller.call(kind, block, prompt, schema) -> (payload or None, row); envelope: whether the caller's replies
         come inside {"payload": ...} (the request's example then shows it). writing: {block: instructions}, the
         template's own rules for a block the import may write when the CV has no text for it; none, none is written.
         blocks: the ids of the template's blocks; a block the template lacks is not asked for, and its content does
-        not count as shown. None: every block the scheme knows."""
+        not count as shown. None: every block the scheme knows. custom: {block: {holds, schema, instructions}}, the
+        template's own blocks (custom.py): mapped and read beside the scheme's."""
         self.caller, self.envelope, self.form, self.writing = caller, envelope, form, dict(writing or {})
         self.blocks = None if blocks is None else set(blocks)
+        self.custom = dict(custom or {})
+        self.mapped = [(block, spec['holds']) for block, spec in self.custom.items()]
         self.data = CV(sources)
         self.lines = self.data.lines
         # The résumé is written in the language most of the CV's letters are of; a value with a form takes its words.
@@ -337,7 +341,7 @@ class Import:
                          'last': entry.get('last'), 'employer': entry.get('employer'), 'jobTitle': entry.get('job_title'),
                          'period': entry.get('period')} for entry in payload.get('entries') or []],
             'hidden': payload.get('hidden') or []}
-        request = {'blocks': [{'block': name} for name, _ in P.MAP_BLOCKS],
+        request = {'blocks': [{'block': name} for name, _ in [*P.MAP_BLOCKS, *self.mapped]],
                    'entryBlocks': [{'block': name} for name in P.ENTRY_BLOCKS]}
         value = parse_map(reply, self.data.offered, self.data.sources, request)
         # A line with content of a block is never hidden (map rule): a line the map both places and hides stays placed.
@@ -690,7 +694,8 @@ class Import:
         reply the checks refuse, lines of projects with no entry at all, a long run of lines no entry holds."""
         page = self.page_lines() if L3 else set()
         lines = [line for line in self.lines if line.ref not in page]
-        payload = self.call('map', 'map', P.map_request(lines, parts=True) if L3 else P.map_request(self.lines), P.map_schema())
+        payload = self.call('map', 'map', P.map_request(lines, parts=True, extra=self.mapped) if L3
+                            else P.map_request(self.lines, extra=self.mapped), P.map_schema(self.mapped))
         if payload is None:
             return None, 'no map'
         try:
@@ -837,6 +842,46 @@ class Import:
                 return form[1]
         self.notes['dropped'].append({'block': block, 'pointer': path, 'why': 'no stated length in years'})
         return None
+
+    def take_custom(self, block, reply):
+        """A block of the template's own: the reply copied into the block's shape. A text is kept when the block's
+        lines state it word for word, a date when its text has a year, a number when the lines state it; a closed
+        choice and a yes or no are taken as given. A list item with nothing kept is left out."""
+        schema, scope, evidence = self.custom[block]['schema'], self.block_lines(block), {}
+        numbers = {number for ref in scope for number in NUMBER.findall(self.text(ref))}
+
+        def take(node, value, path):
+            node = C.resolved(schema, node)
+            types = C.kinds(node)
+            if C.is_date(node):
+                return self.date(block, pointer(*path), value, scope, evidence)
+            if 'array' in types:
+                kept = []
+                for item in value if isinstance(value, list) else []:
+                    here = [*path, len(kept)]
+                    got = take(node.get('items') or {}, item, here)
+                    if C.blank(got):
+                        for key in [key for key in evidence if key == pointer(*here) or key.startswith(pointer(*here) + '/')]:
+                            del evidence[key]
+                        continue
+                    kept.append(got)
+                return kept
+            if 'object' in types:
+                got = {key: take(part, value.get(key) if isinstance(value, dict) else None, [*path, key])
+                       for key, part in (node.get('properties') or {}).items()}
+                return None if 'null' in types and C.blank(got) else got
+            if 'enum' in node:
+                return value if value in node['enum'] else None
+            if types & {'integer', 'number'}:
+                stated = isinstance(value, (int, float)) and not isinstance(value, bool) and str(value).split('.')[0] in numbers
+                return value if stated else None
+            if 'boolean' in types:
+                return value if isinstance(value, bool) else None
+            return self.short(block, pointer(*path), value, scope, evidence)
+        listed = 'array' in C.kinds(C.resolved(schema, schema))
+        content = take(schema, (reply or {}).get('items') if listed else reply, [])
+        if not C.blank(content):
+            self.table[block] = (content, evidence)
 
     def date(self, block, path, text, scope, evidence):
         """A year or date: the model copies its text, code reads the year (and a month when the text names one)."""
@@ -1096,7 +1141,8 @@ class Import:
 
         # Only the blocks this document has and this role's branch fills show anything: a template without Focus shows
         # none of its content, and a block of the other branch is never filled.
-        live = self.live = {block for block in [*SIDE, *BRANCH[self.branch], 'summary', 'career_highlights'] if self.wanted(block)}
+        live = self.live = {block for block in [*SIDE, *BRANCH[self.branch], 'summary', 'career_highlights', *self.custom]
+                            if self.wanted(block)}
         shown = {block: set().union(*(words(text) for text in strings(payload)))
                  for block, (payload, _evidence) in self.table.items() if block != 'projects' and block in live}
         # The same content as text: a line too short to have a counted word («UX») is looked for in it whole.
@@ -1234,6 +1280,11 @@ class Import:
             if self.block_lines(block) and (self.wanted(block) or block == 'identity'):
                 lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
                 jobs[block] = pool.submit(self.call, 'fill', block, P.block_request(block, lines), P.block_schema(block))
+        for block, spec in self.custom.items():
+            if self.block_lines(block) and self.wanted(block):
+                lines = [line for line in self.lines if line.ref in set(self.block_lines(block))]
+                jobs[block] = pool.submit(self.call, 'fill', block, P.custom_request(spec['holds'], spec['instructions'], lines),
+                                          C.asked(spec['schema'])[0])
         for index, entry in enumerate(value['entries']):
             header = {'employer': (entry['header'].get('employer') or {}).get('value'),
                       'job_title': (entry['header'].get('jobTitle') or {}).get('value'),
@@ -1279,6 +1330,8 @@ class Import:
                         self.take_written(block, again.get(block))
             elif reply is None:
                 self.failed.add(key)
+            elif key in self.custom:
+                self.take_custom(key, reply)
             else:
                 self.take_block(key, reply)
 

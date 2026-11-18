@@ -1303,6 +1303,7 @@ export type Targetids = string[];
 export type Taskid2 = string;
 export type Issues1 = ImportIssue[];
 export type Lastobservedat = string | null;
+export type Litecalls = number;
 export type Litereading = string | null;
 /**
  * @minItems 1
@@ -5814,6 +5815,7 @@ export interface ImportOperation {
   inferenceClosed?: Inferenceclosed;
   issues?: Issues1;
   lastObservedAt: Lastobservedat;
+  liteCalls?: Litecalls;
   liteReading?: Litereading;
   otherLines?: Otherlines;
   projectId: Projectid9;

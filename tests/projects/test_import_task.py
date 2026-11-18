@@ -330,9 +330,10 @@ def attempt(state, *counts):
 def test_the_usage_counts_only_attempts_that_ran_and_takes_an_unreported_count_as_none():
     from resume_api.projects.imports import usage_detail
     # A released attempt never ran; one whose outcome is unknown may have, and its provider reported nothing.
-    operation = SimpleNamespace(attempts=[attempt('released', None, None, None), attempt('returned', 900, 0, 40),
-        attempt('outcome_unknown', None, None, None)])
+    capture = SimpleNamespace(policy=SimpleNamespace(lite=False))
+    operation = SimpleNamespace(capture=capture, attempts=[attempt('released', None, None, None),
+        attempt('returned', 900, 0, 40), attempt('outcome_unknown', None, None, None)])
     assert usage_detail(operation) == {'usage': {'calls': 2, 'inputTokens': 900, 'cachedInputTokens': 0,
         'outputTokens': 40}}
-    assert usage_detail(SimpleNamespace(attempts=operation.attempts[:1])) == {}
+    assert usage_detail(SimpleNamespace(capture=capture, attempts=operation.attempts[:1])) == {}
     assert usage_detail(SimpleNamespace(id='operation-hold', state='cancelled')) == usage_detail(None) == {}

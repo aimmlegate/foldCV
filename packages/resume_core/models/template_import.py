@@ -718,6 +718,9 @@ class ImportOperation(Wire):
     # it: an import that stopped continues from this reading and calls no model for it again. A string, so a saved
     # step does not walk it; dropped when every task has its result.
     lite_reading: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The model calls a lite import's scheme made. They are the import's calls: its tasks are answered by code, and
+    # their attempts are no calls of a model.
+    lite_calls: int = Field(default=0, ge=0, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def identity(self):

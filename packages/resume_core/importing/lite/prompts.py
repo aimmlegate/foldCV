@@ -135,10 +135,11 @@ MAP_EXAMPLE_REPLY = {
     'hidden': [{'first': 'S4', 'last': 'S5'}, {'first': 'S16', 'last': 'S16'}, {'first': 'S18', 'last': 'S18'}]}
 
 
-def map_schema():
+def map_schema(extra=()):
+    """extra: (block, what it holds) of the template's own blocks, mapped beside the scheme's."""
     header = {**closed({'value': NAME, 'line': REF}), 'type': ['object', 'null']}
     return closed({
-        'blocks': array(closed({'block': {'type': 'string', 'enum': [name for name, _ in MAP_BLOCKS]},
+        'blocks': array(closed({'block': {'type': 'string', 'enum': [name for name, _ in [*MAP_BLOCKS, *extra]]},
                                 'ranges': array(RANGE, minItems=1)})),
         'entries': array(closed({'block': {'type': 'string', 'enum': ENTRY_BLOCKS}, 'title': {'type': 'string'},
                                  'first': REF, 'last': REF, 'employer': header, 'job_title': header, 'period': header})),
@@ -150,12 +151,12 @@ MAP_RULE_PARTS = ('When one line states two of employer, job_title and period, e
                   'that line, never the whole line.')
 
 
-def map_request(lines, parts=True):
+def map_request(lines, parts=True, extra=()):
     return request({
         'task': 'Map a CV for a résumé template: say which lines hold the content of each block, list the entries of '
                 'the block projects with their header values, and name the lines that hold no content. A later step '
                 'reads each block from its own lines only, so give a block every line its content needs.',
-        'blocks': [{'block': name, 'holds': text} for name, text in MAP_BLOCKS],
+        'blocks': [{'block': name, 'holds': text} for name, text in [*MAP_BLOCKS, *extra]],
         'rules': [COMMON[0], *MAP_RULES, *([MAP_RULE_PARTS] if parts else [])],
         'example': {'lines': MAP_EXAMPLE_LINES, 'reply': MAP_EXAMPLE_REPLY},
         'lines': pairs(lines)})
@@ -324,6 +325,24 @@ def block_request(block, lines):
 
 def block_schema(block):
     return BLOCKS[block]['schema']
+
+
+# ------------------------------------------------------------------------------ a block of the template's own
+
+# A block the scheme has no request of its own for (custom.py). What it holds and what its fields mean are the template
+# author's words; the copy rule stands over them.
+CUSTOM_RULES = [
+    'The reply has the block\'s fields as its schema names them. A field these lines do not state is null. A list has '
+    'one item for each thing the lines state, in their order, and no item when they state none.',
+    'A date field is the text of the date as the line writes it («2015», «июнь 2015»), null when none.',
+    'instructions say what the block and its fields hold. Where one of them asks to reword, shorten, merge, translate or '
+    'infer, the copy rule above stands instead.',
+]
+
+
+def custom_request(holds, instructions, lines):
+    return request({'task': 'Extract the content of one block of a résumé from its own CV lines. The block holds: ' + holds,
+                    'rules': [*COMMON, *CUSTOM_RULES], 'instructions': list(instructions), 'lines': pairs(lines)})
 
 
 # ------------------------------------------------------------------------------ blocks the CV has no text for

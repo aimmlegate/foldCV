@@ -67,6 +67,11 @@ from . import lite_import
 from .template_sidecar import OperationSidecar
 
 
+# Of a task's request, what a lite import's review input does not repeat.
+LITE_REVIEW_LEFT_OUT = ('evidence', 'effectiveRecords', 'effectiveCells', 'relations', 'dependencies', 'modelInstructions',
+    'declaration', 'replyProtocol')
+
+
 class AccountStop(TemplateImportFailure):
     pass
 
@@ -434,6 +439,9 @@ class TemplatePipeline:
         self.wall, self.elapsed, self.id_factory = wall, elapsed, id_factory
         self.locks, self.cancels = {}, {}
         self.read_cache, self.cache_lock = OrderedDict(), threading.Lock()
+        # Per project, the view of a lite import whose latest steps are in memory only: (the committed workspace, the
+        # sidecar keys, the view), as a read-cache entry is.
+        self.pending = {}
         self.calls = ThreadPoolExecutor(max_workers=CALL_THREADS, thread_name_prefix='foldcv-import-call')
         # The calls in flight in the service, shared with every import and rewrite preview (R3).
         self.places = places
@@ -459,6 +467,13 @@ class TemplatePipeline:
             keys = sidecar.keys(project, workspace)
             # The entry holds the committed object and compares it by identity: an id() key matched a later
             # workspace that CPython had placed at the address of a freed one.
+            held = self.pending.get(project)
+            if held is not None:
+                # A lite import's steps kept in memory (update_operation): the view is ahead of the files until
+                # the next saved step, as long as nothing else was committed or written meanwhile.
+                if held[0] is committed and held[1] == keys:
+                    return held[2]
+                self.pending.pop(project, None)
             cached = self.read_cache.get(project)
             hit = cached is not None and cached[0] is committed and cached[1] == keys
             if hit and not verifying():
@@ -505,7 +520,10 @@ class TemplatePipeline:
                 client_mutation_id=identifier, request_sha256=hashlib.sha256(identifier.encode()).hexdigest())
             return self.read(project)
 
-    def update_operation(self, project, operation_id, transition):
+    def update_operation(self, project, operation_id, transition, *, in_memory=False):
+        """One step of an import: the operation after it is validated and saved in the sidecar. in_memory: the step
+        is kept in memory only (a lite import's task steps: no model call runs around them, and a run that stops
+        answers its tasks again from the reading it kept); the next saved step validates and saves them all."""
         session = self.repository.open(project)
         with session.lock:
             import_usage.lap('lockWait')
@@ -516,12 +534,20 @@ class TemplatePipeline:
             prior = operation_in(before, operation_id)
             result = transition(prior, data, with_holder(before, data))
             import_usage.lap('transition')
+            sidecar = OperationSidecar(session.directory)
+            if in_memory:
+                if result is prior and data.facts is owner(before).facts:
+                    return before
+                view = with_holder(before, owner(before).model_copy(update={'facts': data.facts, 'template_operations': [
+                    result if value.id == operation_id else value for value in owner(before).template_operations]}))
+                self.pending[project] = (session.workspace, sidecar.keys(project, view), view)
+                return view
             text = result.model_dump_json(by_alias=True)
             updated = ImportOperation.model_validate_json(text)
             import_usage.lap('validation')
-            if updated == prior and data.facts == owner(before).facts:
+            if updated == prior and data.facts == owner(before).facts and project not in self.pending:
                 return before
-            sidecar = OperationSidecar(session.directory)
+            self.pending.pop(project, None)
             sidecar.write(project, before.project_revision, updated, data.facts, text=text)
             after = with_holder(before, owner(before).model_copy(update={'facts': data.facts, 'template_operations': [
                 updated if value.id == operation_id else value for value in owner(before).template_operations]}))
@@ -541,9 +567,13 @@ class TemplatePipeline:
         """update_operation in a worker thread; the import's timing sums its parts under `kind` (R1)."""
         submitted = time.perf_counter()
 
+        # A lite import answers its tasks from its reading: their steps stay in memory. The steps that keep or drop the
+        # reading are saved, and with them whatever was kept in memory before.
+        in_memory = lite_import.LITE.get() is not None and kind != 'lite_reading'
+
         def timed():
             with import_usage.step(kind, submitted):
-                return self.update_operation(project, operation_id, transition)
+                return self.update_operation(project, operation_id, transition, in_memory=in_memory)
         return await asyncio.to_thread(timed)
 
     def update(self, project, identifier, transition):
@@ -656,9 +686,9 @@ class TemplatePipeline:
                         result = await self.lite(project, operation, data, deadline, cancel)
                         # The reading is kept with the import before any task is answered from it: a run that stops
                         # later continues from this one reading and calls no model for it again.
-                        reading = result.snapshot()
+                        reading, made = result.snapshot(), result.calls
                         workspace = await self.step(project, operation.id, 'lite_reading',
-                            lambda value, _data, _workspace: value.model_copy(update={'lite_reading': reading}))
+                            lambda value, _data, _workspace: value.model_copy(update={'lite_reading': reading, 'lite_calls': made}))
                         operation = operation_in(workspace, operation.id)
                     else:
                         done = {value.task_id for value in operation.task_results}
@@ -683,7 +713,7 @@ class TemplatePipeline:
         key = (project, operation.id)
         try:
             calls = self.transport.lite_calls(operation.capture.primary, cancel,
-                lambda: max(0.0, deadline.remaining(operation, self.wall(), self.elapsed())))
+                lambda: max(0.0, deadline.remaining(operation, self.wall(), self.elapsed())), operation.capture.policy.call_cap)
         except ContentFailure as error:
             # No provider or model for the scheme's calls (signed out, the model gone): the import stops with that code.
             raise (AccountStop if error.code in ACCOUNT_STOP else TemplateImportFailure)(error.code) from None
@@ -695,6 +725,9 @@ class TemplatePipeline:
                 data.template_package, calls, stage)
         finally:
             self.lite_stages.pop(key, None)
+        if result.capped:
+            # The scheme ran into the import's call cap: the import stops with that, as a task's call would.
+            raise TemplateImportFailure('IMPORT_CALL_CAP')
         if result.stop is not None:
             # The account stopped a call of the scheme (no quota, signed out): the import stops with that, as any call
             # would, whatever the scheme read before it. Nothing is published from a part of the CV.
@@ -844,6 +877,14 @@ class TemplatePipeline:
         spans = list({digest(span): span for span in spans}.values())
         options = (evidence_options(spans, data.sources) if mapped is None
             else block_evidence(*mapped, task.block_id, spans, data.sources))
+        lite = lite_import.LITE.get()
+        if lite is not None and source_requested and mapped is None:
+            # A lite import's block is answered from the scheme's reading: its request keeps only the texts that
+            # reading cites for the block (and what is no line of the CV), not the whole CV once per block.
+            cited = lite.offered(task.block_id, options)
+            extra = {digest(span) for cell in cells for span in cell.evidence} | {
+                digest(span) for result in dependencies for span in result.source_spans}
+            options = [option for option in options if option.ref in cited or digest(option.span) in extra]
         value = {'protocol': 'template_import_v1', 'tools': [], 'replyProtocol': PROPOSAL_PROTOCOL,
             'packageHash': data.template_package.package_hash,
             'allowTextRewrite': operation.capture.allow_text_rewrite,
@@ -1020,12 +1061,15 @@ class TemplatePipeline:
                     # (a live import: every effective cell was 250 KB of each 320 KB review input).
                     effective_cells=[cell for cell in effective_cells(data.facts, data.template_operations)
                         if cell.id in {identifier for field in proposal.resolved_fields for identifier in field.effective_cell_ids}],
-                    semantic_context={'taskInput': {key: value for key, value in task_input.items() if key != 'evidence'},
+                    # A lite import's review is answered by code: its input keeps the receipt's parts and leaves out
+                    # what only a model would read (the request's records and prompts, the whole CV).
+                    semantic_context={'taskInput': {key: value for key, value in task_input.items()
+                            if key not in (LITE_REVIEW_LEFT_OUT if lite_import.LITE.get() is not None else ('evidence',))},
                         'taskFactsHash': task_facts_digest(operation, task_id, data.facts),
                         'otherBlocks': other_blocks(operation, task, data.template_package)},
                     # D115: what the repair left as it was keeps the reviewed reply's receipt results.
                     previous=(previous, previous_receipt) if previous is not None and previous_receipt is not None else None,
-                    written=written_pointers(task))
+                    written=written_pointers(task), whole_source=lite_import.LITE.get() is None)
                 if prior_review is None and task_input.get('mapped'):
                     # T4: the review reads what the trimmed request read, and the lines the reply cites; a map entry's
                     # project name its lines do not state word for word is a finding.
@@ -1489,7 +1533,7 @@ class TemplatePipeline:
                     check=False)
                 return reconcile_cleanup(result, proof, self.wall(), check=False) if proof is not None else result
             with import_usage.step('return', submitted):
-                workspace = self.update_operation(project, operation_id, retain)
+                workspace = self.update_operation(project, operation_id, retain, in_memory=lite_import.LITE.get() is not None)
             import_usage.returned(attempt_id, frame.usage.detail, operation_in(workspace, operation_id))
         request = ContentInput(model_prompt(value), dynamic_result(schema, BOOKKEEPING_KEYS),
             GenerationPolicy(policy.model, timeout_seconds=max(0.001, remaining), allow_repair=False,
