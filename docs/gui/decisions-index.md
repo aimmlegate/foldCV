@@ -177,3 +177,5 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D172 The résumé is compared with the original both ways
 - D173 A block is reworded on the user's request, by a prompt the user sees
 - D174 The app is foldCV 1.1.0
+- D175 The fast import keeps the call cap, skips the old pipeline's saved steps and fills a template's own block
+- D176 The app's data folder is `foldCV`; the service run from source uses `FoldCV Dev`; foldCV 1.1.1
