@@ -127,13 +127,17 @@ def _insertion(content, selected):
     return None
 
 
-def _rewrite(content, selected, operation, allocator, bound, flanks, *, path=(), citations=(), replacement=None):
+def _rewrite(content, selected, operation, allocator, bound, flanks, *, path=(), citations=(), replacement=None,
+        gone=frozenset()):
     cursor = 0
     for index, span in enumerate(content):
         length = _length(span)
         nested_target = (selected.start != selected.end or isinstance(bound, FactFieldSpan)
             and any(child.binding_id == bound.binding_id for child, _start, _end in _leaves(span.content)
                 if isinstance(child, FactFieldSpan))) if isinstance(span, (Hyperlink, BoundLink)) else False
+        if nested_target and gone and selected.start <= cursor and cursor + length <= selected.end:
+            # A link that a deletion wholly covers goes with its text, as the replay cuts it.
+            nested_target = False
         if nested_target and cursor <= selected.start <= selected.end <= cursor + length:
             result = [part.model_copy(deep=True) for part in content]
             nested = selected.model_copy(update={'start': selected.start - cursor, 'end': selected.end - cursor})
@@ -189,12 +193,17 @@ def _rewrite(content, selected, operation, allocator, bound, flanks, *, path=(),
     return prefix + inserted + suffix, inserted
 
 
-def _guard_links(content, selected, operation):
+def _guard_links(content, selected, operation, gone=frozenset()):
     if not isinstance(operation, ReplaceText):
         return
     cursor = 0
     for span in content:
         length = _length(span)
+        if isinstance(span, BoundLink) and selected.start <= cursor and cursor + length <= selected.end and any(
+                _identity(field) in gone for field, _start, _end in _fields([span])):
+            # The deletion takes the whole link off the page; its label and URL facts keep their values (F3-0).
+            cursor += length
+            continue
         if isinstance(span, BoundLink):
             overlap = selected.start < cursor + length and selected.end > cursor
             if selected.start == selected.end and cursor < selected.start < cursor + length:
@@ -210,6 +219,38 @@ def _guard_links(content, selected, operation):
                     and (selected.start < cursor or selected.end > cursor + length)):
                 raise ValueError('cross-link replacement cannot discard an untouched URL binding')
         cursor += length
+
+
+def whole_occurrences(document, block_id, selected, field_ranges):
+    """The field occurrences whose whole text lies inside the selected range of this one container (D178; it replaces
+    the empty place of D132). An occurrence with text elsewhere is cut, not whole."""
+    key = selected.cell_id or selected.field
+    candidates = {_identity(span) for span, start, end in field_ranges if end > start}
+    places = {}
+    if candidates:
+        for block in document.blocks():
+            for container, content in inline_groups(block):
+                for span, start, end in _fields(content):
+                    if _identity(span) in candidates:
+                        places.setdefault(_identity(span), []).append((block.id, container, start, end))
+    return {identity for identity in candidates if all(owner == block_id and container == key
+        and selected.start <= start and end <= selected.end for owner, container, start, end in places[identity])}
+
+
+def _without_gone(content, gone):
+    """An empty fragment that an older save left beside a removed field goes too: typed text there is the user's own."""
+    result = []
+    for span in content:
+        if isinstance(span, FactFieldSpan) and not span.text and _identity(span) in gone:
+            continue
+        if isinstance(span, (Hyperlink, BoundLink)):
+            kept = span.model_copy(deep=True)
+            kept.content = _without_gone(kept.content, gone)
+            if kept.content or not span.content:
+                result.append(kept)
+            continue
+        result.append(span)
+    return result
 
 
 def _technology_names(workspace, fields):
@@ -231,7 +272,15 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
     content, text = _range_content(original, selected)
     if replacement is None and isinstance(operation, ReplaceText) and utf16_slice(text, selected.start, selected.end) == operation.text:
         operation = SetMarks(kind='set_marks', opId=operation.op_id, range=selected, styles=operation.styles)
-    _guard_links(content, selected, operation)
+    field_ranges = [(span, start, end) for span, start, end in _fields(content)
+        if start < selected.end and end > selected.start or start == end and selected.start <= start < selected.end]
+    gone = set()
+    if isinstance(operation, ReplaceText) and replacement is None and not operation.text and selected.start != selected.end:
+        # A deletion of a field's whole text takes the field off the page and keeps its fact; a technology line stays
+        # locked, so its name keeps the refusal below.
+        gone = whole_occurrences(workspace.project.document, original.id, selected, field_ranges) - {
+            _identity(span) for span in _technology_names(workspace, [span for span, _start, _end in field_ranges])}
+    _guard_links(content, selected, operation, frozenset(gone))
     allocator = allocator_for(response, request, operation, occupied)
     if replacement is not None:
         replacement.allocator = allocator
@@ -241,8 +290,9 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
         return prepared(None, response.model_copy(deep=True))
     leaves = [(span, start, end) for span, start, end in _leaves(content)
         if start < selected.end and end > selected.start or start == end and selected.start <= start < selected.end]
-    field_ranges = [(span, start, end) for span, start, end in _fields(content)
-        if start < selected.end and end > selected.start or start == end and selected.start <= start < selected.end]
+    gone_length = sum(min(end, selected.end) - max(start, selected.start) for span, start, end in field_ranges
+        if _identity(span) in gone)
+    field_ranges = [(span, start, end) for span, start, end in field_ranges if _identity(span) not in gone]
     fields = [span for span, _start, _end in field_ranges]
     scope_ranges = [(span, start, end) for span, start, end in leaves if isinstance(span, ManualScopeSpan)]
     bound, direct = None, False
@@ -253,7 +303,7 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
         if isinstance(bound, ManualScopeSpan):
             scope_ranges = [(bound, selected.start, selected.end)]
     elif fields:
-        covered = sum(min(end, selected.end) - max(start, selected.start) for _span, start, end in field_ranges)
+        covered = gone_length + sum(min(end, selected.end) - max(start, selected.start) for _span, start, end in field_ranges)
         direct = not scope_ranges and len({_identity(span) for span in fields}) == 1 and covered == selected.end - selected.start
         bound = fields[0] if direct else None
     if replacement is not None:
@@ -282,8 +332,10 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
             seed = next((span for span, _start, _end in leaves if isinstance(span, FactFieldSpan)
                 and _identity(span) == _identity(bound)), None)
         flanks = FlankRecorder(allocator)
-        changed, inserted = _rewrite(content, selected, operation, allocator, seed, flanks, replacement=replacement)
-        target_content[:] = changed
+        changed, inserted = _rewrite(content, selected, operation, allocator, seed, flanks, replacement=replacement,
+            gone=frozenset(gone))
+        kept = _without_gone(changed, gone) if gone else changed
+        target_content[:] = kept
         steps = [{'kind': 'replace_inline_range', 'blockId': original.id, 'cellId': selected.cell_id, 'field': selected.field,
             'start': selected.start, 'end': selected.end, 'beforeRevision': original.revision,
             'content': [part.model_dump(by_alias=True) for part in inserted], 'flankBindings': flanks.entries}]
@@ -299,6 +351,10 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
                 tree, _removed = changed_block_steps(workspace.project.document, candidate.document)
                 steps = tree + steps[1:] if original.id in copies else [*steps,
                     *(step for step in tree if step['block']['id'] != original.id)]
+        if kept != changed and steps[0]['kind'] == 'replace_inline_range':
+            # The range replay keeps an empty fragment at the range end; only a block write drops it.
+            tree, _removed = changed_block_steps(workspace.project.document, candidate.document)
+            steps = [step for step in tree if step['block']['id'] == original.id] + steps[1:]
     result = finish_preparation(response, request, allocator, steps, candidate,
         kind='typing' if isinstance(operation, ReplaceText) and replacement is None else 'structure')
     # Clipboard content is never optimistic, so a paste offers no address correspondence.

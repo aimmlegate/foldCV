@@ -57,7 +57,8 @@ def test_partial_field_edit_prepares_whole_raw_field_and_issue_retirement_atomic
     assert prepared.created_ids == retry.created_ids
 
 
-@pytest.mark.parametrize('text', ['', 'Exact 😀'])
+# A deletion of the whole text keeps the fact and leaves no fragment (F3-0, test_whole_field_deletion.py).
+@pytest.mark.parametrize('text', ['Exact 😀'])
 def test_full_field_replacement_keeps_one_logical_occurrence_and_raw_authority(text):
     before, _ = workspace()
     prepared = prepare_text_edit(response(before), command(before, end=12, text=text))
@@ -184,7 +185,8 @@ def test_cross_cell_replacement_keeps_one_shared_scope_and_untouched_literal_met
     assert prepared.preview.workspace.project.document.regions[2].blocks[1] == second
 
 
-@pytest.mark.parametrize('start,end,text', [(0, 6, 'Human'), (0, 12, ''), (0, 12, 'Exact 😀')])
+# A deletion of the whole label takes the link off the page and keeps both facts (F3-0, test_whole_field_deletion.py).
+@pytest.mark.parametrize('start,end,text', [(0, 6, 'Human'), (0, 12, 'Exact 😀')])
 def test_independently_bound_literal_link_label_updates_whole_human_raw_value(start, end, text):
     from tests.templates.test_bound_links import linked_workspace
     before, _ = linked_workspace()
@@ -355,23 +357,23 @@ def test_deleting_letters_of_a_field_leaves_no_empty_fragment_behind():
     assert after.project.facts.extensions[0].cells[0].raw_input == 'Shred tit'
 
 
-def test_an_emptied_field_keeps_one_place_to_type_into():
+def test_an_emptied_field_leaves_the_block_and_keeps_its_fact():
+    # F3-0 of the tester feedback of 2026-11-23 replaces the empty place of D132: the field goes, the fact keeps its value.
     before, _ = workspace()
     after, steps = typed(before, (11, 12, '', None), (0, 11, '', None))
-    [anchor] = steps[-1]
-    assert (anchor.text, anchor.occurrence_id) == ('', 'occurrence-paper-a')
-    again, steps = typed(after, (0, 0, 'New', {'kind': 'field', 'bindingId': anchor.binding_id}), (2, 3, '', None),
-        (0, 2, '', None), first=2)
-    # The typed text sits before the field's place, which stays its one empty fragment when the field is emptied again.
-    assert [[span.text for span in content] for content in steps] == [['New', ''], ['Ne', ''], ['']]
-    assert again.project.facts.extensions[0].cells[0].raw_input == ''
-    # An empty fragment an older save left stays the field's one place; emptying the field adds no second one.
+    assert steps[-1] == []
+    assert after.project.facts.extensions[0].cells[0].raw_input == 'Shared titl'
+    again, steps = typed(after, (0, 0, 'New', {'kind': 'literal'}), first=2)
+    # Text typed there later is the user's own text, not the value of the fact.
+    assert [[(span.type, span.text) for span in content] for content in steps] == [[('text', 'New')]]
+    assert again.project.facts == after.project.facts
+    # An empty fragment an older save left beside the field goes with it.
     before, _ = workspace()
     block = before.project.document.regions[2].blocks[0]
     block.content.append(block.content[0].model_copy(update={'binding_id': 'older-empty', 'text': ''}, deep=True))
     before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
     _after, steps = typed(before, (0, 12, '', None))
-    assert [(span.text, span.binding_id) for span in steps[-1]] == [('', 'older-empty')]
+    assert steps[-1] == []
 
 
 def test_undo_brings_a_deleted_letter_back():
