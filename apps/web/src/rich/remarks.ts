@@ -149,6 +149,8 @@ export function remarkRecord(cellId: string): string | null {
 /** The tip beside a mark reads its messages from the element; a native title stayed unseen (D127). */
 export const remarkMessagesAttribute = "data-fcv-remark", remarkRecordAttribute = "data-fcv-record";
 export const addedClass = "fcv-added";
+/** A block mark is several spans, one per text node; each names its block, so the tip can treat them as one mark. */
+export const remarkBlockAttribute = "data-fcv-remark-block";
 const markAttributes = (messages: readonly string[], recordId: string | null, added?: ReadonlySet<string>) => ({
   class: added && messages.every(message => added.has(message)) ? `fcv-remark ${addedClass}` : "fcv-remark",
   [remarkMessagesAttribute]: JSON.stringify(messages), ...(recordId ? { [remarkRecordAttribute]: recordId } : {}) });
@@ -198,7 +200,8 @@ export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
       container = id;
       const size = node.firstChild?.content.size ?? 0;
       // The block's own content starts inside its content node, one step past the container's start.
-      if (messages && size) decorations.push(Decoration.inline(position + 2, position + 2 + size, markAttributes(messages, null, marks.added)));
+      if (messages && size && typeof id === "string") decorations.push(Decoration.inline(position + 2, position + 2 + size,
+        { ...markAttributes(messages, null, marks.added), [remarkBlockAttribute]: id }));
       return true;
     });
     return DecorationSet.create(state.doc, decorations);

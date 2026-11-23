@@ -17,6 +17,8 @@
 .remark-tip strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: var(--ui-small); }
 .remark-tip p { margin: 0 0 6px; line-height: 1.5; }
 .remark-tip .text-button { padding: 4px 0 0; font-size: var(--ui-small); }
+/* A tip with no button takes no pointer: a press goes to the text under it. */
+.remark-tip.remark-tip-passive { pointer-events: none; }
 /* «Изменить текст» beside the selection: the same look as the tools, above the page. */
 .selection-action { position: fixed; z-index: 160; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line);
   border-radius: 7px; background: var(--paper); color: var(--ink); font-size: var(--ui-small); white-space: nowrap; cursor: pointer;
