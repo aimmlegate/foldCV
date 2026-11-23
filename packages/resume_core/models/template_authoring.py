@@ -27,6 +27,10 @@ class ManualScopeInsertionTarget(Wire):
     fragment_id: Id
 
 
+InsertionTarget = Annotated[FieldInsertionTarget | LiteralInsertionTarget | ManualScopeInsertionTarget,
+    Field(discriminator='kind')]
+
+
 class AuthoredRange(Wire):
     block_id: Id
     before_revision: Revision
@@ -34,8 +38,7 @@ class AuthoredRange(Wire):
     field: Literal['content', 'caption']
     start: int = Field(ge=0)
     end: int = Field(ge=0)
-    insertion_target: Annotated[FieldInsertionTarget | LiteralInsertionTarget | ManualScopeInsertionTarget,
-        Field(discriminator='kind')] | None = Field(default=None, exclude_if=lambda value: value is None)
+    insertion_target: InsertionTarget | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode='after')
     def ordered(self):
@@ -179,6 +182,47 @@ class RemoveOccurrences(AuthoredOperationBase):
         return self
 
 
+class RangeEdge(Wire):
+    """One end of a range over text containers: a container and a text offset in it."""
+    block_id: Id
+    before_revision: Revision
+    cell_id: Id | None
+    field: Literal['content', 'caption']
+    offset: int = Field(ge=0)
+
+
+class RangeJoin(Wire):
+    """What goes where the range was: typed or pasted text, whose line ends Python makes into lines, and Enter after it.
+    The insertion target is the client's side at the start edge when the range cuts no text of the first block."""
+    text: str
+    styles: InlineStyles
+    enter: bool
+    insertion_target: InsertionTarget | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+class RemoveRange(AuthoredOperationBase):
+    """F3 of the tester feedback of 2026-11-23: one action over several text containers (`template_preparation_chain`)."""
+    kind: Literal['remove_range']
+    start: RangeEdge
+    end: RangeEdge
+    join: RangeJoin | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode='after')
+    def two_containers(self):
+        if (self.start.block_id, self.start.cell_id, self.start.field) == (self.end.block_id, self.end.cell_id, self.end.field):
+            raise ValueError('a range in one container is replace_text')
+        return self
+
+
+class PasteLines(AuthoredOperationBase):
+    """Plain text with line ends at a caret or over a selection in one container, or Enter over a selection (F3c, F3d)."""
+    kind: Literal['paste_lines']
+    destination: AuthoredRange
+    text: str
+    styles: InlineStyles
+    enter: bool
+
+
 class DeleteEntity(AuthoredOperationBase):
     kind: Literal['delete_entity']
     record_id: Id
@@ -243,7 +287,7 @@ class FormatBlocks(AuthoredOperationBase):
 
 AuthoredOperation = Annotated[ReplaceText | SetMarks | SplitBlock | MergeBlocks | InsertParagraph |
     CopyBlocks | CopyFragment | PasteInline | PasteBlocks | MoveBlock | RemoveOccurrences | DeleteEntity |
-    BuiltinPanel | FormatBlocks | ResolveTemplateSync | SetLinkTarget, Field(discriminator='kind')]
+    BuiltinPanel | FormatBlocks | ResolveTemplateSync | SetLinkTarget | RemoveRange | PasteLines, Field(discriminator='kind')]
 
 
 class TemplateEditPreparationV1(Wire):
@@ -259,8 +303,11 @@ class TemplateEditPreparationV1(Wire):
             raise ValueError('preparation exceeds 1 MiB')
         for operation in self.operations:
             target = operation.range if isinstance(operation, (ReplaceText, SetMarks)) else (
-                operation.destination if isinstance(operation, PasteInline) else None)
-            if target is not None:
+                operation.destination if isinstance(operation, (PasteInline, PasteLines)) else None)
+            if (isinstance(operation, PasteLines) and operation.destination.start == operation.destination.end
+                    and operation.text and operation.destination.insertion_target is None):
+                raise ValueError('collapsed paste needs an explicit insertion target')
+            if target is not None and not isinstance(operation, PasteLines):
                 if isinstance(operation, SetMarks) and target.insertion_target is not None:
                     raise ValueError('marks have no insertion target')
                 if isinstance(operation, (ReplaceText, PasteInline)) and target.start == target.end and target.insertion_target is None:

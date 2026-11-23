@@ -3659,6 +3659,8 @@ export type Operations3 = [
   | FormatBlocks
   | ResolveTemplateSync
   | SetLinkTarget
+  | RemoveRange
+  | PasteLines
 ];
 export type Kind86 = "replace_text";
 export type Opid = string;
@@ -3771,6 +3773,20 @@ export type Href3 = string;
 export type Kind103 = "set_link_target";
 export type Occurrenceid5 = string;
 export type Opid15 = string;
+export type Beforerevision19 = number;
+export type Blockid20 = string;
+export type Cellid13 = string | null;
+export type Field12 = "content" | "caption";
+export type Offset2 = number;
+export type Enter = boolean;
+export type Insertiontarget1 = (FieldInsertionTarget | LiteralInsertionTarget | ManualScopeInsertionTarget) | null;
+export type Text25 = string;
+export type Kind104 = "remove_range";
+export type Opid16 = string;
+export type Enter1 = boolean;
+export type Kind105 = "paste_lines";
+export type Opid17 = string;
+export type Text26 = string;
 export type Schemaversion25 = 1;
 export type Editortoken4 = string;
 export type Schemaversion26 = 1;
@@ -3780,7 +3796,7 @@ export type Byteref1 = string;
 export type Bytesha2561 = string;
 export type Code7 = "NO_TEXT" | "IMAGE" | "SHAPE" | "TEXT_BOX" | "UNSUPPORTED_CONTENT";
 export type Column2 = number | null;
-export type Kind104 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
+export type Kind106 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
 export type Page4 = number | null;
 export type Paragraph = number | null;
 export type Part1 = string | null;
@@ -3806,7 +3822,7 @@ export type Sourceid5 = string;
 export type Sourcekind = "pdf" | "docx" | "txt" | "markdown" | "paste";
 export type Id111 = string;
 export type Order2 = number;
-export type Text25 = string;
+export type Text27 = string;
 /**
  * @maxItems 5000
  */
@@ -3819,7 +3835,7 @@ export type Expectedactionid1 = string | null;
 export type Allowtextrewrite3 = boolean;
 export type Clientrequestid3 = string;
 export type Effort2 = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
-export type Kind105 = "start" | "resume" | "cancel";
+export type Kind107 = "start" | "resume" | "cancel";
 export type Lite1 = boolean;
 export type Operationid6 = string | null;
 export type Taskid6 = string | null;
@@ -3845,7 +3861,7 @@ export type Schemaversion28 = 1;
 export type Elapsed = number;
 export type Error1 = string | null;
 export type Id112 = string;
-export type Kind106 = "import" | "export" | "rewrite";
+export type Kind108 = "import" | "export" | "rewrite";
 export type Projectid14 = string;
 export type Stage1 = string | null;
 export type Startedat2 = string;
@@ -4470,8 +4486,8 @@ export type Targets2 =
       FindingTargetV1,
       FindingTargetV1
     ];
-export type Blockid20 = string | null;
-export type Cellid13 = string | null;
+export type Blockid21 = string | null;
+export type Cellid14 = string | null;
 export type End7 = number | null;
 export type Fieldkey11 = string | null;
 export type Recordid19 = string | null;
@@ -4575,7 +4591,7 @@ export type Schemaversion33 = 1;
 export type Requestid2 = string;
 export type Schemaversion34 = 1;
 export type Source3 = string;
-export type Text26 = string;
+export type Text28 = string;
 export type Mode3 = "structured" | "digest" | "imported";
 export type Records3 = (
   | CandidateRecord
@@ -7733,6 +7749,47 @@ export interface SetLinkTarget {
   occurrenceId: Occurrenceid5;
   opId: Opid15;
 }
+/**
+ * F3 of the tester feedback of 2026-11-23: one action over several text containers (`template_preparation_chain`).
+ */
+export interface RemoveRange {
+  end: RangeEdge;
+  join?: RangeJoin | null;
+  kind: Kind104;
+  opId: Opid16;
+  start: RangeEdge;
+}
+/**
+ * One end of a range over text containers: a container and a text offset in it.
+ */
+export interface RangeEdge {
+  beforeRevision: Beforerevision19;
+  blockId: Blockid20;
+  cellId: Cellid13;
+  field: Field12;
+  offset: Offset2;
+}
+/**
+ * What goes where the range was: typed or pasted text, whose line ends Python makes into lines, and Enter after it.
+ * The insertion target is the client's side at the start edge when the range cuts no text of the first block.
+ */
+export interface RangeJoin {
+  enter: Enter;
+  insertionTarget?: Insertiontarget1;
+  styles: InlineStyles;
+  text: Text25;
+}
+/**
+ * Plain text with line ends at a caret or over a selection in one container, or Enter over a selection (F3c, F3d).
+ */
+export interface PasteLines {
+  destination: AuthoredRange;
+  enter: Enter1;
+  kind: Kind105;
+  opId: Opid17;
+  styles: InlineStyles;
+  text: Text26;
+}
 export interface ExportCommand {
   editorToken: Editortoken4;
   schemaVersion: Schemaversion26;
@@ -7762,7 +7819,7 @@ export interface ExtractGap {
 }
 export interface ExtractLocation {
   column?: Column2;
-  kind: Kind104;
+  kind: Kind106;
   page?: Page4;
   paragraph?: Paragraph;
   part?: Part1;
@@ -7779,7 +7836,7 @@ export interface ExtractUnit {
   location: ExtractLocation;
   order: Order2;
   structure?: SourceStructure | null;
-  text: Text25;
+  text: Text27;
 }
 export interface HistoryRequestV1 {
   baseRevision: Baserevision3;
@@ -7792,7 +7849,7 @@ export interface ImportCommand {
   allowTextRewrite?: Allowtextrewrite3;
   clientRequestId?: Clientrequestid3;
   effort?: Effort2;
-  kind: Kind105;
+  kind: Kind107;
   lite?: Lite1;
   operationId?: Operationid6;
   taskId?: Taskid6;
@@ -7823,7 +7880,7 @@ export interface TaskStatusV1 {
   elapsed: Elapsed;
   error: Error1;
   id: Id112;
-  kind: Kind106;
+  kind: Kind108;
   projectId: Projectid14;
   stage: Stage1;
   startedAt: Startedat2;
@@ -7846,8 +7903,8 @@ export interface FindingInputV1 {
   targets?: Targets2;
 }
 export interface FindingTargetV1 {
-  blockId?: Blockid20;
-  cellId?: Cellid13;
+  blockId?: Blockid21;
+  cellId?: Cellid14;
   end?: End7;
   fieldKey?: Fieldkey11;
   recordId?: Recordid19;
@@ -7994,7 +8051,7 @@ export interface TemplateRewritePreviewV1 {
   schemaVersion: Schemaversion34;
   snapshot: TemplateSnapshotIdentity;
   source: Source3;
-  text: Text26;
+  text: Text28;
 }
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;

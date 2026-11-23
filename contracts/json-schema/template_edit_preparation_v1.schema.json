@@ -932,6 +932,150 @@
       "title": "PasteInline",
       "type": "object"
     },
+    "PasteLines": {
+      "additionalProperties": false,
+      "description": "Plain text with line ends at a caret or over a selection in one container, or Enter over a selection (F3c, F3d).",
+      "properties": {
+        "destination": {
+          "$ref": "#/$defs/AuthoredRange"
+        },
+        "enter": {
+          "title": "Enter",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "paste_lines",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "destination",
+        "text",
+        "styles",
+        "enter"
+      ],
+      "title": "PasteLines",
+      "type": "object"
+    },
+    "RangeEdge": {
+      "additionalProperties": false,
+      "description": "One end of a range over text containers: a container and a text offset in it.",
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "cellId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cellid"
+        },
+        "field": {
+          "enum": [
+            "content",
+            "caption"
+          ],
+          "title": "Field",
+          "type": "string"
+        },
+        "offset": {
+          "minimum": 0,
+          "title": "Offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "blockId",
+        "beforeRevision",
+        "cellId",
+        "field",
+        "offset"
+      ],
+      "title": "RangeEdge",
+      "type": "object"
+    },
+    "RangeJoin": {
+      "additionalProperties": false,
+      "description": "What goes where the range was: typed or pasted text, whose line ends Python makes into lines, and Enter after it.\nThe insertion target is the client's side at the start edge when the range cuts no text of the first block.",
+      "properties": {
+        "enter": {
+          "title": "Enter",
+          "type": "boolean"
+        },
+        "insertionTarget": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "field": "#/$defs/FieldInsertionTarget",
+                  "literal": "#/$defs/LiteralInsertionTarget",
+                  "manual_scope": "#/$defs/ManualScopeInsertionTarget"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/FieldInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/LiteralInsertionTarget"
+                },
+                {
+                  "$ref": "#/$defs/ManualScopeInsertionTarget"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Insertiontarget"
+        },
+        "styles": {
+          "$ref": "#/$defs/InlineStyles"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "styles",
+        "enter"
+      ],
+      "title": "RangeJoin",
+      "type": "object"
+    },
     "RemoveOccurrences": {
       "additionalProperties": false,
       "properties": {
@@ -961,6 +1105,47 @@
         "blocks"
       ],
       "title": "RemoveOccurrences",
+      "type": "object"
+    },
+    "RemoveRange": {
+      "additionalProperties": false,
+      "description": "F3 of the tester feedback of 2026-11-23: one action over several text containers (`template_preparation_chain`).",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/RangeEdge"
+        },
+        "join": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RangeJoin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "remove_range",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/$defs/RangeEdge"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "start",
+        "end"
+      ],
+      "title": "RemoveRange",
       "type": "object"
     },
     "ReplaceText": {
@@ -1516,7 +1701,9 @@
             "move_block": "#/$defs/MoveBlock",
             "paste_blocks": "#/$defs/PasteBlocks",
             "paste_inline": "#/$defs/PasteInline",
+            "paste_lines": "#/$defs/PasteLines",
             "remove_occurrences": "#/$defs/RemoveOccurrences",
+            "remove_range": "#/$defs/RemoveRange",
             "replace_text": "#/$defs/ReplaceText",
             "resolve_template_sync": "#/$defs/ResolveTemplateSync",
             "set_link_target": "#/$defs/SetLinkTarget",
@@ -1573,6 +1760,12 @@
           },
           {
             "$ref": "#/$defs/SetLinkTarget"
+          },
+          {
+            "$ref": "#/$defs/RemoveRange"
+          },
+          {
+            "$ref": "#/$defs/PasteLines"
           }
         ]
       },

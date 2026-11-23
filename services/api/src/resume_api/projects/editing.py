@@ -6,6 +6,7 @@ from packages.resume_core.models.projects import EditResultV1, digest_request
 from packages.resume_core.models.template_authoring import BuiltinPanel, PasteBlocks, PasteInline
 from packages.resume_core.editing.mutations import RichMutationFailure
 from packages.resume_core.editing.template_preparation import prepare_edit
+from packages.resume_core.editing.template_preparation_chain import CHAINED, prepare_chained
 from packages.resume_core.editing.template_preparation_panel import PANEL_REFUSALS
 
 from .clipboard import for_paste
@@ -55,18 +56,24 @@ def _edit_locked(service, project_id, request, session):
         if isinstance(operation, (PasteInline, PasteBlocks)) and operation.source.kind == 'same_project':
             clipboard = for_paste(session, committed, operation.source.clipboard_capture_id)
         try:
-            prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids,
-                remembered=remembered)
+            if isinstance(operation, CHAINED):
+                # Several present operations, each on the workspace the one before it left; one commit, one action.
+                chained = prepare_chained(response, preparation, occupied=session.occupied_ids,
+                    response_for=lambda workspace: service.response(project_id, workspace))
+                after, created_ids = chained.workspace, chained.created_ids
+            else:
+                prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids,
+                    remembered=remembered)
+                after, created_ids = prepared.preview.workspace if prepared.mutation is not None else None, prepared.created_ids
         except (ValueError, RichMutationFailure) as error:
             # A panel refusal keeps its code, so the panel can say why; other input is rejected as a whole.
             code = str(error) if isinstance(error, ValueError) and str(error) in PANEL_REFUSALS else 'V7_INPUT_REJECTED'
             raise ProjectFailure(code, 422) from None
-        if prepared.mutation is None:
+        if after is None:
             return None
-        after = prepared.preview.workspace
         states[:] = [committed, after]
         created, changed = block_changes(committed, after, operation.op_id)
-        return after, {'created_ids': prepared.created_ids, 'created_blocks': created, 'changed_block_ids': changed}
+        return after, {'created_ids': created_ids, 'created_blocks': created, 'changed_block_ids': changed}
 
     outcome = repository.mutate(project_id, base_revision=request.base_revision,
         client_mutation_id=preparation.client_mutation_id, request_sha256=digest_request(preparation),
