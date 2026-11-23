@@ -179,3 +179,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D174 The app is foldCV 1.1.0
 - D175 The fast import keeps the call cap, skips the old pipeline's saved steps and fills a template's own block
 - D176 The app's data folder is `foldCV`; the service run from source uses `FoldCV Dev`; foldCV 1.1.1
+- D177 A limited editor that does not refuse: the tester feedback of 2026-11-23
