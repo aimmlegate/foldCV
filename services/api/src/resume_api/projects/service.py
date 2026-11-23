@@ -205,6 +205,11 @@ class ProjectService:
                         rewrite_cancel(project_id, task.detail.get('requestId'))
                 time.sleep(0.05)
             entry = self.repository.delete(project_id)
+            try:
+                self.catalog.forget(project_id)
+            except ProjectStoreFailure:
+                # The project is gone; a flag left in an unwritable catalog names no entry of the list.
+                pass
             imports = getattr(self, 'imports', None)
             if imports is not None:
                 imports.release(project_id)

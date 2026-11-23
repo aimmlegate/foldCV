@@ -75,6 +75,13 @@ class ProjectCatalog:
             raise ProjectStoreFailure("PROJECT_NOT_FOUND")
         self.storage._directory(identifier)
 
+    def forget(self, identifier):
+        """A deleted project's flags go with it (F9); a damaged catalog costs nothing here."""
+        with self._lock():
+            state = self._read()
+            if state.entries.pop(identifier, None) is not None:
+                self._write(state.model_dump_json(by_alias=True).encode())
+
     def entries(self):
         with self._lock():
             return self._read().entries

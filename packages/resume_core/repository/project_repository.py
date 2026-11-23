@@ -878,10 +878,11 @@ class ProjectRepository:
             try:
                 if directory.exists() or directory.is_symlink():
                     marker = directory / '.project-identity.json'
-                    if not marker.exists() and not directory.is_symlink() and directory.is_dir() and not any(directory.iterdir()):
-                        # A prior cleanup can remove the identity before an empty-directory removal fails.
+                    if not marker.exists() and not marker.is_symlink() and not directory.is_symlink() and directory.is_dir():
+                        # A prior cleanup can remove the identity before an empty-directory removal fails; a folder of this
+                        # name with no marker loses only the files a project owns (F9).
                         private_directory(directory)
-                        directory.rmdir()
+                        _remove_project_files(directory)
                     else:
                         directory = self.store._directory(project_id)
                         _remove_project_files(directory)

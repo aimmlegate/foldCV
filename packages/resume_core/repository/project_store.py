@@ -61,6 +61,18 @@ class ProjectStore:
             raise StorageFailure("UNSAFE_STORAGE")
         return directory
 
+    def _deletable(self, id):
+        """What a deletion needs of the folder (F9 of the tester feedback of 2026-11-23): none at all, or a real folder of
+        this name with no identity marker or with this project's own one. A link or another project's marker refuses."""
+        if SAFE_ID.fullmatch(id) is None:
+            raise StorageFailure("UNSAFE_STORAGE")
+        directory = self.projects / id
+        if directory.is_symlink() or directory.exists() and not directory.is_dir():
+            raise StorageFailure("UNSAFE_STORAGE")
+        marker = directory / ".project-identity.json"
+        if directory.exists() and (marker.exists() or marker.is_symlink()):
+            self._directory(id)
+
     def _registry(self):
         private_directory(self.projects)
         if not self.registry_path.exists():
@@ -221,7 +233,7 @@ class ProjectStore:
                 entry = next((item for item in registry.entries if item.project_id == id), None)
                 if entry is None: raise ProjectStoreFailure("PROJECT_NOT_FOUND")
                 if not entry.tombstoned:
-                    self._directory(id)
+                    self._deletable(id)
                     entry.tombstoned, entry.cleanup_status = True, "pending"
                     self._write_registry(registry)
                 self.expected.pop(id, None)
