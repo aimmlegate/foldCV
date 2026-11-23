@@ -12,15 +12,15 @@ import { SessionHistory, type HistoryKind, type HistoryReservation } from "./his
 import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type TemplateQueuedIntent } from "./save-queue";
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
-import { blockAt, containerText, copySource, correctionOperation, emptyRemovalAt, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
-  itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, technologyLines, technologyLocked, technologySelected, textPoint, textPosition,
-  type ExtractedOperation, type TextPoint } from "./v7-extraction";
+import { blockAt, containerText, copySource, correctionOperation, emptyRemovalAt, extractOperations, foldComposition, insertionAt, joinAt, mergeAt,
+  placementOf, itemContaining, rangeAt, rangeCaret, replacementAt, selectedBlocks, selectedText, siblingAfter, splitAt, technologyLines, technologyLocked,
+  technologySelected, textPoint, textPosition, type ExtractedOperation, type Insertion, type TextPoint, type TextRange } from "./v7-extraction";
 import { wireMarks } from "./inline";
 import { panelCommandsV7, type PanelCommand } from "./v7-panel";
 import { serverRewriteStage, type RewriteStage } from "./rewrite-progress";
 import { projectTemplateBlock, templateTableIdentities } from "./v7-projection";
 import { changedBy, selectedTextBlocks, shownSelection, styledKind, type BlockStyle, type TextBlock } from "./selection";
-import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type Placement,
+import { clipboardSelection, containerKey, correctionRange, verifiedRange, type ClipboardSource, type LocalContainer, type LocalJoin, type Placement,
   type V7Intent, type V7Operation } from "./v7-translation";
 
 export type EditorMode = "normal" | "recovering" | "read_only" | "detached" | "closed";
@@ -82,6 +82,10 @@ export class TemplateEditorSession {
   private formatting = false;
   // A removal that Backspace or Delete started, from the key to the re-projection; more of these keys do nothing meanwhile.
   private removing: Promise<void> | null = null;
+  // Characters typed while a range removal that typing started is in flight; they are typed at the caret after it.
+  private held: string[] = [];
+  // Set when the queue has said a refusal of the structure command in flight.
+  private said = false;
   private closed = false;
   private retries = 0;
   // A cancel can come while the request still waits for typing to save; it is then never sent.
@@ -128,11 +132,18 @@ export class TemplateEditorSession {
       },
       props: {
         handleKeyDown: (_view, event) => this.key(event),
+        handleTextInput: (view, from, to, text) => this.textInput(view.state, from, to, text),
         handleDOMEvents: {
           compositionstart: () => { this.compositionStart(); return false; },
           compositionend: () => { queueMicrotask(() => this.compositionEnd()); return false; },
           blur: () => { if (!this.composing) this.boundary(); return false; },
-          beforeinput: (_view, event) => {
+          beforeinput: (view, event) => {
+            // Text that comes with no key press (dictation, a tool) over a range over containers takes the range path too.
+            if ((event.inputType === "insertText" || event.inputType === "insertReplacementText") && event.data && !view.state.selection.empty
+                && rangeAt(view.state)) {
+              event.preventDefault();
+              return this.textInput(view.state, view.state.selection.from, view.state.selection.to, event.data);
+            }
             if (!["historyUndo", "historyRedo"].includes(event.inputType)) return false;
             event.preventDefault(); void this.navigate(event.inputType === "historyUndo" ? "undo" : "redo"); return true;
           },
@@ -367,9 +378,14 @@ export class TemplateEditorSession {
   }
 
   /** Editor structure commands report a refusal as a notice; the editor keeps showing the verified state. */
-  private async structure(items: { operation: V7Operation; prior?: ReadonlyMap<string, string> }[]): Promise<void> {
-    try { await this.command(items.map(item => ({ operation: item.operation, prior: item.prior ?? new Map() })), "structure"); }
-    catch (error) { this.refusal(errorMessage(error)); }
+  private async structure(items: { operation: V7Operation; prior?: ReadonlyMap<string, string> }[]): Promise<boolean> {
+    this.said = false;
+    try { await this.command(items.map(item => ({ operation: item.operation, prior: item.prior ?? new Map() })), "structure"); return true; }
+    catch (error) {
+      // A refusal that the queue has said already is not said twice.
+      if (!this.said) this.refusal(errorMessage(error));
+      return false;
+    }
   }
 
   /** Shift+Mod+Arrow: BlockNote decides the target as usual; Python moves the block and decides any owner change. */
@@ -437,6 +453,82 @@ export class TemplateEditorSession {
   /** Remove whole selected blocks; their facts stay, as in Python's occurrence removal. */
   async removeBlocks(blockIds: string[]): Promise<void> {
     await this.structure([{ operation: { kind: "remove_occurrences", blockIds } }]);
+  }
+
+  /** A range over containers goes as one `remove_range`, with the join text when there is one; the caret then goes to
+   * the join, else to the start of the last block when it stays, else by the rule of F2 point 4 (F3b). */
+  private async removeRange(range: TextRange, join: LocalJoin | null = null, direction: "backward" | "forward" = "backward"): Promise<void> {
+    const editor = this.editor;
+    if (!editor) return;
+    const fallback = rangeCaret(editor._tiptapEditor.state.doc, range, direction);
+    const prior = new Map([[containerKey(range.start.container), range.start.prior], [containerKey(range.end.container), range.end.prior]]);
+    const done = await this.structure([{ operation: { kind: "remove_range", start: { container: range.start.container, offset: range.start.offset },
+      end: { container: range.end.container, offset: range.end.offset }, join }, prior }]);
+    if (!done || !this.editor || this.closed) return;
+    const doc = this.editor._tiptapEditor.state.doc, live = (point: TextPoint) => containerText(doc, this.canonical(point.container)) !== null;
+    const start: TextPoint = { container: range.start.container, offset: range.start.offset };
+    if (live(start)) { this.caretTo(join ? this.afterLines(start, join.text, join.enter) : start); return; }
+    const end: TextPoint = { container: range.end.container, offset: 0 };
+    this.caretTo(live(end) ? end : fallback.find(live) ?? null);
+  }
+
+  /** Lines pasted at a place, or Enter over a selection in one container, as one `paste_lines` (F3c, F3d). */
+  private async pasteLines(at: Insertion, text: string, enter: boolean): Promise<void> {
+    const editor = this.editor;
+    if (!editor) return;
+    const place = replacementAt(editor._tiptapEditor.state.doc, at.container, at.start, at.start < at.end ? at.start + 1 : at.start);
+    if ("reason" in place) { this.refuse(place.reason); return; }
+    const done = await this.structure([{ operation: { kind: "paste_lines", container: at.container, start: at.start, end: at.end,
+      side: at.start === at.end ? at.side : null, text, styles: place.styles, enter }, prior: new Map([[containerKey(at.container), at.prior]]) }]);
+    if (done) this.caretTo(this.afterLines({ container: at.container, offset: at.start }, text, enter));
+  }
+
+  /** Where the caret goes after text put at a place: after the last line Python made from it. */
+  private afterLines(place: TextPoint, text: string, enter: boolean): TextPoint | null {
+    const lines = pastedLines(text, enter), last = lines.at(-1) ?? "";
+    if (place.container.kind !== "content") return { container: place.container, offset: place.offset + lines.join(" ").length };
+    if (lines.length < 2) return { container: place.container, offset: place.offset + last.length };
+    const doc = this.editor?._tiptapEditor.state.doc, id = doc ? siblingAfter(doc, this.canonical(place.container).blockId, lines.length - 1) : null;
+    return id ? { container: { blockId: id, kind: "content", cellId: null }, offset: last.length } : null;
+  }
+
+  private canonical(container: LocalContainer): LocalContainer {
+    const locals = this.queue.template.localBlocks;
+    return { ...container, blockId: locals.get(container.blockId) ?? container.blockId };
+  }
+
+  private caretTo(point: TextPoint | null): void {
+    const editor = this.editor;
+    if (!editor || !point || this.closed) return;
+    const doc = editor._tiptapEditor.state.doc, pos = textPosition(doc, { ...point, container: this.canonical(point.container) });
+    if (pos !== null) editor._tiptapEditor.view.dispatch(editor._tiptapEditor.state.tr.setSelection(TextSelection.create(doc, pos)));
+  }
+
+  /** Typed text over a selection that spans containers: the range goes and the text goes at the join, as one action
+   * (F3c). Text typed while that runs is held and typed at the caret after it. */
+  private textInput(state: EditorState, from: number, to: number, text: string): boolean {
+    if (this.composing) return false;
+    if (this.removing) { this.held.push(text); return true; }
+    if (from === to) return false;
+    const range = rangeAt(state);
+    if (!range) return false;
+    if ("reason" in range) { this.refuse(range.reason, range.code); return true; }
+    const join = joinAt(state.doc, range.start);
+    if ("reason" in join) { this.refuse(join.reason); return true; }
+    this.keyRemoval(() => this.removeRange(range, { text, styles: join.styles, side: join.side, enter: false }));
+    return true;
+  }
+
+  /** Cut over a range that spans containers: the copy handler has put the shown text and the HTML on the clipboard; the
+   * range then goes, with no same-project capture (F3b). Null when the selection is no such range. */
+  cutRange(): { text: string; done: Promise<void> } | null {
+    const editor = this.editor;
+    if (!editor || this.closed || !this.writable || this.composing || this.panelBusy || this.removing) return null;
+    const state = editor._tiptapEditor.state, range = rangeAt(state);
+    if (!range || "reason" in range) return null;
+    const text = selectedText(state);
+    this.keyRemoval(() => this.removeRange(range));
+    return { text, done: this.keyed() };
   }
 
   /** The text a rewrite would read: one non-empty range inside one block or cell. */
@@ -509,7 +601,10 @@ export class TemplateEditorSession {
     if (!editor || !data || this.closed || view.state.selection.empty) return false;
     event.preventDefault();
     if (cut && this.technologyRefused(view.state)) return true;
-    if (cut && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
+    const range = cut ? rangeAt(view.state) : null;
+    if (range && "reason" in range) { this.refuse(range.reason, range.code); return true; }
+    if (range && (!this.writable || this.composing || this.panelBusy || this.removing)) return true;
+    if (cut && !range && (!copySource(view.state) || !this.writable || this.composing || this.panelBusy)) {
       this.refuse("cut needs whole blocks or text inside one block"); return true;
     }
     const { clipboardHTML, externalHTML } = selectedFragmentToHTML(view, editor);
@@ -518,6 +613,7 @@ export class TemplateEditorSession {
     data.setData("text/html", externalHTML);
     // The shown text, not BlockNote's Markdown: a paste elsewhere must not bring literal markers.
     data.setData("text/plain", selectedText(view.state));
+    if (range) { this.cutRange(); return true; }
     const copied = this.copySelection(cut);
     if (copied) data.setData(clipboardType, JSON.stringify({ projectId: this.connection.project, token: copied.token }));
     return true;
@@ -576,8 +672,23 @@ export class TemplateEditorSession {
   async pasteFrom(copied: Copied | null, text: string): Promise<void> {
     const captured = copied ? await copied.capture : null, editor = this.editor;
     if (!editor || this.closed) return;
-    const state = editor._tiptapEditor.state;
+    let state = editor._tiptapEditor.state;
     if (this.technologyRefused(state)) return;
+    const range = rangeAt(state);
+    if (range && "reason" in range) { this.refuse(range.reason, range.code); return; }
+    if (range && !captured) {
+      // Plain text over a range over containers: the range goes and the text goes at the join, as one action (F3b, F3d).
+      const join = joinAt(state.doc, range.start);
+      if ("reason" in join) { this.refuse(join.reason); return; }
+      if (text) await this.removeRange(range, { text, styles: join.styles, side: join.side, enter: false });
+      return;
+    }
+    if (range) {
+      // The session's own copy: the range goes first, then the present paste runs at the caret (two actions).
+      await this.removeRange(range);
+      if (!this.editor || this.closed || rangeAt(this.editor._tiptapEditor.state)) return;
+      state = this.editor._tiptapEditor.state;
+    }
     if (captured?.kind === "blocks") {
       const caret = blockAt(state), around = caret ? placementOf(state.doc, caret) : null;
       if (!caret || !around) { this.refuse("blocks paste needs a caret in a block"); return; }
@@ -591,9 +702,9 @@ export class TemplateEditorSession {
         source: { kind: "same_project", clipboardCaptureId: captured.id } }, prior: new Map([[containerKey(at.container), at.prior]]) }]);
       return;
     }
-    // One copied line ends in a line end; several paragraphs need a block-boundary representation Python does not offer yet.
+    // One copied line ends in a line end; text with more lines is pasted as lines by Python (F3d).
     const line = text.replace(/\r?\n$/, "");
-    if (line.includes("\n")) { this.refuse("multi-paragraph text paste"); return; }
+    if (/[\r\n]/.test(line)) { await this.pasteLines(at, text, false); return; }
     if (line) editor._tiptapEditor.view.dispatch(state.tr.insertText(line));
   }
 
@@ -732,7 +843,10 @@ export class TemplateEditorSession {
 
   private queueChanged(state: TemplateQueueState): void {
     if (state.kind === "conflict") this.port.warning(errorMessage("V7_INPUT_CONFLICT"));
-    else if (state.kind === "rejected" && !this.factsCommand) this.refusal(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
+    else if (state.kind === "rejected" && !this.factsCommand) {
+      this.said = true;
+      this.refusal(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
+    }
     else if (state.kind === "replaced") { this.setMode("read_only"); this.port.warning(errorMessage("EDITOR_REPLACED")); }
   }
 
@@ -765,8 +879,26 @@ export class TemplateEditorSession {
   enter(): boolean {
     if (this.composing) return false;
     const editor = this.editor;
-    if (!editor) return true;
-    const result = splitAt(editor._tiptapEditor.state, `local-${crypto.randomUUID()}`);
+    if (!editor || this.removing) return true;
+    const state = editor._tiptapEditor.state;
+    if (!state.selection.empty) {
+      // Enter over a selection: the selected text goes, then the block splits there, as one action (F3c).
+      const range = rangeAt(state);
+      if (range && "reason" in range) { this.refuse(range.reason, range.code); return true; }
+      if (range) {
+        const join = joinAt(state.doc, range.start);
+        if ("reason" in join) this.refuse(join.reason);
+        else this.keyRemoval(() => this.removeRange(range, { text: "", styles: join.styles, side: null, enter: true }));
+        return true;
+      }
+      if (this.technologyRefused(state)) return true;
+      const at = insertionAt(state);
+      if ("reason" in at) this.refuse(at.reason);
+      else if (at.container.kind !== "content") this.refuse("cells and captions keep one line");
+      else this.keyRemoval(() => this.pasteLines(at, "", true));
+      return true;
+    }
+    const result = splitAt(state, `local-${crypto.randomUUID()}`);
     if ("reason" in result) this.refuse(result.reason);
     else editor._tiptapEditor.view.dispatch(result.transaction);
     return true;
@@ -786,8 +918,38 @@ export class TemplateEditorSession {
   keyed(): Promise<void> { return this.removing ?? Promise.resolve(); }
 
   private keyRemoval(work: () => Promise<void>): void {
-    const done = work().finally(() => { if (this.removing === done) this.removing = null; });
+    const stop = this.holdKeys();
+    const done = work().finally(() => {
+      stop();
+      if (this.removing !== done) return;
+      this.removing = null;
+      this.typeHeld();
+    });
     this.removing = done;
+  }
+
+  /** While input is locked the page has no focus; printable keys meanwhile are held for the caret (F3c point 2). */
+  private holdKeys(): () => void {
+    if (typeof document === "undefined" || !this.editor) return () => {};
+    const page = document, dom = this.editor._tiptapEditor.view.dom;
+    const listener = (event: KeyboardEvent) => {
+      const target = event.target instanceof globalThis.Node ? event.target : null;
+      if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+      if (target && target !== page.body && !dom.contains(target)) return;
+      event.preventDefault();
+      this.held.push(event.key);
+    };
+    page.addEventListener("keydown", listener, true);
+    return () => page.removeEventListener("keydown", listener, true);
+  }
+
+  private typeHeld(): void {
+    const editor = this.editor, text = this.held.join("");
+    this.held = [];
+    if (!text || !editor || this.closed || !this.writable || !editor.isEditable) return;
+    const view = editor._tiptapEditor.view, { from, to } = view.state.selection;
+    if (this.textInput(view.state, from, to, text)) return;
+    view.dispatch(view.state.tr.insertText(text, from, to));
   }
 
   /** An empty block goes as one occurrence removal; the caret then goes to the shown text that the key names. */
@@ -820,6 +982,13 @@ export class TemplateEditorSession {
       const state = this.editor?._tiptapEditor.state, blocks = state ? selectedBlocks(state) : null;
       if (state && blocks && this.technologyRefused(state)) { event.preventDefault(); return true; }
       if (blocks) { event.preventDefault(); if (!this.composing) this.keyRemoval(() => this.removeBlocks(blocks)); return true; }
+      const range = state && !this.composing ? rangeAt(state) : null;
+      if (range) {
+        event.preventDefault();
+        if ("reason" in range) this.refuse(range.reason, range.code);
+        else this.keyRemoval(() => this.removeRange(range, null, direction));
+        return true;
+      }
       const empty = state && !this.composing ? emptyRemovalAt(state, direction) : null;
       if (empty) {
         event.preventDefault();
@@ -832,7 +1001,13 @@ export class TemplateEditorSession {
     return false;
   }
 
-  compositionStart(): void { this.boundary(); this.composing = true; this.composed = []; }
+  compositionStart(): void {
+    // A composition over a range that spans containers removes nothing: the selection collapses to its end (F3c point 5).
+    const view = this.editor?._tiptapEditor.view, state = view?.state;
+    if (view && state && !state.selection.empty && rangeAt(state))
+      view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(state.selection.to), -1)));
+    this.boundary(); this.composing = true; this.composed = [];
+  }
 
   compositionEnd(): void {
     if (!this.composing) return;
@@ -999,6 +1174,13 @@ function parseContainer(key: string): LocalContainer {
     || value[2] !== null && typeof value[2] !== "string") throw new Error("INVALID_RESULT");
   const kind = value[1] === "cell" ? "cell" : value[1] === "caption" ? "caption" : "content";
   return { blockId: value[0], kind, cellId: typeof value[2] === "string" ? value[2] : null };
+}
+
+/** The lines Python makes of put text: text with no line end is one line; text with line ends (CR LF, LF, a lone CR)
+ * loses its lines of only white space; Enter adds a line after them. Only the caret reads this; Python owns the rule. */
+function pastedLines(text: string, enter: boolean): string[] {
+  const lines = !text ? [] : /[\r\n]/.test(text) ? text.replace(/\r\n?/g, "\n").split("\n").filter(line => line.trim()) : [text];
+  return enter ? [...lines.length ? lines : [""], ""] : lines;
 }
 
 function rekey(point: TextPoint | null, locals: ReadonlyMap<string, string>): TextPoint | null {

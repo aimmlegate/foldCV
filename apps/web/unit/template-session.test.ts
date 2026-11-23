@@ -408,7 +408,8 @@ test("a failed undo opens input again", async () => {
   } finally { session.close(); }
 });
 
-test("a line copied with its line end pastes into one block; text inside it is still several paragraphs", async () => {
+test("a line copied with its line end pastes into one block; text inside it goes to Python as lines (F3d)", async () => {
+  // F3d changed this contract: several lines are one `paste_lines` request, not a refusal. This transport refuses it.
   const { session, editor, warnings } = await scripted(response([{ id: "a", text: "aaa" }], 1), () => refused("REQUEST_FAILED", 500));
   try {
     select(editor, blockStart(editor, "a") + 3);
@@ -417,9 +418,19 @@ test("a line copied with its line end pastes into one block; text inside it is s
     await session.pasteFrom(null, "windows\r\n");
     assert.deepEqual(paragraphs(editor), ["a=aaaSenior engineerwindows"]);
     assert.deepEqual(warnings, []);
-    await session.pasteFrom(null, "one\ntwo\n");
-    assert.deepEqual(warnings, [knownErrorMessage("V7_INPUT_UNSUPPORTED")]);
   } finally { session.close(); }
+  const sent: Wire[] = [];
+  const lines = await scripted(response([{ id: "a", text: "aaa" }], 1), (_path, request) => {
+    if (request) sent.push(request);
+    return refused("V7_INPUT_REJECTED");
+  });
+  try {
+    select(lines.editor, blockStart(lines.editor, "a") + 3);
+    await lines.session.pasteFrom(null, "one\ntwo\n");
+    assert.deepEqual(sent.map(request => [request.operation.kind, request.operation.text]), [["paste_lines", "one\ntwo\n"]]);
+    assert.deepEqual(paragraphs(lines.editor), ["a=aaa"]);
+    assert.deepEqual(lines.warnings, [knownErrorMessage("V7_INPUT_REJECTED")]);
+  } finally { lines.session.close(); }
 });
 
 function clipboardEvent() {

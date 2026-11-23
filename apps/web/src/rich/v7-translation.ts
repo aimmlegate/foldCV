@@ -33,7 +33,13 @@ export type V7Operation =
   | { kind: "set_link_target"; blockId: string; occurrenceId: string; href: string }
   | { kind: "format_blocks"; blockIds: string[]; blockKind: BlockKind }
   | { kind: "paste_blocks"; clipboardCaptureId: string; placement: Placement }
-  | { kind: "paste_inline"; container: LocalContainer; start: number; end: number; side: Side | null; source: PasteInline["source"] };
+  | { kind: "paste_inline"; container: LocalContainer; start: number; end: number; side: Side | null; source: PasteInline["source"] }
+  // A range over containers and pasted lines are Python's rules too (F3): the editor names the edges and the text.
+  | { kind: "remove_range"; start: LocalEdge; end: LocalEdge; join: LocalJoin | null }
+  | { kind: "paste_lines"; container: LocalContainer; start: number; end: number; side: Side | null; text: string; styles: Styles; enter: boolean };
+export type LocalEdge = { container: LocalContainer; offset: number };
+/** Text put where a range was: typed or pasted text (Python splits its lines), and Enter after it. */
+export type LocalJoin = { text: string; styles: Styles; side: Side | null; enter: boolean };
 export type Placement = { parentId: string; afterId: string | null };
 /** A copy source in editor coordinates; its texts must equal the verified ones when it is captured. */
 export type ClipboardSource = { kind: "range"; container: LocalContainer; start: number; end: number; prior: string }
@@ -203,6 +209,25 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       const insertion = value.side ? target(container, value.start, value.side) : undefined;
       return { kind: "operation", operation: { kind: "paste_inline", opId, destination: range(container, value.start, value.end, insertion),
         source: structuredClone(value.source) } };
+    }
+    if (value.kind === "remove_range") {
+      const start = checked(basis, intent, value.start.container), end = checked(basis, intent, value.end.container);
+      const edge = (container: Container, offset: number) => {
+        const at = range(container, offset, offset);
+        return { blockId: at.blockId, beforeRevision: at.beforeRevision, cellId: at.cellId, field: at.field, offset };
+      };
+      const join = value.join;
+      const insertion = join?.side ? target(start, value.start.offset, join.side) : undefined;
+      return { kind: "operation", operation: { kind: "remove_range", opId, start: edge(start, value.start.offset), end: edge(end, value.end.offset),
+        ...(join ? { join: { text: join.text, styles: join.styles, enter: join.enter, ...(insertion ? { insertionTarget: insertion } : {}) } } : {}) } };
+    }
+    if (value.kind === "paste_lines") {
+      const container = checked(basis, intent, value.container);
+      const collapsed = value.start === value.end;
+      if (collapsed && value.text && value.side === null) return conflict("collapsed paste needs a side");
+      const insertion = collapsed && value.side ? target(container, value.start, value.side) : undefined;
+      return { kind: "operation", operation: { kind: "paste_lines", opId, text: value.text, styles: value.styles, enter: value.enter,
+        destination: range(container, value.start, value.end, insertion) } };
     }
     if (value.kind === "replace_text") {
       const container = checked(basis, intent, value.container);

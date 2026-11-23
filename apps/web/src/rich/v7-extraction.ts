@@ -1,5 +1,5 @@
 import type { Mark, Node, ResolvedPos } from "@tiptap/pm/model";
-import { TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
+import { AllSelection, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import { AddMarkStep, RemoveMarkStep, ReplaceStep, Transform } from "@tiptap/pm/transform";
 import { wireMarks, type EditorMarks } from "./inline";
 import { containerKey, correctionRange, type ClipboardSource, type LocalContainer, type Placement, type Side, type V7Operation } from "./v7-translation";
@@ -225,6 +225,9 @@ export function extractOperations(transaction: Transaction): Extraction {
  * such lines. A whole-block selection that also holds other blocks removes part of the document, not technologies. */
 export function technologySelected(state: EditorState): boolean {
   const blocks = selectedBlocks(state);
+  // A range over containers takes a whole technology line with it; only an edge that cuts one refuses (F3b).
+  const range = blocks ? null : rangeAt(state);
+  if (range) return "reason" in range && range.code === "TECHNOLOGY_IN_FACTS";
   if (blocks) {
     const wanted = new Set(blocks);
     let lines = 0;
@@ -594,3 +597,92 @@ export function replacementAt(doc: Node, container: LocalContainer, start: numbe
     throw error;
   }
 }
+
+/** One end of a range over containers: a text container, a text offset and the text it was read against. */
+export type RangeEdge = { container: LocalContainer; offset: number; prior: string };
+export type TextRange = { start: RangeEdge; end: RangeEdge };
+
+/** Text containers a range can start or end in: shown text blocks, technology lines included; not a hidden section line. */
+function rangeContainers(doc: Node): Located[] {
+  const found: Located[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    try {
+      const value = locate(doc.resolve(pos + 1));
+      if (value.type !== "section") found.push(value);
+    } catch (error) { if (!(error instanceof Unsupported)) throw error; }
+    return false;
+  });
+  return found;
+}
+
+/** A non-empty selection whose ends are in two different text containers, as two edges in document order (F3b). ⌘A
+ * reads as the range from the first shown text to the last. Null for a selection in one container or none; a reason
+ * when an edge cuts a technology line, which changes only in Facts (D131). An edge at the start or the end of such a
+ * line cuts no text of it. */
+export function rangeAt(state: EditorState): TextRange | { reason: string; code?: string } | null {
+  const selection = state.selection;
+  if (selection.empty || !(selection instanceof TextSelection || selection instanceof AllSelection)) return null;
+  try {
+    const containers = rangeContainers(state.doc);
+    let from: Located | undefined, to: Located | undefined, start = 0, end = 0;
+    if (selection instanceof AllSelection) {
+      from = containers[0]; to = containers.at(-1);
+      if (!from || !to) return null;
+      end = textOf(to.node).length;
+    } else {
+      from = locate(selection.$from); to = locate(selection.$to);
+      start = offset(from, selection.from); end = offset(to, selection.to);
+    }
+    // A hidden section line has no text of its own: its edge moves to the shown text next to it.
+    if (from.type === "section") { from = containers.find(value => value.start > (from as Located).start); start = 0; }
+    if (to.type === "section") {
+      const limit = to.start;
+      to = [...containers].reverse().find(value => value.start < limit);
+      end = to ? textOf(to.node).length : 0;
+    }
+    if (!from || !to || from.start >= to.start) return null;
+    const fromText = textOf(from.node), toText = textOf(to.node);
+    if (technologyLine(from.node) && start > 0 && start < fromText.length || technologyLine(to.node) && end > 0 && end < toText.length)
+      return unsupported(technologyLocked, "TECHNOLOGY_IN_FACTS");
+    return { start: { container: from.container, offset: start, prior: fromText }, end: { container: to.container, offset: end, prior: toText } };
+  } catch (error) {
+    if (error instanceof Unsupported) return { reason: error.message, ...(error.code ? { code: error.code } : {}) };
+    throw error;
+  }
+}
+
+/** Styles and insertion side for text put at the start edge of a range: from the first character that the range cuts
+ * there, or, when it cuts none, from the node at the edge. */
+export function joinAt(doc: Node, edge: RangeEdge): { styles: Styles; side: Side | null } | { reason: string } {
+  const value = replacementAt(doc, edge.container, edge.offset, edge.offset < edge.prior.length ? edge.offset + 1 : edge.offset);
+  return "reason" in value ? value : { styles: value.styles, side: edge.offset < edge.prior.length ? null : value.side };
+}
+
+/** The text block that is `count` siblings after a block, where Python puts the last of several pasted lines. */
+export function siblingAfter(doc: Node, blockId: string, count: number): string | null {
+  let found: string | null = null;
+  doc.descendants((node, pos) => {
+    if (found !== null) return false;
+    if (node.type.name !== "blockContainer" || node.attrs["id"] !== blockId) return true;
+    const position = doc.resolve(pos), index = position.index() + count;
+    const id: unknown = index < position.parent.childCount ? position.parent.child(index).attrs["id"] : null;
+    found = typeof id === "string" ? id : "";
+    return false;
+  });
+  return found || null;
+}
+
+/** Caret targets before the first and after the last block of a range, in the order F2 point 4 names them. */
+export function rangeCaret(doc: Node, range: TextRange, direction: "backward" | "forward"): TextPoint[] {
+  const targets = caretTargets(doc);
+  const startPos = find(doc, range.start.container)?.start ?? 0, endPos = find(doc, range.end.container)?.start ?? 0;
+  const before = [...targets].reverse().find(value => value.start < startPos), after = targets.find(value => value.start > endPos);
+  const points: TextPoint[] = [];
+  const endOf = (value: Located): TextPoint => ({ container: value.container, offset: textOf(value.node).length });
+  const startOf = (value: Located): TextPoint => ({ container: value.container, offset: 0 });
+  if (direction === "backward") { if (before) points.push(endOf(before)); if (after) points.push(startOf(after)); }
+  else { if (after) points.push(startOf(after)); if (before) points.push(endOf(before)); }
+  return points;
+}
+

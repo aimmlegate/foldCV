@@ -308,12 +308,14 @@ test("a section copy is refused by Python and pastes nothing; a cut of whole blo
     const section = session.copySelection();
     assert.ok(section);
     assert.equal(await section.capture, null);
-    const unchanged = JSON.stringify((await shown(session)).blocks);
     select(editor, at(editor, first.id, first.text.length));
+    // F3d changed this part: several lines of plain text paste as blocks after the caret's block.
+    const count = (await shown(session)).blocks.length;
     await session.pasteFrom(section, section.text);
-    assert.equal(JSON.stringify((await shown(session)).blocks), unchanged, "several paragraphs of plain text are refused");
-    assert.equal(warnings.length, 1);
-    warnings.length = 0;
+    assert.ok((await shown(session)).blocks.length > count, "several lines of plain text make new blocks");
+    assert.equal(warnings.length, 0, warnings.join("\n"));
+    await session.navigate("undo");
+    ({ blocks } = await shown(session));
     const tasks = blocks.filter(block => block.text === TASK), second = tasks[1];
     assert.ok(second);
     const next = blocks[blocks.indexOf(second) + 1];
