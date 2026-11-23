@@ -686,3 +686,13 @@ export function rangeCaret(doc: Node, range: TextRange, direction: "backward" | 
   return points;
 }
 
+/** Whether the block with this id shows a technology name (for the page's own menu). */
+export function technologyBlock(doc: Node, blockId: string): boolean {
+  let found = false;
+  doc.descendants(node => {
+    if (found) return false;
+    if (node.type.name === "blockContainer" && node.attrs["id"] === blockId) { found = technologyLine(node.firstChild); return false; }
+    return true;
+  });
+  return found;
+}

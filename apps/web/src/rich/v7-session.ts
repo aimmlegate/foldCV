@@ -519,6 +519,18 @@ export class TemplateEditorSession {
     return true;
   }
 
+  /** What the page's own context menu needs to know of the selection (F5): its kind and whether a cut can run. */
+  menuSelection(): { selection: "none" | "one" | "range" | "blocks"; cuttable: boolean } {
+    const editor = this.editor;
+    if (!editor || this.closed) return { selection: "none", cuttable: false };
+    const state = editor._tiptapEditor.state;
+    if (state.selection.empty) return { selection: "none", cuttable: false };
+    if (selectedBlocks(state)) return { selection: "blocks", cuttable: !technologySelected(state) };
+    const range = rangeAt(state);
+    if (range) return { selection: "range", cuttable: !("reason" in range) };
+    return { selection: "one", cuttable: !technologySelected(state) && copySource(state) !== null };
+  }
+
   /** Cut over a range that spans containers: the copy handler has put the shown text and the HTML on the clipboard; the
    * range then goes, with no same-project capture (F3b). Null when the selection is no such range. */
   cutRange(): { text: string; done: Promise<void> } | null {
@@ -666,6 +678,12 @@ export class TemplateEditorSession {
       && Reflect.get(marker, "projectId") === this.connection.project ? this.copied : null;
     void this.pasteFrom(own, own?.text ?? data.getData("text/plain"));
     return true;
+  }
+
+  /** Text read from the clipboard by the page's own menu: the session's own copy keeps its bindings (F5 point 5). */
+  async pasteText(text: string): Promise<void> {
+    const own = this.copied && this.copied.text === text ? this.copied : null;
+    await this.pasteFrom(own, text);
   }
 
   /** Same-project copies paste through Python with their bindings; other text enters as typing in one block. */

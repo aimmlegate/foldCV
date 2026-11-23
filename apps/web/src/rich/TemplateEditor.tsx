@@ -19,6 +19,9 @@ import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { RemarkTip } from "../workbench/editor/RemarkTip";
 import { SelectionAction } from "../workbench/editor/SelectionAction";
 import { RefusalNotice, type Refusal } from "../workbench/editor/RefusalNotice";
+import { ContextMenu } from "../workbench/editor/ContextMenu";
+import { menuItems, type MenuItem } from "../workbench/editor/context-menu";
+import { AllSelection, TextSelection, type Selection } from "@tiptap/pm/state";
 import { refusalDue } from "../workbench/editor/refusal-notice";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
@@ -29,7 +32,7 @@ import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { parseZoom, readZoom, saveZoom, useFittedZoom, zoomLevels } from "../workbench/editor/document-zoom";
 import { PanelHandle, readPanelSize, savePanelSize } from "../workbench/ui/PanelHandle";
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
-import { markable } from "./v7-extraction";
+import { markable, technologyBlock } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
 import { disabledExtensions, templateDictionary, templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
@@ -430,6 +433,68 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const anchors = useMemo(() => groupAnchors(documentShown, new Map(facts.records.map(record => [record.id, record.kind]))),
     [documentShown, facts]);
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
+  // The page's own context menu (F5): it opens at the pointer or, from the keyboard, at the caret; items that cannot run
+  // are not shown, and with none nothing opens.
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null), [menuList, setMenuList] = useState<MenuItem[]>([]);
+  const [pasteHint, setPasteHint] = useState<string | null>(null);
+  const menuBlock = useRef<string | null>(null), rightPress = useRef<Selection | null>(null);
+  function openMenu(x: number, y: number, block: string | null) {
+    const { selection, cuttable } = session.menuSelection();
+    const items = menuItems({ selection, cuttable, editable: session.writable && !locked, rewritable: session.rewriteSource() !== null,
+      rewordable: caretBlock() !== null, block });
+    menuBlock.current = block; setPasteHint(null);
+    setMenuList(items); setMenuAt(items.length ? { x, y } : null);
+  }
+  function textBlockAt(target: EventTarget | null): string | null {
+    const container = target instanceof Element ? target.closest(".cv-document [data-node-type=blockContainer]") : null;
+    const content = container?.querySelector(":scope > [data-content-type]");
+    const type = content?.getAttribute("data-content-type") ?? "";
+    if (!container || !content || !["paragraph", "heading", "bulletListItem", "numberedListItem"].includes(type)) return null;
+    // A technology line changes only in Facts (D131), so it is not removed from here.
+    const id = container.getAttribute("data-id");
+    return id && !technologyBlock(editor._tiptapEditor.state.doc, id) ? id : null;
+  }
+  function contextMenu(event: React.MouseEvent) {
+    event.preventDefault();
+    const view = editor._tiptapEditor.view, before = rightPress.current ?? view.state.selection;
+    rightPress.current = null;
+    const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+    // A right click inside the selection keeps it; elsewhere the caret goes to the click. WebKit selects the word under the
+    // pointer before this event, so the selection of the press is the one compared.
+    const inside = !before.empty && pos !== undefined && pos >= before.from && pos <= before.to;
+    const doc = view.state.doc;
+    const kept = before instanceof AllSelection ? new AllSelection(doc) : TextSelection.create(doc, before.anchor, before.head);
+    if (inside) view.dispatch(view.state.tr.setSelection(kept));
+    else if (pos !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(doc.resolve(pos))));
+    openMenu(event.clientX, event.clientY, textBlockAt(event.target));
+  }
+  function menuKey(event: KeyboardEvent) {
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+    event.preventDefault();
+    const view = editor._tiptapEditor.view, coords = view.coordsAtPos(view.state.selection.head);
+    openMenu(coords.left, coords.bottom + 4, textBlockAt(view.domAtPos(view.state.selection.head).node.parentElement));
+  }
+  async function pasteFromMenu() {
+    const desktop = (window as { foldcvDesktop?: { paste?: () => Promise<unknown> } }).foldcvDesktop;
+    editor.focus();
+    // In the app the shell sends the system paste to the page: a real paste event with no prompt.
+    if (desktop?.paste) { setMenuAt(null); await desktop.paste(); return; }
+    try {
+      const text = await navigator.clipboard.readText();
+      setMenuAt(null);
+      await session.pasteText(text);
+    } catch { setPasteHint(/Mac|iPhone|iPad/u.test(navigator.platform) ? "Нажмите ⌘V" : "Нажмите Ctrl+V"); }
+  }
+  const runMenu = (item: MenuItem) => {
+    if (item === "paste") { void pasteFromMenu(); return; }
+    setMenuAt(null);
+    editor.focus();
+    if (item === "cut" || item === "copy") document.execCommand(item);
+    else if (item === "rewrite") openRewrite();
+    else if (item === "reword") { const block = caretBlock(); if (block) openReword(block); }
+    else if (menuBlock.current) void session.removeBlocks([menuBlock.current]);
+  };
+  const closeMenu = useCallback(() => setMenuAt(null), []);
   const selecting = session.rewriteSource() !== null;
   const selectionAnchor = selecting && !rewriteOpen && !dragging && !locked && workspaceView !== "original" ? selectionEnd() : null;
   // The fact a mark names, shown in Facts: the panel opens on its row.
@@ -437,6 +502,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   return <div className="contents uir-editor-session">
     <SelectionAction anchor={selectionAnchor} open={openRewrite} />
     <RefusalNotice refusal={refusal} done={refusalDone} />
+    <ContextMenu at={menuAt} items={menuList} run={runMenu} close={closeMenu} pasteHint={pasteHint} />
     <RemarkTip host={paperScroll} openFact={openFact} />
     <BlockRewordButton host={paperScroll} blockIds={locked || rewordOpen || rewriteOpen || dragging || selecting ? noBlocks : rewordIds}
       open={openReword} />
@@ -490,8 +556,9 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
           </fieldset>
           {factsVisible && <PanelHandle className="facts-handle" label="Ширина панели фактов" axis="x" sign={-1} value={factsWidth} minimum={factsWidths.minimum}
             maximum={factsWidths.maximum} change={changeFactsWidth} reset={() => changeFactsWidth(null)} />}
-          <div className="paper-scroll" ref={paperScroll} onKeyDownCapture={linkShortcut}>
-            <div className="cv-document resume-paper" data-project-id={initial.workspace.projectId} data-template="v7"
+          <div className="paper-scroll" ref={paperScroll} onKeyDownCapture={event => { linkShortcut(event); menuKey(event); }}
+            onMouseDownCapture={event => { if (event.button === 2) rightPress.current = editor._tiptapEditor.state.selection; }}>
+            <div className="cv-document resume-paper" onContextMenu={contextMenu} data-project-id={initial.workspace.projectId} data-template="v7"
               data-history-position={session.history.position} data-history-length={session.history.length}>
               {sheet && <style>{sheet.css}</style>}
               {/* A style rule, not classes on the blocks: ProseMirror owns their DOM. */}

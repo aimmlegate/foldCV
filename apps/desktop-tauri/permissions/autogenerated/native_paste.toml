@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-native-paste"
+description = "Enables the native_paste command without any pre-configured scope."
+commands.allow = ["native_paste"]
+
+[[permission]]
+identifier = "deny-native-paste"
+description = "Denies the native_paste command without any pre-configured scope."
+commands.deny = ["native_paste"]

@@ -11,11 +11,12 @@ use std::thread;
 
 use dispatch2::DispatchQueue;
 use objc2::{MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSAlert, NSAlertStyle, NSBackingStoreType, NSWindow, NSWindowButton, NSWindowStyleMask,
+use objc2::sel;
+use objc2_app_kit::{NSAlert, NSAlertStyle, NSApplication, NSBackingStoreType, NSWindow, NSWindowButton, NSWindowStyleMask,
     NSWindowTitleVisibility};
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Builder, LogicalPosition, Manager, TitleBarStyle, WebviewWindowBuilder, Wry};
+use tauri::{AppHandle, Builder, LogicalPosition, Manager, TitleBarStyle, Webview, WebviewWindowBuilder, Wry};
 
 use crate::{shutdown, Shell, WINDOW};
 
@@ -80,6 +81,15 @@ pub fn alert(_title: &str, message: String, detail: String) {
         alert.setMessageText(&NSString::from_str(&message));
         alert.setInformativeText(&NSString::from_str(&detail));
         alert.runModal();
+    });
+}
+
+/// The Edit menu's Paste: `paste:` to the first responder, which is the web view while the page has the focus.
+pub fn paste(_webview: &Webview) {
+    DispatchQueue::main().exec_async(|| {
+        let app = NSApplication::sharedApplication(MainThreadMarker::new().expect("the main queue runs on the main thread"));
+        // SAFETY: a nil target sends the action along the responder chain, as a menu item does.
+        unsafe { app.sendAction_to_from(sel!(paste:), None, None) };
     });
 }
 

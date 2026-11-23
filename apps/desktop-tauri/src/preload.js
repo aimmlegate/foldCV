@@ -1,5 +1,6 @@
-// What the Tauri window gives the page: how a download ended, the desktop styles and, on macOS, the strip that drags
-// the window, which has no title bar. The shell calls it with "macos" or "windows".
+// What the Tauri window gives the page: how a download ended, the system paste for the page's own context menu, the
+// desktop styles and, on macOS, the strip that drags the window, which has no title bar. The shell calls it with
+// "macos" or "windows".
 (desktop => {
   const listeners = new Set();
   Object.defineProperty(window, "foldcvDesktop", { value: Object.freeze({
@@ -7,6 +8,8 @@
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
+    // The shell sends the system paste to the focused page, which then gets a real paste event.
+    paste() { return window.__TAURI_INTERNALS__.invoke("native_paste"); },
   }) });
   // The shell calls this when its save dialog ends.
   Object.defineProperty(window, "__foldcvDownloadDone", { value: (state, name) => {

@@ -26,7 +26,7 @@ libc = "0.2"
 # AppKit for the error alert (rfd gives parentless dialogs to the notification center) and the window buttons.
 dispatch2 = "0.3"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSAlert", "NSButton", "NSControl",
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSAlert", "NSApplication", "NSButton", "NSControl",
   "NSGraphics", "NSResponder", "NSView", "NSWindow"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSString"] }
 
@@ -35,7 +35,7 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["std
 tauri-plugin-single-instance = "=2.5.5"
 # The error message box, links for the default browser and a helper without a console window.
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Threading",
-  "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+  "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 lto = true

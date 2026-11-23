@@ -54,3 +54,6 @@
 .reword-panel .reword-value .rewrite-result { margin: 0; }
 .reword-panel .reword-note { margin: 0 0 10px; color: var(--muted); }
 .reword-panel .rewrite-chips button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-text); }
+
+/* The page's own context menu (F5): the look of the template menu, at the pointer. */
+.editor-context-menu { position: fixed; z-index: 175; }

@@ -6,7 +6,9 @@ use std::path::Path;
 use std::ptr;
 use std::thread;
 
-use tauri::{AppHandle, Builder, Manager, WebviewWindowBuilder, Wry};
+use tauri::{AppHandle, Builder, Manager, Webview, WebviewWindowBuilder, Wry};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    VK_CONTROL, VK_V};
 use windows_sys::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_SETFOREGROUND, SW_SHOWNORMAL};
@@ -48,6 +50,16 @@ pub fn open_url(url: String) {
 /// the wheel, as the Electron View menu did.
 pub fn window<'a>(builder: WebviewWindowBuilder<'a, Wry, AppHandle>, root: &Path) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
     builder.data_directory(root.join("tauri").join("webview")).zoom_hotkeys_enabled(true)
+}
+
+/// Ctrl+V to the focused page, as the user would press it: WebView2 gives the page a real paste event with no prompt.
+/// The page's menu never takes the focus, so the keys reach the editor. Not checked on Windows by hand yet.
+pub fn paste(_webview: &Webview) {
+    let key = |code, flags| INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: code, wScan: 0,
+        dwFlags: flags, time: 0, dwExtraInfo: 0 } } };
+    let inputs = [key(VK_CONTROL, 0), key(VK_V, 0), key(VK_V, KEYEVENTF_KEYUP), key(VK_CONTROL, KEYEVENTF_KEYUP)];
+    // SAFETY: the array outlives the call and its length and element size are given.
+    unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
 }
 
 /// A message box without a window, as Electron shows; returns when it is closed.

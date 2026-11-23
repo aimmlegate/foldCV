@@ -1,5 +1,5 @@
-// The desktop app: a Tauri window that starts the frozen service and shows its page. The page uses no Tauri API;
-// preload.js gives it the download report and the desktop styles.
+// The desktop app: a Tauri window that starts the frozen service and shows its page. The page makes one Tauri call,
+// the paste of its own context menu; preload.js gives it that, the download report and the desktop styles.
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 mod helper;
@@ -46,6 +46,13 @@ struct Shell {
     left: Mutex<Option<mpsc::Sender<()>>>,
     downloads: Mutex<HashMap<String, Download>>,
     next_download: AtomicU64,
+}
+
+/// «Вставить» of the page's own menu: the system paste goes to the focused page, so the page gets a real paste event
+/// with the clipboard and no prompt, as the Edit menu gives it.
+#[tauri::command]
+fn native_paste(webview: Webview) {
+    system::paste(&webview);
 }
 
 /// One app per data root: a second service on the same root would reap the operations of the first.
@@ -273,6 +280,7 @@ fn shutdown(app: &AppHandle, shell: &Arc<Shell>) {
 fn main() {
     let app = system::app(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![native_paste])
         .setup(|app| {
             // Local, not roaming, on Windows; the same Application Support folder on macOS.
             let root = policy::data_root(std::env::var_os("FOLDCV_DESKTOP_ROOT").as_deref(), &app.path().local_data_dir()?);
