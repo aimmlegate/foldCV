@@ -111,8 +111,14 @@ class EditChain:
             'start': start, 'end': end}
         if target is not None:
             selected['insertionTarget'] = target
-        return self.step({'kind': 'replace_text', 'range': selected, 'text': text,
-            'styles': styles.model_dump(mode='json', by_alias=True) if styles is not None else {}})
+        try:
+            return self.step({'kind': 'replace_text', 'range': selected, 'text': text,
+                'styles': styles.model_dump(mode='json', by_alias=True) if styles is not None else {}})
+        except ValueError as error:
+            # A bound link that a range edge cuts in part keeps its present guard, with a code the user can read.
+            if 'URL' in str(error):
+                raise ValueError('RANGE_LINK_EDGE') from None
+            raise
 
     def result(self):
         return ChainedEdit(None if self.current is self.response.workspace else self.current, self.created)

@@ -289,3 +289,18 @@ def test_a_range_over_the_whole_generic_f10_document_fits_one_action(tmp_path):
     kept = [block for block in blocks(after) if isinstance(block.content, list) and block.type != 'section']
     assert [block.id for block in kept] == [first.id] and kept[0].content == []
     assert after.project.facts.records == before.project.facts.records
+
+
+def test_an_edge_that_cuts_a_url_only_link_in_part_is_refused_with_its_own_code():
+    from tests.templates.test_bound_links import linked_workspace
+    before, _ = linked_workspace()
+    first, second = before.project.document.regions[2].blocks[:2]
+    link = first.content[0]
+    link.label_binding = None
+    span = link.content[0]
+    span.field_key, span.cell_id = 'url', 'a-url'
+    span.occurrence_id = span.binding_root_id = 'url-occurrence'
+    span.text = link.href
+    before = WorkspaceV7.model_validate(before.model_dump(by_alias=True))
+    first = before.project.document.regions[2].blocks[0]
+    refused(before, first, 3, second, 2, 'RANGE_LINK_EDGE')
