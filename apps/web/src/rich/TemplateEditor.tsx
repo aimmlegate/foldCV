@@ -29,7 +29,7 @@ import { PanelHandle, readPanelSize, savePanelSize } from "../workbench/ui/Panel
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
 import { markable } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
-import { disabledExtensions, templateSchema } from "./template-schema";
+import { disabledExtensions, templateDictionary, templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
 import { focusFacts } from "./v7-focus";
 import { focusIconChoices } from "../projects/api";
@@ -182,7 +182,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     Extension.create({ name: "foldcv-v7-clipboard", priority: 1000, addProseMirrorPlugins: () => [session.clipboard] })],
     prosemirrorPlugins: [session.plugin, presentation, remarkPlugin, listIndex, listEnds, technologyLock] }), [session, presentation, remarkPlugin, listIndex, listEnds, technologyLock]);
   const editor = useCreateBlockNote({ schema: templateSchema, extensions: [extension],
-    disableExtensions: disabledExtensions,
+    disableExtensions: disabledExtensions, dictionary: templateDictionary,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
     initialContent: projectTemplateDocument(project.document) }, []);
   useEffect(() => {

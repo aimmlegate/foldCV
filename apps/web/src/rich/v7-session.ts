@@ -12,7 +12,7 @@ import { SessionHistory, type HistoryKind, type HistoryReservation } from "./his
 import { RichSaveQueue, type TemplateAdoption, type TemplateQueueState, type TemplateQueuedIntent } from "./save-queue";
 import { restoreTableIdentities } from "./table-identity";
 import type { templateSchema } from "./template-schema";
-import { blockAt, copySource, correctionOperation, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
+import { blockAt, containerText, copySource, correctionOperation, emptyRemovalAt, extractOperations, foldComposition, insertionAt, mergeAt, placementOf,
   itemContaining, replacementAt, selectedBlocks, selectedText, splitAt, technologyLines, technologyLocked, technologySelected, textPoint, textPosition,
   type ExtractedOperation, type TextPoint } from "./v7-extraction";
 import { wireMarks } from "./inline";
@@ -78,6 +78,8 @@ export class TemplateEditorSession {
   private factsCommand = false;
   // A block style waits for Python's result; a second one before it would be expressed on a stale revision.
   private formatting = false;
+  // A removal that Backspace or Delete started, from the key to the re-projection; more of these keys do nothing meanwhile.
+  private removing: Promise<void> | null = null;
   private closed = false;
   private retries = 0;
   // A cancel can come while the request still waits for typing to save; it is then never sent.
@@ -762,15 +764,35 @@ export class TemplateEditorSession {
     return true;
   }
 
-  /** Backspace/Delete at a block edge merge siblings; elsewhere the default deletion is plain text input. */
+  /** Backspace/Delete at a block edge merge siblings; elsewhere the default deletion is plain text input. A merge that
+   * cannot be made at the edge is silent: the key just does nothing there. */
   join(direction: "backward" | "forward"): boolean {
     const editor = this.editor;
     if (!editor || this.composing) return false;
     const state = editor._tiptapEditor.state, result = mergeAt(state, direction);
     if ("transaction" in result) { editor._tiptapEditor.view.dispatch(result.transaction); return true; }
-    if (/caret is not at the block edge|structure input needs a caret/.test(result.reason)) return false;
-    this.refuse(result.reason);
-    return true;
+    return !/caret is not at the block edge|structure input needs a caret/.test(result.reason);
+  }
+
+  /** Settles when the removal that a key started has been shown. */
+  keyed(): Promise<void> { return this.removing ?? Promise.resolve(); }
+
+  private keyRemoval(work: () => Promise<void>): void {
+    const done = work().finally(() => { if (this.removing === done) this.removing = null; });
+    this.removing = done;
+  }
+
+  /** An empty block goes as one occurrence removal; the caret then goes to the shown text that the key names. */
+  private async removeEmpty(blockId: string, caret: TextPoint): Promise<void> {
+    await this.removeBlocks([blockId]);
+    const editor = this.editor;
+    if (!editor || this.closed) return;
+    const locals = this.queue.template.localBlocks, doc = editor._tiptapEditor.state.doc;
+    // A refused removal keeps the block and the caret in it.
+    if (containerText(doc, { blockId: locals.get(blockId) ?? blockId, kind: "content", cellId: null }) !== null) return;
+    const point = rekey(caret, locals), pos = point && textPosition(doc, point);
+    if (pos === null || pos === undefined) return;
+    editor._tiptapEditor.view.dispatch(editor._tiptapEditor.state.tr.setSelection(TextSelection.create(doc, pos)));
   }
 
   private key(event: KeyboardEvent): boolean {
@@ -785,10 +807,18 @@ export class TemplateEditorSession {
       event.preventDefault(); void this.move(event.key === "ArrowUp" ? "up" : "down"); return true;
     }
     if (event.key === "Backspace" || event.key === "Delete") {
+      if (this.removing) { event.preventDefault(); return true; }
+      const direction = event.key === "Backspace" ? "backward" : "forward";
       const state = this.editor?._tiptapEditor.state, blocks = state ? selectedBlocks(state) : null;
       if (state && blocks && this.technologyRefused(state)) { event.preventDefault(); return true; }
-      if (blocks) { event.preventDefault(); if (!this.composing) void this.removeBlocks(blocks); return true; }
-      return this.join(event.key === "Backspace" ? "backward" : "forward");
+      if (blocks) { event.preventDefault(); if (!this.composing) this.keyRemoval(() => this.removeBlocks(blocks)); return true; }
+      const empty = state && !this.composing ? emptyRemovalAt(state, direction) : null;
+      if (empty) {
+        event.preventDefault();
+        if (empty !== "keep") this.keyRemoval(() => this.removeEmpty(empty.blockId, empty.caret));
+        return true;
+      }
+      return this.join(direction);
     }
     if (event.key === "Tab") { event.preventDefault(); return true; }
     return false;

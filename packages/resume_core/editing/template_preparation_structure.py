@@ -27,6 +27,27 @@ def placement(document, value):
     return items, parent
 
 
+def with_emptied_sections(document, identifiers):
+    """The roots to remove: a section whose children all go goes in their place, up the tree. A section that had no child
+    before stays, and so does any heading (F2 of the tester feedback of 2026-11-23)."""
+    chosen = list(dict.fromkeys(identifiers))
+    while True:
+        gone = set(chosen)
+        for identifier in chosen:
+            found = locate(document, identifier)
+            parent = found[2] if found else None
+            if parent is None or getattr(parent, 'type', None) != 'section' or parent.id in gone or not parent.children:
+                continue
+            children = {child.id for child in parent.children}
+            if children <= gone:
+                at = chosen.index(identifier)
+                chosen = [value for value in chosen[:at] if value not in children] + [parent.id] + \
+                    [value for value in chosen[at:] if value not in children]
+                break
+        else:
+            return chosen
+
+
 def formatted(block, patch):
     if block.type not in {'paragraph', 'heading', 'bullet_list', 'numbered_list'}:
         raise ValueError('unsupported authored block formatting')
@@ -159,9 +180,9 @@ def prepare_structure_edit(response, request, *, clipboard=None, occupied=None):
         selected = [target(before.document, value.block_id, value.before_revision) for value in operation.blocks]
         descendants = {child.id for found in selected for child in subtree(found[0][found[1]])
             if child.id != found[0][found[1]].id}
-        for value in operation.blocks:
-            if value.block_id not in descendants:
-                remove(value.block_id)
+        roots = [value.block_id for value in operation.blocks if value.block_id not in descendants]
+        for identifier in with_emptied_sections(candidate.document, roots):
+            remove(identifier)
     elif isinstance(operation, FormatBlocks):
         identifiers = {value.block_id for value in operation.targets}
         for value in operation.targets:

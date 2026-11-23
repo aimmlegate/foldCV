@@ -1,4 +1,5 @@
 import { BlockNoteSchema, defaultInlineContentSpecs } from "@blocknote/core";
+import { en } from "@blocknote/core/locales";
 import { createReactInlineContentSpec } from "@blocknote/react";
 import { schema } from "./editor-schema";
 import { allowRichCodeStyles, allowRichColors } from "./styles";
@@ -27,3 +28,8 @@ allowRichColors(templateSchema);
 /** BlockNote features the session has no operation for: their input rules and shortcuts would only be refused. */
 export const disabledExtensions = ["history", "sideMenu", "code-block-keyboard-shortcuts", "check-list-item-shortcuts", "toggle-list-item-shortcuts",
   "bullet-list-item-shortcuts", "numbered-list-item-shortcuts", "divider-block-shortcuts"];
+
+/** BlockNote's English texts with the placeholders of empty blocks replaced: an empty heading says «Заголовок»; other
+ * blocks show nothing, and no placeholder names commands that the editor does not have. */
+export const templateDictionary = { ...en, placeholders: { ...en.placeholders, default: "", emptyDocument: undefined, heading: "Заголовок",
+  bulletListItem: "", numberedListItem: "", checkListItem: "", toggleListItem: "" } };

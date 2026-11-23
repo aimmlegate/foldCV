@@ -321,6 +321,40 @@ export function mergeAt(state: EditorState, direction: "backward" | "forward"): 
   });
 }
 
+/** A text block the caret can go to: not a hidden section line, not a technology line, not a table or a caption. */
+function caretTargets(doc: Node): Located[] {
+  const found: Located[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    try {
+      const value = locate(doc.resolve(pos + 1));
+      if (value.container.kind === "content" && textBlocks.has(value.type) && !technologyLine(node)) found.push(value);
+    } catch (error) { if (!(error instanceof Unsupported)) throw error; }
+    return false;
+  });
+  return found;
+}
+
+/** Backspace or Delete in a text block with no text and no child blocks: the block goes, never merges (a merge would leave
+ * an empty field fragment in its neighbour). The caret then goes to the previous shown text block for Backspace, the
+ * next one for Delete, else the other way. `keep` when no other block can take the caret: the last one stays. */
+export type EmptyRemoval = { blockId: string; caret: TextPoint } | "keep" | null;
+export function emptyRemovalAt(state: EditorState, direction: "backward" | "forward"): EmptyRemoval {
+  const selection = state.selection;
+  if (!(selection instanceof TextSelection) || !selection.empty) return null;
+  let at: Located;
+  try { at = locate(selection.$from); } catch (error) { if (error instanceof Unsupported) return null; throw error; }
+  if (at.container.kind !== "content" || !textBlocks.has(at.type) || textOf(at.node) !== "" || technologyLine(at.node)) return null;
+  if (selection.$from.node(at.depth - 1).childCount > 1) return null;
+  const targets = caretTargets(state.doc), index = targets.findIndex(value => value.start === at.start);
+  const before = index > 0 ? targets[index - 1] : undefined, after = index >= 0 ? targets[index + 1] : undefined;
+  const end = (value: Located): TextPoint => ({ container: value.container, offset: textOf(value.node).length });
+  const start = (value: Located): TextPoint => ({ container: value.container, offset: 0 });
+  const caret = direction === "backward" ? before ? end(before) : after ? start(after) : null
+    : after ? start(after) : before ? end(before) : null;
+  return caret ? { blockId: at.container.blockId, caret } : "keep";
+}
+
 /** Composition updates stay in the editor; their net change becomes one replacement with the first update's side. */
 export function foldComposition(operations: readonly ExtractedOperation[]): ExtractedOperation | { reason: string } {
   const first = operations[0];
