@@ -25,6 +25,10 @@
   box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 14%, transparent); }
 .selection-action:hover { background: var(--wash); }
 .selection-action svg { width: 14px; height: 14px; color: var(--accent); }
+/* A refused input said at the text (F4): above the line, no pointer, gone after 4 s. */
+.refusal-notice { position: fixed; z-index: 165; max-width: min(360px, calc(100vw - 16px)); padding: 6px 10px; border: 1px solid var(--line);
+  border-radius: 7px; background: var(--paper); color: var(--ink); font-size: var(--ui-small); line-height: 1.4; pointer-events: none;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ink) 14%, transparent); }
 /* Lines of the original the resume does not show (a trial of the look): boxes over a PDF page, marks inside a DOCX (their
    rules travel with the frame), and the legend above. One red for all of them, as a removed line in a comparison of two
    versions; the page under a box stays readable. The colour stands on the original's white page. */

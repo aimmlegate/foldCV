@@ -18,6 +18,8 @@ import { FactsPanel } from "../workbench/facts/FactsPanel";
 import { RewritePanel } from "../workbench/editor/RewritePanel";
 import { RemarkTip } from "../workbench/editor/RemarkTip";
 import { SelectionAction } from "../workbench/editor/SelectionAction";
+import { RefusalNotice, type Refusal } from "../workbench/editor/RefusalNotice";
+import { refusalDue } from "../workbench/editor/refusal-notice";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
 import { rewordTarget, type RewordChange, type RewordPreview } from "../workbench/editor/reword";
@@ -69,6 +71,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const project = initial.workspace.project;
   if (!project) throw new Error("Document is missing");
   const [warning, setWarning] = useState("");
+  // A refused input is said at the text; the same text stays quiet for 3 s.
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  const lastRefusal = useRef<{ text: string; at: number } | null>(null);
+  const refuseAtText = useRef<(text: string) => void>(text => setWarning(text));
+  const refusalDone = useCallback((id: number) => setRefusal(value => value?.id === id ? null : value), []);
   const [mode, setMode] = useState<EditorMode | null>(null);
   const [recovering, setRecovering] = useState(false), [formatting, setFormatting] = useState(false);
   const recoveryRunning = useRef(false);
@@ -176,6 +183,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     warning: text => { setWarning(text); refresh(value => value + 1); },
     mode: value => setMode(value),
     shown: response => { setShown(response); callbacks.current.onShown(response); refresh(value => value + 1); },
+    refused: text => refuseAtText.current(text),
   }), [connection]);
   // Copy, cut and paste must run before BlockNote's own clipboard handlers, which would otherwise end the event.
   const extension = useMemo(() => createExtension({ key: "foldcv-v7-session", runsBefore: ["link"], tiptapExtensions: [tableIdentityAttributes,
@@ -185,6 +193,20 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     disableExtensions: disabledExtensions, dictionary: templateDictionary,
     tables: { splitCells: true, cellBackgroundColor: true, cellTextColor: true, headers: true },
     initialContent: projectTemplateDocument(project.document) }, []);
+  useEffect(() => {
+    refuseAtText.current = text => {
+      const now = Date.now();
+      if (!refusalDue(lastRefusal.current, text, now)) return;
+      lastRefusal.current = { text, at: now };
+      const view = editor._tiptapEditor.view;
+      let line: { left: number; top: number; right: number; bottom: number } | null = null;
+      try { const at = view.coordsAtPos(view.state.selection.from); line = { left: at.left, top: at.top, right: at.right, bottom: at.bottom }; }
+      catch { line = null; }
+      // With no place in the page (the page is not shown), the notice area says it.
+      if (!line) { setWarning(text); return; }
+      setRefusal({ id: now, text, line });
+    };
+  }, [editor]);
   useEffect(() => {
     session.bind(editor, project.document);
     const stop = editor.onSelectionChange(() => { session.selected(editor.transact(tr => selectionLocation(tr))); refresh(value => value + 1); });
@@ -414,6 +436,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const openFact = (recordId: string) => { setFactsVisible(true); setFactFocus({ recordId }); };
   return <div className="contents uir-editor-session">
     <SelectionAction anchor={selectionAnchor} open={openRewrite} />
+    <RefusalNotice refusal={refusal} done={refusalDone} />
     <RemarkTip host={paperScroll} openFact={openFact} />
     <BlockRewordButton host={paperScroll} blockIds={locked || rewordOpen || rewriteOpen || dragging || selecting ? noBlocks : rewordIds}
       open={openReword} />

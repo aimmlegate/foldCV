@@ -32,6 +32,8 @@ export type TemplateSessionPort = {
   mode: (mode: EditorMode) => void;
   /** The verified canonical state now shown in the editor. */
   shown: (response: TemplateProjectResponseV1) => void;
+  /** An input that was not taken, said at the place of work; without it the notice area says it. */
+  refused?: (text: string) => void;
 };
 
 const projectionMeta = "foldcv.v7.projection";
@@ -195,7 +197,13 @@ export class TemplateEditorSession {
   private refuse(reason: string, code = "V7_INPUT_UNSUPPORTED"): void {
     console.warn(`V7 input refused: ${reason}`);
     // Enter or Backspace on a chip line just does nothing: the keys offer no action there.
-    if (reason !== technologyLines) this.port.warning(errorMessage(code));
+    if (reason !== technologyLines) this.refusal(errorMessage(code));
+  }
+
+  /** A refused input goes to the page's message at the text when the page has one, else to the notice area. */
+  private refusal(text: string): void {
+    if (this.port.refused) this.port.refused(text);
+    else this.port.warning(text);
   }
 
   private filter(transaction: Transaction): boolean {
@@ -361,7 +369,7 @@ export class TemplateEditorSession {
   /** Editor structure commands report a refusal as a notice; the editor keeps showing the verified state. */
   private async structure(items: { operation: V7Operation; prior?: ReadonlyMap<string, string> }[]): Promise<void> {
     try { await this.command(items.map(item => ({ operation: item.operation, prior: item.prior ?? new Map() })), "structure"); }
-    catch (error) { this.port.warning(errorMessage(error)); }
+    catch (error) { this.refusal(errorMessage(error)); }
   }
 
   /** Shift+Mod+Arrow: BlockNote decides the target as usual; Python moves the block and decides any owner change. */
@@ -545,7 +553,7 @@ export class TemplateEditorSession {
 
   /** Cut removes the source only after Python holds the copy. */
   private async cut(source: ClipboardSource, capture: Promise<Captured | null>): Promise<void> {
-    if (!await capture) { this.port.warning(errorMessage("V7_INPUT_UNSUPPORTED")); return; }
+    if (!await capture) { this.refusal(errorMessage("V7_INPUT_UNSUPPORTED")); return; }
     if (source.kind === "blocks") { await this.removeBlocks(source.blockIds); return; }
     await this.structure([{ operation: { kind: "replace_text", container: source.container, start: source.start, end: source.end, text: "",
       styles: wireMarks({}), side: null }, prior: new Map([[containerKey(source.container), source.prior]]) }]);
@@ -724,7 +732,7 @@ export class TemplateEditorSession {
 
   private queueChanged(state: TemplateQueueState): void {
     if (state.kind === "conflict") this.port.warning(errorMessage("V7_INPUT_CONFLICT"));
-    else if (state.kind === "rejected" && !this.factsCommand) this.port.warning(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
+    else if (state.kind === "rejected" && !this.factsCommand) this.refusal(knownErrorMessage(state.reason) ?? errorMessage("V7_INPUT_REJECTED"));
     else if (state.kind === "replaced") { this.setMode("read_only"); this.port.warning(errorMessage("EDITOR_REPLACED")); }
   }
 
