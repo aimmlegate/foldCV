@@ -154,7 +154,7 @@ def removals(workspace):
     if project is not None:
         records = {record.id: record for record in [*project.facts.records, *project.facts.extensions]}
         order = {identifier: index for index, identifier in enumerate(records)}
-        lost_lines = [line for identifier in sorted(off_page(project), key=order.get)
+        lost_lines = [line for identifier in sorted(off_page(project), key=lambda identifier: order[identifier])
             for line in record_lines(project, records[identifier], units)]
         cut = set(off_fields(project, named_records(project.document)))
         gone = {' '.join(line.split()) for line in lost_lines}

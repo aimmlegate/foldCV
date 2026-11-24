@@ -96,7 +96,7 @@ def accept(workspace, *, cell_id=None, block_id=None, action_id, client_mutation
             'steps': steps, 'history': {'kind': 'edit', 'originActionId': None}})
         result, _replayed = apply_rich_mutation(workspace, mutation)
     retired = {issue.id for issue in issues}
-    for issue in result.project.import_issues:
+    for issue in getattr(result.project, 'import_issues', []):
         if issue.id in retired:
             issue.lifecycle_id = 'issue-lifecycle-' + action_id + '-' + issue.id
             issue.state, issue.retired_by_action = 'retired', action_id

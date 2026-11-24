@@ -79,7 +79,7 @@ def _period_place(project, record):
     from .template_panel_lines import _sections
     views = {value.id: value for value in project.template_package.definition.blocks}
     for section in _sections(project, record.id):
-        view = views.get(section.presentation.view_key)
+        view = views.get(section.presentation.view_key) if section.presentation is not None else None
         if view is not None and sum(1 for node in view.view.nodes if node.type == 'period') == 1:
             return True
     return False
@@ -108,7 +108,7 @@ def off_fields(project, records=None):
             base = 'period:' + period.id + ':'
             if parts and not any((record.id, base + part) in shown for part in ('start', 'end', 'present')) \
                     and _period_place(project, record):
-                keys.extend(key for key in (base + 'start', base + 'end') if working_field(record, key).raw_text)
+                keys.extend(key for key in (base + 'start', base + 'end') if getattr(working_field(record, key), 'raw_text', ''))
         if keys:
             found[record.id] = keys
     return found

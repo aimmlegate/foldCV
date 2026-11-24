@@ -180,21 +180,22 @@ def _whole_line(candidate, project, record, field, operations, as_of, allocator)
         return False
     rebuilt = _card(rebuilt_document(project, operations if operations is not None else project.template_operations, as_of),
         record.id)
-    lines = [child for child in rebuilt[1].children if child.presentation is not None
-        and child.presentation.node_index == index] if rebuilt is not None else []
+    if rebuilt is None or section.presentation is None:
+        return False
+    lines = [child for child in rebuilt[1].children if child.presentation is not None and child.presentation.node_index == index]
     if not lines:
         return False
+    instance, handle = section.presentation.template_instance_id, section.presentation.item_handle
     shown = named_records(candidate.document)
     lines = [line for line in lines if not (_names(line) - {record.id}) & shown]
     if not lines:
         return False
-    holder = TemplateSectionBlock(type='section', id='restore-line', revision=1, props={'recordId': None}, content=[],
-        children=lines, provenance=[], presentation=rebuilt[1].presentation)
-    lines = _new_ids(holder, allocator).children
+    # The allocator names each old id's slot, so ids two lines share stay shared.
+    lines = [_new_ids(line, allocator) for line in lines]
     # The card keeps its instance: the line's presentation names it, as an import line of this card does.
     for line in lines:
-        line.presentation = line.presentation.model_copy(update={'template_instance_id': section.presentation.template_instance_id,
-            'item_handle': section.presentation.item_handle})
+        if line.presentation is not None:
+            line.presentation = line.presentation.model_copy(update={'template_instance_id': instance, 'item_handle': handle})
     at = next((len(section.children) - position for position, child in enumerate(reversed(section.children))
         if child.presentation is not None and child.presentation.node_index is not None
         and child.presentation.node_index <= index), 0)

@@ -162,7 +162,8 @@ def import_records(directory, workspace):
     project = workspace.project
     if project is None or project.template_operations or not project.import_history:
         return list(project.template_operations) if project is not None else []
-    return decode_project(directory, rich_snapshot_bytes(workspace), history=True).project.template_operations
+    loaded = decode_project(directory, rich_snapshot_bytes(workspace), history=True).project
+    return list(loaded.template_operations) if loaded is not None else []
 
 
 def decode_project(directory, raw, *, history=False):
