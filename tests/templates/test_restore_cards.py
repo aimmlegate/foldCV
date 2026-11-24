@@ -143,6 +143,8 @@ def test_a_removed_field_line_of_a_card_that_stays_comes_back_at_its_node(promot
     assert panel_plan(removed.project)['offPageFields'] == {job: ['role']}
     after, result = restore(removed, job, {'field': 'role'})
     assert (job, 'role') in {(group.record_id, group.key) for group in occurrences(after.project.document).values()}
+    # The line comes back whole: the scope that shared it is shown again too, once.
+    assert sorted(shown_records(after)) == sorted(shown_records(before))
     assert job not in off_fields(after.project)
     undone(removed, after, result)
 

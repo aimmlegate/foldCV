@@ -13,7 +13,7 @@ from ..templates.captured_fields import ownership_parents
 from ..templates.materialize import materialize
 from .off_page import RESTORABLE, named_records, off_fields, off_page
 from .panel_views import restore_view, view_title
-from .template_panel_lines import _add_period_line, period_words, show_fields, sibling_lists
+from .template_panel_lines import _add_period_line, field_place, period_words, show_fields, sibling_lists
 
 # The ids a rebuilt card brings, by the allocator prefix of each kind: the card gets new ones.
 ID_KEYS = {'id': 'block', 'templateInstanceId': 'template-instance', 'occurrenceId': 'occurrence',
@@ -164,6 +164,39 @@ def restore(workspace, command, allocator, operations=None):
         identifier = field.removeprefix('period:').rpartition(':')[0]
         period = next(value for value in updated.periods if value.id == identifier)
         _add_period_line(candidate, updated, period, period_words(project.template_package), allocator)
-    else:
+    elif not _whole_line(candidate, project, updated, field, operations, workspace.formatting_as_of, allocator):
         show_fields(candidate, updated, {field}, allocator)
     return candidate, []
+
+
+def _whole_line(candidate, project, record, field, operations, as_of, allocator):
+    """A node's line that left the card whole comes back whole from the rebuilt card, with the other values it shows (a
+    role with its scope) and its label; False when the card still has a line of the node, which the field joins."""
+    found = field_place(candidate, record, field)
+    if found is None:
+        return False
+    section, _view, index, _node, _parts = found
+    if any(child.presentation is not None and child.presentation.node_index == index for child in section.children):
+        return False
+    rebuilt = _card(rebuilt_document(project, operations if operations is not None else project.template_operations, as_of),
+        record.id)
+    lines = [child for child in rebuilt[1].children if child.presentation is not None
+        and child.presentation.node_index == index] if rebuilt is not None else []
+    if not lines:
+        return False
+    shown = named_records(candidate.document)
+    lines = [line for line in lines if not (_names(line) - {record.id}) & shown]
+    if not lines:
+        return False
+    holder = TemplateSectionBlock(type='section', id='restore-line', revision=1, props={'recordId': None}, content=[],
+        children=lines, provenance=[], presentation=rebuilt[1].presentation)
+    lines = _new_ids(holder, allocator).children
+    # The card keeps its instance: the line's presentation names it, as an import line of this card does.
+    for line in lines:
+        line.presentation = line.presentation.model_copy(update={'template_instance_id': section.presentation.template_instance_id,
+            'item_handle': section.presentation.item_handle})
+    at = next((len(section.children) - position for position, child in enumerate(reversed(section.children))
+        if child.presentation is not None and child.presentation.node_index is not None
+        and child.presentation.node_index <= index), 0)
+    section.children[at:at] = lines
+    return True
