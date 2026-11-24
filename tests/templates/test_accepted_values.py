@@ -88,6 +88,13 @@ def test_g5_the_lines_of_a_removed_card_are_red_as_removed(imported):
         and block.presentation.view_key == 'education')]
     rows = [row for row in removals(after) if row not in removals(workspace)]
     assert rows and {row['reason'] for row in rows} == {'removed'}
+    # No shown value rests on the card's line, so it is red whole, though the page shows two of its words elsewhere
+    # (remark 2 after stop 4).
+    from packages.resume_core.repository.source_diff import shown_fields
+    from packages.resume_core.importing.lite.words import line_words, words
+    shown = set().union(*(words(text) for _id, _key, text, _lines, _record in shown_fields(after)))
+    assert [row['words'] for row in rows] == [None]
+    assert line_words(rows[0]['text']) & shown, 'the case holds a word the page shows on another line'
 
 
 def test_g5_a_removed_field_line_of_a_card_that_stays_gives_removed_word_rows(imported):

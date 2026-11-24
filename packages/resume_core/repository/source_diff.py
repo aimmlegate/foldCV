@@ -141,7 +141,8 @@ def record_lines(project, record, units):
 
 def removals(workspace):
     """The source lines of the facts the document showed with the words it shows nowhere, as rows {text, words,
-    reason}; words is None when the document shows no word of the line. A word counts as the import counts it (three
+    reason}; words is None when the document shows no word of the line, or when the line is a fact's off the page
+and no shown value rests on it. A word counts as the import counts it (three
     letters or a number; a period's month names and a label before a value are form). reason: `removed` for a line of
     a record off the page (D179) or of a card that lost a field line, `changed` for a line of a shown value."""
     from ..editing.off_page import named_records, off_fields, off_page
@@ -162,19 +163,21 @@ def removals(workspace):
     else:
         lost_lines = []
 
-    def add(line):
+    def add(line, whole=False):
         line = ' '.join(line.split())
         if line in seen:
             return
         seen.add(line)
         need = line_words(line)
-        missing = need - shown
+        missing = need if whole else need - shown
         if missing:
-            rows.append({'text': line, 'words': sorted(missing) if need & shown else None,
+            rows.append({'text': line, 'words': sorted(missing) if need & shown and not whole else None,
                 'reason': 'removed' if line in gone else 'changed'})
     for _id, _key, _text, lines, _record in fields:
         for line in lines:
             add(line)
+    # A line of a fact off the page that no shown value rests on is red whole (G5): words the page shows on other
+    # lines (a city, a year) do not keep a part of it.
     for line in lost_lines:
-        add(line)
+        add(line, whole=True)
     return rows
