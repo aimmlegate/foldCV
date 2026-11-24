@@ -193,9 +193,13 @@ def panel_plan(project):
     package, jobs, unshown = project.template_package, {}, {}
     addable = period_jobs(project)
     shown = {(group.record_id, group.key) for group in occurrences(project.document).values()}
+    from .off_page import named_records, off_fields
+    from .template_panel_restore import restorable
+    page = named_records(project.document)
     for record in project.facts.records:
+        # A card off the page has no section to place a field in: the template's views tell what it can show (D179).
         missing = sorted(key for key in DOCUMENT_FIELDS.get(record.kind, ()) if (record.id, key) not in shown
-            and field_place(project, record, key) is None)
+            and (field_place(project, record, key) is None if record.id in page else not template_place(project, record.kind, key)))
         if missing:
             unshown[record.id] = missing
         if record.kind == 'employment':
@@ -206,8 +210,17 @@ def panel_plan(project):
         and len(identifiers) == len(set(identifiers))]
     from .template_panel_creation import addable_kinds
     from .template_panel_groups import new_group_place
-    return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('technologyLines', lines),
+    back = sorted(restorable(project))
+    return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('offPage', back),
+        ('offPageFields', off_fields(project, page)), ('technologyLines', lines),
         ('addKinds', addable_kinds(project)), ('addTechnologyGroup', new_group_place(project) is not None)) if value}
+
+
+def template_place(project, kind, key):
+    """Whether one of the template's item views of a kind has a node for this field."""
+    from .template_panel_creation import view_options
+    from .template_panel_lines import _shown_field
+    return any(_shown_field(project.template_package, view, kind, key) is not None for view, _semantic in view_options(project, kind))
 
 
 def _view_position(project, view):

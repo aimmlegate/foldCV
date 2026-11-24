@@ -30,10 +30,11 @@ from .template_preparation_text import prepare_text_edit
 
 
 
-def prepare_edit(response, request, *, clipboard=None, occupied=None, remembered=None):
+def prepare_edit(response, request, *, clipboard=None, occupied=None, remembered=None, operations=None):
     """The prepared result of one authored operation on the exact durable response; `occupied` names the ids already
     taken (the repository session keeps them, otherwise they are collected from the workspace). `remembered`: the
-    Focus icons the user chose before, which a row added from the facts panel takes (D122)."""
+    Focus icons the user chose before, which a row added from the facts panel takes (D122). `operations`: the import
+    records a card that Facts puts back is built from (D179); the slim project in memory has none."""
     if isinstance(request.operations[0], (ReplaceText, SetMarks)):
         return prepare_text_edit(response, request, occupied=occupied)
     from ..models.template_authoring import PasteInline
@@ -43,7 +44,7 @@ def prepare_edit(response, request, *, clipboard=None, occupied=None, remembered
     from ..models.template_authoring import BuiltinPanel, DeleteEntity
     if isinstance(request.operations[0], (BuiltinPanel, DeleteEntity)):
         from .template_preparation_panel import prepare_panel_edit
-        return prepare_panel_edit(response, request, occupied=occupied, remembered=remembered)
+        return prepare_panel_edit(response, request, occupied=occupied, remembered=remembered, operations=operations)
     from ..models.template_authoring import ResolveTemplateSync
     if isinstance(request.operations[0], ResolveTemplateSync):
         from .template_preparation_sync import prepare_sync_resolution

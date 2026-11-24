@@ -2982,6 +2982,27 @@
           "title": "Jobs",
           "type": "object"
         },
+        "offPage": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Offpage",
+          "type": "array"
+        },
+        "offPageFields": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Offpagefields",
+          "type": "object"
+        },
         "styles": {
           "additionalProperties": {
             "$ref": "#/$defs/EditorStyle"

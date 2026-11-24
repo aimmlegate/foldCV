@@ -188,7 +188,7 @@ def _employment_change(workspace, command, allocator, action_id):
     return candidate, steps
 
 
-def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
+def prepare_panel_edit(response, request, *, occupied=None, remembered=None, operations=None):
     validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
@@ -211,6 +211,9 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None):
         from .template_panel_groups import add_technology_group, move_to_group, remove_from_group
         if command.operation in FOCUS_OPERATIONS:
             prepared = prepare_focus(workspace, command, allocator, remembered)
+        elif command.operation == 'restore':
+            from .template_panel_restore import restore
+            prepared = restore(workspace, command, allocator, operations)
         elif command.operation == 'add' and command.record_kind == 'technology':
             prepared = add_technology(workspace.project, operation, allocator)
         elif command.operation == 'move_technology' and command.group_id is not None:

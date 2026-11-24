@@ -1379,7 +1379,8 @@
             "move_technology",
             "move_focus",
             "set_focus_icon",
-            "add_technology_group"
+            "add_technology_group",
+            "restore"
           ],
           "title": "Operation",
           "type": "string"

@@ -616,6 +616,7 @@ export type Fonts = string[];
 export type Icons1 = string[];
 export type Addperiod = boolean;
 export type Periods = string[];
+export type Offpage = string[];
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
 export type Bold1 = string | null;
@@ -3740,7 +3741,8 @@ export type Operation2 =
   | "move_technology"
   | "move_focus"
   | "set_focus_icon"
-  | "add_technology_group";
+  | "add_technology_group"
+  | "restore";
 export type Periodid1 = string | null;
 export type Recordid18 = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;
@@ -4987,6 +4989,8 @@ export interface EditorPlanV1 {
   iconFiles?: Iconfiles;
   icons: Icons1;
   jobs?: Jobs;
+  offPage?: Offpage;
+  offPageFields?: Offpagefields;
   styles: Styles;
   technologyLines?: Technologylines;
   technologyTargets?: Technologytargets;
@@ -5045,6 +5049,9 @@ export interface Jobs {
 export interface EditorJob {
   addPeriod?: Addperiod;
   periods: Periods;
+}
+export interface Offpagefields {
+  [k: string]: string[];
 }
 export interface Styles {
   [k: string]: EditorStyle;

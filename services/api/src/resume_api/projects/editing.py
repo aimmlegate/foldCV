@@ -6,6 +6,7 @@ from packages.resume_core.models.projects import EditResultV1, digest_request
 from packages.resume_core.models.template_authoring import BuiltinPanel, PasteBlocks, PasteInline
 from packages.resume_core.editing.mutations import RichMutationFailure
 from packages.resume_core.editing.template_preparation import prepare_edit
+from packages.resume_core.repository.project_repository import import_records
 from packages.resume_core.editing.template_preparation_chain import CHAINED, prepare_chained
 from packages.resume_core.editing.template_preparation_panel import PANEL_REFUSALS
 
@@ -48,6 +49,8 @@ def _edit_locked(service, project_id, request, session):
     panel = operation.command.operation if isinstance(operation, BuiltinPanel) else None
     # A row added from the facts panel takes the icon the user chose before for its name (D122).
     remembered = service.remembered_icons() if panel == 'add_to_focus' else None
+    # A card Facts puts back is built from the import's records, which only the history files hold (D104, D179).
+    operations = import_records(session.directory, session.workspace) if panel == 'restore' else None
     states = []
 
     def build(committed):
@@ -63,7 +66,7 @@ def _edit_locked(service, project_id, request, session):
                 after, created_ids = chained.workspace, chained.created_ids
             else:
                 prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids,
-                    remembered=remembered)
+                    remembered=remembered, operations=operations)
                 after, created_ids = prepared.preview.workspace if prepared.mutation is not None else None, prepared.created_ids
         except (ValueError, RichMutationFailure) as error:
             # A panel refusal keeps its code, so the panel can say why; other input is rejected as a whole.

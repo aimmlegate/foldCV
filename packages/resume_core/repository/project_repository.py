@@ -157,6 +157,14 @@ def load_stored_data(directory, raw, *, history=False):
     return data
 
 
+def import_records(directory, workspace):
+    """The import records of a project: its own when it holds them, else read from its history files (D104)."""
+    project = workspace.project
+    if project is None or project.template_operations or not project.import_history:
+        return list(project.template_operations) if project is not None else []
+    return decode_project(directory, rich_snapshot_bytes(workspace), history=True).project.template_operations
+
+
 def decode_project(directory, raw, *, history=False):
     data = load_stored_data(directory, raw, history=history)
     if not isinstance(data, dict) or type(data.get('schemaVersion')) is not int:

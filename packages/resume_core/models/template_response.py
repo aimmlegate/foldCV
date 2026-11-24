@@ -101,6 +101,10 @@ class EditorPlanV1(Wire):
     jobs: dict[Id, EditorJob] = Field(default_factory=dict, exclude_if=lambda value: not value)
     # By record, the fields the document has no place for; the panel's dialog leaves them out.
     unshown_fields: dict[Id, list[str]] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    # D179: the job, education and language records off the page that «Вернуть на страницу» puts back, and by record
+    # the field lines a card on the page lost (the dialog's field keys).
+    off_page: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
+    off_page_fields: dict[Id, list[str]] = Field(default_factory=dict, exclude_if=lambda value: not value)
     # The technologies of each line with several; a move stays inside its line.
     technology_lines: list[list[Id]] = Field(default_factory=list, exclude_if=lambda value: not value)
     # The record kinds this template's document has a place for; the panel offers adding only these.

@@ -27,7 +27,7 @@ class RichPanelRequest(Wire):
                     "jobId": {"type": "null"}, "periodId": {"type": "null"},
                     "values": {"required": ["icon"], "maxProperties": 1}}, "required": ["recordId"]}}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon", "add_technology_group"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon", "add_technology_group", "restore"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
@@ -63,6 +63,10 @@ class RichPanelRequest(Wire):
                 or self.job_id is not None or self.period_id is not None or set(self.values) != {"icon"}
                 or len(self.values["icon"]) > 128):
             raise ValueError("FOCUS_SCOPE_INVALID")
+        # D179: a card off the page, or one field line of a card on it ({"field": key}), back on the page.
+        if self.operation == "restore" and (self.record_id is None or self.record_kind not in {None, "employment", "education", "language"}
+                or self.job_id is not None or self.period_id is not None or not set(self.values) <= {"field"}):
+            raise ValueError("PANEL_ACTION_UNSUPPORTED")
         if self.operation == "clear_technologies" and (self.record_kind != "technology" or self.record_id is not None
                 or self.period_id is not None or self.values):
             raise ValueError("PANEL_CLEAR_INVALID")
