@@ -1,4 +1,4 @@
-import type { RewordChange, RewordPreview } from "../workbench/editor/reword";
+import type { RewordBlocks, RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
 /** What a «Принять» names: the cell of a word mark or a line of a block mark. */
 export type AcceptTarget = { cellId: string } | { blockId: string };
 import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
@@ -134,9 +134,10 @@ export class ProjectEditorConnection {
   }
 
   /** The document blocks the template lets a model reword (a trial), each with the unified rules of its kind of block:
-   * the text the panel's «По правилам» puts into the request. */
-  async rewordBlocks(): Promise<Record<string, string>> {
-    return (await v2Request<{ rules: Record<string, string> }>(this.path("/reword/blocks"), "GET", undefined, this.fetcher)).rules;
+   * the text the panel's «По правилам» puts into the request; and the ones «Написать заново по резюме» can write. */
+  async rewordBlocks(): Promise<RewordBlocks> {
+    const reply = await v2Request<{ rules: Record<string, string>; write?: string[] }>(this.path("/reword/blocks"), "GET", undefined, this.fetcher);
+    return { rules: reply.rules, write: reply.write ?? [] };
   }
 
   /** The present document against the original: by cell ID, the words a shown field has and its source lines lack; and
@@ -153,9 +154,9 @@ export class ProjectEditorConnection {
   }
 
   /** One block reworded by the request the user saw: a preview only, nothing is written. */
-  async rewordPreview(requestId: string, blockId: string, instruction: string): Promise<RewordPreview> {
+  async rewordPreview(requestId: string, blockId: string, instruction: string, mode: RewordMode = "reword"): Promise<RewordPreview> {
     return this.editing(token => v2Request<RewordPreview>(this.path("/reword/preview"), "POST",
-      { editorToken: token, requestId, blockId, instruction }, this.fetcher));
+      { editorToken: token, requestId, blockId, instruction, ...(mode === "write" ? { mode } : {}) }, this.fetcher));
   }
 
   /** The user's Apply of a reworded block: the kept values become fact updates, one undo action. */

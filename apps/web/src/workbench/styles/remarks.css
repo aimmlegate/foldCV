@@ -55,6 +55,14 @@
 .reword-panel .reword-value .rewrite-result { margin: 0; }
 .reword-panel .reword-note { margin: 0 0 10px; color: var(--muted); }
 .reword-panel .rewrite-chips button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-text); }
+/* «Изменить формулировку» or «Написать заново по резюме» (F6a): two choices, each with its one line. */
+.reword-panel .reword-modes { display: grid; gap: 6px; margin: 0 0 10px; }
+.reword-panel .reword-mode { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.reword-panel .reword-mode input { margin-top: 3px; }
+.reword-panel .reword-mode span { display: grid; gap: 1px; }
+.reword-panel .reword-mode small { color: var(--muted); font-size: 12px; }
+/* A text written again is one value: «Было» and «Станет» are shown, as in the sketch. */
+.reword-panel[data-mode="write"] .reword-value:not(.reword-refused) :is(.rewrite-before h3, .rewrite-result label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 
 /* The page's own context menu (F5): the look of the template menu, at the pointer. */
 .editor-context-menu { position: fixed; z-index: 175; }

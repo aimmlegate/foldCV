@@ -1,4 +1,4 @@
-import type { RewordChange, RewordPreview } from "../workbench/editor/reword";
+import type { RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
@@ -339,7 +339,8 @@ export class TemplateEditorSession {
   /** A block reworded by the template's rules, with the user's own instruction beside them when there is one. Typing is
    * saved first, so the model reads what the page shows; `stage` hears the save, the send and the server's stages, as a
    * rewrite of a selection does. Nothing is written. */
-  async rewordPreview(requestId: string, blockId: string, instruction: string, stage: (stage: RewriteStage) => void = () => {}): Promise<RewordPreview> {
+  async rewordPreview(requestId: string, blockId: string, instruction: string, stage: (stage: RewriteStage) => void = () => {},
+    mode: RewordMode = "reword"): Promise<RewordPreview> {
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     stage("saving");
     try {
@@ -347,7 +348,7 @@ export class TemplateEditorSession {
       if (this.cancelledRewrites.has(requestId)) throw new ProjectApiFailure("CANCELLED", 409);
       stage("starting");
       const stop = this.followRewrite(requestId, stage);
-      return await this.connection.rewordPreview(requestId, blockId, instruction.trim()).finally(stop);
+      return await this.connection.rewordPreview(requestId, blockId, instruction.trim(), mode).finally(stop);
     } finally { this.cancelledRewrites.delete(requestId); }
   }
 

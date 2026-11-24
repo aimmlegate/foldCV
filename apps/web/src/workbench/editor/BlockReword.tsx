@@ -4,7 +4,8 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { RewriteOptions, useRewriteSettings } from "./RewriteOptions";
 import { RewriteComparison, RewriteProgress, useFloatingPanel, useRewritePresets } from "./RewritePanel";
-import { kindLabel, refusalLabel, rewordTarget, valueLimit, type RewordChange, type RewordPreview, type RewordValue } from "./reword";
+import { REWORD_MODES, instructionFor, kindLabel, refusalLabel, rewordTarget, valueLimit, writeNote, type RewordChange, type RewordMode, type RewordPreview,
+  type RewordValue } from "./reword";
 
 type Shown = { blockId: string; right: number; top: number };
 
@@ -54,11 +55,14 @@ type Draft = { requestId: string; texts: Record<string, string>; skipped: Readon
 /** A whole block reworded, in the panel of «Изменить текст»: the same chips, model choice, marks of the changed words,
  * editable result and «Ещё вариант», one comparison per value of the block. The request field holds everything the model
  * is told about style: a chip only puts its text there (`rules`: the unified rules of this kind of block), where the user
- * reads and edits it. Nothing changes until «Применить», and only the values left ticked are sent. */
-export function BlockRewritePanel({ open, close, instruction, change, rules, submit, apply, preview, busy, error, activity, cancel, anchor }: {
+ * reads and edits it. Nothing changes until «Применить», and only the values left ticked are sent. A block the CV can
+ * write again (`writable`) gets a switch between «Изменить формулировку» and «Написать заново по резюме». */
+export function BlockRewritePanel({ open, close, instruction, change, rules, submit, apply, preview, busy, error, activity, cancel, anchor,
+  writable = false, mode = "reword", setMode = () => {} }: {
   open: boolean; close: () => void; instruction: string; change: (value: string) => void; rules: string; submit: () => void;
   apply: (changes: RewordChange[]) => void; preview: RewordPreview | null; busy: boolean; error: string;
   activity: RewriteActivity | null; cancel: (id: string) => void; anchor: { left: number; top: number; bottom: number } | null;
+  writable?: boolean; mode?: RewordMode; setMode?: (mode: RewordMode) => void;
 }) {
   const dialog = useRef<HTMLElement>(null);
   const presets = useRewritePresets(open), settings = useRewriteSettings(open);
@@ -75,15 +79,22 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
   const send = () => apply(chosen.map(value => ({ recordId: value.recordId, field: value.field, value: textOf(value).trim(),
     edited: textOf(value).trim() !== (value.after ?? "").trim() })));
   const asked = instruction.trim() !== "";
-  const fields = <><label htmlFor="uir-reword-instruction">Что изменить?</label>
+  const writing = writable && mode === "write", shownMode: RewordMode = preview?.mode ?? "reword";
+  const choose = (next: RewordMode) => { setMode(next); change(instructionFor(next, instruction, rules, [presets.shorten, presets.clarify])); };
+  const fields = <>{writable && <div className="reword-modes" role="radiogroup" aria-label="Что сделать с блоком">
+      {REWORD_MODES.map(item => <label key={item.mode} className="reword-mode">
+        <input type="radio" name="uir-reword-mode" value={item.mode} checked={mode === item.mode} disabled={busy} onChange={() => choose(item.mode)} />
+        <span><strong>{item.label}</strong><small>{item.line}</small></span></label>)}
+    </div>}
+    <label htmlFor="uir-reword-instruction">{writing ? "Что учесть?" : "Что изменить?"}</label>
     <textarea id="uir-reword-instruction" rows={rules && instruction === rules ? 8 : 3} aria-label="Что изменить"
       placeholder="Напишите запрос или выберите готовый ниже: его текст появится здесь"
       disabled={busy} value={instruction} onChange={event => change(event.currentTarget.value)} />
     <div className="rewrite-chips">{rules && <button disabled={busy} aria-pressed={instruction === rules} onClick={() => change(rules)}>По правилам</button>}
-      <button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button>
-      <button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></div>
+      {!writing && <><button disabled={busy} onClick={() => change(presets.shorten)}>Сократить</button>
+      <button disabled={busy} onClick={() => change(presets.clarify)}>Сделать яснее</button></>}</div>
     <RewriteOptions settings={settings} disabled={busy} /></>;
-  return <section ref={dialog} hidden={!open} role="dialog" aria-modal="false" className="rewrite-panel uir-rewrite reword-panel" aria-labelledby="uir-reword-title"
+  return <section ref={dialog} hidden={!open} role="dialog" aria-modal="false" className="rewrite-panel uir-rewrite reword-panel" aria-labelledby="uir-reword-title" data-mode={preview ? shownMode : undefined}
     onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); returnFocus.current?.focus(); }
       else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && !busy) {
@@ -95,18 +106,19 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
     <div className="dialog-heading"><div><h2 id="uir-reword-title">Переписать блок</h2></div>
       <button className="icon" aria-label={busy ? "Скрыть" : "Закрыть"} onClick={close}><Icon name="close" /></button></div>
     {preview && current ? <>
-      {changed.length === 0 && <p className="reword-note">{refused.length ? "Ни одно предложение модели не прошло проверку."
-        : "Модель не предложила изменений: текст уже соответствует запросу."}</p>}
+      {changed.length === 0 && <p className="reword-note">{shownMode === "write" ? writeNote(preview) ?? "Текст не принят."
+        : refused.length ? "Ни одно предложение модели не прошло проверку." : "Модель не предложила изменений: текст уже соответствует запросу."}</p>}
       <div className="reword-values">
         {changed.map(value => <section key={value.id} className="reword-value" data-skipped={current.skipped.has(value.id) || undefined}>
-          <label className="reword-pick"><input type="checkbox" checked={!current.skipped.has(value.id)} disabled={busy} onChange={event => {
+          {shownMode !== "write" && <label className="reword-pick"><input type="checkbox" checked={!current.skipped.has(value.id)} disabled={busy} onChange={event => {
             const skipped = new Set(current.skipped); if (event.currentTarget.checked) skipped.delete(value.id); else skipped.add(value.id);
-            setDraft({ ...current, skipped }); }} /><strong>{kindLabel(value.kind)}</strong></label>
+            setDraft({ ...current, skipped }); }} /><strong>{kindLabel(value.kind)}</strong></label>}
           <RewriteComparison id={`uir-reword-${value.id}`} rows={1} maxLength={valueLimit} source={value.before} text={textOf(value)} disabled={busy || current.skipped.has(value.id)}
             edit={text => setDraft({ ...current, texts: { ...current.texts, [value.id]: text } })} />
         </section>)}
-        {refused.map(value => <section key={value.id} className="reword-value reword-refused">
-          <p className="reword-pick"><strong>{kindLabel(value.kind)}</strong> — не принято: {refusalLabel(value)}</p>
+        {refused.filter(value => value.after !== null).map(value => <section key={value.id} className="reword-value reword-refused">
+          <p className="reword-pick">{shownMode === "write" ? <>Текст не принят: {refusalLabel(value, "write")}</>
+            : <><strong>{kindLabel(value.kind)}</strong> — не принято: {refusalLabel(value)}</>}</p>
           <section className="rewrite-before"><h3>Было</h3><p className="rewrite-source">{value.before}</p></section>
           <section className="rewrite-before"><h3>Предложено</h3><p className="rewrite-source">{value.after}</p></section>
         </section>)}
@@ -117,9 +129,9 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
     <RewriteProgress error={error} busy={busy} activity={activity} cancel={cancel} checking={settings.checking && !preview} />
     <div className="rewrite-actions">
       {preview ? <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={chosen.length === 0} onClick={send}>
-          Применить ({chosen.length})<Icon name="check" /></Button>
-        : <Button variant="primary" busy={busy} busyLabel="Готовим вариант…" disabled={settings.checking || !asked} onClick={submit}>
-          Переписать<Icon name="spark" /></Button>}
+          {shownMode === "write" ? "Применить" : `Применить (${chosen.length})`}<Icon name="check" /></Button>
+        : <Button variant="primary" busy={busy} busyLabel={writing ? "Пишем текст…" : "Готовим вариант…"} disabled={settings.checking || !asked} onClick={submit}>
+          {writing ? "Написать" : "Переписать"}<Icon name="spark" /></Button>}
       {preview && <Button variant="quiet" disabled={busy || !asked} onClick={submit}>Ещё вариант</Button>}
     </div>
   </section>;

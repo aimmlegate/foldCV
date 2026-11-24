@@ -26,7 +26,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { refusalDue } from "../workbench/editor/refusal-notice";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
-import { rewordTarget, type RewordChange, type RewordPreview } from "../workbench/editor/reword";
+import { rewordTarget, type RewordChange, type RewordMode, type RewordPreview } from "../workbench/editor/reword";
 import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
@@ -129,6 +129,10 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   // through its Apply.
   const [rewordRules, setRewordRules] = useState<Readonly<Record<string, string>>>({});
   const rewordIds = useMemo<ReadonlySet<string>>(() => new Set(Object.keys(rewordRules)), [rewordRules]);
+  // The blocks «Написать заново по резюме» can write (F6a): none for a project that cannot tell its hidden lines.
+  const [rewordWrite, setRewordWrite] = useState<ReadonlySet<string>>(new Set());
+  const [rewordMode, setRewordMode] = useState<RewordMode>("reword"), rewordModeNow = useRef<RewordMode>("reword");
+  rewordModeNow.current = rewordMode;
   // The words each shown field has beyond its source lines, by cell ID; marked green while the marks are on.
   const [beyond, setBeyond] = useState<ReadonlyMap<string, readonly string[]>>(new Map());
   // The source lines of shown values with the words the document no longer shows; marked red in the original.
@@ -169,7 +173,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const savedRevision = shown.workspace.projectRevision;
   useEffect(() => {
     let live = true;
-    void connection.rewordBlocks().then(rules => { if (live) setRewordRules(rules); }, () => { if (live) setRewordRules({}); });
+    void connection.rewordBlocks().then(blocks => { if (live) { setRewordRules(blocks.rules); setRewordWrite(new Set(blocks.write)); } },
+      () => { if (live) { setRewordRules({}); setRewordWrite(new Set()); } });
     void connection.sourceDiff().then(diff => { if (live) { setBeyond(new Map(Object.entries(diff.added))); setChangedLines(diff.removed); } },
       () => { if (live) { setBeyond(new Map()); setChangedLines([]); } });
     return () => { live = false; };
@@ -363,7 +368,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     event.preventDefault(); event.stopPropagation(); setLinkTarget(link);
   }
   const rewords = useMemo(() => new RewriteRequests<RewordPreview>({
-    preview: (requestId, stage) => session.rewordPreview(requestId, rewordBlock.current, rewordInstructionNow.current, stage),
+    preview: (requestId, stage) => session.rewordPreview(requestId, rewordBlock.current, rewordInstructionNow.current, stage,
+      rewordModeNow.current),
     cancel: requestId => session.cancelRewrite(requestId), activity: setRewordActivity,
     done: setRewordPreview, failed: setRewordError, cancelFailed: error => setWarning(errorMessage(error)),
   }), [session]);
@@ -382,6 +388,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     // A panel hidden during a request or with a preview reopens on it; another block replaces it.
     if ((rewords.running || rewordPreview) && blockId === rewordBlock.current) { setRewordOpen(true); return; }
     rewordBlock.current = blockId;
+    setRewordMode("reword");
     // The request starts as the unified rules of this kind of block, in the field where the user reads and edits them;
     // their own text stays.
     const typed = rewordInstructionNow.current;
@@ -531,7 +538,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
       open={openReword} />
     <BlockRewritePanel open={rewordOpen} close={() => setRewordOpen(false)} instruction={rewordInstruction} change={setRewordInstruction}
       rules={rewordRules[rewordShown] ?? ""} submit={submitReword} apply={changes => void applyReword(changes)} preview={rewordPreview} busy={rewordActivity !== null}
-      error={rewordError} activity={rewordActivity} cancel={id => { void rewords.cancel(id); }} anchor={rewordAnchor} />
+      error={rewordError} activity={rewordActivity} cancel={id => { void rewords.cancel(id); }} anchor={rewordAnchor}
+      writable={rewordWrite.has(rewordShown)} mode={rewordWrite.has(rewordShown) ? rewordMode : "reword"} setMode={setRewordMode} />
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}
       submit={submitRewrite} busy={rewriteActivity !== null} source={rewriteSource} error={rewriteError}
       preview={rewritePreview ? { text: rewriteText } : null} apply={() => void applyRewrite()} editPreview={setRewriteText}
