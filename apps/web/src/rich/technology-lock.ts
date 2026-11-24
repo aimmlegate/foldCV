@@ -24,6 +24,8 @@ export function technologyLockPlugin(open: (recordId: string) => void): Plugin<D
     props: {
       decorations: state => key.getState(state) ?? DecorationSet.empty,
       handleClick: (_view, _pos, event) => {
+        // WebKit sends a right press here too; it opens the page's menu, not Facts (remark 3 after stop 4).
+        if (event.button !== 0) return false;
         const recordId = event.target instanceof Element ? event.target.closest(technologyName)?.getAttribute("data-record-id") : null;
         if (!recordId) return false;
         open(recordId);

@@ -322,3 +322,19 @@ test("whole sibling selection excludes an unselected final subtree", () => {
   assert.equal(selectedBlocks(selection(start(doc, "b") + "Second".length)), null);
   assert.deepEqual(selectedBlocks(selection(start(doc, "d"))), ["a", "b"], "the next sibling start covers the whole subtree");
 });
+
+test("a right press on a technology name opens the page's menu, not Facts; a left click opens Facts", () => {
+  const opened: string[] = [], plugin = technologyLockPlugin(id => opened.push(id));
+  // Node has no DOM: a stand-in Element class is enough for the plugin's instanceof check.
+  const scope = globalThis as { Element?: unknown };
+  if (scope.Element === undefined) scope.Element = class {};
+  const target = { closest: () => ({ getAttribute: () => "record-1" }) };
+  Object.setPrototypeOf(target, (scope.Element as { prototype: object }).prototype);
+  const click = plugin.props.handleClick;
+  assert.ok(click);
+  const right = { button: 2, target } as unknown as MouseEvent, left = { button: 0, target } as unknown as MouseEvent;
+  assert.equal(click.call(plugin, undefined as never, 0, right), false);
+  assert.deepEqual(opened, []);
+  assert.equal(click.call(plugin, undefined as never, 0, left), true);
+  assert.deepEqual(opened, ["record-1"]);
+});
