@@ -151,6 +151,8 @@ export const remarkMessagesAttribute = "data-fcv-remark", remarkRecordAttribute 
 export const addedClass = "fcv-added";
 /** A block mark is several spans, one per text node; each names its block, so the tip can treat them as one mark. */
 export const remarkBlockAttribute = "data-fcv-remark-block";
+/** A word mark names the cell of its value, so the tip's «Принять» can accept that value (D179). */
+export const remarkCellAttribute = "data-fcv-cell";
 const markAttributes = (messages: readonly string[], recordId: string | null, added?: ReadonlySet<string>) => ({
   class: added && messages.every(message => added.has(message)) ? `fcv-remark ${addedClass}` : "fcv-remark",
   [remarkMessagesAttribute]: JSON.stringify(messages), ...(recordId ? { [remarkRecordAttribute]: recordId } : {}) });
@@ -191,8 +193,8 @@ export function remarkMarksPlugin(current: () => RemarkMarks | null): Plugin {
           markAttributes(messages, typeof cell === "string" ? remarkRecord(cell) : null, marks.added)));
         const words = typeof cell === "string" ? marks.beyond?.get(cell) : undefined;
         // The field's text starts one step inside its node; its text nodes follow one another with no gap.
-        if (words?.length) for (const range of wordRanges(node.textContent, words))
-          decorations.push(Decoration.inline(position + 1 + range.start, position + 1 + range.end, beyondAttributes));
+        if (words?.length && typeof cell === "string") for (const range of wordRanges(node.textContent, words))
+          decorations.push(Decoration.inline(position + 1 + range.start, position + 1 + range.end, { ...beyondAttributes, [remarkCellAttribute]: cell }));
         return false;
       }
       if (name !== "blockContainer") return true;

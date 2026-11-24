@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findLine, narrowed, pdfBoxes, textIndex, unshownLines, unshownRanges, withChanged, type Unshown } from "../src/workbench/editor/unshown";
+import { findLine, narrowed, pdfBoxes, textIndex, unshownLabels, unshownLines, unshownRanges, withChanged, type Unshown } from "../src/workbench/editor/unshown";
 
 const issue = (code: string, message: string, state = "active") => ({ state, message, code, targetIds: ["scope-task"], blockIds: [] });
 
@@ -28,6 +28,13 @@ test("the lines the present document changed join the import's lines, one row pe
     { reason: "hidden", text: "nina@example.org", words: null },
     { reason: "changed", text: "Перевела расчёты с Oracle", words: ["перевела", "расчеты"] },
     { reason: "changed", text: "Старая строка", words: null }]);
+});
+
+test("a line of a fact that left the page keeps Python's reason «removed» with its own label (D179)", () => {
+  const rows = withChanged([], [{ text: "Учебный центр, 2019", words: null, reason: "removed" },
+    { text: "Перевела расчёты с Oracle", words: ["перевела"], reason: "changed" }, { text: "Старая строка", words: null }]);
+  assert.deepEqual(rows.map(row => row.reason), ["removed", "changed", "changed"]);
+  assert.equal(unshownLabels.removed, "удалено из резюме");
 });
 
 test("a line is found across pieces whatever the spacing, and a second equal line takes the next place", () => {

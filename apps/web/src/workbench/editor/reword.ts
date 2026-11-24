@@ -3,7 +3,8 @@
 export type RewordValue = { id: string; recordId: string; field: string; kind: string; before: string; after: string | null;
   state: "changed" | "same" | "refused"; reason: string | null; words: string[]; source: string[] };
 export type RewordPreview = { requestId: string; blockId: string; values: RewordValue[]; touched: Record<string, string> };
-export type RewordChange = { recordId: string; field: string; value: string };
+/** `edited`: the user changed the text the preview gave; an unchanged value stays the model's (D179). */
+export type RewordChange = { recordId: string; field: string; value: string; edited: boolean };
 /** The longest value the service takes in an Apply (RewordChange.value in Python). */
 export const valueLimit = 4000;
 

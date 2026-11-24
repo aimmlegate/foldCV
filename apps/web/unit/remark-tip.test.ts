@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TIP_EDGE, tipPlace, type Box, type TipInput } from "../src/workbench/editor/remark-tip";
+import { acceptTarget } from "../src/workbench/editor/RemarkTip";
 
 // F1 of the tester feedback of 2026-11-23: the place of the tip of a mark. The delay is checked in the GUI only.
 const box = (left: number, top: number, right: number, bottom: number): Box => ({ left, top, right, bottom });
@@ -85,4 +86,12 @@ test("the tip stays 8 px inside the window on each side", () => {
   assert.deepEqual([scrolled.place, scrolled.top], ["right", TIP_EDGE]);
   const tiny = tipPlace({ window: { width: 300, height: 400 }, heightAt, word: { line: box(10, 10, 100, 28), x: 20 } });
   assert.deepEqual([tiny.left, tiny.width], [TIP_EDGE, 300 - 2 * TIP_EDGE]);
+});
+
+test("«Принять» accepts the value of a word mark and the whole block of a block mark, only in a tip «Нет в оригинале» (D179)", () => {
+  const remark = { messages: ["m"], recordId: null, added: true, blockId: null, cellId: null };
+  assert.deepEqual(acceptTarget({ ...remark, cellId: "cell-1" }), { cellId: "cell-1" });
+  assert.deepEqual(acceptTarget({ ...remark, blockId: "line-1" }), { blockId: "line-1" });
+  assert.equal(acceptTarget({ ...remark, added: false, cellId: "cell-1" }), null, "a doubt has no «Принять»");
+  assert.equal(acceptTarget(remark), null);
 });

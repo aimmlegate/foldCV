@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { addedClass, remarkBlockAttribute, remarkMessagesAttribute, remarkRecordAttribute } from "../../rich/remarks";
+import { addedClass, remarkBlockAttribute, remarkCellAttribute, remarkMessagesAttribute, remarkRecordAttribute } from "../../rich/remarks";
+import type { AcceptTarget } from "../../rich/v7-connection";
 import { tipPlace, type Box } from "./remark-tip";
 
-type Remark = { messages: string[]; recordId: string | null; added: boolean; blockId: string | null };
+type Remark = { messages: string[]; recordId: string | null; added: boolean; blockId: string | null; cellId: string | null };
 type Shown = Remark & { mark: HTMLElement; x: number; y: number };
 
 /** The pointer rests this long on a mark before its tip shows: a tip at once covered the lines the user was going to. */
@@ -20,7 +21,7 @@ export function remarkOf(element: Element | null): Remark | null {
     messages = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && item.trim() !== "") : [];
   } catch { messages = []; }
   return messages.length ? { messages, recordId: mark.getAttribute(remarkRecordAttribute), added: mark.classList.contains(addedClass),
-    blockId: mark.getAttribute(remarkBlockAttribute) } : null;
+    blockId: mark.getAttribute(remarkBlockAttribute), cellId: mark.getAttribute(remarkCellAttribute) } : null;
 }
 
 const plain = (rect: DOMRect): Box => ({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom });
@@ -29,6 +30,13 @@ function blockLines(host: HTMLElement, blockId: string): DOMRect[] {
   return [...host.querySelectorAll<HTMLElement>(`[${remarkBlockAttribute}="${CSS.escape(blockId)}"]`)].flatMap(span => [...span.getClientRects()]);
 }
 /** Whether the pointer is still on the mark: for a block mark, anywhere on its block's text. */
+/** What «Принять» accepts in a tip «Нет в оригинале» (D179): the value of a word mark, the whole block of a block mark;
+ * null for a tip with no such button. */
+export function acceptTarget(remark: Remark): AcceptTarget | null {
+  if (!remark.added) return null;
+  if (remark.cellId) return { cellId: remark.cellId };
+  return remark.blockId ? { blockId: remark.blockId } : null;
+}
 function onMark(shown: Shown, target: Element | null): boolean {
   if (!target) return false;
   if (shown.blockId) return !!target.closest(`[data-id="${CSS.escape(shown.blockId)}"] > .bn-block-content`);
@@ -37,7 +45,11 @@ function onMark(shown: Shown, target: Element | null): boolean {
 
 /** What a mark means, shown near it once the pointer rests on it, with a way to the fact it names (D127). A tip with no
  * button takes no pointer, so a click goes to the text under it. Nothing here changes the document. */
-export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | null>; openFact: (recordId: string) => void }) {
+export function RemarkTip({ host, openFact, accept = null }: { host: RefObject<HTMLElement | null>; openFact: (recordId: string) => void;
+  /** Accepts a green mark's value or block; null where the page takes no edit. */
+  accept?: ((target: AcceptTarget) => void) | null }) {
+  const accepting = useRef(accept);
+  accepting.current = accept;
   const [shown, setShown] = useState<Shown | null>(null);
   const tip = useRef<HTMLDivElement>(null), current = useRef<Shown | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null), showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,7 +63,7 @@ export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | nu
     const hideSoon = () => {
       cancelShow();
       if (!current.current) return;
-      if (!current.current.recordId) { hide(); return; }
+      if (!current.current.recordId && !(accepting.current && acceptTarget(current.current))) { hide(); return; }
       if (!hideTimer.current) hideTimer.current = setTimeout(() => { hideTimer.current = null; setShown(null); }, BRIDGE);
     };
     const busy = (event: MouseEvent) => event.buttons !== 0 || !(document.getSelection()?.isCollapsed ?? true);
@@ -120,10 +132,13 @@ export function RemarkTip({ host, openFact }: { host: RefObject<HTMLElement | nu
   }, [shown, host]);
   if (!shown) return null;
   const title = shown.added ? "Нет в оригинале" : "Что проверить";
-  return <div ref={tip} className={shown.recordId ? "remark-tip" : "remark-tip remark-tip-passive"} role="note" aria-label={title}>
+  const target = accept ? acceptTarget(shown) : null;
+  return <div ref={tip} className={shown.recordId || target ? "remark-tip" : "remark-tip remark-tip-passive"} role="note" aria-label={title}>
     <strong>{title}</strong>
     {shown.messages.map(message => <p key={message}>{message}</p>)}
     {shown.recordId && <button type="button" className="text-button" onMouseDown={event => event.preventDefault()}
       onClick={() => { const id = shown.recordId; setShown(null); if (id) openFact(id); }}>Открыть в фактах</button>}
+    {target && accept && <button type="button" className="text-button" onMouseDown={event => event.preventDefault()}
+      onClick={() => { setShown(null); accept(target); }}>{"cellId" in target ? "Принять" : "Принять блок"}</button>}
   </div>;
 }

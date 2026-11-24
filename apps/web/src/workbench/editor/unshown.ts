@@ -3,12 +3,13 @@
  * A line is found by its text with white space left out, so a line the viewer breaks or spaces otherwise is still
  * found. Nothing here touches the resume. */
 
-export type UnshownReason = "no_field" | "dropped" | "hidden" | "changed";
+export type UnshownReason = "no_field" | "dropped" | "hidden" | "changed" | "removed";
 /** `words`: the words to mark when the resume shows the rest of the line; null marks the whole line. */
 export type Unshown = { reason: UnshownReason; text: string; words: readonly string[] | null };
-export type ChangedLine = { text: string; words: readonly string[] | null };
+/** A line Python finds: `changed` for a value the resume shows otherwise, `removed` for a fact that left the page (D179). */
+export type ChangedLine = { text: string; words: readonly string[] | null; reason?: "changed" | "removed" };
 export const unshownLabels: Readonly<Record<UnshownReason, string>> = { no_field: "не вошло в поля шаблона", dropped: "значение отброшено",
-  hidden: "скрыто при импорте", changed: "изменено в резюме" };
+  hidden: "скрыто при импорте", changed: "изменено в резюме", removed: "удалено из резюме" };
 export const unshownCodes: Readonly<Record<string, UnshownReason>> = { IMPORT_LINES_NO_FIELD: "no_field", IMPORT_LINES_DROPPED: "dropped",
   IMPORT_LINES_HIDDEN: "hidden" };
 
@@ -32,13 +33,13 @@ export function unshownLines(issues: readonly IssueInput[]): Unshown[] {
 /** The import's lines with the lines Python finds in the present document (the words of a value's source line the
  * resume no longer shows). One row per line text: a line is found in the original by its text, so two rows of one text
  * would mark a second, equal line. Whole beats words; words add up. */
-export function withChanged(lines: readonly Unshown[], changed: readonly { text: string; words: readonly string[] | null }[]): Unshown[] {
+export function withChanged(lines: readonly Unshown[], changed: readonly ChangedLine[]): Unshown[] {
   const rows = lines.map(line => ({ ...line })), found = new Map<string, Unshown>(rows.map(line => [line.text, line]));
   const extra: Unshown[] = [];
   for (const row of changed) {
     const text = row.text.trim(), held = found.get(text);
     if (!text) continue;
-    if (!held) { const line: Unshown = { reason: "changed", text, words: row.words }; found.set(text, line); extra.push(line); }
+    if (!held) { const line: Unshown = { reason: row.reason ?? "changed", text, words: row.words }; found.set(text, line); extra.push(line); }
     else if (held.words !== null) held.words = row.words === null ? null : [...new Set([...held.words, ...row.words])];
   }
   return [...rows, ...extra];

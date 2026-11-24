@@ -34,9 +34,9 @@ test("the preview and the Apply of a reworded block go with this page's token, a
   // The request the user saw is all that is sent about style.
   const preview = await connection.rewordPreview("request-1", "block-1", "Сократи");
   assert.deepEqual(sent.at(-1)?.body, { editorToken: "token-1", requestId: "request-1", blockId: "block-1", instruction: "Сократи" });
-  const result: EditResult = await connection.rewordApply("mutation-1", "block-1", [{ recordId: "record-1", field: "value", value: "Стало" }], preview.touched);
+  const result: EditResult = await connection.rewordApply("mutation-1", "block-1", [{ recordId: "record-1", field: "value", value: "Стало", edited: false }], preview.touched);
   assert.deepEqual(sent.at(-1)?.body, { editorToken: "token-1", clientMutationId: "mutation-1", blockId: "block-1",
-    changes: [{ recordId: "record-1", field: "value", value: "Стало" }], touched: { "record-1": "hash" } });
+    changes: [{ recordId: "record-1", field: "value", value: "Стало", edited: false }], touched: { "record-1": "hash" } });
   assert.deepEqual(result.changedBlockIds, ["block-1"]);
   assert.equal(connection.response.workspace.projectRevision, 7);
 });

@@ -1,4 +1,6 @@
 import type { RewordChange, RewordPreview } from "../workbench/editor/reword";
+/** What a «Принять» names: the cell of a word mark or a line of a block mark. */
+export type AcceptTarget = { cellId: string } | { blockId: string };
 import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
 import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
@@ -139,8 +141,15 @@ export class ProjectEditorConnection {
 
   /** The present document against the original: by cell ID, the words a shown field has and its source lines lack; and
    * the source lines of shown values with the words the document no longer shows (null: the whole line). */
-  async sourceDiff(): Promise<{ added: Record<string, string[]>; removed: { text: string; words: string[] | null }[] }> {
+  async sourceDiff(): Promise<{ added: Record<string, string[]>; removed: { text: string; words: string[] | null; reason: "changed" | "removed" }[] }> {
     return v2Request(this.path("/source-diff"), "GET", undefined, this.fetcher);
+  }
+
+  /** «Принять» in the tip of a green mark (D179): the value of a word mark, or the whole block of a block mark, becomes the
+   * user's. One undo action. */
+  async accept(clientMutationId: string, target: AcceptTarget): Promise<EditResult> {
+    return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/accept"), "POST",
+      { editorToken: token, clientMutationId, ...target }, this.fetcher), true));
   }
 
   /** One block reworded by the request the user saw: a preview only, nothing is written. */

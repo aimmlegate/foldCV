@@ -72,7 +72,8 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
   const refused = values.filter(value => value.state === "refused"), same = values.length - changed.length - refused.length;
   const textOf = (value: RewordValue) => current?.texts[value.id] ?? value.after ?? "";
   const chosen = changed.filter(value => !current?.skipped.has(value.id) && textOf(value).trim() && textOf(value).trim() !== value.before);
-  const send = () => apply(chosen.map(value => ({ recordId: value.recordId, field: value.field, value: textOf(value).trim() })));
+  const send = () => apply(chosen.map(value => ({ recordId: value.recordId, field: value.field, value: textOf(value).trim(),
+    edited: textOf(value).trim() !== (value.after ?? "").trim() })));
   const asked = instruction.trim() !== "";
   const fields = <><label htmlFor="uir-reword-instruction">Что изменить?</label>
     <textarea id="uir-reword-instruction" rows={rules && instruction === rules ? 8 : 3} aria-label="Что изменить"

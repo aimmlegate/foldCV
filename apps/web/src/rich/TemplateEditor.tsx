@@ -3,7 +3,7 @@ import { Extension } from "@tiptap/core";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import { ProjectApiFailure, type ProjectEditorConnection } from "./v7-connection";
+import { ProjectApiFailure, type AcceptTarget, type ProjectEditorConnection } from "./v7-connection";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
 import type { AssistantFinding, AssistantSelection } from "../assistant/controller";
@@ -502,11 +502,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const selectionAnchor = selecting && !rewriteOpen && !dragging && !locked && workspaceView !== "original" ? selectionEnd() : null;
   // The fact a mark names, shown in Facts: the panel opens on its row.
   const openFact = (recordId: string) => { setFactsVisible(true); setFactFocus({ recordId }); };
+  const acceptMark = (target: AcceptTarget) => { void session.acceptMark(target).catch((error: unknown) => setWarning(errorMessage(error))); };
   return <div className="contents uir-editor-session">
     <SelectionAction anchor={selectionAnchor} open={openRewrite} />
     <RefusalNotice refusal={refusal} done={refusalDone} />
     <ContextMenu at={menuAt} items={menuList} run={runMenu} close={closeMenu} pasteHint={pasteHint} />
-    <RemarkTip host={paperScroll} openFact={openFact} />
+    <RemarkTip host={paperScroll} openFact={openFact} accept={locked ? null : acceptMark} />
     <BlockRewordButton host={paperScroll} blockIds={locked || rewordOpen || rewriteOpen || dragging || selecting ? noBlocks : rewordIds}
       open={openReword} />
     <BlockRewritePanel open={rewordOpen} close={() => setRewordOpen(false)} instruction={rewordInstruction} change={setRewordInstruction}

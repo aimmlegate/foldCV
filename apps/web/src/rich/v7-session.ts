@@ -3,7 +3,7 @@ import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import type { AssistantApplyResultV1 } from "../contracts/generated/contracts";
-import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type EditResult, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
+import { ProjectEditorConnection, ProjectApiFailure, pendingStore, type AcceptTarget, type EditResult, type PendingNavigation, type PendingRecord, type PendingStore } from "./v7-connection";
 import type { RichDocumentV2, TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import { contentText, responseBlocks } from "./v7-response";
 import { errorMessage, knownErrorMessage } from "../errors/messages";
@@ -367,6 +367,32 @@ export class TemplateEditorSession {
         if (error instanceof ProjectApiFailure && error.code === "EDITOR_REPLACED") { this.setMode("read_only"); throw error; }
         if (error instanceof ProjectApiFailure && error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
         result = await this.connection.rewordApply(mutationId, blockId, changes, touched);
+      }
+      this.queue.template.adoptDurable(result.response);
+      await this.reproject();
+      return result;
+    } finally {
+      this.panelBusy = false;
+      this.lock(!this.writable);
+    }
+  }
+
+  /** «Принять» in a mark's tip (D179): as an Apply, input locks, the editor shows Python's committed result, one undo
+   * action takes it back. */
+  async acceptMark(target: AcceptTarget): Promise<EditResult> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    await this.flush();
+    this.panelBusy = true;
+    this.lock(true);
+    try {
+      this.boundary();
+      const mutationId = crypto.randomUUID();
+      let result: EditResult;
+      try { result = await this.connection.accept(mutationId, target); }
+      catch (error) {
+        if (error instanceof ProjectApiFailure && error.code === "EDITOR_REPLACED") { this.setMode("read_only"); throw error; }
+        if (error instanceof ProjectApiFailure && error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
+        result = await this.connection.accept(mutationId, target);
       }
       this.queue.template.adoptDurable(result.response);
       await this.reproject();

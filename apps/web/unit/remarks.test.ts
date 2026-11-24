@@ -3,7 +3,7 @@ import test from "node:test";
 import { Schema, type Node } from "@tiptap/pm/model";
 import { EditorState } from "@tiptap/pm/state";
 import { DecorationSet, type Decoration } from "@tiptap/pm/view";
-import { beyondMessage, doubtfulValue, remarkMarks, remarkMarksPlugin, remarkMessagesAttribute, wordRanges, type RemarkMarks } from "../src/rich/remarks";
+import { beyondMessage, doubtfulValue, remarkCellAttribute, remarkMarks, remarkMarksPlugin, remarkMessagesAttribute, wordRanges, type RemarkMarks } from "../src/rich/remarks";
 import { groupAnchors, type OutlineDocument } from "../src/rich/outline";
 
 type Block = OutlineDocument["regions"][number]["blocks"][number];
@@ -190,6 +190,8 @@ test("the words a field has beyond its source lines are marked as added, word by
   const attrs = (found[0] as unknown as { type: { attrs: Record<string, string | undefined> } }).type.attrs;
   assert.equal(attrs["class"], "fcv-remark fcv-added");
   assert.deepEqual(JSON.parse(attrs[remarkMessagesAttribute] ?? "[]"), [beyondMessage]);
+  // D179: the mark names its value, for the tip's «Принять».
+  assert.equal(attrs[remarkCellAttribute], "cell-1");
 });
 
 test("a notice that carries unshown source lines marks nothing in the resume", () => {
