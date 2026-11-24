@@ -181,7 +181,7 @@ export class TemplateIntentStrategy {
     const [first, next] = this.entries;
     if (!first || !next || first.issued || next.issued || first.actionId !== next.actionId) return;
     const left = first.intent.operation, right = next.intent.operation;
-    if (left.kind !== "replace_text" || right.kind !== "replace_text" || JSON.stringify(left.styles) !== JSON.stringify(right.styles)
+    if (left.kind !== "replace_text" || right.kind !== "replace_text" || left.written !== right.written || JSON.stringify(left.styles) !== JSON.stringify(right.styles)
       || JSON.stringify(left.container) !== JSON.stringify(right.container) || right.start !== right.end
       || right.side !== "before" || right.start !== left.start + left.text.length) return;
     // Appending at the end of pending text in one action is the transaction Python would receive in sequence.

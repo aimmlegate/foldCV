@@ -21,7 +21,9 @@ export type BlockKind = { type: "paragraph" } | { type: "heading"; level: 1 | 2 
   | { type: "numbered_list"; start: number | null };
 export type Side = "before" | "after" | "interior" | "anchor";
 export type V7Operation =
-  | { kind: "replace_text"; container: LocalContainer; start: number; end: number; text: string; styles: Styles; side: Side | null }
+  | { kind: "replace_text"; container: LocalContainer; start: number; end: number; text: string; styles: Styles; side: Side | null;
+      /** D179: a selection rewrite applied as the preview gave it; the cells it writes stay the model's. */
+      written?: "model" }
   | { kind: "set_marks"; container: LocalContainer; start: number; end: number; styles: Styles }
   | { kind: "split_block"; container: LocalContainer; offset: number; created: string }
   | { kind: "merge_blocks"; leading: LocalContainer; trailing: LocalContainer }
@@ -235,7 +237,7 @@ export function translateIntent(intent: V7Intent, basis: Basis, capture: Capture
       if (collapsed !== (value.side !== null)) return conflict("collapsed input needs exactly one side");
       const insertion = value.side ? target(container, value.start, value.side) : undefined;
       return { kind: "operation", operation: { kind: "replace_text", opId, text: value.text, styles: value.styles,
-        range: range(container, value.start, value.end, insertion) } };
+        range: range(container, value.start, value.end, insertion), ...(value.written ? { written: value.written } : {}) } };
     }
     if (value.kind === "set_marks") {
       const container = checked(basis, intent, value.container);

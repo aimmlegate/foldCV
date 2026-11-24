@@ -629,8 +629,10 @@ export class TemplateEditorSession {
     const start = preview.start + middle.start, end = preview.start + middle.end;
     const place = replacementAt(editor._tiptapEditor.state.doc, preview.container, start, end);
     if ("reason" in place) { this.refuse(place.reason); throw new Error("V7_INPUT_UNSUPPORTED"); }
+    // D179: a preview the user did not change stays the model's text (green until the user types in it or accepts it).
+    const written = text === preview.text ? { written: "model" as const } : {};
     await this.command([{ operation: { kind: "replace_text", container: preview.container, start, end, text: middle.text, styles: place.styles,
-      side: start === end ? place.side : null }, prior: new Map([[containerKey(preview.container), preview.prior]]) }], "rewrite");
+      side: start === end ? place.side : null, ...written }, prior: new Map([[containerKey(preview.container), preview.prior]]) }], "rewrite");
   }
 
   private copy(view: EditorView, event: ClipboardEvent, cut: boolean): boolean {

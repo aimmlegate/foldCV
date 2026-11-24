@@ -65,3 +65,12 @@ test("correction ranges only bound the change and never split a surrogate pair",
     }
   }
 });
+
+test("a selection rewrite applied unchanged names its text as the model's; typing does not (D179)", () => {
+  const rewritten = translateIntent({ ...intent, operation: { ...intent.operation, written: "model" } } as V7Intent, basis);
+  assert.ok(rewritten.kind === "operation" && rewritten.operation.kind === "replace_text");
+  assert.equal(rewritten.operation.written, "model");
+  const typed = translateIntent(intent, basis);
+  assert.ok(typed.kind === "operation" && typed.operation.kind === "replace_text");
+  assert.equal("written" in typed.operation, false);
+});
