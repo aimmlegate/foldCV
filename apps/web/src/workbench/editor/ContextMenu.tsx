@@ -32,7 +32,13 @@ export function ContextMenu({ at, items, run, close, pasteHint }: { at: { x: num
       // Any other key, ⌘V among them, goes to the editor and the menu closes.
       close();
     };
-    const press = (event: MouseEvent) => { if (!menu.current?.contains(event.target as Node)) close(); };
+    // A left press outside only closes the menu, as the system menu does: the selection the menu was for stays. A right
+    // press goes on, so the next menu opens where it is.
+    const press = (event: MouseEvent) => {
+      if (menu.current?.contains(event.target as Node)) return;
+      if (event.button === 0) { event.preventDefault(); event.stopPropagation(); }
+      close();
+    };
     const scroll = () => close();
     addEventListener("keydown", key, true);
     addEventListener("mousedown", press, true);

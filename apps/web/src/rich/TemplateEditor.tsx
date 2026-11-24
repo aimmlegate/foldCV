@@ -20,8 +20,9 @@ import { RemarkTip } from "../workbench/editor/RemarkTip";
 import { SelectionAction } from "../workbench/editor/SelectionAction";
 import { RefusalNotice, type Refusal } from "../workbench/editor/RefusalNotice";
 import { ContextMenu } from "../workbench/editor/ContextMenu";
-import { menuItems, type MenuItem } from "../workbench/editor/context-menu";
+import { menuItems, wordAt, type MenuItem } from "../workbench/editor/context-menu";
 import { AllSelection, TextSelection, type Selection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import { refusalDue } from "../workbench/editor/refusal-notice";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
@@ -32,7 +33,7 @@ import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
 import { parseZoom, readZoom, saveZoom, useFittedZoom, zoomLevels } from "../workbench/editor/document-zoom";
 import { PanelHandle, readPanelSize, savePanelSize } from "../workbench/ui/PanelHandle";
 import { blockStyle, selectionLocation, type BlockStyle } from "./selection";
-import { markable, technologyBlock } from "./v7-extraction";
+import { containerText, markable, technologyBlock, textPoint, textPosition } from "./v7-extraction";
 import { tableIdentityAttributes } from "./table-identity";
 import { disabledExtensions, templateDictionary, templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
@@ -465,8 +466,26 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     const doc = view.state.doc;
     const kept = before instanceof AllSelection ? new AllSelection(doc) : TextSelection.create(doc, before.anchor, before.head);
     if (inside) view.dispatch(view.state.tr.setSelection(kept));
-    else if (pos !== undefined) view.dispatch(view.state.tr.setSelection(TextSelection.near(doc.resolve(pos))));
+    else if (pos !== undefined) {
+      // Remark 3 after stop 4: a word under the pointer is selected, as macOS does, so the menu can copy it; a place with
+      // no word (an empty block, white space after the text) takes the caret.
+      const word = wordUnder(view, pos, event.clientX, event.clientY);
+      view.dispatch(view.state.tr.setSelection(word ? TextSelection.create(doc, word.from, word.to) : TextSelection.near(doc.resolve(pos))));
+    }
     openMenu(event.clientX, event.clientY, textBlockAt(event.target));
+  }
+  /** The word of a shown text container under the pointer, as document positions; null when the pointer is not on one. */
+  function wordUnder(view: EditorView, pos: number, x: number, y: number): { from: number; to: number } | null {
+    const doc = view.state.doc, point = textPoint(doc, pos), text = point ? containerText(doc, point.container) : null;
+    const word = point && text !== null ? wordAt(text, point.offset) : null;
+    if (!point || !word) return null;
+    const from = textPosition(doc, { container: point.container, offset: word.start });
+    const to = textPosition(doc, { container: point.container, offset: word.end });
+    if (from === null || to === null) return null;
+    // posAtCoords takes the nearest place, also in white space after the text: the pointer must be on the word itself.
+    const start = view.coordsAtPos(from), end = view.coordsAtPos(to);
+    const on = start.top === end.top ? x >= start.left - 1 && x <= end.left + 1 : x >= start.left - 1 || x <= end.left + 1;
+    return on && y >= Math.min(start.top, end.top) - 1 && y <= Math.max(start.bottom, end.bottom) + 1 ? { from, to } : null;
   }
   function menuKey(event: KeyboardEvent) {
     if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;

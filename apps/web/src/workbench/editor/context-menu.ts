@@ -32,3 +32,26 @@ export function menuItems(state: MenuState): MenuItem[] {
   if (state.editable && state.block !== null) items.push("removeBlock");
   return items;
 }
+
+const wordChar = /[\p{L}\p{N}\p{M}]/u;
+// Joins two word characters into one word: a hyphen or an apostrophe («Ростов-на-Дону», «O'Neil»), and a point or a comma
+// between digits (3.5, 1,5).
+const joiner = (text: string, at: number): boolean => {
+  const char = text.charAt(at), before = text.charAt(at - 1), after = text.charAt(at + 1);
+  if (!wordChar.test(before) || !wordChar.test(after)) return false;
+  return /[-‐'’]/u.test(char) || /[.,]/u.test(char) && /\d/u.test(before) && /\d/u.test(after);
+};
+const inWord = (text: string, at: number): boolean => at >= 0 && at < text.length && (wordChar.test(text.charAt(at)) || joiner(text, at));
+
+/** The word of a text container at a place between two characters (remark 3 after stop 4): the word that the character
+ * after the place belongs to, else the one before it; null where neither is a word character. The same limits on every
+ * engine: WebKit selects a word itself before the menu event, Chromium on Windows does not. */
+export function wordAt(text: string, offset: number): { start: number; end: number } | null {
+  const at = inWord(text, offset) && wordChar.test(text.charAt(offset)) ? offset
+    : inWord(text, offset - 1) && wordChar.test(text.charAt(offset - 1)) ? offset - 1 : -1;
+  if (at < 0) return null;
+  let start = at, end = at + 1;
+  while (inWord(text, start - 1)) start--;
+  while (inWord(text, end)) end++;
+  return { start, end };
+}
