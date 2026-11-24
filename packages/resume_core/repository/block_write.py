@@ -20,7 +20,7 @@ from .block_reword import RewordValue, Target, reword_source
 BLOCKS = tuple(block for block, spec in P.WRITE.items() if spec['shape'] == 'text')
 # The reasons of written_check as the preview names them.
 REASONS = {'no text': 'empty', 'no lines': 'lines', 'too long': 'long', 'a number the CV lacks': 'number',
-           'a word of two alphabets': 'mixed', 'a name the CV lacks': 'name'}
+           'a word of two alphabets': 'mixed', 'a name the CV lacks': 'name', 'another language': 'language'}
 
 
 def fold(text):
@@ -109,7 +109,7 @@ def write_value(source, reply):
     text = fold(reply.get('text') or '')
     refs = sorted({ref for ref in (reply.get('lines') or [])[:WRITTEN_LINES] if isinstance(ref, str) and ref in sent},
                   key=lambda ref: sent[ref])
-    problem, words, told = written_check(text, refs, [line.text for line in source.lines])
+    problem, words, told = written_check(text, refs, [line.text for line in source.lines], language=True)
     if problem is None and text == target.text:
         state, reason, after, told = 'same', None, None, None
     elif problem is not None:

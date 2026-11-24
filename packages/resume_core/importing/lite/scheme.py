@@ -115,11 +115,32 @@ def fold(text):
     return ' '.join(text.split())
 
 
-def written_check(text, refs, lines, limit=WRITTEN_LIMIT):
+# The script of a text by its share of Cyrillic letters among Cyrillic and Latin ones. A Russian text names technologies
+# in Latin letters, so Cyrillic needs only a third; between the two bounds, or with too few letters, it is undecided.
+SCRIPT_CYRILLIC, SCRIPT_LATIN, SCRIPT_LETTERS = 0.3, 0.1, 20
+SCRIPT_NAMES = {'cyrillic': 'Cyrillic', 'latin': 'Latin'}
+
+
+def script(text):
+    """'cyrillic', 'latin' or None (undecided) for a text."""
+    folded = text.casefold()
+    cyrillic, latin = len(CYRILLIC.findall(folded)), len(LATIN.findall(folded))
+    if cyrillic + latin < SCRIPT_LETTERS:
+        return None
+    share = cyrillic / (cyrillic + latin)
+    return 'cyrillic' if share >= SCRIPT_CYRILLIC else 'latin' if share <= SCRIPT_LATIN else None
+
+
+def written_check(text, refs, lines, limit=WRITTEN_LIMIT, language=False):
     """Why code does not keep a text a model wrote from these lines (their texts), as (the problem's name, the words it
     is about, the sentence for the model); (None, [], None) when it keeps it. The text names lines to rest on, is no
     page, and states no number and no name the lines do not state and no word of two alphabets they do not have. The
-    import and the editor's «Написать заново по резюме» both use it."""
+    import and the editor's «Написать заново по резюме» both use it. language: also refuse a text whose script is not
+    the script of the lines (the editor's call only; the import does not check it)."""
+    other = None
+    if language and text:
+        wanted, written = script(' '.join(lines)), script(text)
+        other = (written, wanted) if wanted and written and wanted != written else None
     stated = {number for line in lines for number in NUMBER.findall(line)}
     foreign = sorted(set(NUMBER.findall(text)) - stated)
     known = {word.casefold() for line in lines for word in LETTERS.findall(line)}
@@ -131,6 +152,8 @@ def written_check(text, refs, lines, limit=WRITTEN_LIMIT):
     return (('no text', [], None) if not text
         else ('no lines', [], 'it named no line of these lines to rest on.') if not refs
         else ('too long', [], 'it was too long.') if len(text) > limit
+        else ('another language', [], 'it is written in ' + SCRIPT_NAMES[other[0]] + ' letters, but the lines are in '
+              + SCRIPT_NAMES[other[1]] + ' letters: write it in the language of the lines.') if other
         else ('a number the CV lacks', foreign, 'it states a number the lines do not state: ' + ', '.join(foreign) + '.') if foreign
         else ('a word of two alphabets', mixed, 'a word in it mixes two alphabets: ' + ', '.join('«' + word + '»' for word in mixed)
               + '. Each word is written in one alphabet.') if mixed

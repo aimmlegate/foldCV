@@ -59,6 +59,7 @@ test("a written text that code refused is named against the CV; a reply with no 
   assert.equal(refusalLabel(value("number", ["12"]), "write"), "появилось число, которого нет в резюме: 12");
   assert.equal(refusalLabel(value("name", ["senior"]), "write"), "появилось название, которого нет в резюме: senior");
   assert.equal(refusalLabel(value("lines", []), "write"), "текст не назвал ни одной строки резюме");
+  assert.equal(refusalLabel(value("language", []), "write"), "текст написан не на языке резюме");
   assert.equal(refusalLabel(value("number", ["12"])), "появилось число, которого нет в тексте и в оригинале: 12");
   const preview = (state: RewordValue["state"], reason: string | null, after: string | null): RewordPreview => ({ requestId: "r", blockId: "b",
     touched: {}, mode: "write", values: [{ ...value(reason, []), state, after }] });

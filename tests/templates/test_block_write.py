@@ -249,3 +249,77 @@ def test_the_stand_answers_the_write_request_with_a_text_code_keeps_or_refuses_o
     result = serve_synthetic.ScriptedContent().write_again(request, None)
     value, _told = W.write_value(source, result.value.payload)
     assert (value.state, value.reason) == (state, reason)
+
+
+# The language check (stop 5 addition): one rule by script for every model, the editor's call only.
+ENGLISH_LINES = ['Maya Collins', 'Data Engineer', 'Python, Apache Airflow, Spark, dbt, BigQuery',
+                 'Harbor Analytics Ltd', 'Built daily ingestion pipelines in Airflow for retail data sources',
+                 'Moved transformation jobs from stored procedures to dbt']
+ENGLISH_TEXT = 'Data Engineer who builds ingestion pipelines in Airflow and moves transformation jobs to dbt.'
+RUSSIAN_FOR_ENGLISH = 'Инженер данных, строю конвейеры загрузки в Airflow и переношу преобразования в dbt.'
+
+
+def english(tmp_ref='S'):
+    from types import SimpleNamespace
+    from packages.resume_core.repository.block_reword import Target
+    lines = [SimpleNamespace(ref=tmp_ref + str(number), text=text) for number, text in enumerate(ENGLISH_LINES, 1)]
+    return W.WriteSource('ABOUT', Target('V1', 'record-1', 'text', 'text', 'Data engineer.'), lines)
+
+
+@pytest.mark.parametrize('reply, state, reason', [
+    ({'text': GOOD, 'lines': ['S2']}, 'changed', None),
+    # Technology names in Latin letters inside a Russian text are normal.
+    ({'text': 'Руководитель группы разработки: Java, Spring Boot, PostgreSQL, Kafka, Kubernetes.', 'lines': ['S2', 'S6']},
+     'changed', None),
+    ({'text': 'Development team lead in billing, working with Java, Spring Boot, PostgreSQL and Kafka.', 'lines': ['S2']},
+     'refused', 'language'),
+])
+def test_a_written_text_in_the_script_of_a_russian_cv_is_kept_and_one_in_latin_letters_is_refused(imported, reply, state, reason):
+    value, told = W.write_value(source_of(imported), reply)
+    assert (value.state, value.reason) == (state, reason)
+    if reason:
+        assert told == ('it is written in Latin letters, but the lines are in Cyrillic letters: write it in the language '
+                        'of the lines.')
+
+
+def test_an_english_cv_takes_an_english_text_and_refuses_a_russian_one_with_a_reason_the_model_can_act_on():
+    kept, _told = W.write_value(english(), {'text': ENGLISH_TEXT, 'lines': ['S2', 'S5']})
+    assert kept.state == 'changed'
+    refused, told = W.write_value(english(), {'text': RUSSIAN_FOR_ENGLISH, 'lines': ['S2', 'S5']})
+    assert (refused.state, refused.reason) == ('refused', 'language')
+    assert 'Cyrillic letters, but the lines are in Latin letters' in told
+
+
+def test_too_few_letters_to_decide_give_no_refusal():
+    from packages.resume_core.importing.lite.scheme import script, written_check
+    assert script('Java, SQL.') is None and script('') is None
+    assert written_check('Python, Spark, dbt.', ['S1'], ENGLISH_LINES, language=True)[0] is None
+    # Lines with too few letters: a Russian text is not refused for them.
+    assert written_check('строю конвейеры загрузки данных в Airflow и dbt.', ['S1'], ['Airflow', 'dbt'], language=True)[0] is None
+    # Between the two bounds (a few Cyrillic words in a Latin text) the script is undecided.
+    assert script('Data Engineer at Harbor Analytics, Лиссабон') is None
+
+
+def test_the_import_does_not_check_the_language():
+    from packages.resume_core.importing.lite.scheme import written_check
+    assert written_check(RUSSIAN_FOR_ENGLISH, ['S1'], ENGLISH_LINES)[0] is None
+    assert written_check(RUSSIAN_FOR_ENGLISH, ['S1'], ENGLISH_LINES, language=True)[0] == 'another language'
+
+
+def test_a_text_in_another_language_gets_the_second_call_and_one_refused_twice_has_no_apply(tmp_path):
+    wrong = {'text': 'Development team lead in billing, working with Java, Spring Boot and Kafka.', 'lines': ['S2']}
+    provider = Writing(wrong, {'text': GOOD, 'lines': ['S2', 'S8', 'S13']}, wrong, wrong)
+    workspace, context, Editor = app(tmp_path, provider)
+    with context as (client, _application):
+        project = workspace.project_id
+        editor = Editor(client, project)
+        block_id, = client.get('/v2/projects/' + project + '/reword/blocks').json()['write']
+        body = {'editorToken': editor.token, 'blockId': block_id, 'instruction': 'Коротко.', 'mode': 'write'}
+        again = editor.call('post', '/reword/preview', {**body, 'requestId': 'write-language-1'})
+        second = json.loads(provider.requests[1].text)
+        second = second.get('payload', second)
+        assert 'Latin letters, but the lines are in Cyrillic letters' in second['refused']
+        assert [(value['state'], value['after']) for value in again['values']] == [('changed', GOOD)]
+        twice = editor.call('post', '/reword/preview', {**body, 'requestId': 'write-language-2'})
+        assert len(provider.requests) == 4
+        assert [(value['state'], value['reason']) for value in twice['values']] == [('refused', 'language')]

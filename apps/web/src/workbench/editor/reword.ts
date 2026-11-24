@@ -23,7 +23,8 @@ const reasons: Readonly<Record<string, string>> = { long: "текст стал �
 // A text written from the CV is checked against the CV's lines that were sent, not against a present text.
 const written: Readonly<Record<string, string>> = { long: "текст слишком длинный", number: "появилось число, которого нет в резюме",
   name: "появилось название, которого нет в резюме", mixed: "слово написано буквами двух алфавитов",
-  lines: "текст не назвал ни одной строки резюме", empty: "модель не написала текст" };
+  lines: "текст не назвал ни одной строки резюме", empty: "модель не написала текст",
+  language: "текст написан не на языке резюме" };
 /** Why code did not take the model's text, in words for the user. */
 export function refusalLabel(value: RewordValue, mode: RewordMode = "reword"): string {
   const reason = (mode === "write" ? written : reasons)[value.reason ?? ""] ?? "текст не прошёл проверку";
