@@ -7,6 +7,7 @@ import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact
 import { TechnologyGroups } from "./TechnologyGroups";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
+import { OffPage } from "./OffPage";
 import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { dateText } from "./dates";
@@ -99,11 +100,14 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
             focusRecordId={focusRequest?.recordId} targets={[]} lines={plan.technologyLines} excluded={focusOnly} />}</>
         : facts.records.filter(record => record.kind === kind).map(record => {
           const [name, sub] = summary(record, plan.jobs?.[record.id]?.periods ?? []);
-          return <div key={record.id}><div className="fact-row" data-fact-id={record.id}>
+          // D179, sketch A1: a card the page does not show, with its way back.
+          const off = plan.offPage?.includes(record.id) === true;
+          return <div key={record.id}><div className="fact-row" data-fact-id={record.id} data-off-page={off || undefined}>
             <button className="fact-edit" disabled={busy} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
               {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
             {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={busy} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
-          </div>{record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
+          </div>{off && <OffPage name={name} busy={busy} restore={() => void apply({ operation: "restore", recordId: record.id }).catch(() => {})} />}
+          {record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
             targets={technologyTargets.filter(target => target.jobId === record.id)} lines={plan.technologyLines} excluded={focusOnly} />}</div>;
         })}
       {plan.addKinds?.some(value => value === kind) && <button className="text-button fact-add" disabled={busy}
@@ -114,6 +118,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
         onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}</div>;
     })}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply}
+      offPage={target.record ? plan.offPageFields?.[target.record.id] : undefined}
       unshown={target.record ? plan.unshownFields?.[target.record.id] : undefined} addPeriod={Boolean(target.record && plan.jobs?.[target.record.id]?.addPeriod)} />}
     {iconEntry && focusIcons && <FocusIconDialog entry={iconEntry} load={focusIcons} submit={apply} close={() => setIconRow(null)} />}</>;
 }

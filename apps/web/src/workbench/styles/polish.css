@@ -77,3 +77,9 @@
   .save-issue > .dot, .save-issue > .save-status-label, .retry-save > span { display: none; }
   .save-issue .retry-save { min-width: 24px; min-height: 30px; justify-content: center; }
 }
+
+/* D179, sketch A1: a fact the page does not show, in its Facts row or at its field in the dialog. */
+.fact-off-page { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 4px 0 6px; color: var(--muted); font-size: var(--ui-small); }
+.fact-off-page > span { display: inline-flex; align-items: center; gap: 5px; }
+.fact-off-page .text-button { padding: 2px 0; }
+.fact-row[data-off-page] .fact-edit strong { color: var(--muted); }

@@ -11,7 +11,7 @@ export type TechnologyTarget = EditorTechnologyTarget;
 /** What Python's plan says the panel shows and offers (D113): each job's periods as the document writes them and whether it
  * can take another, the fields with no place in the document, the technologies that share a line, and whether a skill
  * group of one's own can be started (D136). */
-export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "technologyLines" | "addKinds" | "addTechnologyGroup">;
+export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "offPage" | "offPageFields" | "technologyLines" | "addKinds" | "addTechnologyGroup">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { remove: ReadonlySet<string> } = {
@@ -19,6 +19,8 @@ export const panelSupport: { remove: ReadonlySet<string> } = {
 };
 
 const focusOperations: ReadonlySet<PanelCommand["operation"]> = new Set(["add_to_focus", "remove_from_focus", "move_focus"]);
+// The kinds whose cards and field lines Facts puts back on the page (D179).
+const restoredKinds: ReadonlySet<string> = new Set(["employment", "education", "language"]);
 // Records whose fields Python edits outside the employment form.
 const editedKinds: ReadonlySet<string> = new Set(["candidate", "technology", "education", "language", "claim"]);
 
@@ -36,6 +38,13 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
       return null;
     return [command.recordId ? { operation: "add_technology_group", recordId: command.recordId, values: { title } }
       : { operation: "add_technology_group", recordKind: "technology", values: { title, display: display ?? "" } }];
+  }
+  if (command.operation === "restore") {
+    // D179: a card off the page, or one field line of a card on it, back on the page.
+    const field = values?.["field"];
+    if (!command.recordId || !restoredKinds.has(kind ?? "") || command.jobId || command.periodId
+      || Object.keys(values ?? {}).length > (field === undefined ? 0 : 1)) return null;
+    return [{ operation: "restore", recordId: command.recordId, values: field === undefined ? {} : { field } }];
   }
   if (focusOperations.has(command.operation)) {
     if (kind !== "technology" || !command.recordId || command.jobId || command.periodId || values) return null;

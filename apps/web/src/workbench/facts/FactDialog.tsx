@@ -7,9 +7,12 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { factError } from "./error";
 import { DateInput } from "./DateInput";
+import { OffPage } from "./OffPage";
 
 export type FactTarget = { kind: Kind; record: RecordValue | null; remove?: boolean };
-export function FactDialog({ target, close, submit, unshown, addPeriod = false }: { target: FactTarget; close: () => void; submit: (command: PanelCommand) => Promise<void>;
+export function FactDialog({ target, close, submit, unshown, offPage = [], addPeriod = false }: { target: FactTarget; close: () => void; submit: (command: PanelCommand) => Promise<void>;
+  /** The record's field lines the page lost (D179): each shows «Не на странице» and its way back. */
+  offPage?: readonly string[] | undefined;
   /** The record's fields the document has no place for; the dialog leaves them out. */
   unshown?: readonly string[] | undefined;
   /** The document has a place for another period of this job. */
@@ -29,6 +32,11 @@ export function FactDialog({ target, close, submit, unshown, addPeriod = false }
     }
     return values;
   }
+  // A period is one line: its way back stands at its first field the page lost.
+  const backAt = new Set(offPage.filter((key, index) => !key.startsWith("period:")
+    || !offPage.slice(0, index).some(other => other.replace(/:(start|end)$/u, "") === key.replace(/:(start|end)$/u, ""))));
+  const back = (key: string) => record && backAt.has(key) ? <OffPage name={inputs.find(input => input.key === key)?.label ?? key} busy={busy}
+    restore={() => void apply({ operation: "restore", recordId: record.id, values: { field: key } })} /> : null;
   async function apply(command: PanelCommand) {
     setBusy(true); setError("");
     try { await submit(command); close(); }
@@ -46,7 +54,8 @@ export function FactDialog({ target, close, submit, unshown, addPeriod = false }
       {target.remove ? <p className="dialog-copy">{target.kind === "claim" ? "Текст резюме не изменится." : "Поля этого факта будут удалены из документа."}</p> : <>
         {!inputs.length && <p className="dialog-copy">Этого факта нет в документе, поэтому здесь его не изменить.</p>}
         <div className="fact-form-grid">{[...inputs, ...addingPeriod].map((field, index) => "date" in field || field.key === "start" || field.key === "end" || field.key === "completion"
-          ? <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
+          ? back(field.key) ? <div key={field.key}><DateInput name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />{back(field.key)}</div>
+            : <DateInput key={field.key} name={field.key} label={field.label} field={"date" in field ? field.date : undefined} disabled={busy} />
           : target.kind === "claim" ? <div key={field.key} className="full">
             <label htmlFor={`fact-${field.key}`}>{field.label}</label><textarea id={`fact-${field.key}`} name={field.key}
               aria-label={field.label} defaultValue={field.text} autoFocus disabled={busy} maxLength={16000} rows={6} />
@@ -54,6 +63,7 @@ export function FactDialog({ target, close, submit, unshown, addPeriod = false }
           <label htmlFor={`fact-${field.key}`}>{field.label}</label><input id={`fact-${field.key}`} name={field.key} aria-label={field.label}
             type={field.checked === undefined ? "text" : "checkbox"} defaultValue={field.checked === undefined ? field.text : "present"}
             defaultChecked={field.checked} autoFocus={index === 0} disabled={busy} maxLength={16000} required={!record && index === 0} />
+          {back(field.key)}
         </div>)}</div>
         {record?.kind === "employment" && <div className="uir-period-actions">
           {record.periods.map((period, index) => <button className="text-button" type="button" key={period.id} disabled={busy}

@@ -22,6 +22,14 @@ function storage(): Storage {
 Object.assign(globalThis, { sessionStorage: storage(), localStorage: storage() });
 
 const kinds = new Map([["job", "employment"], ["tech", "technology"], ["person", "candidate"], ["school", "education"], ["note", "claim"]]);
+test("«Вернуть на страницу» is forwarded for a job, education or language card or one field line only (D179)", () => {
+  assert.deepEqual(panelCommandsV7({ operation: "restore", recordId: "job" }, kinds), [{ operation: "restore", recordId: "job", values: {} }]);
+  assert.deepEqual(panelCommandsV7({ operation: "restore", recordId: "school", values: { field: "specialty" } }, kinds),
+    [{ operation: "restore", recordId: "school", values: { field: "specialty" } }]);
+  assert.equal(panelCommandsV7({ operation: "restore", recordId: "note" }, kinds), null, "a kind with no control");
+  assert.equal(panelCommandsV7({ operation: "restore", recordId: "job", values: { field: "role", other: "x" } }, kinds), null);
+  assert.equal(panelCommandsV7({ operation: "restore", recordId: "job", jobId: "job" }, kinds), null);
+});
 test("Focus rows and technology edits are forwarded", () => {
   assert.deepEqual(panelCommandsV7({ operation: "move_focus", recordId: "tech", beforeRecordId: "other" }, kinds),
     [{ operation: "move_focus", recordId: "tech", beforeRecordId: "other" }]);
