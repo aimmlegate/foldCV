@@ -9,11 +9,12 @@ block reword, and the user's Apply goes through its route."""
 from collections import OrderedDict
 from dataclasses import dataclass
 import threading
+from typing import Any
 
 from ..importing.lite import prompts as P
 from ..importing.lite.lines import CV
 from ..importing.lite.scheme import WRITTEN_LINES, written_check
-from .block_reword import RewordValue, reword_source
+from .block_reword import RewordValue, Target, reword_source
 
 # Text blocks of the import's write call that the editor writes again (a list block is F6b).
 BLOCKS = tuple(block for block, spec in P.WRITE.items() if spec['shape'] == 'text')
@@ -66,7 +67,7 @@ def project_hidden(directory, workspace):
 @dataclass
 class WriteSource:
     title: str
-    target: object          # block_reword.Target: the block's one text value
+    target: Target          # the block's one text value
     lines: list             # the CV lines sent (EvidenceOption), hidden ones left out
 
 
@@ -77,12 +78,13 @@ def write_source(workspace, block_id, hidden, language='ru'):
     if project is None or not hidden:
         return None
     source = reword_source(workspace, block_id)
-    if source is None or source.block.id not in BLOCKS or len(source.targets) != 1:
+    block: Any = source.block if source is not None else None
+    if source is None or block.id not in BLOCKS or len(source.targets) != 1:
         return None
     lines = [line for line in CV(project.sources).lines if fold(line.text) not in hidden and fold(line.text)]
     if not lines:
         return None
-    title = (source.block.view.title or {}).get(language) or source.block.id
+    title = (block.view.title or {}).get(language) or block.id
     return WriteSource(title, source.targets[0], lines)
 
 
@@ -106,7 +108,7 @@ def write_value(source, reply):
     target, sent = source.target, {line.ref: index for index, line in enumerate(source.lines)}
     text = fold(reply.get('text') or '')
     refs = sorted({ref for ref in (reply.get('lines') or [])[:WRITTEN_LINES] if isinstance(ref, str) and ref in sent},
-                  key=sent.get)
+                  key=lambda ref: sent[ref])
     problem, words, told = written_check(text, refs, [line.text for line in source.lines])
     if problem is None and text == target.text:
         state, reason, after, told = 'same', None, None, None
@@ -114,6 +116,7 @@ def write_value(source, reply):
         state, reason, after = 'refused', REASONS[problem], text or None
     else:
         state, reason, after = 'changed', None, text
-    value = RewordValue(id=target.id, recordId=target.record_id, field=target.field, kind=target.kind, before=target.text,
-        after=after, state=state, reason=reason, words=list(words), source=target.source)
+    value = RewordValue.model_validate({'id': target.id, 'recordId': target.record_id, 'field': target.field,
+        'kind': target.kind, 'before': target.text, 'after': after, 'state': state, 'reason': reason, 'words': list(words),
+        'source': target.source})
     return value, told

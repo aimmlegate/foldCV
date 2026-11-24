@@ -12,8 +12,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from packages.resume_core.repository.block_reword import (RewordChange, RewordValue, model_written, reword_ops, reword_request,
-    reword_schema, reword_source, reword_values, rewordable)
+from packages.resume_core.repository.block_reword import (RewordChange, RewordSource, RewordValue, Target, model_written, reword_ops,
+    reword_request, reword_schema, reword_source, reword_values, rewordable)
 from packages.resume_core.importing.lite import prompts
 from packages.resume_core.repository import block_write
 from packages.resume_core.models.contracts import Id, Wire
@@ -68,13 +68,15 @@ def _read(service, project_id, payload):
     with session.lock:
         session.require_editor(payload.editor_token)
         workspace = session.workspace
+        source: block_write.WriteSource | RewordSource | None
+        targets: list[Target]
         if payload.mode == 'write':
             source = block_write.write_source(workspace, payload.block_id,
                                               block_write.project_hidden(session.directory, workspace))
             targets = [source.target] if source is not None else []
         else:
             source = reword_source(workspace, payload.block_id)
-            targets = source.targets if source is not None else []
+            targets = list(source.targets) if source is not None else []
         if source is None or not payload.instruction.strip():
             raise ProjectFailure('V7_INPUT_REJECTED', 422)
         ops = [{'op': 'update_fact', 'recordId': target.record_id, 'field': target.field, 'value': target.text}
@@ -104,7 +106,7 @@ async def preview(service, project_id, payload):
     started = lambda: service.tasks.update(task.id, stage='generating')
     task = service.tasks.start(project_id, 'rewrite', stage='queued', detail={'requestId': payload.request_id})
     try:
-        if payload.mode == 'write':
+        if isinstance(source, block_write.WriteSource):
             schema = prompts.rewrite_schema()
             reply = _payload(await service.rewrite_reply(project_id, payload.request_id,
                 _maker(lambda: block_write.write_request(source, payload.instruction), schema), started))
@@ -116,9 +118,10 @@ async def preview(service, project_id, payload):
                 value, _told = block_write.write_value(source, reply)
             values = [value]
         else:
+            reword = source
             reply = _payload(await service.rewrite_reply(project_id, payload.request_id,
-                _maker(lambda: reword_request(source, payload.instruction), reword_schema(source.targets)), started))
-            values = reword_values(source, reply)
+                _maker(lambda: reword_request(reword, payload.instruction), reword_schema(reword.targets)), started))
+            values = reword_values(reword, reply)
     except BaseException as error:
         code = getattr(error, 'code', 'PROCESS_FAILED')
         service.tasks.finish(task.id, 'cancelled' if code == 'CANCELLED' else 'failed', error=code)
