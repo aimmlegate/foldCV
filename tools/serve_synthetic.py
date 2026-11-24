@@ -183,8 +183,8 @@ class ScriptedContent:
 
 
     def write_again(self, request, cancel):
-        """«Написать заново по резюме» (F6a): a text of two sent lines, which code keeps. A request that names
-        «Senior» gets a level the lines lack, so code refuses it twice; one that says «пусто» gets no text."""
+        """«Написать заново по резюме» (F6a): a text of two sent lines (the second and the middle one), which code keeps. A request with «[отказ]» gets
+        a level the lines lack, so code refuses it twice; one with «[пусто]» gets no text."""
         try:
             value = json.loads(request.text)
         except (TypeError, ValueError):
@@ -197,11 +197,12 @@ class ScriptedContent:
         self.calls.append({'kind': 'block_write', 'again': 'refused' in value})
         lines = [line for line in value['lines'] if isinstance(line, list) and len(line) == 2]
         title = lines[1] if len(lines) > 1 else lines[0]
-        listed = next((line for line in lines if ',' in line[1]), title)
+        # A line from the middle of the CV: most often one the block's own source lines do not hold, so it shows green.
+        listed = lines[len(lines) // 2]
         text = title[1].rstrip('.') + '. ' + listed[1].rstrip('.') + '.'
-        if 'Senior' in value.get('request', ''):
+        if '[отказ]' in value.get('request', ''):
             text += ' Уровень Senior.'
-        reply = {'text': None, 'lines': []} if 'пусто' in value.get('request', '') else {'text': text, 'lines': [title[0], listed[0]]}
+        reply = {'text': None, 'lines': []} if '[пусто]' in value.get('request', '') else {'text': text, 'lines': [title[0], listed[0]]}
         result = {'payload': reply} if 'output' in value else reply
         return ContentResult(request.result_type.decode_value(result), ReportedUsage(), 'synthetic-scripted',
             request.policy.model, 0, 1)

@@ -106,8 +106,9 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
     <div className="dialog-heading"><div><h2 id="uir-reword-title">Переписать блок</h2></div>
       <button className="icon" aria-label={busy ? "Скрыть" : "Закрыть"} onClick={close}><Icon name="close" /></button></div>
     {preview && current ? <>
-      {changed.length === 0 && <p className="reword-note">{shownMode === "write" ? writeNote(preview) ?? "Текст не принят."
-        : refused.length ? "Ни одно предложение модели не прошло проверку." : "Модель не предложила изменений: текст уже соответствует запросу."}</p>}
+      {changed.length === 0 && shownMode === "write" && writeNote(preview) && <p className="reword-note">{writeNote(preview)}</p>}
+      {changed.length === 0 && shownMode !== "write" && <p className="reword-note">{refused.length ? "Ни одно предложение модели не прошло проверку."
+        : "Модель не предложила изменений: текст уже соответствует запросу."}</p>}
       <div className="reword-values">
         {changed.map(value => <section key={value.id} className="reword-value" data-skipped={current.skipped.has(value.id) || undefined}>
           {shownMode !== "write" && <label className="reword-pick"><input type="checkbox" checked={!current.skipped.has(value.id)} disabled={busy} onChange={event => {
@@ -128,9 +129,9 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
     </> : fields}
     <RewriteProgress error={error} busy={busy} activity={activity} cancel={cancel} checking={settings.checking && !preview} />
     <div className="rewrite-actions">
-      {preview ? <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={chosen.length === 0} onClick={send}>
-          {shownMode === "write" ? "Применить" : `Применить (${chosen.length})`}<Icon name="check" /></Button>
-        : <Button variant="primary" busy={busy} busyLabel={writing ? "Пишем текст…" : "Готовим вариант…"} disabled={settings.checking || !asked} onClick={submit}>
+      {preview ? (shownMode === "write" && changed.length === 0 ? null : <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={chosen.length === 0} onClick={send}>
+          {shownMode === "write" ? "Применить" : `Применить (${chosen.length})`}<Icon name="check" /></Button>)
+        : <Button variant="primary" busy={busy} busyLabel={writing ? "Пишем…" : "Готовим вариант…"} disabled={settings.checking || !asked} onClick={submit}>
           {writing ? "Написать" : "Переписать"}<Icon name="spark" /></Button>}
       {preview && <Button variant="quiet" disabled={busy || !asked} onClick={submit}>Ещё вариант</Button>}
     </div>

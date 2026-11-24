@@ -237,8 +237,8 @@ def test_a_project_with_no_hidden_rows_gets_no_action_and_its_write_preview_is_r
             'instruction': 'Коротко.', 'mode': 'write'}, 422)
 
 
-@pytest.mark.parametrize('instruction, state, reason', [('Коротко.', 'changed', None), ('Уровень Senior.', 'refused', 'name'),
-                                                        ('пусто', 'refused', 'empty')])
+@pytest.mark.parametrize('instruction, state, reason', [('Коротко.', 'changed', None), ('Коротко. [отказ]', 'refused', 'name'),
+                                                        ('[пусто]', 'refused', 'empty')])
 def test_the_stand_answers_the_write_request_with_a_text_code_keeps_or_refuses_on_request(imported, instruction, state, reason):
     from argparse import Namespace
     from resume_api.providers.dynamic_result import dynamic_result
