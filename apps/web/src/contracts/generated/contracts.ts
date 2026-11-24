@@ -3671,6 +3671,7 @@ export type Operations3 = [
 export type Kind87 = "replace_text";
 export type Opid = string;
 export type Text23 = string;
+export type Written = "model" | null;
 export type Kind88 = "set_marks";
 export type Opid1 = string;
 export type Beforerevision15 = number;
@@ -7640,6 +7641,7 @@ export interface ReplaceText {
   range: AuthoredRange;
   styles: InlineStyles;
   text: Text23;
+  written?: Written;
 }
 export interface SetMarks {
   kind: Kind88;

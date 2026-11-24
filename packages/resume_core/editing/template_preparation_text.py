@@ -258,6 +258,18 @@ def _technology_names(workspace, fields):
     return [span for span in fields if span.record_id in records and span.field_key == 'display']
 
 
+def model_written_steps(response, request, steps):
+    """D179: the marks that a model wrote each cell these steps change, for the Apply of an unchanged rewrite preview.
+    A cell is one value: when the selection covers a part of it, the whole value counts as the model's until the user
+    types in it or accepts it."""
+    from .template_mutations import _cell_values
+    from .template_preparation_common import next_facts
+    facts = response.workspace.project.facts
+    before, after = _cell_values(facts), _cell_values(next_facts(response, request, steps))
+    return [{'kind': 'set_model_written', 'cellId': cell, 'beforeActionId': facts.model_written.get(cell),
+        'afterActionId': request.capture.action_id} for cell in sorted(after) if before.get(cell) != after[cell]]
+
+
 def prepare_text_edit(response, request, *, operation=None, replacement=None, occupied=None):
     workspace = response.workspace
     validate_preparation(response, request)
@@ -355,6 +367,8 @@ def prepare_text_edit(response, request, *, operation=None, replacement=None, oc
             # The range replay keeps an empty fragment at the range end; only a block write drops it.
             tree, _removed = changed_block_steps(workspace.project.document, candidate.document)
             steps = [step for step in tree if step['block']['id'] == original.id] + steps[1:]
+    if isinstance(operation, ReplaceText) and operation.written == 'model':
+        steps += model_written_steps(response, request, steps)
     result = finish_preparation(response, request, allocator, steps, candidate,
         kind='typing' if isinstance(operation, ReplaceText) and replacement is None else 'structure')
     # Clipboard content is never optimistic, so a paste offers no address correspondence.

@@ -67,6 +67,8 @@ class ReplaceText(AuthoredOperationBase):
     range: AuthoredRange
     text: str
     styles: InlineStyles
+    # D179: the Apply of a selection rewrite the user did not change; each cell this text writes stays the model's.
+    written: Literal['model'] | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SetMarks(AuthoredOperationBase):

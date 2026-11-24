@@ -1170,6 +1170,19 @@
         "text": {
           "title": "Text",
           "type": "string"
+        },
+        "written": {
+          "anyOf": [
+            {
+              "const": "model",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Written"
         }
       },
       "required": [

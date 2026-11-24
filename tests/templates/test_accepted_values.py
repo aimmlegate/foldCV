@@ -170,3 +170,39 @@ def test_g2a_g2b_and_g8_through_the_routes_with_one_undo(tmp_path):
         assert cell not in diff()['added']
         editor.step('undo', 'undo-2')
         assert diff()['added'][cell] == ['Перевод', 'расчётов'], 'one Undo brings the green back'
+
+
+def test_a_selection_rewrite_applied_unchanged_stays_green_and_a_changed_one_is_the_users(tmp_path):
+    """Remark 1 after stop 4: the selection rewrite obeys G2a and G2b. Its Apply is one text edit of a part of a value;
+    an unchanged preview marks the whole value as the model's."""
+    from tests.projects.support import Editor, v2_app
+    from packages.resume_core.editing.template_preparation_text import _fields
+    from packages.resume_core.fields import inline_groups
+    fixture, _operation = lite_run(tmp_path / 'import', 'promotions', calls=Unwritten('promotions'))
+    workspace = fixture.current()
+    block, span = next((block, span) for block in workspace.project.document.blocks() for _key, content in inline_groups(block)
+        for span, _start, _end in _fields(content) if getattr(span, 'text', '') == TASK)
+    cell = field_key(span.record_id, span.field_key)
+    with v2_app(tmp_path / 'app', [(workspace, fixture.originals)]) as (client, _application):
+        project = workspace.project_id
+        editor = Editor(client, project)
+
+        def apply(identifier, text, written):
+            current = editor.workspace()
+            line = next(value for value in current.project.document.blocks() if value.id == block.id)
+            capture = {'sessionId': 'session', 'actionId': identifier, 'actionToken': 1, 'dependencies': []}
+            operation = {'kind': 'replace_text', 'opId': 'op', 'text': text, 'styles': {},
+                'range': {'blockId': line.id, 'beforeRevision': line.revision, 'cellId': None, 'field': 'content',
+                    'start': 0, 'end': len('Перевела расчёты')}, **({'written': 'model'} if written else {})}
+            editor.edit({'schemaVersion': 1, 'clientMutationId': identifier, 'snapshot': editor.response['snapshot'],
+                'capture': capture, 'operations': [operation]})
+        diff = lambda: client.get('/v2/projects/' + project + '/source-diff').json()['added']
+        apply('rewrite-edited', 'Перевод расчётов сам', False)
+        assert cell not in diff(), 'G2a: a preview the user changed is the user\'s'
+        editor.step('undo', 'undo-1')
+        apply('rewrite-same', 'Перевод расчётов', True)
+        assert diff()[cell] == ['Перевод', 'расчётов'], 'G2b: an unchanged preview stays the model\'s'
+        editor.adopt(editor.call('post', '/accept', {'editorToken': editor.token, 'clientMutationId': 'accept-1', 'cellId': cell}))
+        assert cell not in diff()
+        editor.step('undo', 'undo-2')
+        assert diff()[cell] == ['Перевод', 'расчётов'], 'one Undo brings the green back'
