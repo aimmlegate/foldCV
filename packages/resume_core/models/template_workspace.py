@@ -329,7 +329,8 @@ class RichPreDraftV2(RichPreDraft):
         _unique([operation.id for operation in self.template_operations], 'pre-draft operation')
         if self.template_package is None:
             if (self.template_operations or self.facts.extensions or self.facts.observations or self.facts.relations
-                    or self.facts.manual_scopes or self.facts.builtin_identities or self.facts.builtin_manual_scopes):
+                    or self.facts.manual_scopes or self.facts.builtin_identities or self.facts.builtin_manual_scopes
+                    or self.facts.model_written):
                 raise ValueError('template state requires a captured package')
             return self
         verify_package(self.template_package)

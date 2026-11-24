@@ -181,3 +181,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D176 The app's data folder is `foldCV`; the service run from source uses `FoldCV Dev`; foldCV 1.1.1
 - D177 A limited editor that does not refuse: the tester feedback of 2026-11-23
 - D178 A deletion of a field's whole text takes the field off the page and keeps its fact
+- D179 Marks follow who wrote the text; a fact off the page comes back from Facts

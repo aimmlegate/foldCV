@@ -11802,6 +11802,54 @@
       "title": "SetManualScopeDisplays",
       "type": "object"
     },
+    "SetModelWritten": {
+      "additionalProperties": false,
+      "description": "D179: a cell's mark that a model wrote its value; None on either side is no mark.",
+      "properties": {
+        "afterActionId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afteractionid"
+        },
+        "beforeActionId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforeactionid"
+        },
+        "cellId": {
+          "minLength": 1,
+          "title": "Cellid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "set_model_written",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "cellId",
+        "beforeActionId",
+        "afterActionId"
+      ],
+      "title": "SetModelWritten",
+      "type": "object"
+    },
     "SettledCheck": {
       "additionalProperties": false,
       "description": "A check the coordinator settles without the model (D115): a verbatim value's check, or an earlier receipt's\nresult for a value the repair left as it was.",
@@ -16141,7 +16189,8 @@
                 "set_authored_anchors": "#/$defs/SetAuthoredAnchors",
                 "set_builtin_manual_scope": "#/$defs/SetBuiltinManualScope",
                 "set_issue_state": "#/$defs/SetIssueState",
-                "set_manual_scope_displays": "#/$defs/SetManualScopeDisplays"
+                "set_manual_scope_displays": "#/$defs/SetManualScopeDisplays",
+                "set_model_written": "#/$defs/SetModelWritten"
               },
               "propertyName": "kind"
             },
@@ -16181,6 +16230,9 @@
               },
               {
                 "$ref": "#/$defs/SetBuiltinManualScope"
+              },
+              {
+                "$ref": "#/$defs/SetModelWritten"
               },
               {
                 "$ref": "#/$defs/SetIssueState"
@@ -17432,6 +17484,14 @@
           ],
           "title": "Mode",
           "type": "string"
+        },
+        "modelWritten": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Modelwritten",
+          "type": "object"
         },
         "observations": {
           "items": {

@@ -178,6 +178,12 @@ def inverse_template_mutation(before, after, *, origin_action_id, mutation_id, s
         if old_builtin.get(identifier) != new_builtin.get(identifier):
             steps.append({'kind': 'set_builtin_manual_scope', 'cellId': identifier,
                 'beforeScopeId': new_builtin.get(identifier), 'afterScopeId': old_builtin.get(identifier)})
+    old_written = before.project.facts.model_written
+    new_written = after.project.facts.model_written
+    for identifier in sorted(old_written.keys() | new_written.keys()):
+        if old_written.get(identifier) != new_written.get(identifier):
+            steps.append({'kind': 'set_model_written', 'cellId': identifier,
+                'beforeActionId': new_written.get(identifier), 'afterActionId': old_written.get(identifier)})
     sequence = coverage_sequence(after.project)
     if coverage_sequence(before.project) != sequence:
         raise ValueError('history cannot replace immutable coverage sequence')

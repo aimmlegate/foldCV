@@ -6,14 +6,15 @@ from ..models.rich_facts import WorkingFacts
 from ..models.rich_mutations import MoveBlock, PutBlock, PutRecord, RemoveBlock, RemoveRecord, ReplaceInlineRange
 from ..models.template_facts import WorkingFactsV2
 from ..models.template_mutations import (PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope,
-                                         SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors,
+                                         SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors, SetModelWritten,
                                          RestoreAuthoredBlockPatch, SetManualScopeDisplays, PutTemplateSync,
                                          RemoveTemplateSync)
 from .fact_mutations import apply_record_mutations
 from ..fact_records import delete_subject_in_place
 
 
-FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope)
+FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope,
+    SetModelWritten)
 DOMAIN_STEPS = (*FACT_STEPS, SetIssueState, SetAuthoredAnchors, SetManualScopeDisplays, PutTemplateSync, RemoveTemplateSync)
 
 
@@ -154,6 +155,27 @@ def _set_builtin_owner(facts, relation):
     record.revision += 1
 
 
+def _cell_values(facts):
+    """Each current cell by id, as its stored value: what a write of the cell changes."""
+    from ..fields import builtin_cell_values
+    found = {identifier: value[2].model_dump(mode='json', by_alias=True) for identifier, value in builtin_cell_values(facts.records).items()}
+    found.update({cell.id: cell.model_dump(mode='json', by_alias=True) for record in facts.extensions if record.active
+        for cell in record.cells})
+    return found
+
+
+def _clear_model_written(original, result, marked):
+    """D179: a mark that a model wrote a cell goes with any later write of the cell and with the cell itself; the marks
+    this mutation sets stay as it sets them."""
+    if not original.model_written and not marked:
+        return
+    before, after = _cell_values(original), _cell_values(result)
+    kept = {cell: action for cell, action in original.model_written.items()
+        if cell not in marked and cell in after and before.get(cell) == after[cell]}
+    kept.update({cell: action for cell, action in marked.items() if action is not None})
+    result.model_written = kept
+
+
 def apply_fact_steps(original, request, replay=False):
     steps = [step for step in request.steps if isinstance(step, FACT_STEPS)]
     if not steps:
@@ -168,6 +190,10 @@ def apply_fact_steps(original, request, replay=False):
             target = ('builtin-scope', step.cell_id)
             if original.builtin_manual_scopes.get(step.cell_id) != step.before_scope_id:
                 raise ValueError('stale builtin manual scope reference')
+        elif isinstance(step, SetModelWritten):
+            target = ('model-written', step.cell_id)
+            if original.model_written.get(step.cell_id) != step.before_action_id:
+                raise ValueError('stale model written mark')
         elif isinstance(step, PutManualScope):
             target = ('scope', step.scope.id)
             if step.scope.id in scopes and scopes[step.scope.id] != step.scope:
@@ -215,6 +241,8 @@ def apply_fact_steps(original, request, replay=False):
                 result.builtin_manual_scopes.pop(step.cell_id, None)
             else:
                 result.builtin_manual_scopes[step.cell_id] = step.after_scope_id
+    _clear_model_written(original, result, {step.cell_id: step.after_action_id for step in steps
+        if isinstance(step, SetModelWritten)})
     from ..fields import builtin_cell_values
     old_builtin = builtin_cell_values(original.records)
     new_builtin = builtin_cell_values(result.records)

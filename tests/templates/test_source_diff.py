@@ -46,10 +46,11 @@ def test_a_copied_cv_differs_only_where_the_import_wrote_text_of_its_own(importe
     assert set(found) <= cells and not next(iter(found)).startswith('["fact"')
     # Of the lines its values rest on, the document leaves out two words of the skills line and nothing else.
     assert removals(workspace) == [{'text': 'Java, Spring Boot, PostgreSQL, Kafka, Kubernetes, управление командой',
-                                    'words': ['командой', 'управление']}]
+                                    'words': ['командой', 'управление'], 'reason': 'changed'}]
 
 
-def test_a_value_the_user_changed_is_compared_too_and_the_route_gives_its_new_words(tmp_path):
+def test_an_apply_of_an_unchanged_preview_keeps_the_models_new_words_marked(tmp_path):
+    """G2b (D179): the value is the model's, so its new words are green."""
     from tests.projects.support import Editor, v2_app
     fixture, _operation = lite_run(tmp_path / 'import', 'promotions', calls=Unwritten('promotions'))
     workspace = fixture.current()
@@ -65,9 +66,9 @@ def test_a_value_the_user_changed_is_compared_too_and_the_route_gives_its_new_wo
             'instruction': 'Задачи — существительным'})
         editor.adopt(editor.call('post', '/reword/apply', {'editorToken': editor.token, 'clientMutationId': 'apply-1',
             'blockId': block_id, 'touched': shown['touched'],
-            'changes': [{'recordId': target.record_id, 'field': target.field, 'value': shown['values'][1]['after']}]}))
+            'changes': [{'recordId': target.record_id, 'field': target.field, 'value': shown['values'][1]['after'], 'edited': False}]}))
         # The value keeps its source line, so its new words show as beyond the original.
         after = client.get('/v2/projects/' + project + '/source-diff').json()
         assert after['added'][cell] == ['Перевод', 'расчётов']
         # And the words of that line the document no longer shows are the line's removals.
-        assert {'text': 'Перевела расчёты с Oracle на PostgreSQL', 'words': ['перевела', 'расчеты']} in after['removed']
+        assert {'text': 'Перевела расчёты с Oracle на PostgreSQL', 'words': ['перевела', 'расчеты'], 'reason': 'changed'} in after['removed']

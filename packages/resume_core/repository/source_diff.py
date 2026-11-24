@@ -1,16 +1,18 @@
 """The present document against the original, both ways (a trial of the look).
 
 Every fact field the document shows is compared with the source lines its value rests on. The words of the shown text
-that those lines do not state are the field's additions. The words of those lines that the document shows nowhere are
-the lines' removals. It holds for any field and any way the text came to differ (a form the import gave a value, a
-rewording, the user's own typing). A value with no source lines has no original to compare with and is left out; a
-date, which code writes in the document's own form, is no addition. A line no shown value rests on is not seen here:
-the import's own notices carry the lines it left out. Nothing here writes the project."""
+that those lines do not state are the field's additions, marked only while a model wrote the value (D179): text the
+user typed or accepted is not marked. The words of those lines that the document shows nowhere are the lines'
+removals, and so are the lines of a fact the template shows and the page does not (a removed card or bullet). A value
+with no source lines has no original to compare with and is left out; a date, which code writes in the document's own
+form, is no addition. Lines no fact rests on are not seen here: the import's own notices carry the lines it left out.
+Nothing here writes the project."""
 
+import json
 import re
 
 from ..editing.template_preparation_text import _fields
-from ..fields import field_key, inline_groups
+from ..fields import field_key, inline_groups, working_field
 from ..importing.lite.words import line_words, words
 from .assistant_compiler import find_record
 
@@ -91,12 +93,30 @@ def shown_fields(workspace):
                        source_lines(project, record, extension, key, units) if record is not None else [], record)
 
 
+def written_by_model(project, record, cell):
+    """Whether a model gave the cell its present value and no person wrote it since (D179): the import's value until
+    the user types in it or accepts it, and a value an Apply took unchanged from a preview. A fact the user made is
+    the user's."""
+    if cell in project.facts.model_written:
+        return True
+    if record is None:
+        return False
+    if hasattr(record, 'cells'):
+        value = next((value for value in record.cells if value.id == cell), None)
+        return value is not None and value.origin != 'human'
+    key = json.loads(cell)[2] if cell.startswith('["fact"') else None
+    value = working_field(record, key) if key is not None else None
+    return record.origin == 'source' and value is not None and not value.user_corrected
+
+
 def additions(workspace):
-    """{cell id: the words its shown text has and its source lines lack}, for the fields that have such words."""
+    """{cell id: the words its shown text has and its source lines lack}, for the fields that have such words and that
+    a model wrote (`written_by_model`): text the user typed or accepted is not marked."""
     found, whole = {}, None
     for cell, key, text, lines, record in shown_fields(workspace):
         # A date is written by code in the document's form (03.2021), whatever the line's own form.
-        if key.startswith('period:') or not lines or not any(char.isalpha() for char in text):
+        if key.startswith('period:') or not lines or not any(char.isalpha() for char in text) \
+                or not written_by_model(workspace.project, record, cell):
             continue
         if getattr(record, 'kind', None) == 'technology' and key == 'display':
             # A technology is one fact for the whole CV and keeps only a few of the lines that name it: its name is
@@ -112,21 +132,49 @@ def additions(workspace):
     return {cell: found[cell] for cell in found if found[cell]}
 
 
+def record_lines(project, record, units):
+    """The text of every source span a record rests on: a builtin record's own, an extension's cells'."""
+    if hasattr(record, 'cells'):
+        return [line for cell in record.cells for line in source_lines(project, record, True, cell.field_key, units)]
+    return source_lines(project, record, False, None, units)
+
+
 def removals(workspace):
-    """The source lines of shown values with the words the document shows nowhere, as rows {text, words}; words is
-    None when the document shows no word of the line. A word counts as the import counts it (three letters or a
-    number; a period's month names and a label before a value are form)."""
+    """The source lines of the facts the document showed with the words it shows nowhere, as rows {text, words,
+    reason}; words is None when the document shows no word of the line. A word counts as the import counts it (three
+    letters or a number; a period's month names and a label before a value are form). reason: `removed` for a line of
+    a record off the page (D179) or of a card that lost a field line, `changed` for a line of a shown value."""
+    from ..editing.off_page import named_records, off_fields, off_page
+    project = workspace.project
     fields = list(shown_fields(workspace))
     shown = set().union(*(words(text) for _id, _key, text, _lines, _record in fields)) if fields else set()
     rows, seen = [], set()
+    units = {unit.id: unit.text for source in project.sources for unit in source.units} if project is not None else {}
+    gone = set()
+    if project is not None:
+        records = {record.id: record for record in [*project.facts.records, *project.facts.extensions]}
+        order = {identifier: index for index, identifier in enumerate(records)}
+        lost_lines = [line for identifier in sorted(off_page(project), key=order.get)
+            for line in record_lines(project, records[identifier], units)]
+        cut = set(off_fields(project, named_records(project.document)))
+        gone = {' '.join(line.split()) for line in lost_lines}
+        gone |= {' '.join(line.split()) for identifier in cut for line in record_lines(project, records[identifier], units)}
+    else:
+        lost_lines = []
+
+    def add(line):
+        line = ' '.join(line.split())
+        if line in seen:
+            return
+        seen.add(line)
+        need = line_words(line)
+        missing = need - shown
+        if missing:
+            rows.append({'text': line, 'words': sorted(missing) if need & shown else None,
+                'reason': 'removed' if line in gone else 'changed'})
     for _id, _key, _text, lines, _record in fields:
         for line in lines:
-            line = ' '.join(line.split())
-            if line in seen:
-                continue
-            seen.add(line)
-            need = line_words(line)
-            missing = need - shown
-            if missing:
-                rows.append({'text': line, 'words': sorted(missing) if need & shown else None})
+            add(line)
+    for line in lost_lines:
+        add(line)
     return rows

@@ -9,7 +9,7 @@ import asyncio
 
 from pydantic import Field
 
-from packages.resume_core.repository.block_reword import (RewordChange, RewordValue, reword_ops, reword_request,
+from packages.resume_core.repository.block_reword import (RewordChange, RewordValue, model_written, reword_ops, reword_request,
     reword_schema, reword_source, reword_values, rewordable)
 from packages.resume_core.importing.lite import prompts
 from packages.resume_core.models.contracts import Id, Wire
@@ -122,6 +122,7 @@ def apply(service, project_id, payload):
                 raise ProjectFailure(error.code, 409, detail=error.detail) from None
             if after is committed:
                 raise ProjectFailure('ASSISTANT_PROPOSAL_EMPTY', 409)
+            after = model_written(after.model_copy(deep=True), payload.changes, action_id)
             created_blocks, changed_blocks = editing.block_changes(committed, after, 'reword')
             return after, {'created_ids': created, 'created_blocks': created_blocks, 'changed_block_ids': changed_blocks}
         outcome = repository.mutate(project_id, base_revision=session.revision, client_mutation_id=payload.client_mutation_id,

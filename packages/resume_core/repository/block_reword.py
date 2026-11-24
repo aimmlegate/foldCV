@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from pydantic import Field
 
-from ..fields import inline_groups
+from ..fields import field_key, inline_groups
 from ..importing.lite import prompts as P
 from ..importing.lite.rules import block_text
 from ..importing.lite.scheme import CYRILLIC, LATIN, LETTERS, NUMBER
@@ -51,6 +51,30 @@ class RewordChange(Wire):
     record_id: Id
     field: Id
     value: str = Field(min_length=1, max_length=4000)
+    # D179: the user changed the preview's text of this value before Apply; an unchanged value stays the model's.
+    edited: bool = True
+
+
+def model_written(workspace, changes, action_id):
+    """D179: mark each value an Apply took as the preview gave it as written by a model, in the workspace the Apply
+    committed. A value the user edited in the preview is the user's."""
+    from .assistant_compiler import find_record
+    marks = {}
+    for change in changes:
+        if change.edited:
+            continue
+        record, extension = find_record(workspace, change.record_id)
+        if record is None:
+            continue
+        if extension:
+            cell = next((value for value in record.cells if value.field_key == change.field), None)
+            if cell is not None:
+                marks[cell.id] = action_id
+        else:
+            marks[field_key(record.id, change.field)] = action_id
+    if marks:
+        workspace.project.facts.model_written = {**workspace.project.facts.model_written, **marks}
+    return workspace
 
 
 @dataclass

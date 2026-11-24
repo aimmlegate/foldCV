@@ -26,6 +26,8 @@ def target(workspace, kind, identifier):
         return None
     if kind == 'builtin_scope':
         return {'cellId': identifier, 'scopeId': project.facts.builtin_manual_scopes.get(identifier)}
+    if kind == 'model_written':
+        return {'cellId': identifier, 'actionId': project.facts.model_written.get(identifier)}
     if kind == 'coverage_anchor':
         from ..template_anchors import coverage_at
         return coverage_at(project, identifier)
@@ -71,6 +73,8 @@ def step_targets(workspace, step):
         return {('field', selector('manual_scope', step.scope.id))}
     if step.kind == 'set_builtin_manual_scope':
         return {('field', selector('builtin_scope', step.cell_id)), ('field', step.cell_id)}
+    if step.kind == 'set_model_written':
+        return {('field', selector('model_written', step.cell_id)), ('field', step.cell_id)}
     if step.kind == 'set_issue_state':
         return {('field', selector('issue', step.issue_id))}
     if step.kind == 'set_authored_anchors':

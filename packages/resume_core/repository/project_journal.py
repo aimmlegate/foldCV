@@ -104,6 +104,7 @@ def rebuild(workspace, target):
         current = [item.record_id if kind == 'tombstone' else item.id for item in getattr(project.facts, name)]
         facts[name] = _ordered(target, kind, current)
     facts['builtinManualScopes'] = {identifier: value for (kind, identifier), value in target.items() if kind == 'builtin_scope'}
+    facts['modelWritten'] = {identifier: value for (kind, identifier), value in target.items() if kind == 'model_written'}
     live = {record['id'] for record in facts['records']}
     live.update(record['id'] for record in facts['extensions'] if record['active'])
     facts['tombstones'] = [value for value in facts['tombstones'] if value['recordId'] not in live]

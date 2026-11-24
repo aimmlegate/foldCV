@@ -7428,6 +7428,14 @@
           "title": "Mode",
           "type": "string"
         },
+        "modelWritten": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Modelwritten",
+          "type": "object"
+        },
         "observations": {
           "items": {
             "$ref": "#/$defs/Observation"

@@ -188,6 +188,9 @@ class WorkingFactsV2(WorkingFacts):
     manual_scopes: list[ManualEditScope]
     builtin_manual_scopes: dict[str, Id] = Field(default_factory=dict, exclude_if=lambda value: not value)
     builtin_identities: list[BuiltinItemIdentity] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D179: the cells whose value a model wrote after the import (an Apply of a preview the user did not change), by
+    # the action that wrote them; any later write of the cell takes it out.
+    model_written: dict[str, Id] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
     @model_validator(mode="after")
     def generic_identity(self):
@@ -252,6 +255,9 @@ class WorkingFactsV2(WorkingFacts):
             _unique(scope.cell_ids, 'manual scope cell')
             if not scope.cell_ids or any(identifier not in cells and not historical_builtin(identifier) for identifier in scope.cell_ids):
                 raise ValueError('manual scope references missing cells')
+        written = set(self.model_written) - set(builtin_cells) - {c.id for r in self.extensions if r.active for c in r.cells}
+        if written:
+            raise ValueError('model written mark references a missing current cell')
         for identifier, scope_id in self.builtin_manual_scopes.items():
             scope, current_cell = scopes.get(scope_id), builtin_cells.get(identifier)
             if current_cell is None or scope is None or identifier not in scope.cell_ids:

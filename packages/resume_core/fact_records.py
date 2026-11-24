@@ -134,6 +134,11 @@ def delete_subject_in_place(result,record_id,action_id,*,order=None):
         from .fields import builtin_cell_values
         remaining = builtin_cell_values(result.records)
         result.builtin_manual_scopes = {cell: scope for cell, scope in result.builtin_manual_scopes.items() if cell in remaining}
+    if result.model_written:
+        # D179: a removed record's cells lose their marks.
+        from .fields import builtin_cell_values
+        current = set(builtin_cell_values(result.records)) | {c.id for r in result.extensions if r.id not in removed and r.active for c in r.cells}
+        result.model_written = {cell: action for cell, action in result.model_written.items() if cell in current}
     for record in result.extensions:
         if record.id in removed: record.active=False;record.revision+=1
     for identifier in removed:

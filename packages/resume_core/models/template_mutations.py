@@ -109,6 +109,14 @@ class SetBuiltinManualScope(Wire):
     after_scope_id: Id | None
 
 
+class SetModelWritten(Wire):
+    """D179: a cell's mark that a model wrote its value; None on either side is no mark."""
+    kind: Literal['set_model_written']
+    cell_id: Id
+    before_action_id: Id | None
+    after_action_id: Id | None
+
+
 class SetIssueState(Wire):
     kind: Literal['set_issue_state']
     issue_id: Id
@@ -221,7 +229,7 @@ class HistoryCapture(Wire):
 
 TemplateNonSyncStep = Annotated[TemplatePutBlock | RemoveBlock | MoveBlock | TemplateReplaceInlineRange |
     PutRecord | RemoveRecord | PutExtension | RemoveExtension | PutRelation | RemoveRelation |
-    PutManualScope | SetBuiltinManualScope | SetIssueState | SetAuthoredAnchors | RestoreAuthoredBlockPatch |
+    PutManualScope | SetBuiltinManualScope | SetModelWritten | SetIssueState | SetAuthoredAnchors | RestoreAuthoredBlockPatch |
     SetManualScopeDisplays, Field(discriminator='kind')]
 
 
