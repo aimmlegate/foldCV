@@ -477,8 +477,11 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   async function pasteFromMenu() {
     const desktop = (window as { foldcvDesktop?: { paste?: () => Promise<unknown> } }).foldcvDesktop;
     editor.focus();
-    // In the app the shell sends the system paste to the page: a real paste event with no prompt.
-    if (desktop?.paste) { setMenuAt(null); await desktop.paste(); return; }
+    // In the app the shell sends the system paste to the page: a real paste event with no prompt. When the shell refuses
+    // the call, the page goes on as a browser does, so the item never does nothing.
+    if (desktop?.paste) {
+      try { await desktop.paste(); setMenuAt(null); return; } catch { /* the clipboard read below */ }
+    }
     try {
       const text = await navigator.clipboard.readText();
       setMenuAt(null);
