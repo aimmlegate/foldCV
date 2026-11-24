@@ -265,6 +265,7 @@ Project routes, under `/v2/projects` (`projects/routes.py`):
 | `POST /{id}/clipboard` | same-project clipboard capture |
 | `POST /{id}/check` | the assistant's deterministic check over the committed workspace; read-only, no model call |
 | `POST /{id}/rewrite/preview`, `/rewrite/cancel` | rewrite preview of a selection |
+| `GET /{id}/reword/blocks`, `POST /{id}/reword/preview`, `/reword/apply` | block reword: the blocks, a preview (`mode` reword or write), the Apply |
 | `POST /{id}/import`, `GET /{id}/tasks` | import start, resume or cancel; task status |
 | `POST /{id}/export`, `/exports/{attemptId}/retry` | DOCX export |
 | `POST /{id}/archive` | `.foldcv` download |
@@ -353,6 +354,12 @@ stall check). Nothing there is durable.
   (`contracts/template-export.ts`).
 - Rewrite preview (`projects/rewrite.py`, `template_rewrite.py`): one model call and
   no project write; Apply is an ordinary edit.
+- Block reword (`projects/reword.py`, `repository/block_reword.py`): «Изменить формулировку» sends each value of one
+  block with its source lines, one model call. «Написать заново по резюме» (`repository/block_write.py`, F6a) sends a
+  text block's present text and the CV's lines less the lines the last import hid, and code checks the text against
+  the lines it sent (`written_check`); a refused text gets one more call under the same request ID, so one Cancel
+  stops either. A project with no hidden-line rows (an import before 1.1.0) gets no such action. Both previews write
+  nothing; Apply is one fact update action.
 - Clipboard (`projects/clipboard.py`): captures stay in the session (20 at most), are
   checked against their witnesses at paste and are lost at a restart.
 - Files (`projects/sources.py`, `projects/images.py`, `projects/blobs.py`): reads
@@ -460,8 +467,9 @@ TypeScript strict mode covers implicit `any`; explicit `any` needs a lint rule.
 5. Validate the proposed blocks against facts, compute coverage, and show them.
    Human review handles disputed meaning. No automatic reviewer, self-critique,
    memory summary, or title-generation model call is added.
-6. Render documents locally. A rewrite later includes only the selected block,
-   its facts, directly linked excerpts when needed, requested style, and locks.
+6. Render documents locally. A selection rewrite includes only the selected text and the requested style. A block
+   reword includes the block's values and their source lines; «Написать заново по резюме» includes the CV's lines
+   without the hidden ones (see Block reword above).
 
 Two logical content operations are a normal-case target. A CLI can retry or make
 several internal inference requests; do not claim one process equals one request.

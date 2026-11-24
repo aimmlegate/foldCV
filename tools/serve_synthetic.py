@@ -167,6 +167,9 @@ class ScriptedContent:
     def generate(self, request, _files, cancel):
         if isinstance(request.result_type, DynamicResultSpec):
             from tests.templates.scripted_template_provider import scripted_template_result
+            written = self.write_again(request, cancel)
+            if written is not None:
+                return written
             # --template-delay keeps each call open long enough to watch the import screen; Stop ends the wait.
             if self.delay and cancel is not None:
                 cancel.wait(self.delay)
@@ -176,6 +179,31 @@ class ScriptedContent:
         self.calls.append({'kind': 'selected_text_rewrite'})
         selected = request.text.rsplit('Selected text:\n', 1)[1].strip()
         return ContentResult(PlainTextReply(text=selected + ' (revised)'), ReportedUsage(), 'synthetic-scripted',
+            request.policy.model, 0, 1)
+
+
+    def write_again(self, request, cancel):
+        """«Написать заново по резюме» (F6a): a text of two sent lines, which code keeps. A request that names
+        «Senior» gets a level the lines lack, so code refuses it twice; one that says «пусто» gets no text."""
+        try:
+            value = json.loads(request.text)
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(value, dict) or 'present' not in value or not isinstance(value.get('lines'), list):
+            return None
+        # --template-delay keeps the call open long enough to watch the waiting state; «Отменить» ends the wait.
+        if self.delay and cancel is not None:
+            cancel.wait(self.delay)
+        self.calls.append({'kind': 'block_write', 'again': 'refused' in value})
+        lines = [line for line in value['lines'] if isinstance(line, list) and len(line) == 2]
+        title = lines[1] if len(lines) > 1 else lines[0]
+        listed = next((line for line in lines if ',' in line[1]), title)
+        text = title[1].rstrip('.') + '. ' + listed[1].rstrip('.') + '.'
+        if 'Senior' in value.get('request', ''):
+            text += ' Уровень Senior.'
+        reply = {'text': None, 'lines': []} if 'пусто' in value.get('request', '') else {'text': text, 'lines': [title[0], listed[0]]}
+        result = {'payload': reply} if 'output' in value else reply
+        return ContentResult(request.result_type.decode_value(result), ReportedUsage(), 'synthetic-scripted',
             request.policy.model, 0, 1)
 
 

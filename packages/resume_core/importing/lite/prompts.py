@@ -407,6 +407,41 @@ def write_schema(blocks):
     return closed({block: WRITE_SHAPES[WRITE[block]['shape']] for block in blocks})
 
 
+# ---------------------------------------------------------------------- a text block written again in the editor
+
+# «Написать заново по резюме» (F6a): a block that has text is written again from the CV's lines on the user's request.
+# The frame is fixed; how to write it is only what the request field says, which the user saw and could edit.
+REWRITE_RULES = [
+    COMMON[0],
+    'Rewriting is allowed for this block: the runtime permission is true.',
+    'request is the user\'s own word on how to write the block: follow it within these rules.',
+    'Write the block from what the lines state, in the language of the CV. State nothing they do not state: no '
+    'number, name, level, employer or result of your own.',
+    'present is the text the block has now. Write the new text from the lines, not from present: do not copy it or '
+    'only reword it, and keep nothing of it that the lines do not state.',
+    'The reply is {text, lines}: lines are the refs of the lines the text rests on, at most ten. When the lines state '
+    'no job and no skills, text is null and lines is empty.',
+]
+
+
+def rewrite_request(block, lines, instruction, present, refused=None):
+    """block: the block's title as the page shows it; instruction: the request field as the user sent it; present: the
+    block's text now; refused: why code refused the text of the call before, for the one call that asks again."""
+    return request({
+        'task': 'Write the text of one block of a résumé again from what these CV lines state, by the user\'s request.',
+        'rules': REWRITE_RULES, 'block': block,
+        'request': '\n'.join(' '.join(line.split()) for line in instruction.splitlines() if line.strip()),
+        'present': ' '.join(present.split()),
+        **({'refused': 'The text you wrote before was refused: ' + refused + ' Write it again without that.'}
+           if refused else {}),
+        'example': {'lines': WRITE_EXAMPLE_LINES, 'present': 'Backend-разработчик.', 'reply': WRITE['summary']['example']},
+        'lines': pairs(lines)})
+
+
+def rewrite_schema():
+    return WRITE_SHAPES['text']
+
+
 # -------------------------------------------------------------------------------------------- the narrow question
 
 SIGNS = {'period': 'a line that is only a period, and not the period of this entry',

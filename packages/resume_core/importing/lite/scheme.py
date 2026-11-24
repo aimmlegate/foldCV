@@ -115,6 +115,29 @@ def fold(text):
     return ' '.join(text.split())
 
 
+def written_check(text, refs, lines, limit=WRITTEN_LIMIT):
+    """Why code does not keep a text a model wrote from these lines (their texts), as (the problem's name, the words it
+    is about, the sentence for the model); (None, [], None) when it keeps it. The text names lines to rest on, is no
+    page, and states no number and no name the lines do not state and no word of two alphabets they do not have. The
+    import and the editor's «Написать заново по резюме» both use it."""
+    stated = {number for line in lines for number in NUMBER.findall(line)}
+    foreign = sorted(set(NUMBER.findall(text)) - stated)
+    known = {word.casefold() for line in lines for word in LETTERS.findall(line)}
+    mixed = [word for word in LETTERS.findall(text) if CYRILLIC.search(word.casefold()) and LATIN.search(word.casefold())
+             and word.casefold() not in known]
+    # A name (an employer, a product, a technology, a level such as Senior) must be one the lines write.
+    stated_names = {word.casefold() for line in lines for word in NAME_WORD.findall(line)} | known
+    unknown = unknown_names(text, stated_names)
+    return (('no text', [], None) if not text
+        else ('no lines', [], 'it named no line of these lines to rest on.') if not refs
+        else ('too long', [], 'it was too long.') if len(text) > limit
+        else ('a number the CV lacks', foreign, 'it states a number the lines do not state: ' + ', '.join(foreign) + '.') if foreign
+        else ('a word of two alphabets', mixed, 'a word in it mixes two alphabets: ' + ', '.join('«' + word + '»' for word in mixed)
+              + '. Each word is written in one alphabet.') if mixed
+        else ('a name the CV lacks', list(unknown), 'it names what the lines do not name: ' + ', '.join(unknown) + '.') if unknown
+        else (None, [], None))
+
+
 class Import:
     def __init__(self, sources, caller, *, envelope=True, form='text', writing=None, blocks=None, custom=None):
         """caller.call(kind, block, prompt, schema) -> (payload or None, row); envelope: whether the caller's replies
@@ -1073,24 +1096,9 @@ class Import:
 
     def written_problem(self, text, refs, limit=WRITTEN_LIMIT):
         """Why code does not keep a text the model wrote, as (the note's name, the words for the model); (None, None)
-        when it keeps it. The text names lines of the CV to rest on, is no page, and states no number and no name the
-        CV does not state and no word of two alphabets the CV does not have."""
-        stated = {number for line in self.lines for number in NUMBER.findall(line.text)}
-        foreign = sorted(set(NUMBER.findall(text)) - stated)
-        known = {word.casefold() for line in self.lines for word in LETTERS.findall(line.text)}
-        mixed = [word for word in LETTERS.findall(text) if CYRILLIC.search(word.casefold()) and LATIN.search(word.casefold())
-                 and word.casefold() not in known]
-        # A name (an employer, a product, a technology, a level such as Senior) must be one the CV writes.
-        stated_names = {word.casefold() for line in self.lines for word in NAME_WORD.findall(line.text)} | known
-        unknown = unknown_names(text, stated_names)
-        return (('no text', None) if not text
-            else ('no lines', 'it named no line of these lines to rest on.') if not refs
-            else ('too long', 'it was too long.') if len(text) > limit
-            else ('a number the CV lacks', 'it states a number the lines do not state: ' + ', '.join(foreign) + '.') if foreign
-            else ('a word of two alphabets', 'a word in it mixes two alphabets: ' + ', '.join('«' + word + '»' for word in mixed)
-                  + '. Each word is written in one alphabet.') if mixed
-            else ('a name the CV lacks', 'it names what the lines do not name: ' + ', '.join(unknown) + '.') if unknown
-            else (None, None))
+        when it keeps it (written_check, against every line of the CV)."""
+        problem, _words, told = written_check(text, refs, [line.text for line in self.lines], limit)
+        return problem, told
 
     def cited(self, refs):
         return self.ordered([ref for ref in (refs or [])[:WRITTEN_LINES] if ref in self.data.by_ref and ref not in self.hidden])
