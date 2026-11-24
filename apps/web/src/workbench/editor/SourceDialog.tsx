@@ -7,7 +7,7 @@ import { unshownClass, unshownLabels, type Unshown, type UnshownReason } from ".
 
 type SourceFile = { id: string; originalName: string; byteSha256: string };
 
-const reasons: readonly UnshownReason[] = ["no_field", "hidden", "dropped", "changed"];
+const reasons: readonly UnshownReason[] = ["no_field", "hidden", "dropped", "changed", "removed"];
 
 /** `unshown`: the lines of the original the resume does not show; a PDF and a DOCX mark them. */
 export function SourceDialog({ projectId, sources, expanded, toggle, close, unshown }: {

@@ -8,8 +8,9 @@ type Shown = Remark & { mark: HTMLElement; x: number; y: number };
 
 /** The pointer rests this long on a mark before its tip shows: a tip at once covered the lines the user was going to. */
 export const TIP_DELAY = 500;
-/** A tip with a button waits this long after the pointer leaves the mark, so the pointer can reach the button. */
-const BRIDGE = 220;
+/** A tip with a button waits this long after the pointer leaves the mark, so the pointer can reach the button. The rest of
+ * the tip takes no pointer (D179): a click there reaches the line under it and hides the tip. */
+const BRIDGE = 600;
 
 /** Reads what a marked element carries; null for an element that is no mark. */
 export function remarkOf(element: Element | null): Remark | null {
