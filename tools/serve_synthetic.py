@@ -184,7 +184,7 @@ class ScriptedContent:
 
     def write_again(self, request, cancel):
         """«Написать заново по резюме» (F6a): a text of two sent lines (the second and the middle one), which code keeps. A request with «[отказ]» gets
-        a level the lines lack, so code refuses it twice; one with «[пусто]» gets no text."""
+        a level the lines lack, so code refuses it twice; one with «[пусто]» gets no text. A list request: see below."""
         try:
             value = json.loads(request.text)
         except (TypeError, ValueError):
@@ -196,6 +196,17 @@ class ScriptedContent:
             cancel.wait(self.delay)
         self.calls.append({'kind': 'block_write', 'again': 'refused' in value})
         lines = [line for line in value['lines'] if isinstance(line, list) and len(line) == 2]
+        if isinstance(value['present'], list):
+            # A list (F6b): three middle lines, each with two words its line lacks (green after Apply); «[отказ]» adds an
+            # item with a number the lines lack, «[пусто]» gives no item.
+            middle = lines[len(lines) // 2:len(lines) // 2 + 3]
+            reply = {'items': [] if '[пусто]' in value.get('request', '') else
+                     [{'text': line[1].rstrip('.;') + ' для команды', 'lines': [line[0]]} for line in middle]
+                     + ([{'text': 'Сократила расходы на 99999 рублей', 'lines': [middle[0][0]]}]
+                        if '[отказ]' in value.get('request', '') else [])}
+            result = {'payload': reply} if 'output' in value else reply
+            return ContentResult(request.result_type.decode_value(result), ReportedUsage(), 'synthetic-scripted',
+                request.policy.model, 0, 1)
         title = lines[1] if len(lines) > 1 else lines[0]
         # A line from the middle of the CV: most often one the block's own source lines do not hold, so it shows green.
         listed = lines[len(lines) // 2]

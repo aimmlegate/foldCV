@@ -231,3 +231,18 @@ def test_l14_the_reply_holds_at_most_five_items_or_the_present_count_up_to_eight
     assert len(added) == 5
     source.items = source.items * 2
     assert W.list_most(source) == 8
+
+
+@pytest.mark.parametrize('instruction, states', [('Коротко.', ['added'] * 3), ('Коротко. [отказ]', ['added'] * 3 + ['refused']),
+                                                ('[пусто]', [])])
+def test_the_stand_answers_the_list_request(imported, instruction, states):
+    from argparse import Namespace
+    from resume_api.providers.dynamic_result import dynamic_result
+    from tools import serve_synthetic
+    workspace, _operation, hidden, _block = imported
+    source = W.list_source(workspace, section_of(workspace).id, hidden)
+    request = Namespace(text=W.list_request(source, instruction), result_type=dynamic_result(W.list_schema(source)),
+                        policy=Namespace(model='synthetic'))
+    result = serve_synthetic.ScriptedContent().write_again(request, None)
+    _present, added = W.list_values(source, result.value.payload)
+    assert [item.state for item in added] == states
