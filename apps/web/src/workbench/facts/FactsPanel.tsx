@@ -3,7 +3,7 @@ import { errorMessage } from "../../errors/messages";
 import { useEffect, useRef, useState } from "react";
 import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { panelSupport, type PanelCommand, type PanelPlan, type TechnologyTarget } from "../../rich/v7-panel";
-import { labels, needsCheck, type Kind, type RecordValue } from "../../rich/fact-fields";
+import { labels, needsCheck, title, type Kind, type RecordValue } from "../../rich/fact-fields";
 import { TechnologyGroups } from "./TechnologyGroups";
 import { TechnologySelect } from "./TechnologySelect";
 import { FactDialog, type FactTarget } from "./FactDialog";
@@ -15,6 +15,17 @@ import { FocusYears, type FocusEntry } from "./FocusYears";
 import { FocusIconDialog } from "./FocusIconDialog";
 import type { FocusIconChoices } from "../../projects/api";
 import { OperationStatus } from "../ui/OperationStatus";
+import type { DateWarning } from "../../projects/api";
+import { JobWarnings, overlapLine } from "./JobWarnings";
+
+/** The records of a group as Facts lists them: jobs in the plan's order (D182), the others in record order. */
+export function groupRecords(records: readonly RecordValue[], kind: Kind, order: readonly string[] | undefined): RecordValue[] {
+  const listed = records.filter(record => record.kind === kind);
+  if (kind !== "employment" || !order?.length) return listed;
+  const place = new Map(order.map((id, index) => [id, index]));
+  // A job the plan does not name yet keeps its record place after the named ones.
+  return listed.map((record, index) => ({ record, at: place.get(record.id) ?? order.length + index })).sort((a, b) => a.at - b.at).map(value => value.record);
+}
 
 function summary(record: RecordValue, periods: readonly string[]): [string, string] {
   if (record.kind === "candidate") return [record.name.rawText || "Кандидат", [record.title.rawText, record.location.rawText].filter(Boolean).join("\n")];
@@ -24,8 +35,12 @@ function summary(record: RecordValue, periods: readonly string[]): [string, stri
   if (record.kind === "claim") return [record.value.rawText || "Новый факт", ""];
   return ["", ""];
 }
+function jobName(records: readonly RecordValue[], id: string): string {
+  const record = records.find(value => value.id === id);
+  return record ? title(record) : "Без названия";
+}
 export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, focusIcons = null, technologyTargets = [], plan = {}, submit,
-  pending, paused, hidden, close, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
+  pending, paused, hidden, close, checkDates = null, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
@@ -37,6 +52,8 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
   technologyTargets?: readonly TechnologyTarget[];
   plan?: PanelPlan;
   hidden: boolean; close: () => void;
+  /** Python's warnings for the date dialog's values before Save (D182); null where the editor cannot ask. */
+  checkDates?: ((recordId: string | null, values: Record<string, string>) => Promise<DateWarning[]>) | null;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
   /** Where each group's section is in the resume, by record kind; a group without one offers no jump. */
   anchors?: ReadonlyMap<string, string>; showBlock?: (blockId: string) => void;
@@ -98,26 +115,39 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
             creatable={plan.addTechnologyGroup === true} pending={pending} paused={busy} submit={apply} edit={editTechnology} excluded={focusOnly} />
           : <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology}
             focusRecordId={focusRequest?.recordId} targets={[]} lines={plan.technologyLines} excluded={focusOnly} />}</>
-        : facts.records.filter(record => record.kind === kind).map(record => {
-          const [name, sub] = summary(record, plan.jobs?.[record.id]?.periods ?? []);
+        : groupRecords(facts.records, kind, plan.jobOrder).map(record => {
+          const job = plan.jobs?.[record.id];
+          const [name, sub] = summary(record, job?.periods ?? []);
           // D179, sketch A1: a card the page does not show, with its way back.
           const off = plan.offPage?.includes(record.id) === true;
           return <div key={record.id}><div className="fact-row" data-fact-id={record.id} data-off-page={off || undefined}>
             <button className="fact-edit" disabled={busy} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
               {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
+            {/* D182: one place up or down among the cards of the job's list; Python says which way can go. */}
+            {job?.move && <><button className="icon" aria-label={`Переместить выше: ${name}`} title="Выше" disabled={busy || !job.move.up}
+              onClick={() => void apply({ operation: "move_job", recordId: record.id, values: { direction: "up" } }).catch(() => {})}><Icon name="up" /></button>
+              <button className="icon" aria-label={`Переместить ниже: ${name}`} title="Ниже" disabled={busy || !job.move.down}
+                onClick={() => void apply({ operation: "move_job", recordId: record.id, values: { direction: "down" } }).catch(() => {})}><Icon name="down" /></button></>}
             {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={busy} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
-          </div>{off && <OffPage name={name} busy={busy} restore={() => void apply({ operation: "restore", recordId: record.id }).catch(() => {})} />}
+          </div>{job && <JobWarnings lines={[...(job.outOfOrder ? ["Стоит не по дате"] : []),
+            ...(job.overlaps?.length ? [overlapLine(job.overlaps.map(id => jobName(facts.records, id)))] : [])]} />}
+          {off && <OffPage name={name} busy={busy} restore={() => void apply({ operation: "restore", recordId: record.id }).catch(() => {})} />}
           {record.kind === "employment" && <TechnologySelect facts={facts} document={document} jobId={record.id} label={name} pending={pending} paused={busy} submit={apply} edit={editTechnology} focusRecordId={focusRequest?.recordId}
             targets={technologyTargets.filter(target => target.jobId === record.id)} lines={plan.technologyLines} excluded={focusOnly} />}</div>;
         })}
-      {plan.addKinds?.some(value => value === kind) && <button className="text-button fact-add" disabled={busy}
-        onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
+      {(plan.addKinds?.some(value => value === kind) || kind === "employment" && plan.sortJobs) && <div className="fact-add-row">
+        {plan.addKinds?.some(value => value === kind) && <button className="text-button fact-add" disabled={busy}
+          onClick={() => setTarget({ kind, record: null })}>+ {kind === "employment" ? "Место работы" : kind === "language" ? "Язык" : kind === "claim" ? "Факт" : labels[kind]}</button>}
+        {kind === "employment" && plan.sortJobs && <button className="text-button fact-add" disabled={busy}
+          onClick={() => void apply({ operation: "sort_jobs", recordKind: "employment" }).catch(() => {})}>Расставить по дате</button>}
+      </div>}
     </details>
       {/* Beside the summary, not inside it: a click inside a summary also folds the group. */}
       {anchor && <button type="button" className="icon fact-group-jump" aria-label={`Показать в резюме: ${labels[kind]}`} title="Показать в резюме"
         onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}</div>;
     })}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply}
+      checkDates={target.kind === "employment" ? checkDates : null} jobName={id => jobName(facts.records, id)}
       offPage={target.record ? plan.offPageFields?.[target.record.id] : undefined}
       unshown={target.record ? plan.unshownFields?.[target.record.id] : undefined} addPeriod={Boolean(target.record && plan.jobs?.[target.record.id]?.addPeriod)} />}
     {iconEntry && focusIcons && <FocusIconDialog entry={iconEntry} load={focusIcons} submit={apply} close={() => setIconRow(null)} />}</>;

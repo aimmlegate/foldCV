@@ -142,6 +142,23 @@ export function parseFocusIconChoices(value: unknown): FocusIconChoices {
 export async function focusIconChoices(projectId: string, fetcher?: Fetcher): Promise<FocusIconChoices> {
   return parseFocusIconChoices(await v2Request<unknown>(projectPath(projectId, "/focus-icons"), "GET", undefined, fetcher));
 }
+/** One warning of the date dialog (D182): another job's period the values overlap, or an end before the start. */
+export type DateWarning = { kind: "overlap"; recordId: string; period: string } | { kind: "reversed" };
+export function parseDateWarnings(value: unknown): DateWarning[] {
+  const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  if (record["schemaVersion"] !== 1 || !Array.isArray(record["warnings"])) invalid();
+  return record["warnings"].map((item: unknown): DateWarning => {
+    const { kind, recordId, period } = typeof item === "object" && item !== null ? item as Record<string, unknown> : {};
+    if (kind === "reversed") return { kind };
+    if (kind !== "overlap" || typeof recordId !== "string" || typeof period !== "string") invalid();
+    return { kind, recordId, period };
+  });
+}
+/** POST the date dialog's values (D182); Python answers with the warnings and saves nothing. `recordId` null for an add. */
+export async function dateWarnings(projectId: string, recordId: string | null, values: Record<string, string>,
+  fetcher?: Fetcher): Promise<DateWarning[]> {
+  return parseDateWarnings(await v2Request<unknown>(projectPath(projectId, "/date-check"), "POST", { recordId, values }, fetcher));
+}
 function templateEntry(value: unknown): TemplateEntry {
   if (typeof value !== "object" || value === null) invalid();
   const { id, name, revision, packageHash, bundled, edited } = value as Record<string, unknown>;

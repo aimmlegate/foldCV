@@ -83,3 +83,8 @@
 .fact-off-page > span { display: inline-flex; align-items: center; gap: 5px; }
 .fact-off-page .text-button { padding: 2px 0; }
 .fact-row[data-off-page] .fact-edit strong { color: var(--muted); }
+/* D182: date warnings of a job, in the row and in the date dialog; information only, no box. */
+.fact-warnings { margin: 2px 0 6px; }
+.fact-warning { display: flex; align-items: flex-start; gap: 5px; margin: 2px 0; color: var(--warn); font-size: var(--ui-small); }
+.fact-warning svg { flex: none; width: 13px; height: 13px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; }
+.fact-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }

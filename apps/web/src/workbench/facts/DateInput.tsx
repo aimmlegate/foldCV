@@ -21,9 +21,10 @@ export function DateInput({ name, label, field, disabled }: {
         if (updated) setRaw(updated);
       }}><option value="year">Год</option><option value="month">Месяц</option><option value="day">Дата</option><option value="text">Как в исходнике</option></select>
       <input id={id} aria-label={label} type={precision === "year" ? "number" : precision === "text" ? "text" : precision === "month" ? "month" : "date"}
-        min={precision === "year" ? "1" : precision === "month" ? "0001-01" : "0001-01-01"}
-        max={precision === "year" ? "9999" : precision === "month" ? "9999-12" : "9999-12-31"}
-        maxLength={16000} required={needsChoice} disabled={disabled} value={value} placeholder={precision === "year" ? "ГГГГ" : "Дата из исходника"}
+        // D182, J6-d: no browser check refuses Save; Python keeps a date it cannot read as the user wrote it. The month and
+        // day pickers keep their four-digit year.
+        {...(precision === "month" ? { max: "9999-12" } : precision === "day" ? { max: "9999-12-31" } : precision === "year" ? { step: "any" } : {})}
+        maxLength={16000} disabled={disabled} value={value} placeholder={precision === "year" ? "ГГГГ" : "Дата из исходника"}
         onChange={event => { const text = event.currentTarget.value; setValue(text); setNeedsChoice(false);
           setRaw(precision === "year" && text ? text.padStart(4, "0") : text); }} />
     </div>

@@ -38,7 +38,7 @@ import { tableIdentityAttributes } from "./table-identity";
 import { disabledExtensions, templateDictionary, templateSchema } from "./template-schema";
 import { projectTemplateDocument } from "./v7-projection";
 import { focusFacts } from "./v7-focus";
-import { focusIconChoices } from "../projects/api";
+import { dateWarnings, focusIconChoices } from "../projects/api";
 import { remarkMarks, remarkMarksMeta, remarkMarksPlugin, type RemarkMarks } from "./remarks";
 import { listIndexPlugin } from "./list-index";
 import { listEndsPlugin } from "./list-ends";
@@ -438,6 +438,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     : { entries: [], options: [], only: new Set<string>(), icons: false }, [shown]);
   const projectId = initial.workspace.projectId;
   const loadIcons = useCallback(() => focusIconChoices(projectId), [projectId]);
+  const checkDates = useCallback((recordId: string | null, values: Record<string, string>) => dateWarnings(projectId, recordId, values), [projectId]);
   const anchors = useMemo(() => groupAnchors(documentShown, new Map(facts.records.map(record => [record.id, record.kind]))),
     [documentShown, facts]);
   const locked = mode === "read_only" || mode === "detached" || mode === "recovering";
@@ -581,7 +582,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
         <div className="document-row">
           <fieldset className="contents uir-editor-controls" disabled={locked}>
             <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
-              focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null}
+              focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null} checkDates={checkDates}
               technologyTargets={shown.presentation?.editor?.technologyTargets ?? []} plan={shown.presentation?.editor ?? {}}
               hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
               anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />

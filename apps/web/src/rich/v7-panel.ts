@@ -11,7 +11,8 @@ export type TechnologyTarget = EditorTechnologyTarget;
 /** What Python's plan says the panel shows and offers (D113): each job's periods as the document writes them and whether it
  * can take another, the fields with no place in the document, the technologies that share a line, and whether a skill
  * group of one's own can be started (D136). */
-export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "offPage" | "offPageFields" | "technologyLines" | "addKinds" | "addTechnologyGroup">;
+export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "offPage" | "offPageFields" | "technologyLines" | "addKinds" | "addTechnologyGroup"
+  | "jobOrder" | "sortJobs">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { remove: ReadonlySet<string> } = {
@@ -38,6 +39,17 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
       return null;
     return [command.recordId ? { operation: "add_technology_group", recordId: command.recordId, values: { title } }
       : { operation: "add_technology_group", recordKind: "technology", values: { title, display: display ?? "" } }];
+  }
+  if (command.operation === "move_job") {
+    // D182: Python decides where the card goes; the panel names the job and the way.
+    const direction = values?.["direction"];
+    if (kind !== "employment" || !command.recordId || command.jobId || command.periodId || (direction !== "up" && direction !== "down")
+      || Object.keys(values ?? {}).length !== 1) return null;
+    return [{ operation: "move_job", recordId: command.recordId, values: { direction } }];
+  }
+  if (command.operation === "sort_jobs") {
+    if (command.recordId || (command.recordKind ?? "employment") !== "employment" || command.jobId || command.periodId || values) return null;
+    return [{ operation: "sort_jobs", recordKind: "employment" }];
   }
   if (command.operation === "restore") {
     // D179: a card off the page, or one field line of a card on it, back on the page.
