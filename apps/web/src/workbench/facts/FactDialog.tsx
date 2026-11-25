@@ -33,7 +33,7 @@ export function FactDialog({ target, close, submit, unshown, offPage = [], addPe
   const record = target.record;
   const inputs = record ? offeredFields(record, unshown) : names[target.kind].map(([key, label]) => ({ key, label, text: "", checked: undefined }));
   const addingPeriod = !record && target.kind === "employment" ? [{ key: "start", label: "Начало", text: "", checked: undefined },
-    { key: "end", label: "Окончание", text: "", checked: undefined }, { key: "present", label: present, text: "", checked: false }] : [];
+    { key: "end", label: "Окончание", text: "", checked: undefined }, { key: "present", label: "Работаю сейчас", text: "", checked: false }] : [];
   // D182: the form's period values, as the panel sends them, for the warnings before Save.
   const dated = [...inputs, ...addingPeriod].filter(input => target.kind === "employment" && !target.remove
     && /^(?:period:.+:)?(?:start|end|present)$/u.test(input.key));

@@ -90,10 +90,10 @@ test("the V7 path takes a move with one direction and the sort, and nothing else
   assert.equal(panelCommandsV7({ operation: "sort_jobs", recordKind: "technology" }, kinds), null);
 });
 
-test("the add form has «по настоящее время», the warning region and an enabled Save", () => {
+test("the add form has «Работаю сейчас», the warning region and an enabled Save", () => {
   const markup = renderToStaticMarkup(createElement(FactDialog, { target: { kind: "employment", record: null }, close: () => {},
     submit: async () => {}, checkDates: async () => [] }));
-  assert.match(markup, /<label for="fact-present">по настоящее время<\/label><input id="fact-present"[^>]*type="checkbox"[^>]*name="present"/u);
+  assert.match(markup, /<label for="fact-present">Работаю сейчас<\/label><input id="fact-present"[^>]*type="checkbox"[^>]*name="present"/u);
   assert.match(markup, /class="fact-warnings" role="status"/u);
   assert.doesNotMatch(markup, /<button[^>]*type="submit"[^>]*disabled/u);
   // No browser check refuses a date at Save.
@@ -103,7 +103,7 @@ test("the add form has «по настоящее время», the warning regio
   assert.match(edit, /role="status"/u);
   const language = renderToStaticMarkup(createElement(FactDialog, { target: { kind: "language", record: null }, close: () => {},
     submit: async () => {}, checkDates: async () => [] }));
-  assert.ok(!language.includes('role="status"') && !language.includes("по настоящее время"));
+  assert.ok(!language.includes('role="status"') && !language.includes("Работаю сейчас"));
 });
 
 function fakeTimers() {
