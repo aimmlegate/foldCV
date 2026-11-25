@@ -45,6 +45,8 @@ class RewordValue(Wire):
     reason: str | None
     words: list[str] = Field(default_factory=list)
     source: list[str] = Field(default_factory=list)
+    # F6b: a present item of a list written again whose «оставить» starts on (the user's own value).
+    keep: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class RewordChange(Wire):

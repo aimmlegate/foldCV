@@ -3667,6 +3667,7 @@ export type Operations3 = [
   | SetLinkTarget
   | RemoveRange
   | PasteLines
+  | AddListItem
 ];
 export type Kind87 = "replace_text";
 export type Opid = string;
@@ -3795,6 +3796,39 @@ export type Enter1 = boolean;
 export type Kind106 = "paste_lines";
 export type Opid17 = string;
 export type Text26 = string;
+export type Afterid5 = string | null;
+export type Beforerevision20 = number;
+export type Blockid21 = string;
+/**
+ * @maxItems 10
+ */
+export type Evidence26 =
+  | []
+  | [SourceSpan]
+  | [SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan, SourceSpan]
+  | [
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan,
+      SourceSpan
+    ];
+export type Kind107 = "add_list_item";
+export type Opid18 = string;
+export type Text27 = string;
+export type Written1 = "model" | null;
 export type Schemaversion25 = 1;
 export type Editortoken4 = string;
 export type Schemaversion26 = 1;
@@ -3804,7 +3838,7 @@ export type Byteref1 = string;
 export type Bytesha2561 = string;
 export type Code7 = "NO_TEXT" | "IMAGE" | "SHAPE" | "TEXT_BOX" | "UNSUPPORTED_CONTENT";
 export type Column2 = number | null;
-export type Kind107 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
+export type Kind108 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
 export type Page4 = number | null;
 export type Paragraph = number | null;
 export type Part1 = string | null;
@@ -3830,7 +3864,7 @@ export type Sourceid5 = string;
 export type Sourcekind = "pdf" | "docx" | "txt" | "markdown" | "paste";
 export type Id111 = string;
 export type Order2 = number;
-export type Text27 = string;
+export type Text28 = string;
 /**
  * @maxItems 5000
  */
@@ -3843,7 +3877,7 @@ export type Expectedactionid1 = string | null;
 export type Allowtextrewrite3 = boolean;
 export type Clientrequestid3 = string;
 export type Effort2 = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
-export type Kind108 = "start" | "resume" | "cancel";
+export type Kind109 = "start" | "resume" | "cancel";
 export type Lite1 = boolean;
 export type Operationid6 = string | null;
 export type Taskid6 = string | null;
@@ -3869,7 +3903,7 @@ export type Schemaversion28 = 1;
 export type Elapsed = number;
 export type Error1 = string | null;
 export type Id112 = string;
-export type Kind109 = "import" | "export" | "rewrite";
+export type Kind110 = "import" | "export" | "rewrite";
 export type Projectid14 = string;
 export type Stage1 = string | null;
 export type Startedat2 = string;
@@ -4494,7 +4528,7 @@ export type Targets2 =
       FindingTargetV1,
       FindingTargetV1
     ];
-export type Blockid21 = string | null;
+export type Blockid22 = string | null;
 export type Cellid15 = string | null;
 export type End7 = number | null;
 export type Fieldkey11 = string | null;
@@ -4599,7 +4633,7 @@ export type Schemaversion33 = 1;
 export type Requestid2 = string;
 export type Schemaversion34 = 1;
 export type Source3 = string;
-export type Text28 = string;
+export type Text29 = string;
 export type Mode3 = "structured" | "digest" | "imported";
 export type Records3 = (
   | CandidateRecord
@@ -7817,6 +7851,21 @@ export interface PasteLines {
   styles: InlineStyles;
   text: Text26;
 }
+/**
+ * D181: one item of a list block written again from the CV («Написать заново по резюме»): a new record of the
+ * list's kind with one cell and its bullet in the list, after `after_id` (None: first). `written: "model"` marks the
+ * value as the model's (D179) when the user did not change the preview's text.
+ */
+export interface AddListItem {
+  afterId: Afterid5;
+  beforeRevision: Beforerevision20;
+  blockId: Blockid21;
+  evidence?: Evidence26;
+  kind: Kind107;
+  opId: Opid18;
+  text: Text27;
+  written?: Written1;
+}
 export interface ExportCommand {
   editorToken: Editortoken4;
   schemaVersion: Schemaversion26;
@@ -7846,7 +7895,7 @@ export interface ExtractGap {
 }
 export interface ExtractLocation {
   column?: Column2;
-  kind: Kind107;
+  kind: Kind108;
   page?: Page4;
   paragraph?: Paragraph;
   part?: Part1;
@@ -7863,7 +7912,7 @@ export interface ExtractUnit {
   location: ExtractLocation;
   order: Order2;
   structure?: SourceStructure | null;
-  text: Text27;
+  text: Text28;
 }
 export interface HistoryRequestV1 {
   baseRevision: Baserevision3;
@@ -7876,7 +7925,7 @@ export interface ImportCommand {
   allowTextRewrite?: Allowtextrewrite3;
   clientRequestId?: Clientrequestid3;
   effort?: Effort2;
-  kind: Kind108;
+  kind: Kind109;
   lite?: Lite1;
   operationId?: Operationid6;
   taskId?: Taskid6;
@@ -7907,7 +7956,7 @@ export interface TaskStatusV1 {
   elapsed: Elapsed;
   error: Error1;
   id: Id112;
-  kind: Kind109;
+  kind: Kind110;
   projectId: Projectid14;
   stage: Stage1;
   startedAt: Startedat2;
@@ -7930,7 +7979,7 @@ export interface FindingInputV1 {
   targets?: Targets2;
 }
 export interface FindingTargetV1 {
-  blockId?: Blockid21;
+  blockId?: Blockid22;
   cellId?: Cellid15;
   end?: End7;
   fieldKey?: Fieldkey11;
@@ -8078,7 +8127,7 @@ export interface TemplateRewritePreviewV1 {
   schemaVersion: Schemaversion34;
   snapshot: TemplateSnapshotIdentity;
   source: Source3;
-  text: Text28;
+  text: Text29;
 }
 export interface WorkingFacts {
   extraction?: ExtractionReport | null;

@@ -53,5 +53,9 @@ def prepare_edit(response, request, *, clipboard=None, occupied=None, remembered
     if isinstance(request.operations[0], SetLinkTarget):
         from .template_preparation_link import prepare_link_target
         return prepare_link_target(response, request, occupied=occupied)
+    from ..models.template_authoring import AddListItem
+    if isinstance(request.operations[0], AddListItem):
+        from .template_list_items import prepare_list_item
+        return prepare_list_item(response, request, occupied=occupied)
     from .template_preparation_structure import prepare_structure_edit
     return prepare_structure_edit(response, request, clipboard=clipboard, occupied=occupied)

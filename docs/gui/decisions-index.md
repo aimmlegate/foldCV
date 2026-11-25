@@ -183,3 +183,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D178 A deletion of a field's whole text takes the field off the page and keeps its fact
 - D179 Marks follow who wrote the text; a fact off the page comes back from Facts
 - D180 «Написать заново по резюме» for «О себе»
+- D181 «Написать заново по резюме» for a list: the list replaced whole, two list operations

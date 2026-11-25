@@ -7,6 +7,7 @@ from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 from .contracts import Id, Revision, Sha256, Wire, _unique
 from .rich_document import Alignment, Color, Hyperlink, InlineStyles, StyledText
 from .rich_mutations import ActionCapture
+from .template_facts import SourceSpan
 from .template_mutations import TemplateMutationV1
 from .template_render import TemplateSnapshotIdentity
 from .panel_request import RichPanelRequest
@@ -231,6 +232,19 @@ class DeleteEntity(AuthoredOperationBase):
     before_revision: Revision
 
 
+class AddListItem(AuthoredOperationBase):
+    """D181: one item of a list block written again from the CV («Написать заново по резюме»): a new record of the
+    list's kind with one cell and its bullet in the list, after `after_id` (None: first). `written: "model"` marks the
+    value as the model's (D179) when the user did not change the preview's text."""
+    kind: Literal['add_list_item']
+    block_id: Id
+    before_revision: Revision
+    after_id: Id | None
+    text: str = Field(min_length=1, max_length=4000)
+    evidence: list[SourceSpan] = Field(default_factory=list, max_length=10)
+    written: Literal['model'] | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
 class PanelPlacementContext(Wire):
     context_block_id: Id
     placement: AuthoredPlacement
@@ -289,7 +303,8 @@ class FormatBlocks(AuthoredOperationBase):
 
 AuthoredOperation = Annotated[ReplaceText | SetMarks | SplitBlock | MergeBlocks | InsertParagraph |
     CopyBlocks | CopyFragment | PasteInline | PasteBlocks | MoveBlock | RemoveOccurrences | DeleteEntity |
-    BuiltinPanel | FormatBlocks | ResolveTemplateSync | SetLinkTarget | RemoveRange | PasteLines, Field(discriminator='kind')]
+    BuiltinPanel | FormatBlocks | ResolveTemplateSync | SetLinkTarget | RemoveRange | PasteLines | AddListItem,
+    Field(discriminator='kind')]
 
 
 class TemplateEditPreparationV1(Wire):

@@ -442,6 +442,38 @@ def rewrite_schema():
     return WRITE_SHAPES['text']
 
 
+# «Написать заново по резюме» for a list block (F6b, D181): the whole list is written again; the user's own items stay.
+REWRITE_LIST_RULES = [
+    COMMON[0],
+    'Rewriting is allowed for this block: the runtime permission is true.',
+    'request is the user\'s own word on how to write the block: follow it within these rules.',
+    REWRITE_RULES[3],
+    'present lists the items the block has now. Write the new list from the lines, not from present: do not copy an '
+    'item or only reword it, and keep nothing of present that the lines do not state.',
+    'kept lists items the user wrote that stay on the page: never repeat one of them.',
+    'The reply is {items}: at most the number that items allows, the weightiest first, each {text, lines} with the refs '
+    'of the lines that item rests on. When the lines state nothing the block holds, items is empty; never fill it for '
+    'the sake of it.',
+]
+
+
+def rewrite_list_request(block, lines, instruction, present, kept):
+    """present: the texts of the block's items now; kept: the user's own items that stay on the page."""
+    return request({
+        'task': 'Write the items of one list block of a résumé again from what these CV lines state, by the user\'s '
+                'request.',
+        'rules': REWRITE_LIST_RULES, 'block': block,
+        'request': '\n'.join(' '.join(line.split()) for line in instruction.splitlines() if line.strip()),
+        'present': [' '.join(text.split()) for text in present], 'kept': [' '.join(text.split()) for text in kept],
+        'example': {'lines': WRITE_EXAMPLE_LINES, 'present': ['Работал с Kafka'],
+                    'reply': WRITE['career_highlights']['example']},
+        'lines': pairs(lines)})
+
+
+def rewrite_list_schema(most):
+    return closed({'items': array(closed({'text': NAME, 'lines': array(REF, minItems=1)}), maxItems=most)})
+
+
 # -------------------------------------------------------------------------------------------- the narrow question
 
 SIGNS = {'period': 'a line that is only a period, and not the period of this entry',

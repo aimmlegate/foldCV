@@ -35,6 +35,81 @@
       "title": "ActionCapture",
       "type": "object"
     },
+    "AddListItem": {
+      "additionalProperties": false,
+      "description": "D181: one item of a list block written again from the CV («Написать заново по резюме»): a new record of the\nlist's kind with one cell and its bullet in the list, after `after_id` (None: first). `written: \"model\"` marks the\nvalue as the model's (D179) when the user did not change the preview's text.",
+      "properties": {
+        "afterId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Afterid"
+        },
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "blockId": {
+          "minLength": 1,
+          "title": "Blockid",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceSpan"
+          },
+          "maxItems": 10,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "kind": {
+          "const": "add_list_item",
+          "title": "Kind",
+          "type": "string"
+        },
+        "opId": {
+          "minLength": 1,
+          "title": "Opid",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "written": {
+          "anyOf": [
+            {
+              "const": "model",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Written"
+        }
+      },
+      "required": [
+        "opId",
+        "kind",
+        "blockId",
+        "beforeRevision",
+        "afterId",
+        "text"
+      ],
+      "title": "AddListItem",
+      "type": "object"
+    },
     "AuthoredPlacement": {
       "additionalProperties": false,
       "properties": {
@@ -1576,6 +1651,57 @@
       "title": "SetMarks",
       "type": "object"
     },
+    "SourceSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "sliceHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Slicehash",
+          "type": "string"
+        },
+        "sourceId": {
+          "minLength": 1,
+          "title": "Sourceid",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "minimum": 1,
+          "title": "Sourcerevision",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "unitId": {
+          "minLength": 1,
+          "title": "Unitid",
+          "type": "string"
+        },
+        "unitRevision": {
+          "minimum": 1,
+          "title": "Unitrevision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceRevision",
+        "unitId",
+        "unitRevision",
+        "start",
+        "end",
+        "sliceHash"
+      ],
+      "title": "SourceSpan",
+      "type": "object"
+    },
     "SplitBlock": {
       "additionalProperties": false,
       "properties": {
@@ -1654,6 +1780,7 @@
           "items": {
             "discriminator": {
               "mapping": {
+                "add_list_item": "#/$defs/AddListItem",
                 "builtin_panel": "#/$defs/BuiltinPanel",
                 "copy_blocks": "#/$defs/CopyBlocks",
                 "copy_fragment": "#/$defs/CopyFragment",
@@ -1729,6 +1856,9 @@
               },
               {
                 "$ref": "#/$defs/PasteLines"
+              },
+              {
+                "$ref": "#/$defs/AddListItem"
               }
             ]
           },

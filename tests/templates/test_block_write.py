@@ -25,8 +25,16 @@ def imported(tmp_path_factory):
     fixture, operation = run(tmp_path_factory.mktemp('write'))
     workspace = fixture.current()
     hidden = W.hidden_lines([operation])
-    block_id, = W.writable(workspace, hidden)
+    # Since F6b the list block can be written again too; these cases are about the summary.
+    block_id, = [block for block in W.writable(workspace, hidden) if W.write_source(workspace, block, hidden) is not None]
     return workspace, operation, hidden, block_id
+
+
+def summary(offered):
+    """The summary among the blocks the route offers to write again (the list block is offered too since F6b)."""
+    found = [block for block in offered['write'] if offered['rules'][block].startswith('О себе')]
+    assert len(found) == 1
+    return found[0]
 
 
 def source_of(imported):
@@ -136,7 +144,7 @@ def test_a_refused_text_gets_one_more_call_in_the_same_task_and_apply_unchanged_
         # The import records are in the history files only (D104): the route reads the hidden lines from them.
         assert not application.state.projects.repository.open(project).workspace.project.template_operations
         offered = client.get('/v2/projects/' + project + '/reword/blocks').json()
-        block_id, = offered['write']
+        block_id = summary(offered)
         assert block_id in offered['blockIds']
         before = application.state.projects.repository.read(project)
         shown = editor.call('post', '/reword/preview', {'editorToken': editor.token, 'requestId': 'write-1',
@@ -178,7 +186,7 @@ def test_an_edited_preview_is_the_users_text_and_no_text_gets_no_second_call(tmp
     with context as (client, _application):
         project = workspace.project_id
         editor = Editor(client, project)
-        block_id, = client.get('/v2/projects/' + project + '/reword/blocks').json()['write']
+        block_id = summary(client.get('/v2/projects/' + project + '/reword/blocks').json())
         ask = lambda identifier: editor.call('post', '/reword/preview', {'editorToken': editor.token, 'requestId': identifier,
             'blockId': block_id, 'instruction': 'Коротко.', 'mode': 'write'})
         empty = ask('write-empty')
@@ -206,7 +214,7 @@ def test_a_text_refused_twice_has_no_apply_and_a_cancel_between_the_calls_stops_
     with context as (client, application):
         project = workspace.project_id
         editor = Editor(client, project)
-        block_id, = client.get('/v2/projects/' + project + '/reword/blocks').json()['write']
+        block_id = summary(client.get('/v2/projects/' + project + '/reword/blocks').json())
         body = {'editorToken': editor.token, 'blockId': block_id, 'instruction': 'Коротко.', 'mode': 'write'}
         twice = editor.call('post', '/reword/preview', {**body, 'requestId': 'write-twice'})
         assert len(provider.requests) == 2
@@ -313,7 +321,7 @@ def test_a_text_in_another_language_gets_the_second_call_and_one_refused_twice_h
     with context as (client, _application):
         project = workspace.project_id
         editor = Editor(client, project)
-        block_id, = client.get('/v2/projects/' + project + '/reword/blocks').json()['write']
+        block_id = summary(client.get('/v2/projects/' + project + '/reword/blocks').json())
         body = {'editorToken': editor.token, 'blockId': block_id, 'instruction': 'Коротко.', 'mode': 'write'}
         again = editor.call('post', '/reword/preview', {**body, 'requestId': 'write-language-1'})
         second = json.loads(provider.requests[1].text)
