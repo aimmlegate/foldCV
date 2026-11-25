@@ -225,7 +225,9 @@ def test_l12_a_project_with_no_hidden_rows_has_no_list_action(tmp_path):
 def test_l14_the_reply_holds_at_most_five_items_or_the_present_count_up_to_eight(imported):
     workspace, _operation, hidden, _block = imported
     source = W.list_source(workspace, section_of(workspace).id, hidden)
-    assert W.list_most(source) == 5 and W.list_schema(source)['properties']['items']['maxItems'] == 5
+    # The request names the limit; the schema has none, so a reply with more items is not lost: code keeps the first.
+    assert W.list_most(source) == 5 and 'maxItems' not in W.list_schema(source)['properties']['items']
+    assert json.loads(W.list_request(source, 'Коротко.')).get('most') == 5
     many = items(*[(GATEWAY + ' ' + str(number), ['S23']) for number in range(9)])
     _present, added = W.list_values(source, many)
     assert len(added) == 5

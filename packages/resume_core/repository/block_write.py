@@ -200,11 +200,12 @@ def list_most(source):
 
 
 def list_request(source, instruction):
-    return P.rewrite_list_request(source.title, source.lines, instruction, [item.text for item in source.items], source.kept)
+    return P.rewrite_list_request(source.title, source.lines, instruction, [item.text for item in source.items], source.kept,
+                                  list_most(source))
 
 
-def list_schema(source):
-    return P.rewrite_list_schema(list_most(source))
+def list_schema(_source):
+    return P.rewrite_list_schema()
 
 
 def list_values(source, reply):

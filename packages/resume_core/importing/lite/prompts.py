@@ -451,27 +451,29 @@ REWRITE_LIST_RULES = [
     'present lists the items the block has now. Write the new list from the lines, not from present: do not copy an '
     'item or only reword it, and keep nothing of present that the lines do not state.',
     'kept lists items the user wrote that stay on the page: never repeat one of them.',
-    'The reply is {items}: at most the number that items allows, the weightiest first, each {text, lines} with the refs '
-    'of the lines that item rests on. When the lines state nothing the block holds, items is empty; never fill it for '
-    'the sake of it.',
+    'The reply is {items}: at most most items, the weightiest first, each {text, lines} with the refs of the lines that '
+    'item rests on. When the lines state nothing the block holds, items is empty; never fill it for the sake of it.',
 ]
 
 
-def rewrite_list_request(block, lines, instruction, present, kept):
-    """present: the texts of the block's items now; kept: the user's own items that stay on the page."""
+def rewrite_list_request(block, lines, instruction, present, kept, most):
+    """present: the texts of the block's items now; kept: the user's own items that stay on the page; most: the
+    largest number of items."""
     return request({
         'task': 'Write the items of one list block of a résumé again from what these CV lines state, by the user\'s '
                 'request.',
         'rules': REWRITE_LIST_RULES, 'block': block,
         'request': '\n'.join(' '.join(line.split()) for line in instruction.splitlines() if line.strip()),
         'present': [' '.join(text.split()) for text in present], 'kept': [' '.join(text.split()) for text in kept],
+        'most': most,
         'example': {'lines': WRITE_EXAMPLE_LINES, 'present': ['Работал с Kafka'],
                     'reply': WRITE['career_highlights']['example']},
         'lines': pairs(lines)})
 
 
-def rewrite_list_schema(most):
-    return closed({'items': array(closed({'text': NAME, 'lines': array(REF, minItems=1)}), maxItems=most)})
+def rewrite_list_schema():
+    # No maxItems: a reply with an item more than `most` would be refused whole; code keeps the first `most` items.
+    return closed({'items': array(closed({'text': NAME, 'lines': array(REF, minItems=1)}))})
 
 
 # -------------------------------------------------------------------------------------------- the narrow question
