@@ -108,6 +108,8 @@ def test_l1_the_whole_list_is_replaced_in_one_action_and_one_undo_brings_it_back
         assert asked['present'] == texts(section_of(stand.workspace)) and asked['kept'] == []
         assert asked['request'] == 'Достижения: эффект.' and not {'holds', 'write', 'instructions'} & set(asked)
         assert CONTACT not in json.dumps(asked, ensure_ascii=False)
+        # The live round: a rule against copying `present` made both models leave out the weightiest results.
+        assert any('leave out no weighty result' in rule for rule in asked['rules']) and asked['most'] == 5
         before = stand.editor.workspace()
         applied = stand.apply(shown, [value['recordId'] for value in shown['values']], take(shown))
         assert texts(stand.section()) == [ROLE, GATEWAY, CABINET]

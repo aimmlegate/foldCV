@@ -448,8 +448,9 @@ REWRITE_LIST_RULES = [
     'Rewriting is allowed for this block: the runtime permission is true.',
     'request is the user\'s own word on how to write the block: follow it within these rules.',
     REWRITE_RULES[3],
-    'present lists the items the block has now. Write the new list from the lines, not from present: do not copy an '
-    'item or only reword it, and keep nothing of present that the lines do not state.',
+    'present lists the items the block has now. Write the new list from the lines: an item may state what a present '
+    'item states when the lines state it, written from those lines; keep nothing of present that the lines do not '
+    'state, and leave out no weighty result the lines state because present has it.',
     'kept lists items the user wrote that stay on the page: never repeat one of them.',
     'The reply is {items}: at most most items, the weightiest first, each {text, lines} with the refs of the lines that '
     'item rests on. When the lines state nothing the block holds, items is empty; never fill it for the sake of it.',
