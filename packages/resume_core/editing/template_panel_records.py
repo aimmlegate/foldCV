@@ -196,6 +196,8 @@ def panel_plan(project):
     from .off_page import named_records, off_fields
     from .template_panel_restore import restorable
     page = named_records(project.document)
+    from .template_panel_jobs import job_warnings
+    warnings, order, unsorted = job_warnings(project)
     for record in project.facts.records:
         # A card off the page has no section to place a field in: the template's views tell what it can show (D179).
         missing = sorted(key for key in DOCUMENT_FIELDS.get(record.kind, ()) if (record.id, key) not in shown
@@ -204,7 +206,7 @@ def panel_plan(project):
             unshown[record.id] = missing
         if record.kind == 'employment':
             jobs[record.id] = {'periods': [period_text(period, package) for period in record.periods],
-                **({'addPeriod': True} if record.id in addable else {})}
+                **({'addPeriod': True} if record.id in addable else {}), **warnings.get(record.id, {})}
     lines = [identifiers for _block, _container, content, _owner in technology_lines(project)
         if len(identifiers := [entry[0] for entry in _split_technology_line(content)[1]]) > 1
         and len(identifiers) == len(set(identifiers))]
@@ -213,7 +215,8 @@ def panel_plan(project):
     back = sorted(restorable(project))
     return {key: value for key, value in (('jobs', jobs), ('unshownFields', unshown), ('offPage', back),
         ('offPageFields', off_fields(project, page)), ('technologyLines', lines),
-        ('addKinds', addable_kinds(project)), ('addTechnologyGroup', new_group_place(project) is not None)) if value}
+        ('addKinds', addable_kinds(project)), ('addTechnologyGroup', new_group_place(project) is not None),
+        ('jobOrder', order), ('sortJobs', unsorted)) if value}
 
 
 def template_place(project, kind, key):

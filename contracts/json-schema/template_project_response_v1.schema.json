@@ -2385,6 +2385,30 @@
           "title": "Addperiod",
           "type": "boolean"
         },
+        "move": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EditorJobMove"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "outOfOrder": {
+          "default": false,
+          "title": "Outoforder",
+          "type": "boolean"
+        },
+        "overlaps": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Overlaps",
+          "type": "array"
+        },
         "periods": {
           "items": {
             "type": "string"
@@ -2397,6 +2421,26 @@
         "periods"
       ],
       "title": "EditorJob",
+      "type": "object"
+    },
+    "EditorJobMove": {
+      "additionalProperties": false,
+      "description": "Where a job's card can go by one place in its list (D182); a disabled arrow for the other way.",
+      "properties": {
+        "down": {
+          "title": "Down",
+          "type": "boolean"
+        },
+        "up": {
+          "title": "Up",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "up",
+        "down"
+      ],
+      "title": "EditorJobMove",
       "type": "object"
     },
     "EditorPlacement": {
@@ -2491,6 +2535,14 @@
           "title": "Icons",
           "type": "array"
         },
+        "jobOrder": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Joborder",
+          "type": "array"
+        },
         "jobs": {
           "additionalProperties": {
             "$ref": "#/$defs/EditorJob"
@@ -2521,6 +2573,11 @@
           },
           "title": "Offpagefields",
           "type": "object"
+        },
+        "sortJobs": {
+          "default": false,
+          "title": "Sortjobs",
+          "type": "boolean"
         },
         "styles": {
           "additionalProperties": {

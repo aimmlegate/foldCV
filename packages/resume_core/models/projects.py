@@ -113,6 +113,25 @@ class RenameRequestV1(Wire):
     title: str = Field(min_length=1, max_length=200)
 
 
+class DateCheckRequestV1(Wire):
+    """The date dialog's values before Save (D182): the job, or none for a new one, and its period fields by dialog key."""
+    record_id: Id | None
+    values: dict[str, str] = Field(max_length=150)
+
+
+class DateCheckWarningV1(Wire):
+    """One warning of the date dialog: another job's period it overlaps, or a period whose end is before its start."""
+    kind: Literal['overlap', 'reversed']
+    record_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+    period: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    period_id: Id | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+class DateCheckResultV1(Wire):
+    schema_version: Literal[1]
+    warnings: list[DateCheckWarningV1]
+
+
 class DeleteRequestV1(Wire):
     confirmed: Literal[True]
 
@@ -128,6 +147,8 @@ PROJECT_CONTRACTS = {
     'revision_conflict_v1': RevisionConflictV1,
     'rename_request_v1': RenameRequestV1,
     'delete_request_v1': DeleteRequestV1,
+    'date_check_request_v1': DateCheckRequestV1,
+    'date_check_result_v1': DateCheckResultV1,
     'rewrite_preview_request_v1': RewritePreviewRequestV1,
     'rewrite_cancel_request_v1': RewriteCancelRequestV1,
 }

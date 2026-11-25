@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "DateCheckWarningV1": {
+      "additionalProperties": false,
+      "description": "One warning of the date dialog: another job's period it overlaps, or a period whose end is before its start.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "overlap",
+            "reversed"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "periodId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Periodid"
+        },
+        "recordId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recordid"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "DateCheckWarningV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/DateCheckWarningV1"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "warnings"
+  ],
+  "title": "DateCheckResultV1",
+  "type": "object"
+}

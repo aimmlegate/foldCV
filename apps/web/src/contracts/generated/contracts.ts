@@ -614,9 +614,15 @@ export type Icons = boolean;
 export type Records = string[];
 export type Fonts = string[];
 export type Icons1 = string[];
+export type Joborder = string[];
 export type Addperiod = boolean;
+export type Down = boolean;
+export type Up = boolean;
+export type Outoforder = boolean;
+export type Overlaps = string[];
 export type Periods = string[];
 export type Offpage = string[];
+export type Sortjobs = boolean;
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
 export type Bold1 = string | null;
@@ -3640,6 +3646,13 @@ export type Blocks8 = [BlockTarget, ...BlockTarget[]];
 export type Beforerevision14 = number;
 export type Blockid16 = string;
 export type Kind86 = "blocks";
+export type Recordid17 = string | null;
+export type Schemaversion25 = 1;
+export type Kind87 = "overlap" | "reversed";
+export type Period2 = string | null;
+export type Periodid1 = string | null;
+export type Recordid18 = string | null;
+export type Warnings3 = DateCheckWarningV1[];
 export type Confirmed = true;
 export type Baserevision2 = number;
 export type Editortoken3 = string;
@@ -3669,18 +3682,18 @@ export type Operations3 = [
   | PasteLines
   | AddListItem
 ];
-export type Kind87 = "replace_text";
+export type Kind88 = "replace_text";
 export type Opid = string;
 export type Text23 = string;
 export type Written = "model" | null;
-export type Kind88 = "set_marks";
+export type Kind89 = "set_marks";
 export type Opid1 = string;
 export type Beforerevision15 = number;
 export type Blockid17 = string;
-export type Kind89 = "split_block";
+export type Kind90 = "split_block";
 export type Offset1 = number;
 export type Opid2 = string;
-export type Kind90 = "merge_blocks";
+export type Kind91 = "merge_blocks";
 export type Leadingid = string;
 export type Leadingrevision = number;
 export type Opid3 = string;
@@ -3688,44 +3701,44 @@ export type Trailingid = string;
 export type Trailingrevision = number;
 export type Contextblockid = string;
 export type Contextrevision = number;
-export type Kind91 = "insert_paragraph";
+export type Kind92 = "insert_paragraph";
 export type Opid4 = string;
 export type Afterid4 = string | null;
 export type Parentid6 = string;
 export type Text24 = string;
-export type Kind92 = "copy_blocks";
+export type Kind93 = "copy_blocks";
 export type Opid5 = string;
 /**
  * @minItems 1
  * @maxItems 1000
  */
 export type Sources5 = [BlockTarget, ...BlockTarget[]];
-export type Kind93 = "copy_fragment";
+export type Kind94 = "copy_fragment";
 export type Opid6 = string;
-export type Kind94 = "paste_inline";
+export type Kind95 = "paste_inline";
 export type Opid7 = string;
 export type Source2 = SameProjectClipboard | LiteralPaste;
 export type Clipboardcaptureid = string;
-export type Kind95 = "same_project";
+export type Kind96 = "same_project";
 export type Content29 = (StyledText | Hyperlink)[];
-export type Kind96 = "literal";
-export type Kind97 = "paste_blocks";
+export type Kind97 = "literal";
+export type Kind98 = "paste_blocks";
 export type Opid8 = string;
 export type Beforerevision16 = number;
 export type Blockid18 = string;
-export type Kind98 = "move_block";
+export type Kind99 = "move_block";
 export type Opid9 = string;
 /**
  * @minItems 1
  * @maxItems 1000
  */
 export type Blocks9 = [BlockTarget, ...BlockTarget[]];
-export type Kind99 = "remove_occurrences";
+export type Kind100 = "remove_occurrences";
 export type Opid10 = string;
 export type Beforerevision17 = number;
-export type Kind100 = "delete_entity";
+export type Kind101 = "delete_entity";
 export type Opid11 = string;
-export type Recordid17 = string;
+export type Recordid19 = string;
 export type Beforerecordid = string | null;
 export type Documentrevision5 = number;
 export type Factsrevision1 = number;
@@ -3744,14 +3757,16 @@ export type Operation2 =
   | "move_focus"
   | "set_focus_icon"
   | "add_technology_group"
-  | "restore";
-export type Periodid1 = string | null;
-export type Recordid18 = string | null;
+  | "restore"
+  | "move_job"
+  | "sort_jobs";
+export type Periodid2 = string | null;
+export type Recordid20 = string | null;
 export type Recordkind = ("candidate" | "employment" | "technology" | "education" | "language" | "claim") | null;
-export type Kind101 = "builtin_panel";
+export type Kind102 = "builtin_panel";
 export type Opid12 = string;
 export type Contextblockid1 = string;
-export type Kind102 = "format_blocks";
+export type Kind103 = "format_blocks";
 export type Opid13 = string;
 export type BlockFormatPatch =
   | {
@@ -3773,13 +3788,13 @@ export type BlockFormatPatch =
 export type Targets1 = [BlockTarget, ...BlockTarget[]];
 export type Beforelifecycleid3 = string;
 export type Beforerecordhash1 = string;
-export type Kind103 = "resolve_template_sync";
+export type Kind104 = "resolve_template_sync";
 export type Opid14 = string;
 export type Syncid1 = string;
 export type Beforerevision18 = number;
 export type Blockid19 = string;
 export type Href3 = string;
-export type Kind104 = "set_link_target";
+export type Kind105 = "set_link_target";
 export type Occurrenceid5 = string;
 export type Opid15 = string;
 export type Beforerevision19 = number;
@@ -3790,10 +3805,10 @@ export type Offset2 = number;
 export type Enter = boolean;
 export type Insertiontarget1 = (FieldInsertionTarget | LiteralInsertionTarget | ManualScopeInsertionTarget) | null;
 export type Text25 = string;
-export type Kind105 = "remove_range";
+export type Kind106 = "remove_range";
 export type Opid16 = string;
 export type Enter1 = boolean;
-export type Kind106 = "paste_lines";
+export type Kind107 = "paste_lines";
 export type Opid17 = string;
 export type Text26 = string;
 export type Afterid5 = string | null;
@@ -3825,20 +3840,20 @@ export type Evidence26 =
       SourceSpan,
       SourceSpan
     ];
-export type Kind107 = "add_list_item";
+export type Kind108 = "add_list_item";
 export type Opid18 = string;
 export type Text27 = string;
 export type Written1 = "model" | null;
-export type Schemaversion25 = 1;
-export type Editortoken4 = string;
 export type Schemaversion26 = 1;
+export type Editortoken4 = string;
+export type Schemaversion27 = 1;
 export type Editortoken5 = string;
 export type Bytelength = number;
 export type Byteref1 = string;
 export type Bytesha2561 = string;
 export type Code7 = "NO_TEXT" | "IMAGE" | "SHAPE" | "TEXT_BOX" | "UNSUPPORTED_CONTENT";
 export type Column2 = number | null;
-export type Kind108 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
+export type Kind109 = "page" | "paragraph" | "table_cell" | "header" | "footer" | "image" | "pasted";
 export type Page4 = number | null;
 export type Paragraph = number | null;
 export type Part1 = string | null;
@@ -3877,7 +3892,7 @@ export type Expectedactionid1 = string | null;
 export type Allowtextrewrite3 = boolean;
 export type Clientrequestid3 = string;
 export type Effort2 = ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
-export type Kind109 = "start" | "resume" | "cancel";
+export type Kind110 = "start" | "resume" | "cancel";
 export type Lite1 = boolean;
 export type Operationid6 = string | null;
 export type Taskid6 = string | null;
@@ -3892,18 +3907,18 @@ export type Legacyimport = boolean;
 export type Projectmegabytes = number;
 export type Rewritereasoningeffort =
   ("none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra") | null;
-export type Schemaversion27 = 1;
+export type Schemaversion28 = 1;
 export type Selectedfallbackmodel = string | null;
 export type Selectedimportmodel = string | null;
 export type Selectedmodel = string | null;
 export type Selectedrewritemodel = string | null;
 export type Theme = "light" | "dark" | "system";
 export type Editortoken7 = string;
-export type Schemaversion28 = 1;
+export type Schemaversion29 = 1;
 export type Elapsed = number;
 export type Error1 = string | null;
 export type Id112 = string;
-export type Kind110 = "import" | "export" | "rewrite";
+export type Kind111 = "import" | "export" | "rewrite";
 export type Projectid14 = string;
 export type Stage1 = string | null;
 export type Startedat2 = string;
@@ -4532,7 +4547,7 @@ export type Blockid22 = string | null;
 export type Cellid15 = string | null;
 export type End7 = number | null;
 export type Fieldkey11 = string | null;
-export type Recordid19 = string | null;
+export type Recordid21 = string | null;
 export type Start8 = number | null;
 export type Cleanupstatus = "none" | "pending" | "complete" | "failed";
 export type Projectid15 = string;
@@ -4540,7 +4555,7 @@ export type Title11 = string;
 export type Tombstoned = boolean;
 export type Updatedat3 = string;
 export type Entries1 = RegistryEntry[];
-export type Schemaversion29 = 1;
+export type Schemaversion30 = 1;
 export type Baserevision4 = number;
 export type Editortoken8 = string;
 export type Title12 = string;
@@ -4574,7 +4589,7 @@ export type Id113 = string;
 export type Revision62 = number;
 export type Role7 = "header" | "sidebar" | "main";
 export type Revision63 = number;
-export type Schemaversion30 = 1;
+export type Schemaversion31 = 1;
 export type Markdown1 = string;
 export type Clarify = string;
 export type Shorten = string;
@@ -4601,7 +4616,7 @@ export type Baserevision5 = number;
 export type Markdown2 = string;
 export type Clipboardcaptureid1 = string;
 export type Projectid16 = string;
-export type Schemaversion31 = 1;
+export type Schemaversion32 = 1;
 export type Selection1 = ClipboardRangeSelection | ClipboardBlocksSelection;
 export type Bytesbase641 = string;
 export type Id114 = string;
@@ -4622,16 +4637,16 @@ export type Originalhash1 = string;
 export type Packagehash8 = string;
 export type Projectionversion1 = string;
 export type Revision65 = string;
-export type Schemaversion32 = 1;
+export type Schemaversion33 = 1;
 export type Assets5 = TemplateRenderAsset[];
 export type Documenthash4 = string;
 export type Factshash4 = string;
 export type Packagehash9 = string;
 export type Presentationhash3 = string;
 export type Renderinputversion2 = 1;
-export type Schemaversion33 = 1;
-export type Requestid2 = string;
 export type Schemaversion34 = 1;
+export type Requestid2 = string;
+export type Schemaversion35 = 1;
 export type Source3 = string;
 export type Text29 = string;
 export type Mode3 = "structured" | "digest" | "imported";
@@ -4679,6 +4694,8 @@ export interface FoldCVContracts {
   assistant_skill_list_v1: AssistantSkillListV1;
   cli_installation_payload: CliInstallationPayload;
   clipboard_capture_request_v1: ClipboardCaptureRequestV1;
+  date_check_request_v1: DateCheckRequestV1;
+  date_check_result_v1: DateCheckResultV1;
   delete_request_v1: DeleteRequestV1;
   edit_request_v1: EditRequestV1;
   edit_result_v1: EditResultV1;
@@ -5023,9 +5040,11 @@ export interface EditorPlanV1 {
   fonts: Fonts;
   iconFiles?: Iconfiles;
   icons: Icons1;
+  jobOrder?: Joborder;
   jobs?: Jobs;
   offPage?: Offpage;
   offPageFields?: Offpagefields;
+  sortJobs?: Sortjobs;
   styles: Styles;
   technologyLines?: Technologylines;
   technologyTargets?: Technologytargets;
@@ -5083,7 +5102,17 @@ export interface Jobs {
  */
 export interface EditorJob {
   addPeriod?: Addperiod;
+  move?: EditorJobMove | null;
+  outOfOrder?: Outoforder;
+  overlaps?: Overlaps;
   periods: Periods;
+}
+/**
+ * Where a job's card can go by one place in its list (D182); a disabled arrow for the other way.
+ */
+export interface EditorJobMove {
+  down: Down;
+  up: Up;
 }
 export interface Offpagefields {
   [k: string]: string[];
@@ -7654,6 +7683,29 @@ export interface BlockTarget {
   beforeRevision: Beforerevision14;
   blockId: Blockid16;
 }
+/**
+ * The date dialog's values before Save (D182): the job, or none for a new one, and its period fields by dialog key.
+ */
+export interface DateCheckRequestV1 {
+  recordId: Recordid17;
+  values: Values1;
+}
+export interface Values1 {
+  [k: string]: string;
+}
+export interface DateCheckResultV1 {
+  schemaVersion: Schemaversion25;
+  warnings: Warnings3;
+}
+/**
+ * One warning of the date dialog: another job's period it overlaps, or a period whose end is before its start.
+ */
+export interface DateCheckWarningV1 {
+  kind: Kind87;
+  period?: Period2;
+  periodId?: Periodid1;
+  recordId?: Recordid18;
+}
 export interface DeleteRequestV1 {
   confirmed: Confirmed;
 }
@@ -7666,11 +7718,11 @@ export interface TemplateEditPreparationV1 {
   capture: ActionCapture;
   clientMutationId: Clientmutationid3;
   operations: Operations3;
-  schemaVersion: Schemaversion25;
+  schemaVersion: Schemaversion26;
   snapshot: TemplateSnapshotIdentity;
 }
 export interface ReplaceText {
-  kind: Kind87;
+  kind: Kind88;
   opId: Opid;
   range: AuthoredRange;
   styles: InlineStyles;
@@ -7678,7 +7730,7 @@ export interface ReplaceText {
   written?: Written;
 }
 export interface SetMarks {
-  kind: Kind88;
+  kind: Kind89;
   opId: Opid1;
   range: AuthoredRange;
   styles: InlineStyles;
@@ -7686,12 +7738,12 @@ export interface SetMarks {
 export interface SplitBlock {
   beforeRevision: Beforerevision15;
   blockId: Blockid17;
-  kind: Kind89;
+  kind: Kind90;
   offset: Offset1;
   opId: Opid2;
 }
 export interface MergeBlocks {
-  kind: Kind90;
+  kind: Kind91;
   leadingId: Leadingid;
   leadingRevision: Leadingrevision;
   opId: Opid3;
@@ -7701,7 +7753,7 @@ export interface MergeBlocks {
 export interface InsertParagraph {
   contextBlockId: Contextblockid;
   contextRevision: Contextrevision;
-  kind: Kind91;
+  kind: Kind92;
   opId: Opid4;
   placement: AuthoredPlacement;
   text: Text24;
@@ -7711,33 +7763,33 @@ export interface AuthoredPlacement {
   parentId: Parentid6;
 }
 export interface CopyBlocks {
-  kind: Kind92;
+  kind: Kind93;
   opId: Opid5;
   placement: AuthoredPlacement;
   sources: Sources5;
 }
 export interface CopyFragment {
-  kind: Kind93;
+  kind: Kind94;
   opId: Opid6;
   placement: AuthoredPlacement;
   source: AuthoredRange;
 }
 export interface PasteInline {
   destination: AuthoredRange;
-  kind: Kind94;
+  kind: Kind95;
   opId: Opid7;
   source: Source2;
 }
 export interface SameProjectClipboard {
   clipboardCaptureId: Clipboardcaptureid;
-  kind: Kind95;
+  kind: Kind96;
 }
 export interface LiteralPaste {
   content: Content29;
-  kind: Kind96;
+  kind: Kind97;
 }
 export interface PasteBlocks {
-  kind: Kind97;
+  kind: Kind98;
   opId: Opid8;
   placement: AuthoredPlacement;
   source: SameProjectClipboard;
@@ -7745,24 +7797,24 @@ export interface PasteBlocks {
 export interface MoveBlock1 {
   beforeRevision: Beforerevision16;
   blockId: Blockid18;
-  kind: Kind98;
+  kind: Kind99;
   opId: Opid9;
   placement: AuthoredPlacement;
 }
 export interface RemoveOccurrences {
   blocks: Blocks9;
-  kind: Kind99;
+  kind: Kind100;
   opId: Opid10;
 }
 export interface DeleteEntity {
   beforeRevision: Beforerevision17;
-  kind: Kind100;
+  kind: Kind101;
   opId: Opid11;
-  recordId: Recordid17;
+  recordId: Recordid19;
 }
 export interface BuiltinPanel {
   command: RichPanelRequest;
-  kind: Kind101;
+  kind: Kind102;
   opId: Opid12;
   placementContext?: PanelPlacementContext | null;
 }
@@ -7774,12 +7826,12 @@ export interface RichPanelRequest {
   groupId?: Groupid;
   jobId?: Jobid7;
   operation: Operation2;
-  periodId?: Periodid1;
-  recordId?: Recordid18;
+  periodId?: Periodid2;
+  recordId?: Recordid20;
   recordKind?: Recordkind;
-  values?: Values1;
+  values?: Values2;
 }
-export interface Values1 {
+export interface Values2 {
   [k: string]: string;
 }
 export interface PanelPlacementContext {
@@ -7787,7 +7839,7 @@ export interface PanelPlacementContext {
   placement: AuthoredPlacement;
 }
 export interface FormatBlocks {
-  kind: Kind102;
+  kind: Kind103;
   opId: Opid13;
   patch: BlockFormatPatch;
   targets: Targets1;
@@ -7795,7 +7847,7 @@ export interface FormatBlocks {
 export interface ResolveTemplateSync {
   beforeLifecycleId: Beforelifecycleid3;
   beforeRecordHash: Beforerecordhash1;
-  kind: Kind103;
+  kind: Kind104;
   opId: Opid14;
   syncId: Syncid1;
 }
@@ -7806,7 +7858,7 @@ export interface SetLinkTarget {
   beforeRevision: Beforerevision18;
   blockId: Blockid19;
   href: Href3;
-  kind: Kind104;
+  kind: Kind105;
   occurrenceId: Occurrenceid5;
   opId: Opid15;
 }
@@ -7816,7 +7868,7 @@ export interface SetLinkTarget {
 export interface RemoveRange {
   end: RangeEdge;
   join?: RangeJoin | null;
-  kind: Kind105;
+  kind: Kind106;
   opId: Opid16;
   start: RangeEdge;
 }
@@ -7846,7 +7898,7 @@ export interface RangeJoin {
 export interface PasteLines {
   destination: AuthoredRange;
   enter: Enter1;
-  kind: Kind106;
+  kind: Kind107;
   opId: Opid17;
   styles: InlineStyles;
   text: Text26;
@@ -7861,14 +7913,14 @@ export interface AddListItem {
   beforeRevision: Beforerevision20;
   blockId: Blockid21;
   evidence?: Evidence26;
-  kind: Kind107;
+  kind: Kind108;
   opId: Opid18;
   text: Text27;
   written?: Written1;
 }
 export interface ExportCommand {
   editorToken: Editortoken4;
-  schemaVersion: Schemaversion26;
+  schemaVersion: Schemaversion27;
   snapshot: TemplateSnapshotIdentity;
 }
 export interface ExportRetry {
@@ -7895,7 +7947,7 @@ export interface ExtractGap {
 }
 export interface ExtractLocation {
   column?: Column2;
-  kind: Kind108;
+  kind: Kind109;
   page?: Page4;
   paragraph?: Paragraph;
   part?: Part1;
@@ -7925,7 +7977,7 @@ export interface ImportCommand {
   allowTextRewrite?: Allowtextrewrite3;
   clientRequestId?: Clientrequestid3;
   effort?: Effort2;
-  kind: Kind109;
+  kind: Kind110;
   lite?: Lite1;
   operationId?: Operationid6;
   taskId?: Taskid6;
@@ -7937,7 +7989,7 @@ export interface Preferences {
   legacyImport?: Legacyimport;
   projectMegabytes?: Projectmegabytes;
   rewriteReasoningEffort?: Rewritereasoningeffort;
-  schemaVersion: Schemaversion27;
+  schemaVersion: Schemaversion28;
   selectedFallbackModel?: Selectedfallbackmodel;
   selectedImportModel?: Selectedimportmodel;
   selectedModel: Selectedmodel;
@@ -7948,7 +8000,7 @@ export interface ProjectOpenResultV1 {
   editorToken: Editortoken7;
   history: HistoryStateV1;
   response: TemplateProjectResponseV1;
-  schemaVersion: Schemaversion28;
+  schemaVersion: Schemaversion29;
   tasks: Tasks1;
 }
 export interface TaskStatusV1 {
@@ -7956,7 +8008,7 @@ export interface TaskStatusV1 {
   elapsed: Elapsed;
   error: Error1;
   id: Id112;
-  kind: Kind110;
+  kind: Kind111;
   projectId: Projectid14;
   stage: Stage1;
   startedAt: Startedat2;
@@ -7983,12 +8035,12 @@ export interface FindingTargetV1 {
   cellId?: Cellid15;
   end?: End7;
   fieldKey?: Fieldkey11;
-  recordId?: Recordid19;
+  recordId?: Recordid21;
   start?: Start8;
 }
 export interface Registry {
   entries: Entries1;
-  schemaVersion: Schemaversion29;
+  schemaVersion: Schemaversion30;
 }
 export interface RegistryEntry {
   cleanupStatus: Cleanupstatus;
@@ -8027,7 +8079,7 @@ export interface RewritePreviewRequestV1 {
 export interface RichDocumentV1 {
   regions: Regions2;
   revision: Revision63;
-  schemaVersion: Schemaversion30;
+  schemaVersion: Schemaversion31;
 }
 export interface RichRegion {
   blocks: Blocks10;
@@ -8074,7 +8126,7 @@ export interface SaveRulesRequest {
 export interface TemplateClipboardCaptureV1 {
   clipboardCaptureId: Clipboardcaptureid1;
   projectId: Projectid16;
-  schemaVersion: Schemaversion31;
+  schemaVersion: Schemaversion32;
   selection: Selection1;
   sourceSnapshot: TemplateSnapshotIdentity;
 }
@@ -8094,7 +8146,7 @@ export interface TemplatePackage {
   projectionVersion: Projectionversion1;
   recipe: CompiledRecipe;
   revision: Revision65;
-  schemaVersion: Schemaversion32;
+  schemaVersion: Schemaversion33;
 }
 export interface CapturedAsset {
   bytesBase64: Bytesbase641;
@@ -8116,7 +8168,7 @@ export interface TemplateRenderRequestV1 {
   presentationHash: Presentationhash3;
   renderInputVersion: Renderinputversion2;
   renderer: TemplateRendererIdentity;
-  schemaVersion: Schemaversion33;
+  schemaVersion: Schemaversion34;
 }
 /**
  * A rewrite preview: the selected source and the model's text; the document changes only through Apply.
@@ -8124,7 +8176,7 @@ export interface TemplateRenderRequestV1 {
 export interface TemplateRewritePreviewV1 {
   range: AuthoredRange;
   requestId: Requestid2;
-  schemaVersion: Schemaversion34;
+  schemaVersion: Schemaversion35;
   snapshot: TemplateSnapshotIdentity;
   source: Source3;
   text: Text29;

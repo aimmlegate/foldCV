@@ -184,3 +184,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D179 Marks follow who wrote the text; a fact off the page comes back from Facts
 - D180 «Написать заново по резюме» for «О себе»
 - D181 «Написать заново по резюме» for a list: the list replaced whole, two list operations
+- D182 Job order and date warnings in Facts

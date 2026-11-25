@@ -211,6 +211,9 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None, ope
         from .template_panel_groups import add_technology_group, move_to_group, remove_from_group
         if command.operation in FOCUS_OPERATIONS:
             prepared = prepare_focus(workspace, command, allocator, remembered)
+        elif command.operation in {'move_job', 'sort_jobs'}:
+            from .template_panel_jobs import move_job, sort_jobs
+            prepared = move_job(workspace.project, command) if command.operation == 'move_job' else sort_jobs(workspace.project)
         elif command.operation == 'restore':
             from .template_panel_restore import restore
             prepared = restore(workspace, command, allocator, operations)

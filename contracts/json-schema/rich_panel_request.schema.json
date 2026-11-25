@@ -244,7 +244,9 @@
         "move_focus",
         "set_focus_icon",
         "add_technology_group",
-        "restore"
+        "restore",
+        "move_job",
+        "sort_jobs"
       ],
       "title": "Operation",
       "type": "string"

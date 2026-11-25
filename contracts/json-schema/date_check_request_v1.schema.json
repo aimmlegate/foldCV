@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The date dialog's values before Save (D182): the job, or none for a new one, and its period fields by dialog key.",
+  "properties": {
+    "recordId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Recordid"
+    },
+    "values": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 150,
+      "title": "Values",
+      "type": "object"
+    }
+  },
+  "required": [
+    "recordId",
+    "values"
+  ],
+  "title": "DateCheckRequestV1",
+  "type": "object"
+}

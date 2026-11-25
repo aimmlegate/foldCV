@@ -267,8 +267,9 @@ def _recency(record):
     return max(dates, default=None)
 
 
-def _by_date(before, shown, record):
-    """The block a new job follows: the last one newer than it, as the import orders jobs. A job without dates goes last."""
+def _by_date(before, shown, record, siblings):
+    """The block a new job follows: the one right before the first older card, as the import orders jobs. A job without
+    dates goes last. `siblings` are the region's blocks, for a first card with no view title above it."""
     key = _recency(record)
     records = {value.id: value for value in before.facts.records if value.kind == 'employment'}
     after = shown[-1].id
@@ -277,8 +278,11 @@ def _by_date(before, shown, record):
     for previous, block in zip([None, *shown], shown):
         other = records.get(getattr(block.props, 'record_id', None))
         known = _recency(other) if other is not None else None
-        if known is not None and known < key and previous is not None:
-            return previous.id
+        if known is not None and known < key:
+            if previous is not None:
+                return previous.id
+            index = [value.id for value in siblings].index(block.id)
+            return siblings[index - 1].id if index else None
     return after
 
 
@@ -309,7 +313,7 @@ def create_employment(workspace, operation, allocator):
             'employment region missing')
         shown = [block for block in region.blocks if block.presentation is not None and block.presentation.view_key == view.id]
         if shown:
-            parent, after = region.id, _by_date(before, shown, record)
+            parent, after = region.id, _by_date(before, shown, record, region.blocks)
     else:
         parent, after = operation.placement_context.placement.parent_id, operation.placement_context.placement.after_id
         cursor, seen = parent, set()

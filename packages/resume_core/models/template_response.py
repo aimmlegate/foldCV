@@ -78,12 +78,24 @@ class EditorFocusPanel(Wire):
     full: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
+class EditorJobMove(Wire):
+    """Where a job's card can go by one place in its list (D182); a disabled arrow for the other way."""
+    up: bool
+    down: bool
+
+
 class EditorJob(Wire):
     """One job in the facts panel."""
     # Each period as the document writes it.
     periods: list[str]
     # A new period has a place in the document; a job in a compressed list has none.
     add_period: bool = Field(default=False, exclude_if=lambda value: not value)
+    # D182: the arrows of a job with one card on the page; absent for a job off the page or in a compact list.
+    move: EditorJobMove | None = Field(default=None, exclude_if=lambda value: value is None)
+    # The nearest dated card above this job's card is older (D182, «Стоит не по дате»).
+    out_of_order: bool = Field(default=False, exclude_if=lambda value: not value)
+    # The other jobs whose periods overlap this job's, in row order (D182, «Пересекается с …»).
+    overlaps: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class EditorPlanV1(Wire):
@@ -112,6 +124,10 @@ class EditorPlanV1(Wire):
         exclude_if=lambda value: not value)
     # A skill group of the user's own can follow the last one, under a title of its own (D136).
     add_technology_group: bool = Field(default=False, exclude_if=lambda value: not value)
+    # D182: the Facts rows of jobs in the page's reading order, then the jobs off the page in record order.
+    job_order: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # A job card stands out of date order, so «Расставить по дате» has something to do.
+    sort_jobs: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):
