@@ -157,6 +157,12 @@ and no shown value rests on it. A word counts as the import counts it (three
         order = {identifier: index for index, identifier in enumerate(records)}
         lost_lines = [line for identifier in sorted(off_page(project), key=lambda identifier: order[identifier])
             for line in record_lines(project, records[identifier], units)]
+        # D181: an item that a list written again removed keeps its record, inactive, with its evidence; its lines are
+        # red as removed until Undo makes the record active again.
+        from .block_write import LIST_BLOCKS
+        lost_lines += [line for record in project.facts.extensions
+            if not record.active and record.semantic_type.split(':')[-1] in LIST_BLOCKS
+            for line in record_lines(project, record, units)]
         cut = set(off_fields(project, named_records(project.document)))
         gone = {' '.join(line.split()) for line in lost_lines}
         gone |= {' '.join(line.split()) for identifier in cut for line in record_lines(project, records[identifier], units)}

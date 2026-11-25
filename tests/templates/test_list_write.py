@@ -250,3 +250,37 @@ def test_the_stand_answers_the_list_request(imported, instruction, states):
     result = serve_synthetic.ScriptedContent().write_again(request, None)
     _present, added = W.list_values(source, result.value.payload)
     assert [item.state for item in added] == states
+
+
+HEADING = 'Опыт работы'     # a line the page does not show (the map hides it); its words count
+
+
+def resting_on_contact(workspace):
+    """The list's first item says a line word for word that no other shown value rests on (the page hides it)."""
+    from packages.resume_core.importing.lite.lines import CV
+    from packages.resume_core.models.template_facts import SourceSpan
+    value = workspace.model_copy(deep=True)
+    record_id = section_of(value).children[0].content[0].record_id
+    record = next(item for item in value.project.facts.extensions if item.id == record_id)
+    line = next(line for line in CV(value.project.sources).lines if ' '.join(line.text.split()) == HEADING)
+    record.cells[0] = record.cells[0].model_copy(update={'evidence': [SourceSpan.model_validate(line.span.model_dump(mode='json', by_alias=True))],
+        'raw_input': HEADING, 'typed_value': HEADING})
+    bullet = section_of(value).children[0]
+    bullet.content[0] = bullet.content[0].model_copy(update={'text': HEADING})
+    return value
+
+
+def test_l11_the_lines_of_a_removed_item_are_red_as_removed_until_undo(tmp_path):
+    with Stand(tmp_path, Writing(items((ROLE, ['S12']))), resting_on_contact) as stand:
+        removed = lambda: [row for row in stand.client.get('/v2/projects/' + stand.project + '/source-diff').json()['removed']
+                           if row['text'] == HEADING]
+        # While the item shows, the page shows its line's words: no row.
+        assert removed() == []
+        shown = stand.preview()
+        applied = stand.apply(shown, [value['recordId'] for value in shown['values']], take(shown))
+        assert removed() == [{'text': HEADING, 'words': None, 'reason': 'removed'}]
+        # A removed item's line that a shown value rests on is not marked whole (G5): the job card still shows it.
+        rows = stand.client.get('/v2/projects/' + stand.project + '/source-diff').json()['removed']
+        assert not [row for row in rows if row['text'] == 'Перевела расчёты с Oracle на PostgreSQL']
+        stand.editor.step('undo', 'list-undo', expected=applied['history']['undo']['actionId'])
+        assert removed() == []
