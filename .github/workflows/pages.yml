@@ -31,5 +31,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
+      # GitHub sometimes lists the uploaded artifact some seconds after the upload ends; the deploy then finds none.
+      - run: sleep 20
       - id: deployment
         uses: actions/deploy-pages@v5
