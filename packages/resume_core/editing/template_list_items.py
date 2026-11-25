@@ -23,7 +23,7 @@ def item_bullets(project, section):
         if child.type != 'bullet_list' or len(spans) != 1 or len(content) != 1 or child.children:
             continue
         record = extensions.get(spans[0].record_id)
-        if record is not None and len(record.cells) == 1 and spans[0].cell_id == record.cells[0].id:
+        if record is not None and len(record.cells) == 1 and getattr(spans[0], 'cell_id', None) == record.cells[0].id:
             found.append((child, record))
     return found
 

@@ -86,8 +86,8 @@ def _read(service, project_id, payload):
                     raise ProjectFailure('V7_INPUT_REJECTED', 422)
                 # The list block's hash sees a change of its structure too: a bullet typed, moved or removed.
                 section = next(block for block in workspace.project.document.blocks() if block.id == payload.block_id)
-                ops = [UpdateFactOp(op='update_fact', recordId=item.record_id, field=item.field, value=item.text)
-                       for item in listed.items]
+                ops = [UpdateFactOp.model_validate({'op': 'update_fact', 'recordId': item.record_id, 'field': item.field,
+                       'value': item.text}) for item in listed.items]
                 return listed, {**touched(workspace, ops), payload.block_id: _hash(section)}
             targets = [source.target]
         else:

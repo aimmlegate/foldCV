@@ -248,7 +248,10 @@ def list_workspace(workspace, block_id, removed, added, hidden, *, action_id, oc
     if any(ref not in sent for item in added for ref in item.lines):
         raise ValueError('an item rests on a line that was not sent')
     chain = Chain(workspace, action_id=action_id, occupied=occupied, response_for=response_for)
-    children = [child.id for child in find_block(workspace, block_id).children]
+    block = find_block(workspace, block_id)
+    if block is None:
+        raise ValueError('the list block is gone')
+    children = [child.id for child in block.children]
     gone = [present[record].bullet_id for record in removed]
     first = min((children.index(bullet) for bullet in gone), default=None)
     after = (children[first - 1] if first else None) if first is not None else present[source.items[-1].record_id].bullet_id
