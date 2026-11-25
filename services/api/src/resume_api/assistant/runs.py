@@ -120,12 +120,12 @@ class ResumeScope:
 
 
 class AssistantService:
-    def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0, scope=None, root=None):
+    def __init__(self, projects, runtime, connection, *, fetcher=None, wait_seconds=15.0):
         self.projects, self.runtime, self.connection = projects, runtime, connection
-        self.scope = scope or ResumeScope()
+        self.scope = ResumeScope()
         # The runtime of a model's provider (D119); without it every model runs on `runtime`.
         self.runtime_for = lambda _model: self.runtime
-        root = self.root = Path(root if root is not None else projects.repository.root)
+        root = self.root = Path(projects.repository.root)
         self.store = self.scope.store(root)
         self.settings = AgentSettingsStore(root)
         self._fetcher = fetcher

@@ -73,7 +73,7 @@ class HostConnections:
         self.sign_in_log = rules_store.root / "logs" / LOG_NAME
         self.release_lookups: dict[str, asyncio.Task] = {}
         self.enabled = set()
-        self.intake = self.rewrite = self.projects = self.assistant = self.template_assistant = None
+        self.intake = self.rewrite = self.projects = self.assistant = None
         self.wall = wall
         # The last quota a provider's calls sent, with its time (Claude's windows, T9): only shown, never a gate. The
         # calls report from their worker threads.
@@ -431,7 +431,6 @@ class HostConnections:
                 # An import may use both providers, so a new sign-in, sign-out or CLI on either stops all model work
                 # (D119). The job's thread starts after this, and its exclusive permit then waits for that work to end.
                 self.assistant.stop_all()
-                self.template_assistant.stop_all()
                 self.rewrite.request_shutdown()
                 self.projects.imports.stop_all()
                 if job == "install":
@@ -700,7 +699,6 @@ class HostConnections:
             self.rewrite.request_shutdown()
             self.projects.imports.stop_all()
             self.assistant.stop_all()
-            self.template_assistant.stop_all()
         codes = await asyncio.gather(*(self.stop_connection(task, files, cancel) for task, files, cancel in current))
         try:
             await self.intake.shutdown()
@@ -732,7 +730,6 @@ class HostConnections:
             self.connection_epoch += 1
             self.epochs[kind] += 1
             self.assistant.stop_all()
-            self.template_assistant.stop_all()
             self.states[kind] = ProviderState(state="login_required", version=self.states[kind].version)
             files, cancel = self.connection_work[current]
         code = await self.stop_connection(current, files, cancel)

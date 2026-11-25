@@ -99,7 +99,6 @@
  "services/api/src/resume_api/assistant/context.py": 3,
  "services/api/src/resume_api/assistant/proposals.py": 14,
  "services/api/src/resume_api/assistant/runs.py": 22,
- "services/api/src/resume_api/assistant/template_tools.py": 6,
  "services/api/src/resume_api/assistant/tools.py": 11,
  "services/api/src/resume_api/cli/process_runner.py": 8,
  "services/api/src/resume_api/desktop.py": 1,
