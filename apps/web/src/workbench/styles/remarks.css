@@ -61,6 +61,20 @@
 .reword-panel .reword-mode input { flex: none; width: auto; margin: 2px 0 0; }
 .reword-panel .reword-mode span { display: grid; flex: 1; gap: 1px; }
 .reword-panel .reword-mode small { color: var(--muted); font-size: 12px; }
+/* A list written again (F6b, sketch L1): «Было» with «оставить», «Станет» with a tick and an editable text per item. */
+.reword-panel .reword-list { gap: 12px; }
+.reword-panel .reword-list-part { display: grid; gap: 6px; }
+.reword-panel .reword-list-head { display: flex; justify-content: space-between; align-items: baseline; }
+.reword-panel .reword-list-head h3 { margin: 0; font-size: 12px; }
+.reword-panel .reword-list-head span { color: var(--muted); font-size: 12px; }
+.reword-panel .reword-list-row { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 13px; cursor: pointer; }
+.reword-panel .reword-list-row input[type="checkbox"] { flex: none; width: auto; margin: 3px 0 0; }
+.reword-panel .reword-list-text { flex: 1; }
+.reword-panel .reword-list-row[data-gone] .reword-list-text { color: var(--muted); text-decoration: line-through; }
+.reword-panel .reword-list-new textarea { flex: 1; min-height: 0; resize: vertical; font-size: 13px; }
+.reword-panel .reword-list-row[data-skipped] textarea { opacity: .55; }
+.reword-panel .reword-list-refused { color: var(--muted); font-size: 12px; }
+.reword-panel .reword-list-refused p { margin: 4px 0 0; }
 /* A text written again is one value: «Было» and «Станет» are shown, as in the sketch. */
 .reword-panel[data-mode="write"] .reword-value:not(.reword-refused) :is(.rewrite-before h3, .rewrite-result label) { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
 

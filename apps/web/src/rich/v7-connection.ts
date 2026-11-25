@@ -1,4 +1,4 @@
-import type { RewordBlocks, RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
+import type { ListApply, RewordBlocks, RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
 /** What a «Принять» names: the cell of a word mark or a line of a block mark. */
 export type AcceptTarget = { cellId: string } | { blockId: string };
 import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
@@ -160,9 +160,11 @@ export class ProjectEditorConnection {
   }
 
   /** The user's Apply of a reworded block: the kept values become fact updates, one undo action. */
-  async rewordApply(clientMutationId: string, blockId: string, changes: RewordChange[], touched: Record<string, string>): Promise<EditResult> {
+  async rewordApply(clientMutationId: string, blockId: string, changes: RewordChange[], touched: Record<string, string>,
+    list?: ListApply): Promise<EditResult> {
     return this.adopt(await this.editing(token => v2Request<EditResult>(this.path("/reword/apply"), "POST",
-      { editorToken: token, clientMutationId, blockId, changes, touched }, this.fetcher), true));
+      { editorToken: token, clientMutationId, blockId, changes, touched, ...(list ? { removed: list.removed, added: list.added } : {}) },
+      this.fetcher), true));
   }
 
   async capture(clientCaptureId: string, snapshot: Snapshot, selection: Selection): Promise<{ clipboardCaptureId: string }> {

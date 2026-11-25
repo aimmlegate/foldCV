@@ -1,4 +1,4 @@
-import type { RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
+import type { ListApply, RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
 import { selectedFragmentToHTML, type BlockNoteEditor } from "@blocknote/core";
 import { Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
@@ -354,7 +354,7 @@ export class TemplateEditorSession {
 
   /** The user's Apply of a reworded block, as an assistant proposal is applied: input locks, the editor shows Python's
    * committed result, one undo action takes it back. */
-  async applyReword(blockId: string, changes: RewordChange[], touched: Record<string, string>): Promise<EditResult> {
+  async applyReword(blockId: string, changes: RewordChange[], touched: Record<string, string>, list?: ListApply): Promise<EditResult> {
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();
     this.panelBusy = true;
@@ -363,11 +363,11 @@ export class TemplateEditorSession {
       this.boundary();
       const mutationId = crypto.randomUUID();
       let result: EditResult;
-      try { result = await this.connection.rewordApply(mutationId, blockId, changes, touched); }
+      try { result = await this.connection.rewordApply(mutationId, blockId, changes, touched, list); }
       catch (error) {
         if (error instanceof ProjectApiFailure && error.code === "EDITOR_REPLACED") { this.setMode("read_only"); throw error; }
         if (error instanceof ProjectApiFailure && error.code !== "EDITOR_TOKEN_UNKNOWN") throw error;
-        result = await this.connection.rewordApply(mutationId, blockId, changes, touched);
+        result = await this.connection.rewordApply(mutationId, blockId, changes, touched, list);
       }
       this.queue.template.adoptDurable(result.response);
       await this.reproject();

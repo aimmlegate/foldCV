@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ProjectEditorConnection, type EditResult, type Fetcher } from "../src/rich/v7-connection";
-import { REWORD_MODES, instructionFor, kindLabel, refusalLabel, writeNote, type RewordPreview, type RewordValue } from "../src/workbench/editor/reword";
+import { REWORD_MODES, instructionFor, kindLabel, listApply, listDraft, listNote, refusalLabel, writeNote, type RewordPreview, type RewordValue } from "../src/workbench/editor/reword";
 
 const value = (reason: string | null, words: string[]): RewordValue => ({ id: "V1", recordId: "record-1", field: "value", kind: "tasks",
   before: "Было", after: "Стало", state: "refused", reason, words, source: [] });
@@ -37,6 +37,10 @@ test("the preview and the Apply of a reworded block go with this page's token, a
   // «Написать заново по резюме» names its action; the reword sends none, as before.
   await connection.rewordPreview("request-2", "block-1", "Коротко.", "write");
   assert.deepEqual(sent.at(-1)?.body, { editorToken: "token-1", requestId: "request-2", blockId: "block-1", instruction: "Коротко.", mode: "write" });
+  // A list's Apply sends the items that go and come.
+  await connection.rewordApply("mutation-0", "block-1", [], { "block-1": "h" }, { removed: ["record-1"], added: [{ text: "Новый", lines: ["S2"], edited: false }] });
+  assert.deepEqual(sent.at(-1)?.body, { editorToken: "token-1", clientMutationId: "mutation-0", blockId: "block-1", changes: [],
+    touched: { "block-1": "h" }, removed: ["record-1"], added: [{ text: "Новый", lines: ["S2"], edited: false }] });
   const result: EditResult = await connection.rewordApply("mutation-1", "block-1", [{ recordId: "record-1", field: "value", value: "Стало", edited: false }], preview.touched);
   assert.deepEqual(sent.at(-1)?.body, { editorToken: "token-1", clientMutationId: "mutation-1", blockId: "block-1",
     changes: [{ recordId: "record-1", field: "value", value: "Стало", edited: false }], touched: { "record-1": "hash" } });
@@ -67,4 +71,26 @@ test("a written text that code refused is named against the CV; a reply with no 
   assert.equal(writeNote(preview("same", null, null)), "Модель вернула прежний текст.");
   assert.equal(writeNote(preview("refused", "name", "Текст")), null);
   assert.equal(writeNote(preview("changed", null, "Текст")), null);
+});
+
+test("a list written again (F6b): «оставить» starts on for the user's own item, the Apply names what goes and what comes", () => {
+  const present = (id: string, keep = false): RewordValue => ({ id, recordId: "record-" + id, field: "text", kind: "items", before: "Было " + id,
+    after: null, state: "present", reason: null, words: [], source: [], ...(keep ? { keep } : {}) });
+  const item = (id: string, state: "added" | "refused" = "added") => ({ id, text: "Новый " + id, lines: ["S2"], source: [], state, reason: null, words: [] });
+  const preview: RewordPreview = { requestId: "r", blockId: "list", touched: {}, mode: "write", shape: "items",
+    values: [present("P1"), present("P2", true), present("P3")], added: [item("N1"), item("N2"), item("N3", "refused")] };
+  const draft = listDraft(preview);
+  assert.deepEqual([...draft.keep], ["record-P2"]);
+  assert.deepEqual(listApply(preview, draft), { removed: ["record-P1", "record-P3"], ready: true,
+    added: [{ text: "Новый N1", lines: ["S2"], edited: false }, { text: "Новый N2", lines: ["S2"], edited: false }] });
+  // An unticked new item does not come; an edited one is the user's.
+  const changed = { ...draft, skipped: new Set(["N2"]), texts: { N1: "Новый N1 сама" } };
+  assert.deepEqual(listApply(preview, changed).added, [{ text: "Новый N1 сама", lines: ["S2"], edited: true }]);
+  // Nothing changes, or the list would be empty: no Apply.
+  assert.equal(listApply(preview, { ...draft, keep: new Set(["record-P1", "record-P2", "record-P3"]), skipped: new Set(["N1", "N2"]) }).ready, false);
+  assert.equal(listApply(preview, { ...draft, keep: new Set(), skipped: new Set(["N1", "N2"]) }).ready, false);
+  assert.equal(listNote(preview), null);
+  assert.equal(listNote({ ...preview, added: [] }), "Модель не написала пунктов. Измените запрос и попробуйте ещё раз.");
+  assert.equal(listNote({ ...preview, added: [item("N1", "refused")] }), "Ни один пункт не прошёл проверку.");
+  assert.equal(refusalLabel({ reason: "duplicate", words: [] }, "write"), "такой пункт уже есть");
 });

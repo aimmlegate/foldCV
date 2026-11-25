@@ -26,7 +26,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { refusalDue } from "../workbench/editor/refusal-notice";
 import { LinkTargetDialog } from "../workbench/editor/LinkTargetDialog";
 import { BlockRewordButton, BlockRewritePanel } from "../workbench/editor/BlockReword";
-import { rewordTarget, type RewordChange, type RewordMode, type RewordPreview } from "../workbench/editor/reword";
+import { rewordTarget, type ListApply, type RewordChange, type RewordMode, type RewordPreview } from "../workbench/editor/reword";
 import { RewriteRequests, type RewriteActivity } from "./rewrite-progress";
 import type { PanelCommand } from "./v7-panel";
 import { Toolbar, type ToolbarCommand } from "../workbench/editor/Toolbar";
@@ -397,12 +397,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     setRewordShown(blockId); setRewordPreview(null); setRewordError(""); setRewordOpen(true);
   }
   function submitReword() { setRewordError(""); void rewords.submit(); }
-  async function applyReword(changes: RewordChange[]) {
-    if (!rewordPreview || changes.length === 0) return;
+  async function applyReword(changes: RewordChange[], list?: ListApply) {
+    if (!rewordPreview || (changes.length === 0 && !list)) return;
     setRewordError("");
     setRewordActivity({ actionId: rewordPreview.requestId, stage: "applying", startedAt: Date.now(), finishedAt: null, detail: null });
     try {
-      const result = await session.applyReword(rewordBlock.current, changes, rewordPreview.touched);
+      const result = await session.applyReword(rewordBlock.current, changes, rewordPreview.touched, list);
       setRewordOpen(false); setRewordPreview(null); editor.focus();
       showChanges(result.changedBlockIds);
     } catch (error) { setRewordError(error instanceof ProjectApiFailure ? error.code : error instanceof Error ? error.message : "INVALID_RESULT"); }
@@ -537,7 +537,8 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     <BlockRewordButton host={paperScroll} blockIds={locked || rewordOpen || rewriteOpen || dragging || selecting ? noBlocks : rewordIds}
       open={openReword} />
     <BlockRewritePanel open={rewordOpen} close={() => setRewordOpen(false)} instruction={rewordInstruction} change={setRewordInstruction}
-      rules={rewordRules[rewordShown] ?? ""} submit={submitReword} apply={changes => void applyReword(changes)} preview={rewordPreview} busy={rewordActivity !== null}
+      rules={rewordRules[rewordShown] ?? ""} submit={submitReword} apply={changes => void applyReword(changes)}
+      applyList={body => void applyReword([], { removed: body.removed, added: body.added })} preview={rewordPreview} busy={rewordActivity !== null}
       error={rewordError} activity={rewordActivity} cancel={id => { void rewords.cancel(id); }} anchor={rewordAnchor}
       writable={rewordWrite.has(rewordShown)} mode={rewordWrite.has(rewordShown) ? rewordMode : "reword"} setMode={setRewordMode} />
     <RewritePanel open={rewriteOpen} close={() => setRewriteOpen(false)} instruction={instruction} change={setInstruction}

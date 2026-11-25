@@ -4,8 +4,8 @@ import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { RewriteOptions, useRewriteSettings } from "./RewriteOptions";
 import { RewriteComparison, RewriteProgress, useFloatingPanel, useRewritePresets } from "./RewritePanel";
-import { REWORD_MODES, instructionFor, kindLabel, refusalLabel, rewordTarget, valueLimit, writeNote, type RewordChange, type RewordMode, type RewordPreview,
-  type RewordValue } from "./reword";
+import { REWORD_MODES, instructionFor, kindLabel, listApply, listDraft, listNote, refusalLabel, rewordTarget, valueLimit, writeNote,
+  type ListApply, type ListDraft, type RewordChange, type RewordMode, type RewordPreview, type RewordValue } from "./reword";
 
 type Shown = { blockId: string; right: number; top: number };
 
@@ -58,17 +58,22 @@ type Draft = { requestId: string; texts: Record<string, string>; skipped: Readon
  * reads and edits it. Nothing changes until «Применить», and only the values left ticked are sent. A block the CV can
  * write again (`writable`) gets a switch between «Изменить формулировку» and «Написать заново по резюме». */
 export function BlockRewritePanel({ open, close, instruction, change, rules, submit, apply, preview, busy, error, activity, cancel, anchor,
-  writable = false, mode = "reword", setMode = () => {} }: {
+  writable = false, mode = "reword", setMode = () => {}, applyList = () => {} }: {
   open: boolean; close: () => void; instruction: string; change: (value: string) => void; rules: string; submit: () => void;
   apply: (changes: RewordChange[]) => void; preview: RewordPreview | null; busy: boolean; error: string;
   activity: RewriteActivity | null; cancel: (id: string) => void; anchor: { left: number; top: number; bottom: number } | null;
-  writable?: boolean; mode?: RewordMode; setMode?: (mode: RewordMode) => void;
+  writable?: boolean; mode?: RewordMode; setMode?: (mode: RewordMode) => void; applyList?: (body: ListApply) => void;
 }) {
   const dialog = useRef<HTMLElement>(null);
   const presets = useRewritePresets(open), settings = useRewriteSettings(open);
   // The request field takes the focus, so Escape closes the panel and the keys go to it, not to the page behind.
   const returnFocus = useFloatingPanel(dialog, open, anchor, true, close);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [listed, setListed] = useState<ListDraft | null>(null);
+  // A list written again (F6b, sketch L1): «Было» with «оставить», «Станет» with a tick and an editable text per item.
+  const list = preview?.shape === "items" ? preview : null;
+  const listNow = list ? (listed?.requestId === list.requestId ? listed : listDraft(list)) : null;
+  const listBody = list && listNow ? listApply(list, listNow) : null;
   // A new preview starts from the model's texts with every changed value ticked.
   const current = preview && draft?.requestId === preview.requestId ? draft
     : preview ? { requestId: preview.requestId, texts: {}, skipped: new Set<string>() } : null;
@@ -99,13 +104,42 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); returnFocus.current?.focus(); }
       else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing && !busy) {
         event.preventDefault();
-        if (preview && !(event.target instanceof HTMLTextAreaElement && event.target.id === "uir-reword-instruction")) { if (chosen.length) send(); }
+        if (preview && !(event.target instanceof HTMLTextAreaElement && event.target.id === "uir-reword-instruction")) {
+          if (listBody) { if (listBody.ready) applyList(listBody); } else if (chosen.length) send();
+        }
         else if (asked) submit();
       }
     }}>
     <div className="dialog-heading"><div><h2 id="uir-reword-title">Переписать блок</h2></div>
       <button className="icon" aria-label={busy ? "Скрыть" : "Закрыть"} onClick={close}><Icon name="close" /></button></div>
-    {preview && current ? <>
+    {list && listNow && listBody ? <>
+      {listNote(list) && <p className="reword-note">{listNote(list)}</p>}
+      <div className="reword-values reword-list">
+        <section className="reword-list-part"><div className="reword-list-head"><h3>Было</h3><span>оставить</span></div>
+          {list.values.map(value => <label key={value.id} className="reword-list-row" data-gone={!listNow.keep.has(value.recordId) || undefined}>
+            <span className="reword-list-text">{value.before}</span>
+            <input type="checkbox" aria-label="Оставить пункт" checked={listNow.keep.has(value.recordId)} disabled={busy} onChange={event => {
+              const keep = new Set(listNow.keep); if (event.currentTarget.checked) keep.add(value.recordId); else keep.delete(value.recordId);
+              setListed({ ...listNow, keep }); }} /></label>)}
+        </section>
+        {(list.added ?? []).some(item => item.state === "added") && <section className="reword-list-part"><div className="reword-list-head"><h3>Станет</h3></div>
+          {(list.added ?? []).filter(item => item.state === "added").map(item => <div key={item.id} className="reword-list-row reword-list-new"
+            data-skipped={listNow.skipped.has(item.id) || undefined}>
+            <input type="checkbox" aria-label="Взять пункт" checked={!listNow.skipped.has(item.id)} disabled={busy} onChange={event => {
+              const skipped = new Set(listNow.skipped); if (event.currentTarget.checked) skipped.delete(item.id); else skipped.add(item.id);
+              setListed({ ...listNow, skipped }); }} />
+            <textarea rows={2} maxLength={valueLimit} aria-label="Новый пункт" disabled={busy || listNow.skipped.has(item.id)}
+              value={listNow.texts[item.id] ?? item.text} onChange={event => setListed({ ...listNow, texts: { ...listNow.texts, [item.id]: event.currentTarget.value } })} />
+          </div>)}
+        </section>}
+        {(list.added ?? []).some(item => item.state === "refused") && <details className="reword-list-refused">
+          <summary>Не принято: {(list.added ?? []).filter(item => item.state === "refused").length}</summary>
+          {(list.added ?? []).filter(item => item.state === "refused").map(item => <p key={item.id}>
+            <span className="reword-list-text">{item.text}</span> — {refusalLabel(item, "write")}</p>)}
+        </details>}
+      </div>
+      <details className="rewrite-adjust"><summary>Изменить инструкцию</summary>{fields}</details>
+    </> : preview && current ? <>
       {changed.length === 0 && shownMode === "write" && writeNote(preview) && <p className="reword-note">{writeNote(preview)}</p>}
       {changed.length === 0 && shownMode !== "write" && <p className="reword-note">{refused.length ? "Ни одно предложение модели не прошло проверку."
         : "Модель не предложила изменений: текст уже соответствует запросу."}</p>}
@@ -129,7 +163,10 @@ export function BlockRewritePanel({ open, close, instruction, change, rules, sub
     </> : fields}
     <RewriteProgress error={error} busy={busy} activity={activity} cancel={cancel} checking={settings.checking && !preview} />
     <div className="rewrite-actions">
-      {preview ? (shownMode === "write" && changed.length === 0 ? null : <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={chosen.length === 0} onClick={send}>
+      {listBody ? (list && listNote(list) && !(list.added ?? []).some(item => item.state === "added") ? null
+          : <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={!listBody.ready} onClick={() => applyList(listBody)}>
+            {`Применить: −${listBody.removed.length} +${listBody.added.length}`}<Icon name="check" /></Button>)
+        : preview ? (shownMode === "write" && changed.length === 0 ? null : <Button variant="primary" busy={busy} busyLabel="Применяем…" disabled={chosen.length === 0} onClick={send}>
           {shownMode === "write" ? "Применить" : `Применить (${chosen.length})`}<Icon name="check" /></Button>)
         : <Button variant="primary" busy={busy} busyLabel={writing ? "Пишем…" : "Готовим вариант…"} disabled={settings.checking || !asked} onClick={submit}>
           {writing ? "Написать" : "Переписать"}<Icon name="spark" /></Button>}
