@@ -185,3 +185,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D180 «Написать заново по резюме» for «О себе»
 - D181 «Написать заново по резюме» for a list: the list replaced whole, two list operations
 - D182 Job order and date warnings in Facts
+- D183 The template assistant is removed

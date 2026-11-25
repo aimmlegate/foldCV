@@ -68,7 +68,7 @@ Development only (not distributed):
 - Tests build their PDF fixtures with PyMuPDF's drawing API at run time: `tests/extract/test_parser.py` (an AES-256
   encrypted file; the page-limit case lowers `MAX_PAGES` to 2 on `mixed-columns.pdf`; the malformed case is a file
   without `%%EOF`, refused before the library), `tests/extract/test_structure.py` (`insert_text` rows in `helv`/`hebo`,
-  two columns on one baseline, overlapping text plus a rotated string in one fixture), `tests/extract/test_sample_summary.py`
+  two columns on one baseline, overlapping text plus a rotated string in one fixture), `tests/extract/test_sample_summary.py` (removed with the template assistant, D183)
   (a two-column sample asserting bold and the exact sizes 20, 9 and 11, inserted images);
   `tests/render/test_captured_conversion.py` (slow) reads the LibreOffice-converted PDF with it. The only stored PDF
   fixture is `tests/fixtures/synthetic/import/mixed-columns.pdf`, also used by `tests/service/test_extract_worker.py`
