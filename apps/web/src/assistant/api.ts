@@ -28,9 +28,8 @@ export function saveAssistantSettings(value: AgentSettingsRequest, fetcher: Fetc
 
 export class AssistantApi {
   readonly prefix: string;
-  /** `prefix` serves another scope on the same handlers: the template assistant (D141). */
-  constructor(readonly projectId: string, private readonly fetcher: Fetcher = defaultFetch, prefix?: string) {
-    this.prefix = prefix ?? `/v2/projects/${encodeURIComponent(projectId)}/assistant`;
+  constructor(readonly projectId: string, private readonly fetcher: Fetcher = defaultFetch) {
+    this.prefix = `/v2/projects/${encodeURIComponent(projectId)}/assistant`;
   }
   private request<T>(tail: string, method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
     const fetcher: Fetcher = signal ? (input, init) => this.fetcher(input, { ...init, signal }) : this.fetcher;

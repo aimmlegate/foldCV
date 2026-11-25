@@ -10,24 +10,21 @@ import { deliverFile, deliveryMessage, type Delivery } from "../files/delivery";
 import { checkTemplateConfig, createTemplate, deleteTemplate, problemLine, problemTab, readTemplateCatalog, readTemplateConfig, resetTemplateConfig,
   saveTemplateConfig, sectionNotes, sectionTab, sectionTabs, setDefaultTemplate, topLevelSections, withState, type SectionTab, type TemplateConfigState,
   type TemplateProblem, type TemplateSave } from "./config";
-import { downloadName, draftLabel, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
+import { downloadName, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type MenuAction, type ShownTemplate } from "./studio";
 import { TemplateToolbar } from "./TemplateToolbar";
 import type { YamlEditorHandle } from "./YamlEditor";
-import type { TemplateProposal } from "../../assistant/template";
-import { applyProposal, type ApplyOutcome } from "./apply";
-import { TemplateAssistant, type TemplateContext } from "./TemplateAssistant";
 import { TemplateBranding } from "./TemplateBranding";
 
 const YamlEditor = lazy(() => import("./YamlEditor"));
-type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | "applying" | null;
+type Work = "loading" | "checking" | "saving" | "resetting" | "defaulting" | "adding" | "deleting" | null;
 type Outcome = "checked" | "saved" | "branded" | "reset" | "default" | "added" | "deleted" | null;
 // Work the toolbar buttons do not show themselves goes to the status line.
 const progress: Partial<Record<Exclude<Work, null>, string>> = { loading: "Загружаем шаблон", resetting: "Возвращаем встроенный шаблон",
-  defaulting: "Делаем шаблон основным", adding: "Добавляем копию", deleting: "Удаляем шаблон", applying: "Применяем предложение" };
+  defaulting: "Делаем шаблон основным", adding: "Добавляем копию", deleting: "Удаляем шаблон" };
 
-/** The templates screen: the list, the YAML of the shown template and the template assistant. New imports use these
- * templates; existing resumes keep their own captured version. */
-export default function TemplatesScreen({ open, settings }: { open: boolean; settings: () => void }) {
+/** The templates screen: the list and the YAML of the shown template. New imports use these templates; existing resumes
+ * keep their own captured version. */
+export default function TemplatesScreen() {
   const [catalog, setCatalog] = useState<TemplateCatalog | null>(null);
   const [shown, setShown] = useState<ShownTemplate | null>(null);
   const [text, setText] = useState("");
@@ -49,14 +46,10 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
   // The design part first: blocks, not the model's English prompt text at the top of the file.
   const [tab, setTab] = useState<SectionTab>("blocks");
   const yaml = useRef<YamlEditorHandle>(null), more = useRef<HTMLButtonElement>(null);
-  // The assistant puts its toggle here, at the end of the tab row.
-  const [assistantSlot, setAssistantSlot] = useState<HTMLElement | null>(null);
   const dirty = unsaved(shown, text), selected = shownId(shown), state = shown?.kind === "saved" ? shown.state : null;
-  const draft = shown?.kind === "draft" ? shown : null;
-  // The assistant reads and applies after renders: these hold what the editor shows now.
+  // A question before another template opens reads what the editor shows now.
   const live = useRef({ shown, text });
   live.current = { shown, text };
-  const names = useMemo(() => new Map(catalog?.templates.map(entry => [entry.id, entry.name]) ?? []), [catalog]);
   const present = useMemo(() => new Set(topLevelSections(text).map(section => sectionTab(section.key))), [text]);
 
   function begin(kind: Exclude<Work, null>) { setWork(kind); setFailure(null); setOutcome(null); setNextRevision(null); setDelivery(null); }
@@ -91,7 +84,6 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     else showProblem(result.error);
   });
   const save = (revision?: string) => run("saving", async () => {
-    if (draft) { if (created(await createTemplate({ text, assetsFrom: draft.assetsFrom }))) setOutcome("saved"); return; }
     if (!state) return;
     const result = await saveTemplateConfig(state.package.id, text, revision);
     if (!result.saved) { if (result.error.nextRevision) setOffer(result.error); else showProblem(result.error); return; }
@@ -124,23 +116,6 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     const next = await deleteTemplate(state.package.id);
     setCatalog(next); adopt(await readTemplateConfig(next.defaultId)); setOutcome("deleted");
   });
-  function context(): TemplateContext | null {
-    const { shown: current, text: source } = live.current;
-    if (!current) return null;
-    return current.kind === "saved" ? { templateId: current.state.package.id, assetsFrom: current.state.package.id, text: source, name: current.state.package.name }
-      : { templateId: null, assetsFrom: current.assetsFrom, text: source, name: draftLabel(current.name) };
-  }
-  async function apply(proposal: TemplateProposal, force: boolean, runAssets: string | null): Promise<ApplyOutcome> {
-    const replace = (value: string) => { setText(value); setProblem(null); setOutcome(null); };
-    // The list and the editor wait while the target opens, so nothing typed meanwhile is overwritten.
-    begin("applying");
-    try {
-      return await applyProposal(proposal, force, runAssets, { current: () => live.current, mayLeave,
-        open: async templateId => { const opened = await readTemplateConfig(templateId); adopt(opened); return opened.text; },
-        showDraft: (name, assetsFrom, value) => { setShown({ kind: "draft", name, assetsFrom }); replace(value); },
-        renameDraft: name => setShown(value => value?.kind === "draft" ? { ...value, name } : value), replace });
-    } finally { setWork(null); }
-  }
   const download = async () => {
     setDelivery(null);
     setDelivery(await deliverFile(new Blob([text], { type: "application/yaml" }), downloadName(shown)));
@@ -163,7 +138,7 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
     <small>{rowNote(entry, catalog?.defaultId ?? "")}</small>
   </button>;
   const chips = state && catalog ? [{ label: state.package.revision }, { label: templateKind(state) },
-    ...(state.package.id === catalog.defaultId ? [{ label: "основной", main: true }] : [])] : [{ label: "новый" }];
+    ...(state.package.id === catalog.defaultId ? [{ label: "основной", main: true }] : [])] : [];
   const done = outcome === "checked" ? nextRevision ? `Ошибок нет. Эта версия уже сохранена с другим содержимым: при сохранении будет предложена версия ${nextRevision}.` : "Ошибок нет."
     : outcome === "saved" ? "Сохранено. Изменения применятся к новым резюме."
     : outcome === "branded" && state ? `Сохранено как версия ${state.package.revision}. Новые резюме получат логотип и email; готовые не изменятся.`
@@ -179,12 +154,11 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
           <button type="button" className="icon templates-add" aria-label="Копия выбранного" title="Копия выбранного" disabled={busy || !state}
             onClick={() => setCopyName(state ? `${state.package.name} — копия` : "")}><Icon name="plus" /></button></div>
         {groups?.bundled.map(row)}
-        {groups && (groups.own.length > 0 || draft) && <div className="templates-list-heading"><span className="eyebrow">Свои</span></div>}
+        {groups && groups.own.length > 0 && <div className="templates-list-heading"><span className="eyebrow">Свои</span></div>}
         {groups?.own.map(row)}
-        {draft && <button className="template-row" aria-current="page" disabled={busy}><strong>{draftLabel(draft.name)}</strong><small>новый</small></button>}
       </nav>
       <div className="templates-editor">
-        {shown && <TemplateToolbar name={state ? state.package.name : draft ? draftLabel(draft.name) : ""} chips={chips}
+        {shown && <TemplateToolbar name={state ? state.package.name : ""} chips={chips}
           actions={menuActions(shown, catalog?.defaultId ?? null)} dirty={dirty} busy={busy} saving={work === "saving"} checking={work === "checking"}
           save={() => void save()} check={state ? () => void check() : undefined} more={more} choose={pick} />}
         {!shown && <div className="template-yaml-loading">
@@ -195,10 +169,9 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
         {shown && <Tabs.Root className="template-tabs" value={tab} onValueChange={value => setTab(value as SectionTab)}>
           <div className="template-tab-row">{present.size > 0 && <Tabs.List className="template-tab-list" aria-label="Разделы шаблона">
             {sectionTabs.map(item => <Tabs.Trigger key={item.id} value={item.id} disabled={!present.has(item.id)}>{item.label}</Tabs.Trigger>)}
-          </Tabs.List>}<span className="template-assistant-slot" ref={setAssistantSlot} /></div>
+          </Tabs.List>}</div>
           {/* What the app's import reads of these sections; the rest is the legacy import's (Settings turns it on). */}
           {sectionNotes[tab] && <p className="template-section-note">{sectionNotes[tab]}</p>}
-          {/* The assistant pane sits under the toolbar beside the editor; on a narrow window it lies over the editor only. */}
           <div className="template-work">
             {/* One editor for every tab: the panel follows the chosen tab instead of holding a copy per tab. */}
             <Tabs.Content className="template-tab-panel" value={tab} forceMount>
@@ -207,9 +180,6 @@ export default function TemplatesScreen({ open, settings }: { open: boolean; set
                   change={value => { setText(value); setProblem(null); setOutcome(null); }} />
               </Suspense>
             </Tabs.Content>
-            <aside className="templates-assistant" aria-label="Помощник по шаблонам">
-              <TemplateAssistant open={open} context={context} names={names} apply={apply} settings={settings} toggleHost={assistantSlot} />
-            </aside>
           </div>
         </Tabs.Root>}
         {shown && <div className="template-status">

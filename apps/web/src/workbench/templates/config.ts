@@ -77,8 +77,8 @@ export async function saveTemplateConfig(templateId: string, source: string, rev
   const { status, value } = await call(one(templateId), "PUT", revision ? { text: source, revision } : { text: source });
   return parseSave(status, value);
 }
-/** A copy of a saved template under a new name, or a new template from unsaved text; the server picks the id. */
-export type TemplateCreate = { copyOf: string; name: string } | { text: string; assetsFrom: string | null };
+/** A copy of a saved template under a new name; the server picks the id. */
+export type TemplateCreate = { copyOf: string; name: string };
 export async function createTemplate(body: TemplateCreate): Promise<TemplateSave> {
   const { status, value } = await call(path, "POST", body);
   return parseSave(status, value);

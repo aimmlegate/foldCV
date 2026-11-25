@@ -4,11 +4,6 @@ export const assistantCommands: readonly AssistantCommand[] = [
   { command: "/import-resume", description: "Правила импорта резюме" },
   { command: "/format-resume", description: "Оформить по шаблону, не меняя текст" },
 ];
-/** The template assistant's skills (D141); the resume assistant does not list them. */
-export const templateCommands: readonly AssistantCommand[] = [
-  { command: "/skills", description: "Показать навыки помощника" },
-  { command: "/design-template", description: "Шаблон по образцу" },
-];
 
 export function commandSuggestions(value: string, commands: readonly AssistantCommand[] = assistantCommands) {
   return /^\/[a-z-]*$/u.test(value) ? commands.filter(item => item.command.startsWith(value)) : [];

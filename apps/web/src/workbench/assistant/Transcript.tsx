@@ -6,10 +6,9 @@ import { MessageText } from "../../assistant/MessageText";
 import { Icon } from "../ui/Icon";
 import { resumeScope, type ChatScope } from "./scope";
 
-/** `attachment` names a file sent with a user message, such as the template sample of its run. */
-export function Transcript({ view, active, resource, focus, draft, scope = resumeScope, attachment }: { view: AssistantView; active: boolean;
+export function Transcript({ view, active, resource, focus, draft, scope = resumeScope }: { view: AssistantView; active: boolean;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean; draft: (value: string) => void;
-  scope?: ChatScope; attachment?: ((runId: string) => string | null) | undefined }) {
+  scope?: ChatScope }) {
   const [stale, setStale] = useState<Set<string>>(() => new Set()), [copy, setCopy] = useState("");
   return <>
     {!view.messages.length && !active && <div className="chat-empty"><span className="chat-empty-icon"><Icon name="spark" /></span><h3>{scope.empty}</h3>
@@ -18,7 +17,6 @@ export function Transcript({ view, active, resource, focus, draft, scope = resum
       <div className="chat-message-heading"><span>{message.role !== "user" && <Icon name="spark" />}{message.role === "user" ? "Вы" : "Помощник"}</span>
         <small><time dateTime={message.timestamp}>{new Date(message.timestamp).toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}</time></small></div>
       <MessageText text={message.text} truncated={message.truncated} error={message.error?.code ?? null} />
-      {message.role === "user" && attachment?.(message.runId) && <small className="chat-message-attachment"><Icon name="file" />{attachment(message.runId)}</small>}
       {message.sources.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("sources", ref.id)}><Icon name="file" />{ref.label || "Открыть источник"}<Icon name="arrow" /></button>)}
       {message.findings.map(ref => <button className="chat-source" key={ref.id} onClick={() => resource("findings", ref.id)}><Icon name="info" />{ref.label || "Открыть замечание"}<Icon name="arrow" /></button>)}
       {message.role !== "user" && <div className="chat-message-actions"><button className="chat-icon" aria-label="Скопировать ответ" title="Скопировать ответ"

@@ -17,9 +17,7 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
   log: RefObject<HTMLDivElement | null>; failure: string | null; fence: string | null;
   select: (id: string) => void; fresh: () => void;
   resource: (kind: "sources" | "findings", id: string) => void; focus: (anchor: AssistantFinding["anchors"][number]) => boolean;
-  applyProposal: (value: Proposal) => void; discardProposal: (value: Proposal) => void;
-  /** The template drawer's proposal cards; `attachment` as in the transcript. */
-  extra?: ReactNode; attachment?: (runId: string) => string | null }) {
+  applyProposal: (value: Proposal) => void; discardProposal: (value: Proposal) => void }) {
   const { view, active, collapsed, expanded, toggle, expand, scope = resumeScope } = props;
   const [threads, setThreads] = useState(false), menu = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const wasCollapsed = useRef(collapsed);
@@ -51,11 +49,10 @@ export function DrawerView(props: ComposerProps & { collapsed: boolean; expanded
           onClick={() => { props.select(item.id); setThreads(false); }}><Icon name="chat" /><span>{item.title || "Пустой диалог"}</span></button>)}</div>}
       <div ref={props.log} className="chat-messages" role="log" aria-live="off" aria-busy={active}>
         <p className="visually-hidden" role="status" aria-live="polite">{currentActivity(view, active)}</p>
-        <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} scope={scope} attachment={props.attachment} />
+        <Transcript view={view} active={active} resource={props.resource} focus={props.focus} draft={props.draft} scope={scope} />
         {view.proposals.map(value => <ProposalPreview key={value.id} value={value} busy={active || view.proposalBusy !== null} applying={view.proposalBusy === value.id && view.proposalAction === "apply"}
           stale={view.staleProposals.includes(value.id)} allowEdits={view.flags.allowEdits}
           apply={() => props.applyProposal(value)} discard={() => props.discardProposal(value)} />)}
-        {props.extra}
         {view.loading && <div className="chat-load-status"><OperationStatus label={view.loading} /></div>}
         {view.files.map(file => <p key={file.id} className="chat-project-file">
           <a href={file.url} download={file.filename}>{file.format === "docx" ? "Скачать DOCX" : "Скачать .foldcv"}</a></p>)}

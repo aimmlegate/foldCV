@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { screenTitle, visit, type Screen } from "../src/workbench/templates/screen";
-import { deleteControl, downloadName, draftLabel, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
+import { deleteControl, downloadName, groupedCatalog, menuActions, rowNote, shownId, templateKind, unsaved, type ShownTemplate } from "../src/workbench/templates/studio";
 
 const state = { package: { id: "generic", name: "Две колонки", revision: "1.3.0", packageHash: "a".repeat(64) }, format: "yaml" as const,
   text: "template: {}\n", bundled: true, edited: false };
@@ -25,15 +25,12 @@ test("the list says shipped, edited or own, and the editor knows unsaved text", 
   assert.equal(templateKind({ bundled: true, edited: false }), "встроенный");
   assert.equal(templateKind({ bundled: true, edited: true }), "изменён");
   assert.equal(templateKind({ bundled: false, edited: false }), "свой");
-  const saved: ShownTemplate = { kind: "saved", state }, draft: ShownTemplate = { kind: "draft", name: "Мой", assetsFrom: "generic" };
+  const saved: ShownTemplate = { kind: "saved", state };
   assert.equal(shownId(saved), "generic");
-  assert.equal(shownId(draft), null);
   assert.equal(shownId(null), null);
   assert.equal(unsaved(saved, state.text), false);
   assert.equal(unsaved(saved, `${state.text}# edit\n`), true);
-  assert.equal(unsaved(draft, ""), true);
   assert.equal(unsaved(null, "x"), false);
-  assert.equal(draftLabel("Мой"), "Мой (не сохранён)");
 });
 
 test("delete is hidden on shipped templates and disabled on the default; downloads are named by id", () => {
@@ -41,7 +38,7 @@ test("delete is hidden on shipped templates and disabled on the default; downloa
   assert.equal(deleteControl({ id: "custom-moy", bundled: false }, "custom-moy"), "disabled");
   assert.equal(deleteControl({ id: "custom-moy", bundled: false }, "generic"), "enabled");
   assert.equal(downloadName({ kind: "saved", state }), "generic.yaml");
-  assert.equal(downloadName({ kind: "draft", name: "Мой", assetsFrom: null }), "template.yaml");
+  assert.equal(downloadName(null), "template.yaml");
 });
 
 test("the «⋯» menu offers only what applies to the shown template", () => {
@@ -56,8 +53,6 @@ test("the «⋯» menu offers only what applies to the shown template", () => {
   // An own template is deleted, except while it is the default.
   assert.deepEqual(offered(saved(false, true), "generic"), ["copy:enabled", "branding:enabled", "default:enabled", "download:enabled", "delete:enabled"]);
   assert.deepEqual(offered(saved(false, true), "custom-moy"), ["copy:enabled", "branding:enabled", "download:enabled", "delete:disabled"]);
-  // A new template exists only in the editor until saved.
-  assert.deepEqual(offered({ kind: "draft", name: "Мой", assetsFrom: "generic" }, "generic"), ["download:enabled"]);
   assert.deepEqual(offered(null, "generic"), []);
 });
 
