@@ -243,7 +243,7 @@ def list_workspace(workspace, block_id, removed, added, hidden, *, action_id, oc
     if not set(removed) <= present.keys() or len(set(removed)) != len(removed) or not (removed or added):
         raise ValueError('a removal outside the list, or nothing to apply')
     if len(present) - len(removed) + len(added) < 1:
-        raise ValueError('LIST_EMPTY')
+        raise ValueError('the list would be left with no item')
     sent = {line.ref: line for line in source.lines}
     if any(ref not in sent for item in added for ref in item.lines):
         raise ValueError('an item rests on a line that was not sent')
