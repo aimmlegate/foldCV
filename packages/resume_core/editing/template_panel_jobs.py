@@ -2,13 +2,17 @@
 newest first, and the flags «Стоит не по дате» and «Пересекается с …». A warning never refuses a change."""
 
 from ..fields import inline_groups, set_text
-from ..importing.template_builtin_admission import unknown
 from ..models.rich_document import FactFieldSpan
 from ..models.rich_facts import EmploymentRecord, WorkingPeriod
 from ..models.template_document import BoundLink, TemplateSectionBlock
 from .template_panel_creation import _recency
 
 _PRECISIONS = ('year', 'month', 'day')
+
+
+def unknown():
+    # The empty field of the form's job; the editing layer does not import the import layer.
+    return {'value': None, 'rawText': '', 'status': 'unknown', 'revision': 1, 'pendingRawText': None, 'userCorrected': False}
 
 
 def _jobs(project):
