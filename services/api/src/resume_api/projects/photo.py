@@ -28,6 +28,8 @@ def set_photo(service, project_id, request):
         except (ValueError, binascii.Error) as error:
             code = str(error) if str(error).startswith('IMAGE_') else 'IMAGE_INVALID'
             raise ProjectFailure(code, 422) from None
+        # The checked image is stored without its metadata segments (D187).
+        data = checked.data
         digest = hashlib.sha256(data).hexdigest()
         extension = 'jpg' if checked.mime_type == 'image/jpeg' else 'png'
         photo = LocalImageAsset(id='photo-' + digest[:32], sha256=digest, path=f'images/{digest}.{extension}',

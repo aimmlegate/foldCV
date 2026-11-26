@@ -1,5 +1,7 @@
 """The images a user adds (D187): the cropped photo of a résumé and an own Focus icon. The client crops and scales;
-Python checks the result again before it stores it. A stored image holds no EXIF, XMP, text or other metadata."""
+Python checks the result again before it stores it. An image whose metadata can name a person, a place, a device or a
+time is refused; the structural EXIF a browser canvas writes (colour space, pixel size) is allowed and, like every
+metadata segment, left out of the stored file, so a stored image holds no EXIF, XMP, text or other metadata."""
 
 from __future__ import annotations
 
@@ -10,8 +12,9 @@ PHOTO_PIXELS = 800
 PHOTO_BYTES = 3 * 1024 * 1024
 ICON_PIXELS = 256
 ICON_BYTES = 1024 * 1024
-# Pillow's info keys that are no metadata of a person or a device: the colour profile and the pixel density.
-HARMLESS = frozenset({'dpi', 'jfif', 'jfif_version', 'jfif_unit', 'jfif_density', 'icc_profile', 'gamma', 'srgb',
+# Pillow's info keys that are no metadata of a person or a device: the colour profile and the pixel density; EXIF and a
+# JPEG's resource block are checked tag by tag below.
+HARMLESS = frozenset({'exif', 'photoshop', 'dpi', 'jfif', 'jfif_version', 'jfif_unit', 'jfif_density', 'icc_profile', 'gamma', 'srgb',
                       'transparency', 'aspect', 'progressive', 'progression', 'adobe', 'adobe_transform'})
 
 
@@ -43,30 +46,60 @@ def check_image(data, kind):
                 raise ValueError('IMAGE_INVALID')
             if getattr(image, 'is_animated', False) or getattr(image, 'n_frames', 1) > 1:
                 raise ValueError('IMAGE_ANIMATED')
-            if set(image.info) - HARMLESS or image.getexif():
+            if set(image.info) - HARMLESS or not _structural(image):
                 raise ValueError('IMAGE_METADATA')
             width, height = image.size
     except (UnidentifiedImageError, OSError, SyntaxError):
         raise ValueError('IMAGE_INVALID') from None
-    if image.format == 'JPEG' and _jpeg_metadata(data):
-        raise ValueError('IMAGE_METADATA')
     if width != height or not 1 <= width <= pixels or (kind == 'icon' and width != ICON_PIXELS):
         raise ValueError('IMAGE_SIZE')
-    return CheckedImage(data, 'image/jpeg' if image.format == 'JPEG' else 'image/png', width, height)
+    jpeg = image.format == 'JPEG'
+    return CheckedImage(_stripped_jpeg(data) if jpeg else _stripped_png(data), 'image/jpeg' if jpeg else 'image/png', width, height)
 
 
-def _jpeg_metadata(data):
-    """Whether a JPEG holds an EXIF, XMP, IPTC or comment segment; Pillow does not report each of them."""
-    index = 2
+# EXIF tags a canvas or an image library writes about the picture itself: the IFD pointers, orientation, resolution, colour
+# space and pixel size. Any other tag (camera, place, time, author, software, comment) is metadata the app refuses.
+BASE_TAGS = frozenset({0x8769, 0x0112, 0x011A, 0x011B, 0x0128, 0x0213})
+EXIF_TAGS = frozenset({0xA001, 0xA002, 0xA003})
+
+
+def _structural(image):
+    exif = image.getexif()
+    if set(exif) - BASE_TAGS or set(exif.get_ifd(0x8769)) - EXIF_TAGS or exif.get_ifd(0x8825):
+        return False
+    # A JPEG resource block may hold an IPTC record (names, places); a canvas writes at most an empty one.
+    resources = image.info.get('photoshop') or {}
+    return all(len(value) <= 64 for value in resources.values()) if isinstance(resources, dict) else not resources
+
+
+def _stripped_png(data):
+    """The PNG without its metadata chunks (eXIf, text, time); pixel and colour chunks stay byte for byte."""
+    out, index = [data[:8]], 8
+    while index + 12 <= len(data):
+        length = int.from_bytes(data[index:index + 4], 'big')
+        kind = data[index + 4:index + 8]
+        chunk = data[index:index + 12 + length]
+        if kind not in {b'eXIf', b'tEXt', b'iTXt', b'zTXt', b'tIME'}:
+            out.append(chunk)
+        index += 12 + length
+        if kind == b'IEND':
+            break
+    return b''.join(out)
+
+
+def _stripped_jpeg(data):
+    """The JPEG without its EXIF, XMP, resource and comment segments; the image data stays byte for byte."""
+    out, index = [data[:2]], 2
     while index + 4 <= len(data) and data[index] == 0xFF:
         marker = data[index + 1]
-        if marker in (0xD9, 0xDA):
-            return False
+        if marker == 0xDA:
+            out.append(data[index:])
+            return b''.join(out)
         length = int.from_bytes(data[index + 2:index + 4], 'big')
-        if marker in (0xE1, 0xED, 0xFE):
-            return True
+        if marker not in (0xE1, 0xED, 0xFE):
+            out.append(data[index:index + 2 + length])
         index += 2 + length
-    return False
+    return b''.join(out)
 
 
 def rounded(data, radius_ratio):

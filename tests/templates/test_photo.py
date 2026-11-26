@@ -194,3 +194,22 @@ def test_each_bundled_template_renders_the_photo_in_its_header(tmp_path, templat
     (tmp_path / 'render').mkdir()
     _package, parts = docx_parts(render_captured_docx(request, tmp_path / 'render'))
     assert b'Photo' in parts['word/header1.xml'] and any(name.startswith('word/media/') for name in parts)
+
+
+def test_the_structural_exif_of_a_browser_canvas_is_allowed_and_left_out_of_the_stored_image():
+    image = Image.new('RGB', (64, 64), (40, 90, 160))
+    exif = Image.Exif()
+    exif.get_ifd(0x8769).update({0xA001: 1, 0xA002: 64, 0xA003: 64})
+    for kind in ('PNG', 'JPEG'):
+        raw = BytesIO()
+        image.save(raw, format=kind, exif=exif.tobytes())
+        checked = check_image(raw.getvalue(), 'photo')
+        with Image.open(BytesIO(checked.data)) as stored:
+            assert not stored.getexif() and 'exif' not in stored.info
+    # A camera's tag is metadata: refused.
+    camera = Image.Exif()
+    camera[0x0110] = 'Synthetic Model'
+    raw = BytesIO()
+    image.save(raw, format='PNG', exif=camera.tobytes())
+    with pytest.raises(ValueError, match='IMAGE_METADATA'):
+        check_image(raw.getvalue(), 'photo')
