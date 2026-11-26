@@ -430,6 +430,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
   const state = session.queue.template.state, styles = editor.getActiveStyles(), textBlocks = session.textBlocks();
   const listed = (type: string) => textBlocks.length > 0 && textBlocks.every(block => block.type === type);
   const plan = shown.presentation?.editor;
+  const photo = plan?.photo ?? null;
   const heavier = textBlocks.length === 0 || textBlocks.some(block => {
     const entry = plan?.blocks[block.id], faces = entry && plan?.styles[entry.style]?.faces;
     return !faces || faces.bold !== faces.regular;
@@ -585,6 +586,7 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
             <FactsPanel facts={facts} document={documentShown} submit={submitPanel} pending={panelPending} paused={false}
               focusEntries={focus.entries} focusOptions={focus.options} focusOnly={focus.only} focusIcons={focus.icons ? loadIcons : null} checkDates={checkDates}
               technologyTargets={shown.presentation?.editor?.technologyTargets ?? []} plan={shown.presentation?.editor ?? {}}
+              photo={photo} setPhoto={image => session.setPhoto(image)}
               hidden={!factsVisible} close={() => { setFactsVisible(false); editor.focus(); }} focusRequest={factFocus} onFocused={factFocused}
               anchors={anchors} showBlock={blockId => { showBlock(blockId, "start"); }} />
           </fieldset>
@@ -597,8 +599,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
               {sheet && <style>{sheet.css}</style>}
               {/* A style rule, not classes on the blocks: ProseMirror owns their DOM. */}
               {changed && <style key={changed.at}>{`${changed.blockIds.map(id => `.cv-document .bn-block[data-id="${CSS.escape(id)}"] > :first-child`).join(", ")} { animation: assistant-change 3s ease-out; }`}</style>}
-              <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} style={sheet?.variables}>
+              <div className={sheet ? "uir-engine-sheet fcv-sheet" : "uir-engine-sheet"} data-photo={photo ? "" : undefined}
+                style={photo ? { ...sheet?.variables, "--fcv-photo-shift": `${photo.shift}pt`, "--fcv-photo-bottom": `${photo.top + photo.size}pt` } as CSSProperties : sheet?.variables}>
                 {sheet?.logo && <img className="fcv-logo" src={sheet.logo.url} alt="" style={sheet.logo.style} />}
+                {/* D187: the résumé's photo, left of the name; without one the sheet is as it was. */}
+                {photo && <img className="fcv-photo" src={photo.url} alt="" style={{ left: `${photo.x}pt`, top: `${photo.top}pt`, width: `${photo.size}pt`,
+                  height: `${photo.size}pt`, borderRadius: `${photo.radius}pt` }} />}
                 <BlockNoteView editor={editor} theme="light" filePanel={false} slashMenu={false} formattingToolbar={false} sideMenu={false} tableHandles={false}
                   {...(portalHost ? { portalElements: { default: portalHost } } : {})} />
                 {sheet?.footer && <p className="fcv-footer" style={sheet.footer.style}>{sheet.footer.text}</p>}

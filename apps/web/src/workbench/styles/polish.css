@@ -111,3 +111,12 @@
 .anonymized-form input { width: 100%; padding: 9px 11px; }
 .anonymized-left-out { margin: 4px 0 0; color: var(--muted); font-size: var(--ui-small); }
 .anonymized-check { margin: 2px 0 0; color: var(--warn); font-size: var(--ui-small); overflow-wrap: anywhere; }
+/* D187: the photo control in «Кандидат» and the image dialog's square frame. */
+.fact-photo { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; }
+.fact-photo-preview { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; }
+.image-dialog { display: grid; gap: 10px; }
+.image-crop { position: relative; width: min(420px, 80vw); height: min(420px, 80vw); background: var(--desk); border-radius: 6px; overflow: hidden; }
+.image-dialog.rounded .reactEasyCrop_CropArea { border-radius: 12%; }
+.image-pick { min-height: 180px; border: 1px dashed var(--line-strong); border-radius: 8px; background: var(--wash); color: var(--ink); }
+.image-zoom { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: var(--ui-small); }
+.image-zoom input { flex: 1; }

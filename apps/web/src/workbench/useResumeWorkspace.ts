@@ -296,7 +296,7 @@ export function useResumeWorkspace() {
       if (!connection) throw new Error("Сначала откройте резюме.");
       await editor.flush();
       const changes = await connection.anonymizedPreview(anonymizedName);
-      await editor.print(title, { removed: changes.removed, texts: changes.texts });
+      await editor.print(title, { removed: changes.removed, texts: changes.texts, photo: false });
       await connection.rememberAnonymizedName(anonymizedName);
       await editor.refresh().catch(() => {});
     }, "Открываем печать");

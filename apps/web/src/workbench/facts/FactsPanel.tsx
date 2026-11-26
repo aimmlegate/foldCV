@@ -18,7 +18,8 @@ import { OperationStatus } from "../ui/OperationStatus";
 import type { DateWarning } from "../../projects/api";
 import { JobWarnings, overlapLine } from "./JobWarnings";
 import { HiddenMark, HideEye } from "./HideEye";
-import type { EditorHideBlock } from "../../contracts/generated/contracts";
+import { PhotoControl } from "./PhotoControl";
+import type { EditorHideBlock, EditorPhoto } from "../../contracts/generated/contracts";
 
 /** The records of a group as Facts lists them: jobs in the plan's order (D182), the others in record order. */
 export function groupRecords(records: readonly RecordValue[], kind: Kind, order: readonly string[] | undefined): RecordValue[] {
@@ -42,7 +43,7 @@ function jobName(records: readonly RecordValue[], id: string): string {
   return record ? title(record) : "Без названия";
 }
 export function FactsPanel({ facts, document, focusEntries = [], focusOptions = [], focusOnly, focusIcons = null, technologyTargets = [], plan = {}, submit,
-  pending, paused, hidden, close, checkDates = null, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
+  pending, paused, hidden, close, checkDates = null, photo = null, setPhoto = null, focusRequest = null, onFocused, anchors, showBlock = () => {} }: {
   facts: WorkingFacts; document: OrderDocument; submit: (command: PanelCommand) => Promise<void>; pending: readonly PanelCommand[]; paused: boolean;
   focusEntries?: readonly FocusEntry[];
   focusOptions?: readonly FocusEntry[];
@@ -54,6 +55,8 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
   technologyTargets?: readonly TechnologyTarget[];
   plan?: PanelPlan;
   hidden: boolean; close: () => void;
+  /** D187: the résumé's photo and its change; null where the editor cannot change it. */
+  photo?: EditorPhoto | null; setPhoto?: ((image: string | null) => Promise<void>) | null;
   /** Python's warnings for the date dialog's values before Save (D182); null where the editor cannot ask. */
   checkDates?: ((recordId: string | null, values: Record<string, string>) => Promise<DateWarning[]>) | null;
   focusRequest?: { recordId: string } | null; onFocused?: () => void;
@@ -119,6 +122,7 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
       const anchor = own?.hidden ? undefined : anchors?.get(kind);
       return <div className="fact-group-frame" key={kind} data-hidden={own?.hidden || undefined}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
+      {kind === "candidate" && setPhoto && <PhotoControl photo={photo} busy={busy} setPhoto={setPhoto} />}
       {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null}
           eye={eyeOf(hideBlocks.find(block => block.place === "focus"))} hidden={hideBlocks.some(block => block.place === "focus" && block.hidden)} />
         {/* D136: the resume's skill groups; a template without them keeps one general list. */}

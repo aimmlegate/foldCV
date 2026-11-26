@@ -78,3 +78,7 @@
    its baseline on every page (export.css). */
 .fcv-sheet .fcv-footer { margin: 18pt 0 0; text-align: center; white-space: nowrap;
   transform: translateX(calc(var(--fcv-footer-x) - var(--fcv-page-width) / 2)); }
+/* D187: the photo left of the name; the header lines move right of it, and the header is at least as tall as the photo. */
+.fcv-photo { position: absolute; object-fit: cover; pointer-events: none; }
+.fcv-sheet[data-photo] .fcv-region-header { padding-left: var(--fcv-photo-shift);
+  min-height: max(var(--fcv-header-height), calc(var(--fcv-photo-bottom) - var(--fcv-top))); }

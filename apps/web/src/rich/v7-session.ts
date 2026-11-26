@@ -310,6 +310,23 @@ export class TemplateEditorSession {
   /** Apply an assistant proposal: typing drains, input locks, and the editor shows Python's committed result (one undo
    * action). An unknown token re-opens and repeats the same request; a lost reply repeats it once, which the server's
    * replay window answers without applying twice. */
+  /** D187: add, replace or remove the photo as one server action; the page shows it from the next response. */
+  async setPhoto(image: string | null): Promise<void> {
+    if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
+    await this.flush();
+    this.panelBusy = true;
+    this.lock(true);
+    try {
+      this.boundary();
+      const result = await this.connection.setPhoto(image, crypto.randomUUID());
+      this.queue.template.adoptDurable(result.response);
+      await this.reproject();
+    } finally {
+      this.panelBusy = false;
+      this.lock(!this.writable);
+    }
+  }
+
   async applyAssistant(proposalId: string, allowEdits: boolean): Promise<AssistantApplyResultV1> {
     if (!this.editor || this.closed || this.composing || this.panelBusy || this.navigating || this.mode !== "normal") throw new Error("WRITER_INPUT_BLOCKED");
     await this.flush();

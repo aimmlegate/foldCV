@@ -79,12 +79,17 @@ export function printCopyNow(paper: HTMLElement, page: PrintPage): HTMLElement {
 /** A copy of the paper without editing, marks and buttons, laid out off screen. It loses the editor's class, so the editor's
  * queries skip it. */
 /** D186: what Python's anonymized copy changes on the page, applied to the print copy only. */
-export type PageChanges = { removed: readonly string[]; texts: Readonly<Record<string, string>> };
+export type PageChanges = { removed: readonly string[]; texts: Readonly<Record<string, string>>; photo?: false };
 
 /** The anonymized export's changes on a copy: Python's removed blocks go and its changed blocks take its plain text. */
 export function applyPageChanges(copy: HTMLElement, changes: PageChanges): void {
   const block = (id: string) => copy.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
   for (const id of changes.removed) block(id)?.remove();
+  // D187: the anonymized export leaves the photo out, and the header lines stand where they stand without it.
+  if (changes.photo === false) {
+    for (const element of copy.querySelectorAll(".fcv-photo")) element.remove();
+    for (const element of copy.querySelectorAll<HTMLElement>("[data-photo]")) { delete element.dataset["photo"]; element.style.removeProperty("--fcv-photo-shift"); }
+  }
   for (const [id, text] of Object.entries(changes.texts)) {
     const content = block(id)?.querySelector<HTMLElement>(":scope > .bn-block > .bn-block-content .bn-inline-content");
     if (content) content.textContent = text;
@@ -144,7 +149,7 @@ function pageCopy(copy: HTMLElement, index: number, page: PrintPage): HTMLElemen
   for (const element of paper.querySelectorAll<HTMLElement>("[data-print-pages]"))
     if (!(element.dataset["printPages"] ?? "").split(" ").includes(shown)) element.classList.add("print-hidden");
   if (index > 0) {
-    for (const element of paper.querySelectorAll(".fcv-region-header, .fcv-logo")) element.classList.add("print-hidden");
+    for (const element of paper.querySelectorAll(".fcv-region-header, .fcv-logo, .fcv-photo")) element.classList.add("print-hidden");
     const sheet = paper.querySelector<HTMLElement>(".fcv-sheet");
     if (sheet) sheet.style.paddingTop = `${String(page.continuation_body_top)}pt`;
   }
