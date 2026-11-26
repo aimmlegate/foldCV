@@ -31,7 +31,7 @@ const historyWidths = { minimum: 160, maximum: 360 };
 export function App({ portalHost }: { portalHost: HTMLElement }) {
   const workspace = useResumeWorkspace();
   const { template, projects, error, status, setStatus, busy, screen, setScreen, showResume,
-    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, printPdf, imports, importActions } = workspace;
+    templateEditor, assistant, action, fresh, open, remove, archive, process, upload, exportFile, printPdf, anonymizedPreview, imports, importActions } = workspace;
   const shown = template?.response ?? null;
   const [collapsed, setCollapsed] = useState(() => innerWidth <= 600);
   const [historyWidth, setHistoryWidth] = useState(() => readPanelSize("history", historyWidths.minimum, historyWidths.maximum));
@@ -150,6 +150,10 @@ export function App({ portalHost }: { portalHost: HTMLElement }) {
       error={error} busy={busy} operation={workspace.operation?.label} close={() => setFileMode(null)} download={() => exportFile(fileMode === "export" ? "export" : "archive",
         current => projectFilename(current.identity?.title ?? current.workspace.title, fileMode === "export" ? "docx" : "foldcv"))}
       print={() => printPdf(projectStem(projectTitle))}
+      anonymized={fileMode === "export" ? { preview: () => anonymizedPreview(null),
+        // D186: the file of an anonymized export is named after the short name, never the full one.
+        download: name => exportFile("export", projectFilename(name || "resume", "docx"), name),
+        print: name => printPdf(projectStem(name || "resume"), name) } : undefined}
       upload={async file => { const done = await upload(file); if (done) { showResume(); if (innerWidth <= 600) setCollapsed(true); } return done; }} />}
   </main></NotificationProvider>;
 }

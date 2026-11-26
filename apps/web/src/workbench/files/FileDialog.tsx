@@ -6,10 +6,15 @@ import { Icon } from "../ui/Icon";
 import { OperationStatus } from "../ui/OperationStatus";
 import { deliveryMessage, type Delivery } from "./delivery";
 import { printHint, printPlatform } from "./print";
+import { AnonymizedForm } from "./AnonymizedForm";
+import type { AnonymizedPreviewV1 } from "../../contracts/generated/contracts";
 
 export type FileMode = "open" | "save" | "export";
-type ExportFormat = "docx" | "pdf";
-export function FileDialog({ mode, title, subtitle, filename, error, busy, operation, close, download, print, upload, templateName }: {
+type ExportFormat = "docx" | "pdf" | "docx-anonymized" | "pdf-anonymized";
+/** D186: the anonymized export: Python's dialog values, and the DOCX and PDF of the anonymized copy. */
+export type AnonymizedExport = { preview: () => Promise<AnonymizedPreviewV1>; download: (name: string) => Promise<Delivery | null>;
+  print: (name: string) => Promise<boolean> };
+export function FileDialog({ mode, title, subtitle, filename, error, busy, operation, close, download, print, upload, templateName, anonymized }: {
   mode: FileMode; title: string; subtitle: string; filename: string; error: string; busy: boolean;
   /** The project's own captured template. */
   templateName?: string | undefined;
@@ -17,15 +22,23 @@ export function FileDialog({ mode, title, subtitle, filename, error, busy, opera
   close: () => void; download: () => Promise<Delivery | null>; upload: (file: File) => Promise<boolean>;
   /** PDF export through the system print window; true once the window was asked to open. */
   print: () => Promise<boolean>;
+  anonymized?: AnonymizedExport | undefined;
 }) {
   const input = useRef<HTMLInputElement>(null), [message, setMessage] = useState(""), [format, setFormat] = useState<ExportFormat>("docx");
-  const exporting = mode === "export", opening = mode === "open", pdf = exporting && format === "pdf";
+  // D186: an anonymized format opens the dialog «Обезличенное резюме» before the file is made.
+  const [step, setStep] = useState<"formats" | "anonymized">("formats"), [anonymizedName, setAnonymizedName] = useState<string | null>(null);
+  const exporting = mode === "export", opening = mode === "open", pdf = exporting && (format === "pdf" || format === "pdf-anonymized");
+  const anonymizing = exporting && step === "anonymized" && anonymized !== undefined;
   const choose = (value: ExportFormat) => { setFormat(value); setMessage(""); };
-  return <Dialog open close={() => { if (!busy) close(); }} title={exporting ? "Экспорт" : opening ? "Открыть файл" : "Сохранить в файл"}>
-    {exporting ? <><p className="dialog-copy">{title}<br />{subtitle}</p>
+  const chosenAnonymized = format === "docx-anonymized" || format === "pdf-anonymized";
+  return <Dialog open close={() => { if (!busy) close(); }} title={anonymizing ? "Обезличенное резюме" : exporting ? "Экспорт" : opening ? "Открыть файл" : "Сохранить в файл"}>
+    {anonymizing ? <AnonymizedForm load={anonymized.preview} name={anonymizedName} change={setAnonymizedName} busy={busy} />
+    : exporting ? <><p className="dialog-copy">{title}<br />{subtitle}</p>
       <div className="export-formats" role="radiogroup" aria-label="Формат">
         <FormatOption value="docx" mark="W" label="DOCX" detail="Для Word и Google Docs" chosen={format} busy={busy} choose={choose} />
         <FormatOption value="pdf" mark="PDF" label="PDF" detail="Через окно печати, как резюме на экране" chosen={format} busy={busy} choose={choose} />
+        {anonymized && <><FormatOption value="docx-anonymized" mark="W" label="DOCX обезличенный" detail="Без фамилии и контактов" chosen={format} busy={busy} choose={choose} />
+          <FormatOption value="pdf-anonymized" mark="PDF" label="PDF обезличенный" detail="Без фамилии и контактов, через окно печати" chosen={format} busy={busy} choose={choose} /></>}
       </div>
       <div className="export-summary"><span>Шаблон</span><strong>{templateName ?? "FoldCV / две колонки"}</strong></div>
     </> : <>{opening && <p className="notice">Текущие изменения сохранятся.</p>}
@@ -44,8 +57,14 @@ export function FileDialog({ mode, title, subtitle, filename, error, busy, opera
     <div className="operation-slot">{busy ? <OperationStatus label={operation ?? (opening ? "Открываем файл" : "Готовим файл")} timed />
       : error ? <p className="notice error" role="alert">{errorMessage(error)}</p> : message ? <OperationStatus state="success" label={message} />
       : pdf ? <p className="print-hint">{printHint(printPlatform())}</p> : null}</div>
-    <div className="dialog-actions">{exporting ? <><button className="text-button" disabled={busy} onClick={close}>{message ? "Закрыть" : "Отмена"}</button>
-      {pdf ? <Button variant="primary" busy={busy} busyLabel="Открываем печать…" onClick={() => { void print().then(done => { if (done) close(); }); }}>Печать в PDF<Icon name="arrow" /></Button>
+    <div className="dialog-actions">{anonymizing ? <><button className="text-button" disabled={busy} onClick={close}>{message ? "Закрыть" : "Отмена"}</button>
+      {pdf ? <Button variant="primary" busy={busy} busyLabel="Открываем печать…" disabled={anonymizedName === null}
+        onClick={() => { void anonymized.print(anonymizedName ?? "").then(done => { if (done) close(); }); }}>Печать в PDF<Icon name="arrow" /></Button>
+        : <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" disabled={anonymizedName === null}
+          onClick={() => { setMessage(""); void anonymized.download(anonymizedName ?? "").then(delivery => setMessage(deliveryMessage(delivery))); }}>Скачать<Icon name="download" /></Button>}</>
+      : exporting ? <><button className="text-button" disabled={busy} onClick={close}>{message ? "Закрыть" : "Отмена"}</button>
+      {chosenAnonymized ? <Button variant="primary" disabled={busy} onClick={() => { setMessage(""); setStep("anonymized"); }}>Далее<Icon name="arrow" /></Button>
+      : pdf ? <Button variant="primary" busy={busy} busyLabel="Открываем печать…" onClick={() => { void print().then(done => { if (done) close(); }); }}>Печать в PDF<Icon name="arrow" /></Button>
         : <Button variant="primary" busy={busy} busyLabel="Готовим DOCX…" onClick={() => { setMessage(""); void download().then(delivery => setMessage(deliveryMessage(delivery))); }}>Скачать DOCX<Icon name="download" /></Button>}</>
       : <Button disabled={busy} onClick={close}>Закрыть</Button>}
     </div>

@@ -259,7 +259,8 @@ export function useResumeWorkspace() {
       } finally { reads.current.cancelReplacement(version); }
     }, "Открываем файл");
   }
-  async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string)) {
+  async function exportFile(kind: "export" | "archive", filename?: string | ((current: TemplateProjectResponseV1) => string),
+    anonymizedName?: string) {
     const fallback = kind === "export" ? "resume.docx" : "project.foldcv";
     const outcome: { delivery: Delivery | null } = { delivery: null };
     const finished = await action(async () => {
@@ -272,7 +273,7 @@ export function useResumeWorkspace() {
       if (!reads.current.current(kind, capture) || current.workspace.projectId !== capture.projectId) return;
       stage(kind === "export" ? "Готовим DOCX" : "Готовим файл .foldcv");
       // The editor token and the flushed revision go with the file.
-      const blob = kind === "export" ? (await connection.exportDocx()).blob : await connection.saveFoldcv();
+      const blob = kind === "export" ? (await connection.exportDocx(anonymizedName)).blob : await connection.saveFoldcv();
       if (!reads.current.current(kind, capture)) return;
       const delivered = deliverFile(blob, typeof filename === "function" ? filename(current) : filename ?? fallback);
       // Refresh adopts the export record. The file is already delivered, so a failed refresh is not this action's error:
@@ -285,12 +286,25 @@ export function useResumeWorkspace() {
     return finished ? outcome.delivery : null;
   }
   /** The PDF export: the editor prints its sheet; the title names the saved file. */
-  async function printPdf(title: string) {
+  async function printPdf(title: string, anonymizedName?: string) {
     return action(async () => {
       const editor = templateEditor.current;
       if (!editor) throw new Error("Сначала откройте резюме.");
-      await editor.print(title);
+      if (anonymizedName === undefined) { await editor.print(title); return; }
+      // D186: Python's anonymized copy changes only the print copy; the project then remembers the name.
+      const connection = template?.connection;
+      if (!connection) throw new Error("Сначала откройте резюме.");
+      await editor.flush();
+      const changes = await connection.anonymizedPreview(anonymizedName);
+      await editor.print(title, { removed: changes.removed, texts: changes.texts });
+      await connection.rememberAnonymizedName(anonymizedName);
+      await editor.refresh().catch(() => {});
     }, "Открываем печать");
+  }
+  /** The anonymized export's dialog: Python's name, the line of what is left out, the places to check (D186). */
+  function anonymizedPreview(name: string | null) {
+    const connection = template?.connection;
+    return connection ? connection.anonymizedPreview(name) : Promise.reject(new Error("Сначала откройте резюме."));
   }
   const importActions = {
     stop: (id: string) => void tracker.current?.stop(id), retry: (id: string) => void tracker.current?.retry(id),
@@ -298,5 +312,5 @@ export function useResumeWorkspace() {
   };
   return { template, templateEditor, acknowledgeTemplate, openingEpoch: opening?.selectionEpoch ?? 0, projects,
     error, status, setStatus, busy, operation, imports, importActions, resumeTemplate, loading, screen, setScreen, showResume,
-    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, printPdf, dismissError };
+    assistant, action, fresh, open, remove, archive, projectLifecycle, process, upload, exportFile, printPdf, anonymizedPreview, dismissError };
 }

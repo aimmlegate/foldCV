@@ -106,3 +106,8 @@
 .technology-label { display: flex; align-items: center; }
 /* The row's own small text is a block; the hidden mark keeps the icon-and-text gap of Facts (D185 check). */
 .fact-edit .fact-hidden-mark { display: flex; align-items: center; gap: 5px; white-space: normal; }
+/* D186: the dialog «Обезличенное резюме»: the name, the line of what is left out, a subdued notice of places to check. */
+.anonymized-form { display: grid; gap: 6px; }
+.anonymized-form input { width: 100%; padding: 9px 11px; }
+.anonymized-left-out { margin: 4px 0 0; color: var(--muted); font-size: var(--ui-small); }
+.anonymized-check { margin: 2px 0 0; color: var(--warn); font-size: var(--ui-small); overflow-wrap: anywhere; }
