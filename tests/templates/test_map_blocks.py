@@ -10,7 +10,7 @@ from packages.resume_core.importing.template_identity import evidence_options
 from packages.resume_core.importing.template_map import block_evidence, reads_whole_cv, whole_source
 from packages.resume_core.sources import capture_span, line_spans
 from packages.resume_core.templates.replies import MAPPED_REVIEW_PROTOCOL, REVIEW_PROTOCOL
-from tests.templates.generic_fixtures import TABLES, generic_import, generic_package
+from tests.templates.generic_fixtures import TABLES, generic_import, generic_package, two_column_1_6
 from tests.templates.test_source_map import cv_source, line, table
 from tests.templates.test_template_view_adapters import text
 
@@ -37,7 +37,9 @@ def test_a_block_that_rewrites_a_summary_reads_the_whole_cv_and_the_others_their
     rewrite = type('Task', (), {'kind': 'rewrite'})
     extract = type('Task', (), {'kind': 'extract'})
     assert reads_whole_cv(rewrite, blocks['summary'], package.definition)
-    assert reads_whole_cv(rewrite, blocks['career_highlights'], package.definition)
+    # A list block the template lets a model word reads the whole CV too («Две колонки» 1.6.0 has one, D184).
+    old = two_column_1_6().definition
+    assert reads_whole_cv(rewrite, next(block for block in old.blocks if block.id == 'career_highlights'), old)
     # Without rewriting the summary keeps the source's own summary: its lines are enough.
     assert not reads_whole_cv(extract, blocks['summary'], package.definition)
     assert not reads_whole_cv(rewrite, blocks['projects'], package.definition)

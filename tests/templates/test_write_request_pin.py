@@ -8,6 +8,7 @@ import json
 import pytest
 
 from resume_api.importer import lite_import
+from tests.templates.generic_fixtures import two_column_1_6
 from tests.templates.test_lite_import import StoredCalls, lite_run
 
 SCHEMA_BOTH = 'cf3ffb4c60c1a3e6c5d8f39e24d0d4066f3add0964e616223f5c2fc2b4e0a3ef'
@@ -22,7 +23,9 @@ PINNED = {
 
 @pytest.fixture(scope='module')
 def promotions(tmp_path_factory):
-    return lite_run(tmp_path_factory.mktemp('promotions-pin'), 'promotions')
+    # «Две колонки» 1.6.0 writes both blocks; 1.7.0 has no career highlights (D184). The pin guards the shared code, so
+    # it stays on the template whose request it recorded.
+    return lite_run(tmp_path_factory.mktemp('promotions-pin'), 'promotions', package=two_column_1_6())
 
 
 class Seen(StoredCalls):

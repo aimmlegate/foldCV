@@ -17,7 +17,8 @@ pytestmark = pytest.mark.slow
 # the tasks in declaration order; at a higher width a review made before the role branch is decided lists the blocks
 # of both branches, so its size would follow the timing.
 # T4: the map is one more call; a block the map gives no line makes none (F01 seven blocks, F07 five, F10 one).
-PINS = {'F01': (15, 176319), 'F07': (19, 718824), 'F10': (29, 338946)}
+# D184: «Две колонки» 1.7.0 has no career_highlights block, so each import makes its extract and review calls no more.
+PINS = {'F01': (13, 157005), 'F07': (17, 617074), 'F10': (27, 317922)}
 BELOW = 0.02
 
 

@@ -246,9 +246,10 @@ async def test_a_project_name_the_entrys_lines_do_not_state_word_for_word_is_one
     assert slots.count('primary_repair') == 1 and slots.count('replacement_review') == 1
     shown = '\n'.join(document(workspace))
     assert 'Queue Platform' in shown and 'Queue-Platform' not in shown
-    # Only F10's own designed finding (a result claiming more than its line) stays a warning; the name's is fixed.
-    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_FALLBACK']
-    assert 'Название проекта' not in result.issues[0].message
+    # Only F10's own designed finding (a result claiming more than its line) stays a warning; the name's is fixed. The
+    # career line has no block since «Две колонки» 1.7.0 (D184) and is named as unused.
+    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_UNUSED', 'IMPORT_SOURCE_FALLBACK']
+    assert not any('Название проекта' in issue.message for issue in result.issues)
 
 
 @pytest.mark.asyncio
@@ -259,4 +260,4 @@ async def test_an_entry_the_map_titled_by_its_employer_that_names_a_project_is_f
     assert [(flag['title'], flag['name']) for flag in closed['titledByEmployer']] == [('Example Labs', 'Queue Platform')]
     assert not any(value.disposition == 'violation' and value.reason.startswith('Название проекта')
         for record in result.review_inputs for value in record.value.settled)
-    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_FALLBACK']
+    assert [issue.code for issue in result.issues] == ['IMPORT_SOURCE_UNUSED', 'IMPORT_SOURCE_FALLBACK']

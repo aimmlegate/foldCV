@@ -45,16 +45,19 @@ async def test_lines_the_map_gives_no_block_are_named_once_at_the_top_and_kept_a
         return answer
     _fixture, result, workspace, _originals = await generic_import(tmp_path, 'F10', source_map=True, wrap=wrap)
     assert result.state == 'published'
-    # The languages line is in no block and holds content; the open source line the map named as holding none.
+    # The languages line is in no block and holds content; the open source line the map named as holding none. The
+    # career line has no block since «Две колонки» 1.7.0 (D184): it is text with no field too.
     notices = [issue for issue in result.issues if issue.code == 'IMPORT_SOURCE_UNUSED']
-    assert len(notices) == 1 and notices[0].message == 'Строки резюме не попали ни в один раздел: 1. «English».'
+    assert len(notices) == 1 and notices[0].message == ('Строки резюме не попали ни в один раздел: 2. «English», '
+                                                        '«Career: Mentored five engineers across teams.».')
     assert notices[0].task_id == next(task.id for task in result.tasks if task.kind == 'map')
     project = workspace.project
     published = next(issue for issue in project.import_issues if issue.code == 'IMPORT_SOURCE_UNUSED')
     assert published.block_ids == [next(iter(project.document.blocks())).id]
     unused = [source_slice(project.sources, value.span) for value in project.import_coverage if value.reason == UNUSED_REASON]
-    assert [text.strip() for text in unused] == ['English']
+    assert [text.strip() for text in unused] == ['English', 'Career: Mentored five engineers across teams.']
     assert all(value.disposition == 'source_only' for value in project.import_coverage if value.reason == UNUSED_REASON)
-    # Without such lines there is no notice.
+    # Without the two lines only the career line is named.
     _fixture, plain, _workspace, _originals = await generic_import(tmp_path / 'plain', 'F10', source_map=True)
-    assert not any(issue.code == 'IMPORT_SOURCE_UNUSED' for issue in plain.issues)
+    assert [issue.message for issue in plain.issues if issue.code == 'IMPORT_SOURCE_UNUSED'] == [
+        'Строки резюме не попали ни в один раздел: 1. «Career: Mentored five engineers across teams.».']

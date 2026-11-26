@@ -2,7 +2,7 @@
 schema_version: 4
 template:
   id: generic-two-column
-  revision: 1.6.0
+  revision: 1.7.0
   name: Две колонки
   default_locale: ru
 model:
@@ -445,32 +445,6 @@ blocks:
     - type: join_items
       field: /items
       separator: ', '
-      style: body
-- id: career_highlights
-  region: main
-  order: 40
-  schema: terms
-  facts:
-    career_highlights: [items/*=text]
-  extract:
-  - Preserve explicitly career-wide achievements in their own optional block, as shown in reference_a.
-  - Do not duplicate project results or attach an achievement to an employer without source support.
-  rules:
-  - 'Достижения: личный вклад и подтверждённый эффект, один пункт — одно достижение. Если эффект неизвестен, описать
-    выполненную работу.'
-  rewrite:
-    fields: [/items]
-    instructions:
-    - Preserve attribution, metrics and qualifications while improving clarity.
-  view:
-    title:
-      ru: КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ
-      en: CAREER HIGHLIGHTS
-    inset: 10.5
-    item_gap: 8
-    nodes:
-    - type: bullets
-      field: /items
       style: body
 - id: programming
   region: main
@@ -956,9 +930,6 @@ fact_types:
 - id: other_projects
   fields:
     items: texts
-- id: career_highlights
-  fields:
-    text: string
 - id: programming
   fields:
     display: string

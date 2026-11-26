@@ -54,6 +54,16 @@ LETTERS = re.compile(r'[^\W\d_]+')
 CYRILLIC, LATIN = re.compile(r'[а-яё]'), re.compile(r'[a-z]')
 NAME_WORD = re.compile(r"[^\W\d_][\w.+#-]*")
 TECHNOLOGY_LISTS = ('programming', 'data_and_tools', 'infrastructure', 'role_tools')
+# A map block whose lines also serve other blocks (block_lines): focus lines feed the technology lists.
+MAP_SERVES = {'focus': TECHNOLOGY_LISTS}
+
+
+def map_blocks(wanted):
+    """The scheme's blocks the map offers for a template: each one the template has, or whose lines a block it has
+    takes (D184). A block the template does not have gets no lines, no request and no write; its CV lines are text
+    with no field. The entry block always stays: the entries are mapped under it."""
+    return [(name, holds) for name, holds in P.MAP_BLOCKS if name in P.ENTRY_BLOCKS or wanted(name)
+            or any(wanted(other) for other in MAP_SERVES.get(name, ()))]
 OWN_PERIOD = 3  # an entry's own period line stands among its first lines
 SEPARATORS = ' \t,;:|·•/–—-'
 # A call that gave no reply is asked once more, unless the account, a cancel or the deadline stopped it. The map and a
@@ -173,6 +183,7 @@ class Import:
         self.blocks = None if blocks is None else set(blocks)
         self.custom = dict(custom or {})
         self.mapped = [(block, spec['holds']) for block, spec in self.custom.items()]
+        self.known = map_blocks(self.wanted)
         self.data = CV(sources)
         self.lines = self.data.lines
         # The résumé is written in the language most of the CV's letters are of; a value with a form takes its words.
@@ -387,7 +398,7 @@ class Import:
                          'last': entry.get('last'), 'employer': entry.get('employer'), 'jobTitle': entry.get('job_title'),
                          'period': entry.get('period')} for entry in payload.get('entries') or []],
             'hidden': payload.get('hidden') or []}
-        request = {'blocks': [{'block': name} for name, _ in [*P.MAP_BLOCKS, *self.mapped]],
+        request = {'blocks': [{'block': name} for name, _ in [*self.known, *self.mapped]],
                    'entryBlocks': [{'block': name} for name in P.ENTRY_BLOCKS]}
         value = parse_map(reply, self.data.offered, self.data.sources, request)
         # A line with content of a block is never hidden (map rule): a line the map both places and hides stays placed.
@@ -740,8 +751,9 @@ class Import:
         reply the checks refuse, lines of projects with no entry at all, a long run of lines no entry holds."""
         page = self.page_lines() if L3 else set()
         lines = [line for line in self.lines if line.ref not in page]
-        payload = self.call('map', 'map', P.map_request(lines, parts=True, extra=self.mapped) if L3
-                            else P.map_request(self.lines, extra=self.mapped), P.map_schema(self.mapped))
+        payload = self.call('map', 'map', P.map_request(lines, parts=True, extra=self.mapped, blocks=self.known) if L3
+                            else P.map_request(self.lines, extra=self.mapped, blocks=self.known),
+                            P.map_schema(self.mapped, self.known))
         if payload is None:
             return None, 'no map'
         try:

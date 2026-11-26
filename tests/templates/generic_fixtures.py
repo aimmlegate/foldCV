@@ -1,6 +1,7 @@
 """Scripted two-column replies: each block's payload, with the exact source phrase every value cites."""
 
 from functools import cache
+from pathlib import Path
 
 from packages.resume_core.importing.template_identity import _binding_instances, empty_value
 from packages.resume_core.templates.source_spans import _bound_root, payload_value
@@ -15,6 +16,16 @@ from tests.templates.storage_fixtures import source_fixture
 @cache
 def generic_package():
     return compile_template(BUNDLED_TEMPLATE)
+
+
+OLD_TWO_COLUMN = Path(__file__).resolve().parents[1] / 'fixtures/synthetic/templates/generic-two-column-1.6.0.yaml'
+
+
+@cache
+def two_column_1_6():
+    """«Две колонки» 1.6.0, the last revision with the block career_highlights (D184), as projects captured it."""
+    from packages.resume_core.templates.compiler import compile_bytes
+    return compile_bytes(OLD_TWO_COLUMN.read_bytes(), BUNDLED_TEMPLATE.parent)
 
 
 def pointer_of(tokens):

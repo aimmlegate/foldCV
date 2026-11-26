@@ -135,11 +135,12 @@ MAP_EXAMPLE_REPLY = {
     'hidden': [{'first': 'S4', 'last': 'S5'}, {'first': 'S16', 'last': 'S16'}, {'first': 'S18', 'last': 'S18'}]}
 
 
-def map_schema(extra=()):
-    """extra: (block, what it holds) of the template's own blocks, mapped beside the scheme's."""
+def map_schema(extra=(), blocks=MAP_BLOCKS):
+    """extra: (block, what it holds) of the template's own blocks, mapped beside the scheme's; blocks: the scheme's
+    blocks this template takes (the scheme's `map_blocks`)."""
     header = {**closed({'value': NAME, 'line': REF}), 'type': ['object', 'null']}
     return closed({
-        'blocks': array(closed({'block': {'type': 'string', 'enum': [name for name, _ in [*MAP_BLOCKS, *extra]]},
+        'blocks': array(closed({'block': {'type': 'string', 'enum': [name for name, _ in [*blocks, *extra]]},
                                 'ranges': array(RANGE, minItems=1)})),
         'entries': array(closed({'block': {'type': 'string', 'enum': ENTRY_BLOCKS}, 'title': {'type': 'string'},
                                  'first': REF, 'last': REF, 'employer': header, 'job_title': header, 'period': header})),
@@ -151,12 +152,12 @@ MAP_RULE_PARTS = ('When one line states two of employer, job_title and period, e
                   'that line, never the whole line.')
 
 
-def map_request(lines, parts=True, extra=()):
+def map_request(lines, parts=True, extra=(), blocks=MAP_BLOCKS):
     return request({
         'task': 'Map a CV for a résumé template: say which lines hold the content of each block, list the entries of '
                 'the block projects with their header values, and name the lines that hold no content. A later step '
                 'reads each block from its own lines only, so give a block every line its content needs.',
-        'blocks': [{'block': name, 'holds': text} for name, text in [*MAP_BLOCKS, *extra]],
+        'blocks': [{'block': name, 'holds': text} for name, text in [*blocks, *extra]],
         'rules': [COMMON[0], *MAP_RULES, *([MAP_RULE_PARTS] if parts else [])],
         'example': {'lines': MAP_EXAMPLE_LINES, 'reply': MAP_EXAMPLE_REPLY},
         'lines': pairs(lines)})

@@ -8,6 +8,7 @@ import pytest
 from packages.resume_core.repository import block_reword as R
 from packages.resume_core.repository.assistant_compiler import compile_ops
 from resume_api.projects.service import response_for_workspace
+from tests.templates.generic_fixtures import two_column_1_6
 from tests.templates.test_lite_import import Unwritten, lite_run
 
 
@@ -70,7 +71,8 @@ def test_the_request_tells_the_model_only_what_the_user_saw_and_takes_a_reply_of
 
 
 def test_a_block_the_import_wrote_as_a_list_is_offered_with_its_items_as_values(tmp_path):
-    fixture, _operation = lite_run(tmp_path, 'promotions')
+    # «Две колонки» 1.6.0 has the list block (D184); a project captured with it keeps the block.
+    fixture, _operation = lite_run(tmp_path, 'promotions', package=two_column_1_6())
     written = fixture.current()
     blocks = [R.reword_source(written, block_id) for block_id in R.rewordable(written)]
     highlights = next(source for source in blocks if source.block.id == 'career_highlights')
@@ -183,3 +185,13 @@ def test_the_routes_preview_without_a_write_and_apply_as_one_action_that_undo_ta
         undone = editor.step('undo', 'reword-undo-1', expected=applied['history']['undo']['actionId'])
         record = next(value for value in undone['response']['workspace']['project']['facts']['records'] if value['id'] == target.record_id)
         assert record['value']['value'] == 'Перевела расчёты с Oracle на PostgreSQL'
+
+
+def test_a_new_import_offers_no_list_block_to_write_again(tmp_path):
+    """D184: a new import with «Две колонки» 1.7.0 has no career highlights block, so none is offered again."""
+    fixture, _operation = lite_run(tmp_path, 'promotions')
+    written = fixture.current()
+    blocks = [R.reword_source(written, block_id) for block_id in R.rewordable(written)]
+    assert not [source for source in blocks if source.block.id == 'career_highlights']
+    assert not any(getattr(block.presentation, 'view_key', None) == 'career_highlights'
+                   for block in written.project.document.blocks())

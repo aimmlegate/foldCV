@@ -15,7 +15,7 @@ from packages.resume_core.import_failure import TemplateImportFailure
 from resume_api.importer import lite_import
 from resume_api.projects.errors import ProjectFailure
 from resume_api.providers.content import ContentFailure, ReportedUsage
-from tests.templates.generic_fixtures import generic_package
+from tests.templates.generic_fixtures import generic_package, two_column_1_6
 from tests.templates.scripted_template_provider import ScriptedTemplateProvider
 from tests.templates.template_runtime_fixtures import ControlledTransport, EmploymentFixture
 from tests.templates.test_template_import_app import app_client, operation_of, saved, upload
@@ -120,6 +120,12 @@ def promotions(tmp_path_factory):
     return lite_run(tmp_path_factory.mktemp('promotions'), 'promotions')
 
 
+@pytest.fixture(scope='module')
+def highlights(tmp_path_factory):
+    """The same run with «Две колонки» 1.6.0, the last revision with career highlights (D184)."""
+    return lite_run(tmp_path_factory.mktemp('highlights'), 'promotions', package=two_column_1_6())
+
+
 def test_a_lite_import_publishes_the_schemes_result_with_no_model_call_of_the_pipeline(promotions):
     fixture, operation = promotions
     assert operation.state == 'published'
@@ -138,8 +144,8 @@ def test_a_lite_import_publishes_the_schemes_result_with_no_model_call_of_the_pi
     assert sum(attempt.usage.output_tokens for attempt in operation.attempts) == sum(usage.output_tokens for usage in spent)
 
 
-def test_a_block_the_cv_has_no_text_for_is_written_from_its_lines_and_marked_as_added(promotions):
-    fixture, operation = promotions
+def test_a_block_the_cv_has_no_text_for_is_written_from_its_lines_and_marked_as_added(highlights):
+    fixture, operation = highlights
     # The CV has no summary and no career highlights. One call beside the others wrote both (the general rule for a
     # block the CV left empty and the template lets a model word), and each shows as written, not as its cited lines.
     assert [(row['kind'], row['block']) for row in fixture.transport.stored.rows].count(('write', 'write')) == 1
@@ -222,9 +228,10 @@ def test_a_refused_written_block_is_asked_for_again_and_the_second_text_is_kept(
     assert [item['block'] for item in second['write']] == ['summary'] and 'two alphabets' in second['refused']['summary']
 
 
-def test_a_written_block_is_asked_for_by_the_templates_rules_of_wording_not_the_legacy_prompts(promotions):
+def test_a_written_block_is_asked_for_by_the_templates_rules_of_wording_not_the_legacy_prompts(highlights):
     from packages.resume_core.importing.lite.rules import BLOCKS, STYLE
     from packages.resume_core.importing.lite.scheme import Import
+    promotions = highlights
     package = promotions[0].current().project.template_package
     rules = lite_import.writing_rules(package)
     # The bundled template carries the unified rules as its own copy.
@@ -683,3 +690,72 @@ async def test_a_start_with_lite_captures_a_lite_import_and_no_task_calls_a_mode
         assert app.state.intake.capture(saved(app, project), False, lite=True).fallback is None
         with pytest.raises(ProjectFailure, match='MODEL_DENIED'):
             app.state.intake.capture(saved(app, project), False, lite=False)
+
+
+def test_a_template_without_career_highlights_asks_no_part_for_them_and_shows_none(promotions):
+    """D184: «Две колонки» 1.7.0 has no block career_highlights. The map does not offer it, no write call names it, no
+    task or notice is made for it, and the import publishes; the summary is still written."""
+    fixture, operation = promotions
+    package = fixture.current().project.template_package
+    assert 'career_highlights' not in {block.id for block in package.definition.blocks}
+    assert operation.state == 'published'
+    assert 'career_highlights' not in {task.block_id for task in operation.tasks}
+    notices = [issue for issue in fixture.current().project.import_issues if issue.code == 'IMPORT_TEXT_GENERATED']
+    blocks = {task.id: task.block_id for task in operation.tasks}
+    assert [blocks[notice.task_id] for notice in notices] == ['summary']
+
+    class Seen(StoredCalls):
+        def __init__(self, name):
+            super().__init__(name)
+            self.prompts, self.schemas = {}, {}
+
+        def call(self, kind, block, prompt, schema):
+            self.prompts[(kind, block)], self.schemas[(kind, block)] = json.loads(prompt), schema
+            return super().call(kind, block, prompt, schema)
+    calls = Seen('promotions')
+    result = lite_import.run(fixture.current().project.sources, package, calls)
+    mapped = [item['block'] for item in calls.prompts[('map', 'map')]['blocks']]
+    assert 'career_highlights' not in mapped and 'summary' in mapped and 'projects' in mapped
+    assert 'career_highlights' not in json.dumps(calls.schemas[('map', 'map')])
+    assert [item['block'] for item in calls.prompts[('write', 'write')]['write']] == ['summary']
+    assert 'career_highlights' not in result.table
+
+
+def test_the_map_keeps_a_block_whose_lines_a_block_of_the_template_takes():
+    """A template without Focus still maps focus lines: they feed its technology lists (D184 rule, map_blocks)."""
+    from packages.resume_core.importing.lite.scheme import map_blocks
+    names = lambda present: [name for name, _holds in map_blocks(lambda block: block in present)]
+    assert 'focus' in names({'programming'}) and 'focus' not in names({'summary'})
+    assert 'career_highlights' not in names({'focus', 'projects'}) and 'career_highlights' in names({'career_highlights'})
+    # The entry block is always offered: the entries are mapped under it.
+    assert names(set()) == ['projects']
+
+
+def test_a_career_wide_section_is_text_with_no_field_and_moves_into_no_job(tmp_path):
+    """D184, 2e: the CV has its own section of career-wide achievements and the template has no block for it. The map
+    offers no such block, so its line gets none; the import does not move it into a job. It takes the path of text with
+    no field: not on the page, kept with the import's other lines, and marked for the original (red). The jobs keep
+    their own results. Synthetic CV: the stored run, with its last two lines made a career section."""
+    line = 'Сократила время выпуска релизов вдвое в трёх командах'
+
+    class Career(StoredCalls):
+        def call(self, kind, block, prompt, schema):
+            reply, row = super().call(kind, block, prompt, schema)
+            if kind == 'map' and reply is not None:
+                # S30 is the career line now: the map gives it to no block (the stored run gave it to education).
+                reply = {**reply, 'blocks': [item for item in reply['blocks'] if item['block'] != 'education']}
+            return reply, row
+    fixture, operation = lite_run(tmp_path, 'promotions', calls=Career('promotions'),
+                                  lines={29: 'Ключевые достижения', 30: line})
+    assert operation.state == 'published'
+    project = fixture.current().project
+    shown = document_text(fixture)
+    assert line not in shown and 'Ключевые достижения' not in shown
+    assert not any(getattr(block.presentation, 'view_key', None) == 'career_highlights' for block in project.document.blocks())
+    # The jobs keep their own results; no job took the career line.
+    assert 'Провела переход группы на трёхнедельные релизы' in shown and 'Подготовила 30 практических заданий' in shown
+    assert not any(line in record.model_dump_json() for record in project.facts.records if record.kind == 'employment')
+    # Kept as text with no field, and marked for the original; the heading is hidden form.
+    assert [(value.reason, value.lines) for value in operation.other_lines if line in value.lines] == [('no_field', [line])]
+    assert line in [issue.message for issue in project.import_issues if issue.code == 'IMPORT_LINES_NO_FIELD']
+    assert any('Ключевые достижения' in value.lines for value in operation.other_lines if value.reason == 'hidden')

@@ -29,7 +29,7 @@ def test_equivalent_yaml_json_keeps_originals_and_compiled_assets(config):
     assert yaml_package.original_hash != json_package.original_hash
     assert yaml_package.original_format == "yaml"
     assert json_package.original_format == "json"
-    assert len(yaml_package.blocks) == 17
+    assert len(yaml_package.blocks) == 16  # D184: 1.7.0 has no career_highlights
     assert yaml_package.recipe.style.text["name"].size == 18
     assert yaml_package.recipe.style.text["body"].size == 10
     assert yaml_package.recipe.layout.regions[1].width == 118.5

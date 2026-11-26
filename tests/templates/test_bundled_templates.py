@@ -23,7 +23,8 @@ from tests.templates.test_panel_preparation import move
 from tests.templates.test_template_preparation import response
 from tests.templates.test_template_view_adapters import render
 
-TWO_COLUMN_HASH = 'd6035e8907f3a3bfc8866ce6b99df408dadb0fd1c8ef3f58462650617e5083b3'
+# D184: 1.7.0 has no block career_highlights (was d6035e89… at 1.6.0).
+TWO_COLUMN_HASH = 'da9049e297e75051ee555cb89284d24cc45e25e04592c438cd05845a5fc86b1b'
 GENERIC = BUNDLED_TEMPLATES['generic-one-column']
 PUBLIC = ['generic-two-column', 'generic-one-column', 'generic-skills-table', 'generic-questionnaire', 'generic-project-cards']
 
@@ -44,7 +45,11 @@ def test_every_public_template_carries_the_unified_rules_of_wording_as_its_own_c
     from packages.resume_core.importing.lite.rules import BLOCKS, STYLE
     definition = bundled_package(template).definition
     assert definition.model.rules == STYLE
-    assert {block.id: block.rules for block in definition.blocks if block.rules} == BLOCKS
+    # A template that has no block of the unified rules (D184: «Две колонки» has no career_highlights) carries no copy of
+    # its rules; every block it has carries them.
+    present = {block.id for block in definition.blocks}
+    assert {block.id: block.rules for block in definition.blocks if block.rules} == {
+        key: value for key, value in BLOCKS.items() if key in present}
 
 
 def test_a_template_without_rules_of_wording_keeps_its_hash_and_the_short_form_takes_them():

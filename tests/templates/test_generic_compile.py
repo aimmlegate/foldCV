@@ -29,7 +29,7 @@ def binding(value, identifier, pointer):
 
 def test_the_bundled_template_maps_its_types_to_the_existing_record_kinds():
     package = generic_package()
-    assert package.revision == '1.6.0' and 'date_text' in package.recipe.capabilities
+    assert package.revision == '1.7.0' and 'date_text' in package.recipe.capabilities
     kinds = {fact.id: (fact.builtin_kind, {key: value.field for key, value in fact.builtin_fields.items()})
         for fact in package.definition.fact_types}
     assert kinds['foldcv:identity'] == ('candidate', {'name': 'name', 'profession': 'title'})
@@ -46,7 +46,7 @@ def test_the_bundled_template_maps_its_types_to_the_existing_record_kinds():
     assert {name: kind for name, (kind, _fields) in kinds.items() if kind is None} == {name: None for name in [
         'foldcv:role_family', 'foldcv:education_place', 'foldcv:location', 'foldcv:language_note', 'foldcv:opensource',
         'foldcv:portfolio', 'foldcv:summary', 'foldcv:project', 'foldcv:project_role', 'foldcv:other_projects',
-        'foldcv:career_highlights', 'foldcv:key_skills']}
+        'foldcv:key_skills']}
 
 
 def test_two_semantic_types_at_one_item_root_are_refused_for_new_packages_only():

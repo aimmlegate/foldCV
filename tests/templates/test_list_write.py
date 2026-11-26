@@ -7,7 +7,23 @@ import json
 import pytest
 
 from packages.resume_core.repository import block_write as W
-from tests.templates.test_block_write import CONTACT, Writing, imported, run  # noqa: F401 (imported: a fixture)
+from tests.templates.generic_fixtures import two_column_1_6
+from tests.templates.test_block_write import CONTACT, Writing
+from tests.templates.test_lite_import import lite_run
+
+
+def run(tmp_path):
+    """The invented CV with a phone number in its contact line, imported with «Две колонки» 1.6.0: since 1.7.0 (D184)
+    only a project captured with an earlier revision has the list block."""
+    return lite_run(tmp_path, 'promotions', lines={4: CONTACT}, package=two_column_1_6())
+
+
+@pytest.fixture(scope='module')
+def imported(tmp_path_factory):
+    fixture, operation = run(tmp_path_factory.mktemp('list-write'))
+    workspace = fixture.current()
+    hidden = W.hidden_lines([operation])
+    return workspace, operation, hidden, None
 
 ROLE = 'Руковожу группой разработчиков биллинга и планирую кварталы'     # «планирую кварталы» is not in S12
 GATEWAY = 'Писала интеграцию с платёжным шлюзом'                          # S23 word for word
@@ -284,3 +300,17 @@ def test_l11_the_lines_of_a_removed_item_are_red_as_removed_until_undo(tmp_path)
         assert not [row for row in rows if row['text'] == 'Перевела расчёты с Oracle на PostgreSQL']
         stand.editor.step('undo', 'list-undo', expected=applied['history']['undo']['actionId'])
         assert removed() == []
+
+
+def test_a_project_captured_with_1_6_opens_shows_its_list_and_offers_it_again(tmp_path):
+    """D184, 2f: a project keeps its captured template. One captured with «Две колонки» 1.6.0 opens with the list
+    block «Ключевые достижения» and still offers «Написать заново по резюме» for it, while the store ships 1.7.0."""
+    from packages.resume_core.templates.store import bundled_package
+    assert bundled_package('generic-two-column').revision == '1.7.0'
+    with Stand(tmp_path, Writing()) as stand:
+        project = stand.editor.workspace().project
+        assert project.template_package.revision == '1.6.0'
+        assert any(getattr(block.presentation, 'view_key', None) == 'career_highlights' for block in project.document.blocks())
+        assert stand.block in stand.editor.response['presentation']['blocks']
+        offered = stand.client.get('/v2/projects/' + stand.project + '/reword/blocks').json()
+        assert stand.block in offered['write']
