@@ -81,7 +81,7 @@ YEARS = re.compile(r'(?<![\w.,])(\d{1,2})(?:[.,](\d))?\s*\+?\s*(лет|года|
 ITEMS = re.compile(r'[;|•]|,(?!\d)')
 DATE_WORD = re.compile(r'^(?:январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр|янв|фев|мар|апр|'
                        r'авг|сен|окт|ноя|дек|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|настоящ|наст|время|сейчас|'
-                       r'текущ|present|now|current|today|ongoing|till|состоянию)', re.I)
+                       r'текущ|present|now|current|today|ongoing|till|состоянию|сих|пор|сей|день|наши|дни)', re.I)
 
 
 def pointer(*tokens):

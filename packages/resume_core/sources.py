@@ -6,6 +6,7 @@ from .extraction.models import ExtractResult
 from .hashing import sha256
 from .models.contracts import Source
 from .models.template_facts import SourceSpan
+from .period_text import wraps
 
 
 def canonical_source(result: ExtractResult, *, source_id: str | None = None) -> Source:
@@ -51,11 +52,21 @@ def capture_span(source,unit,start=0,end=None):
     return span
 
 
-def line_spans(source, unit):
-    """Each non-blank line of a multi-line unit, with its line break, as one exact span."""
-    spans, start = [], 0
-    for line in unit.text.splitlines(keepends=True):
+def line_cuts(text):
+    """(start, end) of each non-blank line of a text, with its line break. A period that a narrow column wraps onto
+    two lines («март 2025 —» / «настоящее время») is one line: read apart, its end is lost."""
+    cuts, start = [], 0
+    for line in text.splitlines(keepends=True):
         if line.strip():
-            spans.append(capture_span(source, unit, start, start + len(line)))
+            if cuts and wraps(text[cuts[-1][0]:cuts[-1][1]], line):
+                cuts[-1] = (cuts[-1][0], start + len(line))
+            else:
+                cuts.append((start, start + len(line)))
         start += len(line)
+    return cuts
+
+
+def line_spans(source, unit):
+    """Each line of a multi-line unit, as line_cuts cuts it, as one exact span."""
+    spans = [capture_span(source, unit, start, end) for start, end in line_cuts(unit.text)]
     return spans if len(spans) > 1 else []

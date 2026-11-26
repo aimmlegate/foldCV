@@ -17,6 +17,7 @@ import re
 from ..hashing import digest
 from ..models.template_import import (EntryHeader, EvidenceOption, HeaderValue, MapRepairReply, MapReply,
                                       ReviewInput, SettledCheck)
+from ..period_text import parse_period
 from ..sources import capture_span, line_spans, source_slice
 from ..templates.compiler import splits_entries
 from ..templates.replies import MAP_PROTOCOL, MAP_REPAIR_PROTOCOL, MAPPED_REVIEW_PROTOCOL
@@ -353,50 +354,6 @@ def map_scopes(value, offered, block_id):
         scopes.append((title, [offered[ref].span for ref in entry['lines']], EntryHeader(employer=header('employer'),
             jobTitle=header('jobTitle'), period=header('period'), dropped=list(entry.get('dropped', [])))))
     return scopes
-
-
-# Header values are put into an entry's reply before completion (T4, point 3). Month stems in Russian and English: a
-# period's dates are read from its wording.
-MONTHS = {1: ('январ', 'янв', 'jan'), 2: ('феврал', 'фев', 'feb'), 3: ('март', 'мар', 'mar'), 4: ('апрел', 'апр', 'apr'),
-    5: ('май', 'мая', 'may'), 6: ('июн', 'jun'), 7: ('июл', 'jul'), 8: ('август', 'авг', 'aug'),
-    9: ('сентябр', 'сен', 'sep'), 10: ('октябр', 'окт', 'oct'), 11: ('ноябр', 'ноя', 'nov'), 12: ('декабр', 'дек', 'dec')}
-PRESENT = re.compile(r'настоящ|н\.\s?в\b|наст\.|сейчас|текущ|present|now|current|today|ongoing', re.IGNORECASE)
-DATE = re.compile(r'(?P<name>[^\W\d_]{3,})\.?\s*(?P<named>(?:19|20)\d{2})(?!\d)|'
-    r'(?<![\d.])(?P<month>0?[1-9]|1[0-2])\s*[./-]\s*(?P<numbered>(?:19|20)\d{2})(?!\d)|'
-    r'(?<![\d.])(?P<first>(?:19|20)\d{2})[-./](?P<later>0[1-9]|1[0-2])(?![\d.])|'
-    r'(?<![\d.])(?P<year>(?:19|20)\d{2})(?!\d)')
-
-
-def _month(name):
-    folded = name.casefold()
-    return next((number for number, stems in MONTHS.items() if any(folded.startswith(stem) for stem in stems)), None)
-
-
-def _date(year, month):
-    # As the templates ask the model to write it (D135): MM.YYYY, or YYYY when the source states only the year.
-    return {'raw': f'{month:02d}.{year}' if month else str(year), 'year': year, 'month': month}
-
-
-def parse_period(text):
-    """The template's period object read from a period's wording, or None when no date reads from it: the first date
-    starts it, a later one ends it, and a word for now after the start makes it ongoing."""
-    dates = []
-    for found in DATE.finditer(text):
-        if found['named']:
-            dates.append((found.start(), _date(int(found['named']), _month(found['name']))))
-        elif found['numbered']:
-            dates.append((found.start(), _date(int(found['numbered']), int(found['month']))))
-        elif found['first']:
-            dates.append((found.start(), _date(int(found['first']), int(found['later']))))
-        else:
-            dates.append((found.start(), _date(int(found['year']), None)))
-    if not dates:
-        return None
-    start, ongoing = dates[0][1], PRESENT.search(text[dates[0][0]:]) is not None
-    end = None if ongoing or len(dates) < 2 else dates[1][1]
-    if end is not None and (end['year'], end['month'] or 0) < (start['year'], start['month'] or 0):
-        return None
-    return {'raw': ' '.join(text.split()), 'start': start, 'end': end, 'ongoing': ongoing}
 
 
 def header_fields(block, definition):

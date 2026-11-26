@@ -364,6 +364,22 @@ def test_the_lines_of_a_value_the_admission_drops_are_kept(promotions):
     assert lines and set().union(*(line_words(text) for text, _words in lines)) <= lite_import.shown_words(task)
 
 
+def test_a_period_wrapped_onto_two_lines_keeps_its_end(tmp_path):
+    """A narrow column wraps a period («март 2023 —» / «по настоящее время»). Read as two lines, the import took the
+    dates of one line only and the page showed a start with no end. The line cut keeps such a period on one line."""
+    fixture, operation = lite_run(tmp_path, 'promotions', lines={11: 'Март 2023 —\nпо настоящее время',
+                                                                  26: 'Сентябрь 2021 —\nмай 2023'})
+    assert operation.state == 'published'
+    periods = {record.role.raw_text: [(period.start.raw_text, period.end.raw_text, period.present.value)
+        for period in record.periods] for record in fixture.current().project.facts.records if record.kind == 'employment'}
+    assert periods['Руководитель группы разработки'] == [('03.2023', '', True)]
+    assert periods['Преподаватель курса по Java (по совместительству)'] == [('09.2021', '05.2023', False)]
+    shown = ' '.join(document_text(fixture).split())
+    assert '03.2023 – по настоящее время' in shown and '09.2021 – 05.2023' in shown
+    # Neither half of a wrapped period is left over as text with no field.
+    assert not [value.lines for value in operation.other_lines if any('2023' in line and '2017' not in line for line in value.lines)]
+
+
 def test_a_project_with_no_employer_role_or_period_is_still_a_card(tmp_path):
     fixture, operation = lite_run(tmp_path, 'junior')
     assert operation.state == 'published'

@@ -9,6 +9,8 @@ import pytest
 from packages.resume_core.hashing import digest
 from packages.resume_core.importing.template_map import header_fields, merge_header, parse_period
 from packages.resume_core.models.template_import import EntryHeader, EntryPart, EntryScope, HeaderValue
+from packages.resume_core.period_text import wraps
+from packages.resume_core.sources import line_cuts
 from packages.resume_core.templates.replies import MAPPED_PROPOSAL_VERSION, PROPOSAL_PROTOCOL, proposal_protocol
 from tests.templates.generic_fixtures import TABLES, generic_import, generic_package
 from tests.templates.test_map_blocks import document
@@ -23,12 +25,46 @@ from tests.templates.test_source_map import LINES, cv_source, line, table
     ('сентябрь 2018 – декабрь 2019', ('09.2018', 2018, 9), ('12.2019', 2019, 12), False),
     ('2015', ('2015', 2015, None), None, False),
     ('2010–2011-10', ('2010', 2010, None), ('10.2011', 2011, 10), False),
+    ('03.2021 – н/в', ('03.2021', 2021, 3), None, True),
+    ('март 2021 г. — н. вр.', ('03.2021', 2021, 3), None, True),
+    ('03.2021 — до сих пор', ('03.2021', 2021, 3), None, True),
+    ('2021 – по сей день', ('2021', 2021, None), None, True),
 ])
 def test_a_period_reads_its_dates_from_the_wording_the_cv_gives_it(text, start, end, ongoing):
     period = parse_period(text)
     as_date = lambda value: None if value is None else (value['raw'], value['year'], value['month'])
     assert (period['raw'], as_date(period['start']), as_date(period['end']), period['ongoing']) == (
         ' '.join(text.split()), start, end, ongoing)
+
+
+@pytest.mark.parametrize('first,second', [
+    ('Март 2021 —', 'настоящее время'), ('Июнь 2018 —', 'Февраль 2021'), ('Июнь 2018 — Февраль', '2021'),
+    ('с марта 2021 по', 'настоящее время'), ('03.2018 -', '11.2020 (2 года 9 месяцев)'), ('Аналитик, март 2021 —', 'по н.в.'),
+])
+def test_a_period_a_narrow_column_wraps_is_one_period(first, second):
+    whole = parse_period(first + ' ' + second)
+    assert wraps(first, second) and (whole['end'] is not None or whole['ongoing'])
+
+
+@pytest.mark.parametrize('first,second', [
+    ('Март 2021', 'настоящее время'),            # no open range
+    ('Март 2021 —', '1 год 9 месяцев'),          # a length of work, no end
+    ('Март 2021 —', 'ООО «Северный ветер»'),     # an employer
+    ('2019 –', '2015 – 2018'),                   # the next job's own period
+    ('2019 –', '2015'),                          # would run backwards
+    ('2019 — Компания', '2021'),                 # the word before the year is no month
+    ('Март 2018 — май 2021', 'настоящее время'),  # the period is whole on its line
+])
+def test_two_lines_that_are_not_one_period_stay_apart(first, second):
+    assert not wraps(first, second)
+
+
+def test_the_line_cut_keeps_a_wrapped_period_on_one_line_and_cuts_every_other_line():
+    text = 'Март 2021 —\nнастоящее время\n1 год 9 месяцев\n\nООО «Северный ветер»\n'
+    assert [text[start:end] for start, end in line_cuts(text)] == ['Март 2021 —\nнастоящее время\n', '1 год 9 месяцев\n',
+        'ООО «Северный ветер»\n']
+    plain = 'Июнь 2018 — февраль 2021\nАО «Южный берег»\n'
+    assert [plain[start:end] for start, end in line_cuts(plain)] == ['Июнь 2018 — февраль 2021\n', 'АО «Южный берег»\n']
 
 
 @pytest.mark.parametrize('text', ['no dates here', '2020 – 2016', ''])

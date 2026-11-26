@@ -15,6 +15,7 @@ document needs. A request of an earlier protocol reads exactly as it was sent, s
 
 import json
 
+from ..sources import line_cuts
 from ..templates.replies import COMPACT_PROTOCOLS
 
 LEADING = ('protocol', 'evidence', 'replyProtocol', 'modelInstructions', 'allowTextRewrite', 'formattingAsOf',
@@ -64,11 +65,7 @@ def unit_lines(option, offered, ends):
     span = option['span']
     if span.get('start') != 0 or span.get('end') != ends[_unit(span)]:
         return []
-    refs, start = [], 0
-    for line in option['text'].splitlines(keepends=True):
-        if line.strip():
-            refs.append(offered.get((_unit(span), start, start + len(line), line)))
-        start += len(line)
+    refs = [offered.get((_unit(span), start, end, option['text'][start:end])) for start, end in line_cuts(option['text'])]
     return refs if len(refs) > 1 and None not in refs else []
 
 
