@@ -3025,6 +3025,41 @@
       "title": "Observation",
       "type": "object"
     },
+    "OwnIcon": {
+      "additionalProperties": false,
+      "description": "D187: a résumé's own copy of an icon from the app's library, so it shows and exports without the library.",
+      "properties": {
+        "bytesBase64": {
+          "maxLength": 1500000,
+          "minLength": 4,
+          "title": "Bytesbase64",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sha256",
+        "bytesBase64"
+      ],
+      "title": "OwnIcon",
+      "type": "object"
+    },
     "Page": {
       "additionalProperties": false,
       "properties": {
@@ -8019,6 +8054,13 @@
       "pattern": "^[a-f0-9]{64}$",
       "title": "Factshash",
       "type": "string"
+    },
+    "ownIcons": {
+      "items": {
+        "$ref": "#/$defs/OwnIcon"
+      },
+      "title": "Ownicons",
+      "type": "array"
     },
     "package": {
       "$ref": "#/$defs/TemplatePackage"

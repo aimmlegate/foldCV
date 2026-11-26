@@ -1271,6 +1271,13 @@
           "title": "Factshash",
           "type": "string"
         },
+        "ownIcons": {
+          "items": {
+            "$ref": "#/$defs/OwnIcon"
+          },
+          "title": "Ownicons",
+          "type": "array"
+        },
         "packageHash": {
           "pattern": "^[a-f0-9]{64}$",
           "title": "Packagehash",
@@ -8951,6 +8958,41 @@
       "title": "OtherLines",
       "type": "object"
     },
+    "OwnIcon": {
+      "additionalProperties": false,
+      "description": "D187: a résumé's own copy of an icon from the app's library, so it shows and exports without the library.",
+      "properties": {
+        "bytesBase64": {
+          "maxLength": 1500000,
+          "minLength": 4,
+          "title": "Bytesbase64",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sha256",
+        "bytesBase64"
+      ],
+      "title": "OwnIcon",
+      "type": "object"
+    },
     "Page": {
       "additionalProperties": false,
       "properties": {
@@ -9826,6 +9868,13 @@
           "title": "Operations",
           "type": "array"
         },
+        "ownIcons": {
+          "items": {
+            "$ref": "#/$defs/OwnIcon"
+          },
+          "title": "Ownicons",
+          "type": "array"
+        },
         "photo": {
           "anyOf": [
             {
@@ -10527,6 +10576,30 @@
       "title": "PutManualScope",
       "type": "object"
     },
+    "PutOwnIcon": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "default": null,
+          "title": "Beforerevision",
+          "type": "null"
+        },
+        "icon": {
+          "$ref": "#/$defs/OwnIcon"
+        },
+        "kind": {
+          "const": "put_own_icon",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "icon"
+      ],
+      "title": "PutOwnIcon",
+      "type": "object"
+    },
     "PutRecord": {
       "additionalProperties": false,
       "properties": {
@@ -11105,6 +11178,27 @@
         "beforeRevision"
       ],
       "title": "RemoveHiddenBlocks",
+      "type": "object"
+    },
+    "RemoveOwnIcon": {
+      "additionalProperties": false,
+      "properties": {
+        "iconId": {
+          "minLength": 1,
+          "title": "Iconid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_own_icon",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "iconId"
+      ],
+      "title": "RemoveOwnIcon",
       "type": "object"
     },
     "RemoveRecord": {
@@ -17684,11 +17778,13 @@
                 "put_extension": "#/$defs/PutExtension",
                 "put_hidden_blocks": "#/$defs/PutHiddenBlocks",
                 "put_manual_scope": "#/$defs/PutManualScope",
+                "put_own_icon": "#/$defs/PutOwnIcon",
                 "put_record": "#/$defs/PutRecord",
                 "put_relation": "#/$defs/PutRelation",
                 "remove_block": "#/$defs/RemoveBlock",
                 "remove_extension": "#/$defs/RemoveExtension",
                 "remove_hidden_blocks": "#/$defs/RemoveHiddenBlocks",
+                "remove_own_icon": "#/$defs/RemoveOwnIcon",
                 "remove_record": "#/$defs/RemoveRecord",
                 "remove_relation": "#/$defs/RemoveRelation",
                 "replace_inline_range": "#/$defs/TemplateReplaceInlineRange",
@@ -17758,6 +17854,12 @@
               },
               {
                 "$ref": "#/$defs/RemoveHiddenBlocks"
+              },
+              {
+                "$ref": "#/$defs/PutOwnIcon"
+              },
+              {
+                "$ref": "#/$defs/RemoveOwnIcon"
               }
             ]
           },
