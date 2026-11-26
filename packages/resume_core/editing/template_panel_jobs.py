@@ -210,9 +210,9 @@ def sort_jobs(project):
     (J4-d). None when every list is in order already."""
     jobs, plans = _jobs(project), []
     for parent, cards in job_lists(project):
-        dated = [block for block in cards if _recency(jobs[block.props.record_id]) is not None]
-        dated.sort(key=lambda block: _recency(jobs[block.props.record_id]), reverse=True)
-        order = dated + [block for block in cards if _recency(jobs[block.props.record_id]) is None]
+        dated = [(recency, block) for block in cards if (recency := _recency(jobs[block.props.record_id])) is not None]
+        dated.sort(key=lambda pair: pair[0], reverse=True)
+        order = [block for _recency_key, block in dated] + [block for block in cards if _recency(jobs[block.props.record_id]) is None]
         if [block.id for block in order] != [block.id for block in cards]:
             plans.append((parent, cards, order))
     if not plans:
@@ -225,10 +225,10 @@ def _form_record(project, record_id, values):
     if record_id is None:
         if not set(values) <= {'start', 'end', 'present'}:
             raise ValueError('DATE_CHECK_INVALID')
-        period = WorkingPeriod(id='form-period', revision=1, start=unknown(), end=unknown(),
-            present={**unknown(), 'value': False, 'status': 'known'}, evidence=[])
-        record = EmploymentRecord(id='form-job', kind='employment', revision=1, origin='user', evidence=[],
-            employer=unknown(), role=unknown(), periods=[period])
+        period = WorkingPeriod.model_validate({'id': 'form-period', 'revision': 1, 'start': unknown(), 'end': unknown(),
+            'present': {**unknown(), 'value': False, 'status': 'known'}, 'evidence': []})
+        record = EmploymentRecord.model_validate({'id': 'form-job', 'kind': 'employment', 'revision': 1, 'origin': 'user',
+            'evidence': [], 'employer': unknown(), 'role': unknown(), 'periods': [period]})
         values = {'period:form-period:' + key: value for key, value in values.items()}
     else:
         original = _jobs(project).get(record_id)

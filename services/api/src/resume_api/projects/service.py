@@ -10,6 +10,7 @@ from packages.resume_core.models.projects import HistoryStateV1, ProjectOpenResu
 from packages.resume_core.repository.project_catalog import ProjectCatalog
 from packages.resume_core.storage import RepositoryFailure
 from packages.resume_core.storage import ProjectStoreFailure
+from packages.resume_core.repository.own_icons import OwnIconStore
 from packages.resume_core.repository.project_tasks import TaskRegistry
 from packages.resume_core.rich_identity import display_identity
 from packages.resume_core.storage import StorageFailure
@@ -44,6 +45,8 @@ class ProjectService:
         self.catalog = catalog or ProjectCatalog(repository.store)
         # The Focus icons the user chose (D122, a FocusIconStore); None keeps none.
         self.icons = icons
+        # The app's own Focus icons (D187, an OwnIconStore); the app sets it, None in a bare service.
+        self.own_icons: OwnIconStore | None = None
         self.lock = threading.Lock()
         # Built once per committed workspace object, for the latest few projects; a hit is verified again under
         # FOLDCV_VERIFY (D108).

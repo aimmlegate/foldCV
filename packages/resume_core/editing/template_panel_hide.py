@@ -190,7 +190,7 @@ def _groups(project, picked):
             run.append(sibling.model_copy(deep=True))
             seen.add(sibling.id)
         before = [sibling.id for sibling in items[:start] if sibling.id not in ids]
-        groups.append(HiddenGroup(parentId=parent, beforeIds=before[-1000:], blocks=run))
+        groups.append(HiddenGroup.model_validate({'parentId': parent, 'beforeIds': before[-1000:], 'blocks': run}))
     return groups
 
 
@@ -199,11 +199,11 @@ def _anchors(project, removed):
     found = []
     for issue in project.import_issues:
         if set(issue.block_ids) & removed:
-            found.append(HiddenAnchor(kind='issue', key=issue.id, blockIds=list(issue.block_ids)))
+            found.append(HiddenAnchor.model_validate({'kind': 'issue', 'key': issue.id, 'blockIds': list(issue.block_ids)}))
     for index, value in enumerate(project.import_coverage):
         if set(value.block_ids) & removed:
-            found.append(HiddenAnchor(kind='coverage', key=sha256(canonical(coverage_identity(value))), index=index,
-                                      blockIds=list(value.block_ids)))
+            found.append(HiddenAnchor.model_validate({'kind': 'coverage', 'key': sha256(canonical(coverage_identity(value))),
+                                                      'index': index, 'blockIds': list(value.block_ids)}))
     return found
 
 

@@ -5,7 +5,7 @@ variant the user asks for by name, not a filter of the import or the editor (D07
 import re
 
 from ..fields import inline_groups
-from ..models.rich_document import FactFieldSpan, Hyperlink
+from ..models.rich_document import FactFieldSpan, Hyperlink, InlineStyles
 from ..models.template_document import BoundLink, FieldOccurrence, PresentedText, TemplateSectionBlock
 
 # A Russian or a Latin patronymic: Сергеевич, Ивановна, Ильинична, Sergeevich, Ivanovna; the Turkic оглы and кызы.
@@ -200,7 +200,7 @@ def anonymized(project, name):
             text = _line_text(content)
             if not text.strip():
                 continue
-            names = [span for span in content if name_span(span)]
+            names = [span for span in content if isinstance(span, FactFieldSpan) and name_span(span)]
             if names:
                 for span in names:
                     span.text = name
@@ -221,7 +221,7 @@ def anonymized(project, name):
                 if isinstance(span, (Hyperlink, BoundLink)) and not in_job(path):
                     # A link that is no profile and stands outside a job: its text stays, its address goes (A4-e).
                     notices.append({'kind': 'link', 'quote': _quote(_span_text(span))})
-                    kept.append(PresentedText(type='text', text=_span_text(span), styles={}, presentation=getattr(
+                    kept.append(PresentedText(type='text', text=_span_text(span), styles=InlineStyles(), presentation=getattr(
                         span, 'presentation', None) or block.presentation))
                     continue
                 if isinstance(span, (PresentedText, FieldOccurrence)) and not name_span(span):

@@ -32,8 +32,8 @@ def set_photo(service, project_id, request):
         data = checked.data
         digest = hashlib.sha256(data).hexdigest()
         extension = 'jpg' if checked.mime_type == 'image/jpeg' else 'png'
-        photo = LocalImageAsset(id='photo-' + digest[:32], sha256=digest, path=f'images/{digest}.{extension}',
-            mimeType=checked.mime_type, size=len(data), width=checked.width, height=checked.height)
+        photo = LocalImageAsset.model_validate({'id': 'photo-' + digest[:32], 'sha256': digest, 'path': f'images/{digest}.{extension}',
+            'mimeType': checked.mime_type, 'size': len(data), 'width': checked.width, 'height': checked.height})
         blobs = [('images', photo.path, data, digest)]
 
     def build(committed):

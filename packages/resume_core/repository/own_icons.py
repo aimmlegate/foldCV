@@ -60,7 +60,8 @@ class OwnIconStore:
             return None
         if hashlib.sha256(data).hexdigest() != entry['sha256']:
             return None
-        return OwnIcon(id=entry['id'], name=entry['name'], sha256=entry['sha256'], bytesBase64=base64.b64encode(data).decode())
+        return OwnIcon.model_validate({'id': entry['id'], 'name': entry['name'], 'sha256': entry['sha256'],
+                                       'bytesBase64': base64.b64encode(data).decode()})
 
     def add(self, name, data):
         """A new library icon: a checked 256 px PNG and a name; two icons may share a name. ValueError with a public code."""

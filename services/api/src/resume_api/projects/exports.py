@@ -12,7 +12,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from packages.resume_core.models.rich_workspace import RichRenderSnapshot
-from packages.resume_core.models.template_render import TemplateRenderRequestV1, TemplateSnapshotIdentity
+from packages.resume_core.models.template_import import ExportAttempt
+from packages.resume_core.models.template_render import TemplateExportCapture, TemplateRenderRequestV1, TemplateSnapshotIdentity
 from packages.resume_core.rich_limits import DOCX_BYTES
 from packages.resume_core.responses.template_export import capture_export
 from packages.resume_core.import_failure import TemplateImportFailure
@@ -37,7 +38,7 @@ class ExportRetry(BaseModel):
 
 @dataclass
 class ExportResult:
-    attempt: object
+    attempt: ExportAttempt
     snapshot: object
     artifact: bytes
 
@@ -132,9 +133,9 @@ class ExportService:
 
 @dataclass
 class _Prepared:
-    attempt: object
-    captured: object
-    request: object
+    attempt: ExportAttempt
+    captured: TemplateExportCapture
+    request: TemplateRenderRequestV1
 
 
 @asynccontextmanager
@@ -210,7 +211,8 @@ def remember_name(repository, session, name):
         current = session.workspace
         project = current.project
         record = next((value for value in project.facts.records if value.kind == 'candidate'), None)
-        value = AnonymizedName(name=' '.join(name.split()), fullName=record.name.raw_text if record is not None else '')
+        value = AnonymizedName.model_validate({'name': ' '.join(name.split()),
+                                               'fullName': record.name.raw_text if record is not None else ''})
         if project.anonymized_name == value:
             return
         updated = current.model_copy(deep=True)
@@ -229,5 +231,5 @@ def photo_input(directory, project):
     from packages.resume_core.rich_limits import IMAGE_BYTES
     from .blobs import read_owned
     data = read_owned(directory / project.photo.path, IMAGE_BYTES, 'IMAGE_NOT_FOUND')
-    return TemplateRenderPhoto(sha256=project.photo.sha256, mimeType=project.photo.mime_type,
-                               bytesBase64=base64.b64encode(data).decode('ascii'))
+    return TemplateRenderPhoto.model_validate({'sha256': project.photo.sha256, 'mimeType': project.photo.mime_type,
+                                               'bytesBase64': base64.b64encode(data).decode('ascii')})

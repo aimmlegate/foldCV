@@ -21,6 +21,7 @@ def choices(service, project_id):
     own, seen = [], set()
     library = getattr(service, 'own_icons', None)
     for entry in library.list() if library is not None else []:
+        assert library is not None
         icon = library.get(entry['id'])
         if icon is not None:
             remember_asset(icon.sha256, icon.bytes_base64, 'image/png')

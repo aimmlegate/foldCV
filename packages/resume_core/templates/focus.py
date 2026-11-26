@@ -203,8 +203,9 @@ def _initial_png(font_bytes, letter):
 def own_assets(icons):
     """A résumé's own icon copies (D187) as assets by id, as the catalog gives its icons."""
     import base64 as _base64
-    return {icon.id: CapturedAsset(id=icon.id, path=f'own-icons/{icon.id}.png', role='icon', mimeType='image/png',
-        sha256=icon.sha256, size=len(_base64.b64decode(icon.bytes_base64)), bytesBase64=icon.bytes_base64) for icon in icons}
+    return {icon.id: CapturedAsset.model_validate({'id': icon.id, 'path': f'own-icons/{icon.id}.png', 'role': 'icon',
+        'mimeType': 'image/png', 'sha256': icon.sha256, 'size': len(_base64.b64decode(icon.bytes_base64)),
+        'bytesBase64': icon.bytes_base64}) for icon in icons}
 
 
 def row_icon(package, facts, row, catalog=None, chosen=None, own=None):
