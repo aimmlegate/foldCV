@@ -132,6 +132,35 @@ class DateCheckResultV1(Wire):
     warnings: list[DateCheckWarningV1]
 
 
+class AnonymizedPreviewRequestV1(Wire):
+    """The anonymized export's dialog (D186): the name to show; none for the remembered or proposed one."""
+    name: str | None = Field(default=None, max_length=200)
+
+
+class AnonymizedNoticeV1(Wire):
+    """A place the user should check: a contact taken out of a sentence, the family name in a sentence, a link kept
+    without its address."""
+    kind: Literal['contact', 'family', 'link']
+    quote: str = Field(max_length=200)
+
+
+class AnonymizedPreviewV1(Wire):
+    schema_version: Literal[1]
+    name: str
+    proposal: str
+    left_out: str
+    notices: list[AnonymizedNoticeV1]
+    # For the print copy: the top blocks the anonymized page leaves out, and the new plain text of changed blocks.
+    removed: list[Id]
+    texts: dict[Id, str]
+
+
+class AnonymizedRememberV1(Wire):
+    """The name the user confirmed for an anonymized PDF; the DOCX export remembers it itself."""
+    editor_token: str = Field(min_length=1, max_length=128)
+    name: str = Field(max_length=200)
+
+
 class DeleteRequestV1(Wire):
     confirmed: Literal[True]
 
@@ -148,6 +177,9 @@ PROJECT_CONTRACTS = {
     'rename_request_v1': RenameRequestV1,
     'delete_request_v1': DeleteRequestV1,
     'date_check_request_v1': DateCheckRequestV1,
+    'anonymized_preview_request_v1': AnonymizedPreviewRequestV1,
+    'anonymized_preview_v1': AnonymizedPreviewV1,
+    'anonymized_remember_v1': AnonymizedRememberV1,
     'date_check_result_v1': DateCheckResultV1,
     'rewrite_preview_request_v1': RewritePreviewRequestV1,
     'rewrite_cancel_request_v1': RewriteCancelRequestV1,

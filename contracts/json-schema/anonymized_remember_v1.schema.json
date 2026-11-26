@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "The name the user confirmed for an anonymized PDF; the DOCX export remembers it itself.",
+  "properties": {
+    "editorToken": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 200,
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "editorToken",
+    "name"
+  ],
+  "title": "AnonymizedRememberV1",
+  "type": "object"
+}

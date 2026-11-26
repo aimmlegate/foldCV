@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "AnonymizedNoticeV1": {
+      "additionalProperties": false,
+      "description": "A place the user should check: a contact taken out of a sentence, the family name in a sentence, a link kept\nwithout its address.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "contact",
+            "family",
+            "link"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "quote": {
+          "maxLength": 200,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "quote"
+      ],
+      "title": "AnonymizedNoticeV1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "leftOut": {
+      "title": "Leftout",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "notices": {
+      "items": {
+        "$ref": "#/$defs/AnonymizedNoticeV1"
+      },
+      "title": "Notices",
+      "type": "array"
+    },
+    "proposal": {
+      "title": "Proposal",
+      "type": "string"
+    },
+    "removed": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Removed",
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "title": "Schemaversion",
+      "type": "integer"
+    },
+    "texts": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "minLength": 1
+      },
+      "title": "Texts",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "proposal",
+    "leftOut",
+    "notices",
+    "removed",
+    "texts"
+  ],
+  "title": "AnonymizedPreviewV1",
+  "type": "object"
+}

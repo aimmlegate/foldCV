@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "The anonymized export's dialog (D186): the name to show; none for the remembered or proposed one.",
+  "properties": {
+    "name": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    }
+  },
+  "title": "AnonymizedPreviewRequestV1",
+  "type": "object"
+}

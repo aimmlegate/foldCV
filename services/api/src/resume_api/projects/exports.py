@@ -26,6 +26,8 @@ class ExportCommand(BaseModel):
     schema_version: Literal[1] = Field(alias='schemaVersion')
     snapshot: TemplateSnapshotIdentity
     editor_token: str = Field(alias='editorToken', min_length=1)
+    # D186: the short name of an anonymized export ('' leaves the name line out); absent for the present export.
+    anonymized_name: str | None = Field(default=None, alias='anonymizedName', max_length=200)
 
 
 class ExportRetry(BaseModel):
@@ -53,16 +55,23 @@ class ExportService:
             self._renderer = renderer_identity()
         return self._renderer
 
-    async def export(self, project_id, snapshot, editor_token, *, retry_attempt_id=None, trusted=False):
-        """`trusted` is the assistant's server-side export: it has no page, so no editor token."""
+    async def export(self, project_id, snapshot, editor_token, *, retry_attempt_id=None, trusted=False, anonymized_name=None):
+        """`trusted` is the assistant's server-side export: it has no page, so no editor token. `anonymized_name`: the
+        anonymized export (D186) of a copy of the page; it records no export and only remembers the name."""
         task = self.projects.tasks.start(project_id, 'export', stage='rendering')
         try:
             async with pinned(self.projects.repository, project_id) as session:
-                prepared = await asyncio.to_thread(self._prepare, session, snapshot, editor_token, retry_attempt_id, trusted)
+                prepared = await asyncio.to_thread(self._prepare, session, snapshot, editor_token, retry_attempt_id, trusted,
+                                                   anonymized_name)
                 artifact = await self.render(prepared.request)
                 if not isinstance(artifact, bytes) or not 0 < len(artifact) <= DOCX_BYTES:
                     raise ProjectFailure('IMPORT_EXPORT_INVALID_ARTIFACT', 422)
-                result = await asyncio.to_thread(self._record, session, prepared, artifact)
+                if anonymized_name is None:
+                    result = await asyncio.to_thread(self._record, session, prepared, artifact)
+                else:
+                    await asyncio.to_thread(remember_name, self.projects.repository, session, anonymized_name)
+                    attempt = prepared.attempt.model_copy(update={'state': 'completed', 'artifact_hash': sha256(artifact)})
+                    result = ExportResult(attempt, prepared.captured.snapshot, artifact)
             self.projects.tasks.finish(task.id, 'succeeded', detail={'attemptId': result.attempt.id})
             return result
         except ProjectFailure as error:
@@ -75,7 +84,7 @@ class ExportService:
             self.projects.tasks.finish(task.id, 'failed', error=getattr(error, 'code', 'PROCESS_FAILED'))
             raise
 
-    def _prepare(self, session, snapshot, editor_token, retry_attempt_id, trusted):
+    def _prepare(self, session, snapshot, editor_token, retry_attempt_id, trusted, anonymized_name=None):
         with session.lock:
             if not trusted:
                 session.require_editor(editor_token)
@@ -94,6 +103,8 @@ class ExportService:
                 raise ProjectFailure(error.code, 409) from None
             request = TemplateRenderRequestV1.model_validate({**captured.request.model_dump(by_alias=True),
                 'package': project.template_package})
+            if anonymized_name is not None:
+                request = anonymized_request(project, request, anonymized_name)
             return _Prepared(attempt, captured, request)
 
     def _record(self, session, prepared, artifact):
@@ -175,3 +186,33 @@ async def production_render(request, *, temp_root, worker_slot, renderer, cleanu
     finally:
         if files.cleanup_failed:
             cleanup_error(SpikeError('PROCESS_CLEANUP_FAILED'))
+
+
+def anonymized_request(project, request, name):
+    """The render request of the anonymized copy of the page (D186), with its own hashes; facts and package as they are."""
+    from packages.resume_core.editing.anonymize import anonymized
+    from packages.resume_core.hashing import canonical
+    from packages.resume_core.models.template_render import presentation_value
+    document, _notices = anonymized(project, ' '.join(name.split()))
+    return TemplateRenderRequestV1.model_validate({**request.model_dump(by_alias=True, exclude={'package'}),
+        'package': project.template_package, 'document': document.model_dump(by_alias=True),
+        'documentHash': sha256(canonical(document)),
+        'presentationHash': sha256(canonical(presentation_value(document, project.template_package)))})
+
+
+def remember_name(repository, session, name):
+    """The project keeps the name the user confirmed for the present full name (A2-f): no history action and no change
+    the user sees, as the export record."""
+    from packages.resume_core.models.template_workspace import AnonymizedName
+    with session.lock:
+        current = session.workspace
+        project = current.project
+        record = next((value for value in project.facts.records if value.kind == 'candidate'), None)
+        value = AnonymizedName(name=' '.join(name.split()), fullName=record.name.raw_text if record is not None else '')
+        if project.anonymized_name == value:
+            return
+        updated = current.model_copy(deep=True)
+        updated.project.anonymized_name = value
+        repository.replace(session.project_id, base_revision=current.project_revision, workspace=updated,
+            reason='export', blobs=[], client_mutation_id='anonymized-name-' + sha256(value.model_dump_json().encode())[:24],
+            request_sha256=sha256(value.model_dump_json().encode()))

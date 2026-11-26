@@ -10,7 +10,8 @@ import asyncio
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
-from packages.resume_core.models.projects import (ClipboardCaptureRequestV1, DateCheckRequestV1, DeleteRequestV1, EditRequestV1,
+from packages.resume_core.models.projects import (AnonymizedPreviewRequestV1, AnonymizedRememberV1, ClipboardCaptureRequestV1,
+    DateCheckRequestV1, DeleteRequestV1, EditRequestV1,
     HistoryRequestV1, RenameRequestV1, RewritePreviewRequestV1, RewriteCancelRequestV1)
 from packages.resume_core.project_limits import ARCHIVE_BYTES
 
@@ -121,7 +122,8 @@ def mount_projects_v2(app, service):
 
     @app.post(PREFIX + '/{project_id}/export')
     async def export(project_id: str, payload: ExportCommand):
-        result = await service.exports.export(project_id, payload.snapshot, payload.editor_token)
+        result = await service.exports.export(project_id, payload.snapshot, payload.editor_token,
+            anonymized_name=payload.anonymized_name)
         return _export_reply(result)
 
     @app.post(PREFIX + '/{project_id}/exports/{attempt_id}/retry')
@@ -162,6 +164,15 @@ def mount_projects_v2(app, service):
     async def focus_icon_choices(project_id: str):
         return json_reply(await asyncio.to_thread(focus_icons.choices, service, project_id))
 
+    @app.post(PREFIX + '/{project_id}/anonymized')
+    async def anonymized_preview(project_id: str, payload: AnonymizedPreviewRequestV1):
+        return model_reply(await asyncio.to_thread(anonymized_view, service, project_id, payload.name))
+
+    @app.post(PREFIX + '/{project_id}/anonymized/name')
+    async def anonymized_remember(project_id: str, payload: AnonymizedRememberV1):
+        await asyncio.to_thread(remember_anonymized, service, project_id, payload)
+        return json_reply({'schemaVersion': 1})
+
     @app.post(PREFIX + '/{project_id}/date-check')
     async def date_warnings(project_id: str, payload: DateCheckRequestV1):
         return model_reply(await asyncio.to_thread(date_check.warnings, service, project_id, payload))
@@ -188,3 +199,21 @@ def _export_reply(result):
         'X-FoldCV-Snapshot': json.dumps(result.snapshot.model_dump(mode='json', by_alias=True),
             ensure_ascii=True, sort_keys=True, separators=(',', ':')),
     })
+
+
+def anonymized_view(service, project_id, name):
+    """The anonymized export's dialog and print changes (D186); reads the committed project, writes nothing."""
+    from packages.resume_core.editing.anonymize import preview
+    from packages.resume_core.models.projects import AnonymizedPreviewV1
+    project = service.repository.read(project_id).project
+    if project is None:
+        raise ProjectFailure('IMPORT_PROJECT_NOT_AUTHORED', 409)
+    return AnonymizedPreviewV1.model_validate(preview(project, name))
+
+
+def remember_anonymized(service, project_id, payload):
+    from .exports import remember_name
+    session = service.repository.open(project_id)
+    with session.lock:
+        session.require_editor(payload.editor_token)
+    remember_name(service.repository, session, payload.name)

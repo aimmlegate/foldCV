@@ -88,6 +88,28 @@
       "title": "ActionOp",
       "type": "object"
     },
+    "AnonymizedName": {
+      "additionalProperties": false,
+      "description": "The name an anonymized export showed last (D186); it stands until the candidate's name in the facts changes.",
+      "properties": {
+        "fullName": {
+          "maxLength": 1000,
+          "title": "Fullname",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "fullName"
+      ],
+      "title": "AnonymizedName",
+      "type": "object"
+    },
     "AssetDeclaration": {
       "additionalProperties": false,
       "properties": {
@@ -9608,6 +9630,17 @@
     "ProjectV6": {
       "additionalProperties": false,
       "properties": {
+        "anonymizedName": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnonymizedName"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "assets": {
           "items": {
             "$ref": "#/$defs/LocalImageAsset"

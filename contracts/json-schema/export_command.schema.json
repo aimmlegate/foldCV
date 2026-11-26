@@ -54,6 +54,19 @@
   },
   "additionalProperties": false,
   "properties": {
+    "anonymizedName": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Anonymizedname"
+    },
     "editorToken": {
       "minLength": 1,
       "title": "Editortoken",
