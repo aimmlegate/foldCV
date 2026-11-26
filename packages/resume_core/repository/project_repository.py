@@ -604,7 +604,7 @@ class ProjectRepository:
 
     # Commits
 
-    def mutate(self, project_id, *, base_revision, client_mutation_id, request_sha256, action_id, kind, build):
+    def mutate(self, project_id, *, base_revision, client_mutation_id, request_sha256, action_id, kind, build, blobs=()):
         """Commit `build(committed)` as one edit, undo or redo; see the module docstring for the protocol."""
         if kind not in {'edit', 'undo', 'redo'}:
             raise ValueError('unknown mutation kind')
@@ -627,7 +627,7 @@ class ProjectRepository:
                 # No change: nothing is written and the id is not consumed.
                 return EditOutcome(client_mutation_id, request_sha256, session.revision, kind, action_id, dict(details))
             return self._commit(session, after, client_mutation_id=client_mutation_id, request_sha256=request_sha256,
-                action_id=action_id, kind=kind, details=dict(details))
+                action_id=action_id, kind=kind, details=dict(details), blobs=tuple(blobs))
 
     def replace(self, project_id, *, base_revision, workspace, blobs=(), action_id=None, reason='replace',
             client_mutation_id=None, request_sha256=None):
@@ -911,7 +911,8 @@ class ProjectRepository:
         folder = session.directory / 'images'
         if not folder.exists():
             return []
-        keep = {asset.path for asset in session.workspace.project.assets} if session.workspace.project else set()
+        project = session.workspace.project
+        keep = {asset.path for asset in [*project.assets, *([project.photo] if project.photo else [])]} if project else set()
         for action in [*session.journal.undo, *session.journal.redo]:
             for side in (action.before, action.after):
                 for value in side.values():

@@ -41,7 +41,8 @@ def export_archive(service, project_id, request, *, trusted=False):
             raw = (session.directory / 'workspace.json').read_bytes()
             images = {}
             if workspace.project is not None:
-                for asset in workspace.project.assets:
+                # D187: the photo goes with the résumé, beside the document's own images.
+                for asset in [*workspace.project.assets, *([workspace.project.photo] if workspace.project.photo else [])]:
                     path = session.directory / asset.path
                     if path.is_file():
                         images[asset.id] = read_owned(path, IMAGE_BYTES, 'IMAGE_NOT_FOUND')
@@ -76,7 +77,7 @@ def import_archive(service, data):
     blobs = [('sources', source_id, blob, hashlib.sha256(blob).hexdigest()) for source_id, blob in originals.items()]
     owner = workspace.project
     if owner is not None:
-        for asset in owner.assets:
+        for asset in [*owner.assets, *([owner.photo] if owner.photo else [])]:
             blob = images.get(asset.id)
             if blob is not None:
                 blobs.append(('images', asset.path, blob, asset.sha256))

@@ -631,6 +631,12 @@ class CapturedWriter:
         self.compact(header.paragraphs[0], anchor)
         recipe = self.recipe.style.header
         region = self.recipe.layout.regions[0]
+        # D187: a photo stands left of the header lines, which move right by its size and gap.
+        shift = 0.0
+        if self.request.photo is not None:
+            from ..templates.photo import photo_place
+            place = photo_place(self.recipe)
+            shift = place.x + place.size + place.gap - region.x
         # Source fallback lines stack from the first slot; growth counts from the last slot, as if they filled both.
         first, last = min(recipe.name_top, recipe.profession_top), max(recipe.name_top, recipe.profession_top)
         cursor = anchor
@@ -650,9 +656,12 @@ class CapturedWriter:
                 height = self.metrics.paragraph_height(self.runs[child.id], region.width, self.paragraphs[child.id][0])
                 paragraph = self.paragraph(header, child, header=True)
                 y = max(top, cursor)
-                self.header_line(paragraph, region.x, region.width, y - cursor)
+                self.header_line(paragraph, region.x + shift, region.width - shift, y - cursor)
                 cursor = y + height
                 growth = max(growth, cursor - designed - self.paragraphs[child.id][0])
+        if self.request.photo is not None:
+            from ..templates.photo import photo_growth
+            growth = max(growth, photo_growth(self.recipe))
         if cursor > self.recipe.style.page.body_bottom or self.recipe.style.page.first_body_top + growth >= self.recipe.style.page.body_bottom:
             raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
         return growth, cursor
@@ -806,6 +815,8 @@ class CapturedWriter:
                 raise RenderFailure('RICH_EXPORT_UNSUPPORTED')
             self.floating_image(self.document.sections[0].first_page_header.paragraphs[0], paths[logo.asset], width, height, x, top,
                 label='Captured template logo')
+        if self.request.photo is not None:
+            self.photo(workspace)
         raw = BytesIO()
         self.order_properties()
         self.document.save(raw)
@@ -814,6 +825,17 @@ class CapturedWriter:
         # Word slants an upright face only while its family embeds no italic, so one such run decides for the family.
         return embed_captured_fonts(raw.getvalue(), [selection for selection in self.selections.values()
             if not (selection.font.italic and selection.font.family in self.slanted)])
+
+    def photo(self, workspace):
+        """The résumé's photo in the first page's header, its corners rounded in the picture itself (D187)."""
+        import base64
+        from ..image_check import rounded
+        from ..templates.photo import photo_place
+        place = photo_place(self.recipe)
+        path = Path(workspace) / 'photo.png'
+        path.write_bytes(rounded(base64.b64decode(self.request.photo.bytes_base64), place.radius / place.size))
+        self.floating_image(self.document.sections[0].first_page_header.paragraphs[0], path, place.size, place.size,
+            place.x, place.top, label='Photo')
 
     def order_properties(self):
         names = ('pStyle', 'keepNext', 'keepLines', 'pageBreakBefore', 'framePr', 'widowControl',

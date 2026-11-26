@@ -69,6 +69,15 @@ class Logo(Definition):
     fit: Literal["contain"]
 
 
+class PhotoPlace(Definition):
+    # D187: where the résumé's photo stands in the header, left of the name; the header lines move right by size + gap.
+    x: Points
+    top: Points
+    size: Positive
+    radius: Points
+    gap: Points
+
+
 class Divider(Definition):
     x1: Points
     x2: Positive
@@ -84,6 +93,8 @@ class Header(Definition):
     overflow: Literal["grow_header_and_move_body"]
     logo: Logo | None
     divider: Divider | None
+    # Absent in templates made before D187: the renderer then uses the default place (templates/photo.py).
+    photo: PhotoPlace | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Band(Definition):

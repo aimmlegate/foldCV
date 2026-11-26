@@ -15,6 +15,9 @@ def values(workspace):
     result.update({('builtin_scope', key): value for key, value in project.facts.builtin_manual_scopes.items()})
     result.update({('model_written', key): value for key, value in project.facts.model_written.items()})
     result.update({('tombstone', item.record_id): item.model_dump(mode='json', by_alias=True) for item in project.facts.tombstones})
+    # D187: the photo is one undoable value; its path keeps the image file while history can bring it back.
+    if project.photo is not None:
+        result[('photo', 'photo')] = project.photo.model_dump(mode='json', by_alias=True)
     # D185: the hidden store moves with the blocks it holds, so an Undo of Hide or Show restores both.
     result.update({('hidden', entry.id): entry.model_dump(mode='json', by_alias=True) for entry in project.hidden_blocks})
     result.update({('coverage_anchor', address): item.model_dump(mode='json', by_alias=True)

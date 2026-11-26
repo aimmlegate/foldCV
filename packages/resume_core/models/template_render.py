@@ -53,6 +53,20 @@ def presentation_value(document, package):
             for block in document.blocks()}}
 
 
+class TemplateRenderPhoto(Wire):
+    """D187: the résumé's photo for the header; absent for a résumé without one, so its input stays as before."""
+    sha256: Sha256
+    mime_type: Literal['image/png', 'image/jpeg']
+    bytes_base64: str = Field(min_length=4, max_length=5 * 1024 * 1024)
+
+    @model_validator(mode='after')
+    def owned(self):
+        import base64
+        if sha256(base64.b64decode(self.bytes_base64, validate=True)) != self.sha256:
+            raise ValueError('photo bytes differ from their hash')
+        return self
+
+
 class CapturedTemplateRenderInputV1(Wire):
     schema_version: Literal[1]
     render_input_version: Literal[1]
@@ -64,6 +78,7 @@ class CapturedTemplateRenderInputV1(Wire):
     package_hash: Sha256
     assets: list[TemplateRenderAsset]
     renderer: TemplateRendererIdentity
+    photo: TemplateRenderPhoto | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class TemplateRenderRequestV1(CapturedTemplateRenderInputV1):

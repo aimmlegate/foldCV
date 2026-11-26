@@ -161,6 +161,14 @@ class AnonymizedRememberV1(Wire):
     name: str = Field(max_length=200)
 
 
+class PhotoRequestV1(Wire):
+    """D187: the résumé's new photo (the cropped square, base64 JPEG or PNG), or null to remove it."""
+    editor_token: str = Field(min_length=1, max_length=128)
+    base_revision: Revision
+    client_mutation_id: Id
+    image: str | None = Field(default=None, max_length=5 * 1024 * 1024)
+
+
 class DeleteRequestV1(Wire):
     confirmed: Literal[True]
 
@@ -180,6 +188,7 @@ PROJECT_CONTRACTS = {
     'anonymized_preview_request_v1': AnonymizedPreviewRequestV1,
     'anonymized_preview_v1': AnonymizedPreviewV1,
     'anonymized_remember_v1': AnonymizedRememberV1,
+    'photo_request_v1': PhotoRequestV1,
     'date_check_result_v1': DateCheckResultV1,
     'rewrite_preview_request_v1': RewritePreviewRequestV1,
     'rewrite_cancel_request_v1': RewriteCancelRequestV1,

@@ -101,6 +101,17 @@ class EditorJob(Wire):
     eye: Literal['shown', 'hidden', 'locked'] | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
+class EditorPhoto(Wire):
+    """D187: the résumé's photo on the sheet: its image, its place and corner radius in points, and how far the header
+    lines move right."""
+    url: str
+    x: float
+    top: float
+    size: float
+    radius: float
+    shift: float
+
+
 class EditorHideBlock(Wire):
     """One template block with an eye in Facts (D185): where the eye stands and whether the block is hidden."""
     # `view:` and the template block's id; the same id names the technology group of that view.
@@ -146,6 +157,8 @@ class EditorPlanV1(Wire):
     sort_jobs: bool = Field(default=False, exclude_if=lambda value: not value)
     # D185: the blocks with an eye, in template order; the page header is never one.
     hide_blocks: list[EditorHideBlock] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D187: absent for a résumé without a photo, so its sheet stays as it was.
+    photo: EditorPhoto | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class TemplatePresentationV1(Wire):

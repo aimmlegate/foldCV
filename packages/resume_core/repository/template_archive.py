@@ -73,6 +73,11 @@ def archive_payload_v7(workspace,originals,images,current_render=None,*,history=
             blob=images.get(asset.id)
             if blob is None: raise ArchiveFailure('ARCHIVE_IMAGE_MISMATCH')
             _verify_image(asset,blob);add(asset.path,'user_image',blob)
+        photo=workspace.project.photo
+        if photo is not None:
+            blob=images.get(photo.id)
+            if blob is None: raise ArchiveFailure('ARCHIVE_IMAGE_MISMATCH')
+            _verify_image(photo,blob);add(photo.path,'user_image',blob)
     add('workspace.json','workspace',json_bytes(workspace.model_dump(mode='json',by_alias=True)))
     try:
         manifest=ArchiveManifestV7(schemaVersion=7,appVersion='0.1.0',projectId=workspace.project_id,
@@ -131,6 +136,11 @@ def open_archive_v7(data,project_id):
                 if asset.path not in entries or entries[asset.path].role!='user_image':
                     raise ArchiveFailure('ARCHIVE_IMAGE_MISMATCH')
                 _verify_image(asset,files[asset.path]);images[asset.id]=files[asset.path];expected_images.add(asset.path)
+            photo=workspace.project.photo
+            if photo is not None:
+                if photo.path not in entries or entries[photo.path].role!='user_image':
+                    raise ArchiveFailure('ARCHIVE_IMAGE_MISMATCH')
+                _verify_image(photo,files[photo.path]);images[photo.id]=files[photo.path];expected_images.add(photo.path)
             workspace.project.project_id=project_id
             workspace.project.renders=[]
         if expected_images!={e.path for e in entries.values() if e.role=='user_image'}:

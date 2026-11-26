@@ -10,7 +10,8 @@ from ..importing.template_import import identity
 
 
 
-def capture_export(workspace, expected, renderer, *, retry_capture=None, id_factory=identity):
+def capture_export(workspace, expected, renderer, *, retry_capture=None, id_factory=identity, photo=None):
+    """photo: the résumé's photo for the header (D187), read by the caller from the project's images."""
     if retry_capture is None:
         snapshot = snapshot_identity(workspace)
         if snapshot != expected:
@@ -20,7 +21,8 @@ def capture_export(workspace, expected, renderer, *, retry_capture=None, id_fact
             facts=project.facts, documentHash=snapshot.document_hash, factsHash=snapshot.facts_hash,
             presentationHash=snapshot.presentation_hash, package=project.template_package, packageHash=snapshot.package_hash,
             assets=[TemplateRenderAsset(id=asset.id, path=asset.path, sha256=asset.sha256, size=asset.size)
-                for asset in project.template_package.assets], renderer=renderer)
+                for asset in project.template_package.assets], renderer=renderer,
+            **({'photo': photo} if photo is not None else {}))
     else:
         if retry_capture.snapshot.project_id != workspace.project_id or retry_capture.request.renderer != renderer:
             raise TemplateImportFailure('IMPORT_EXPORT_SNAPSHOT_STALE')

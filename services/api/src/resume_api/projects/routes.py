@@ -11,6 +11,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse, Response
 
 from packages.resume_core.models.projects import (AnonymizedPreviewRequestV1, AnonymizedRememberV1, ClipboardCaptureRequestV1,
+    PhotoRequestV1,
     DateCheckRequestV1, DeleteRequestV1, EditRequestV1,
     HistoryRequestV1, RenameRequestV1, RewritePreviewRequestV1, RewriteCancelRequestV1)
 from packages.resume_core.project_limits import ARCHIVE_BYTES
@@ -163,6 +164,11 @@ def mount_projects_v2(app, service):
     @app.get(PREFIX + '/{project_id}/focus-icons')
     async def focus_icon_choices(project_id: str):
         return json_reply(await asyncio.to_thread(focus_icons.choices, service, project_id))
+
+    @app.put(PREFIX + '/{project_id}/photo')
+    async def photo(project_id: str, payload: PhotoRequestV1):
+        from .photo import set_photo
+        return model_reply(await asyncio.to_thread(set_photo, service, project_id, payload))
 
     @app.post(PREFIX + '/{project_id}/anonymized')
     async def anonymized_preview(project_id: str, payload: AnonymizedPreviewRequestV1):

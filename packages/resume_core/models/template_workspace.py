@@ -104,6 +104,8 @@ class ProjectV6(Wire):
     template_operations: list[ImportOperation] = Field(default_factory=list, exclude=True)
     exports: list[ExportAttempt]
     export_inputs: list[TemplateExportCapture] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D187: the résumé's photo, one square image in its images folder; none for a résumé without one.
+    photo: LocalImageAsset | None = Field(default=None, exclude_if=lambda value: value is None)
     # D186: the short name the user confirmed for an anonymized export, with the full name it was confirmed for.
     anonymized_name: AnonymizedName | None = Field(default=None, exclude_if=lambda value: value is None)
     # D185: blocks a Facts eye took off the page, kept whole until Show; empty is left out, so older files keep their bytes.

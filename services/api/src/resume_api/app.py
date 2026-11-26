@@ -174,6 +174,9 @@ class LocalBoundary:
                 if path.startswith("/v2/projects/") and path.endswith("/edits"):
                     # A preparation is bounded to 1 MiB; the envelope adds the token and the base revision.
                     body_limit = MAX_BODY + 64 * 1024
+                if path.startswith("/v2/projects/") and path.endswith("/photo") or path.startswith("/v2/icons"):
+                    # D187: one cropped image in base64 (a photo up to 3 MB, an icon up to 1 MB) and its envelope.
+                    body_limit = 6 * 1024 * 1024
                 if template_config(path):
                     # The compiler's own limit, plus the JSON escapes of a text of that size (its line ends and quotes).
                     body_limit = 2 * CONFIG_BYTES

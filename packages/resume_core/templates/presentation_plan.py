@@ -210,6 +210,11 @@ def editor_plan(project):
     if targets:
         plan['technologyTargets'] = targets
     plan.update(panel_plan(project))
+    if project.photo is not None:
+        from .photo import photo_place
+        place, region = photo_place(package.recipe), package.recipe.layout.regions[0]
+        plan['photo'] = {'url': f'/v2/projects/{project.project_id}/images/{project.photo.sha256}', 'x': place.x,
+            'top': place.top, 'size': place.size, 'radius': place.radius, 'shift': place.x + place.size + place.gap - region.x}
     only = focus_only(project)
     if only is not None:
         plan['focusPanel'] = {'records': sorted(only), **({'full': True} if focus_full(project) else {})}

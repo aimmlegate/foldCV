@@ -98,7 +98,8 @@ class ExportService:
                 if retry is None:
                     raise ProjectFailure('IMPORT_EXPORT_ATTEMPT_UNKNOWN', 409)
             try:
-                attempt, captured = capture_export(workspace, snapshot, self.renderer, retry_capture=retry)
+                attempt, captured = capture_export(workspace, snapshot, self.renderer, retry_capture=retry,
+                    photo=photo_input(session.directory, project))
             except TemplateImportFailure as error:
                 raise ProjectFailure(error.code, 409) from None
             request = TemplateRenderRequestV1.model_validate({**captured.request.model_dump(by_alias=True),
@@ -194,7 +195,8 @@ def anonymized_request(project, request, name):
     from packages.resume_core.hashing import canonical
     from packages.resume_core.models.template_render import presentation_value
     document, _notices = anonymized(project, ' '.join(name.split()))
-    return TemplateRenderRequestV1.model_validate({**request.model_dump(by_alias=True, exclude={'package'}),
+    # The anonymized export leaves the photo out (D187, G2-h).
+    return TemplateRenderRequestV1.model_validate({**request.model_dump(by_alias=True, exclude={'package', 'photo'}),
         'package': project.template_package, 'document': document.model_dump(by_alias=True),
         'documentHash': sha256(canonical(document)),
         'presentationHash': sha256(canonical(presentation_value(document, project.template_package)))})
@@ -216,3 +218,16 @@ def remember_name(repository, session, name):
         repository.replace(session.project_id, base_revision=current.project_revision, workspace=updated,
             reason='export', blobs=[], client_mutation_id='anonymized-name-' + sha256(value.model_dump_json().encode())[:24],
             request_sha256=sha256(value.model_dump_json().encode()))
+
+
+def photo_input(directory, project):
+    """The résumé's photo for the render request (D187); None without one."""
+    if project.photo is None:
+        return None
+    import base64
+    from packages.resume_core.models.template_render import TemplateRenderPhoto
+    from packages.resume_core.rich_limits import IMAGE_BYTES
+    from .blobs import read_owned
+    data = read_owned(directory / project.photo.path, IMAGE_BYTES, 'IMAGE_NOT_FOUND')
+    return TemplateRenderPhoto(sha256=project.photo.sha256, mimeType=project.photo.mime_type,
+                               bytesBase64=base64.b64encode(data).decode('ascii'))

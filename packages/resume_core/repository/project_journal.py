@@ -110,6 +110,7 @@ def rebuild(workspace, target):
     facts['tombstones'] = [value for value in facts['tombstones'] if value['recordId'] not in live]
     data['project']['importIssues'] = _ordered(target, 'issue', [item.id for item in project.import_issues])
     data['project']['hiddenBlocks'] = _ordered(target, 'hidden', [entry.id for entry in project.hidden_blocks])
+    data['project']['photo'] = target.get(('photo', 'photo'))
     coverage = data['project']['importCoverage']
     for address, row in zip(coverage_addresses(project), coverage, strict=True):
         anchor = target.get(('coverage_anchor', address))
