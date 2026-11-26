@@ -984,6 +984,17 @@
           "title": "Packagehash",
           "type": "string"
         },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateRenderPhoto"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "presentationHash": {
           "pattern": "^[a-f0-9]{64}$",
           "title": "Presentationhash",
@@ -3762,6 +3773,17 @@
           "const": "grow_header_and_move_body",
           "title": "Overflow",
           "type": "string"
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhotoPlace"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "profession_top": {
           "minimum": 0,
@@ -7975,6 +7997,45 @@
       "title": "PeriodParameters",
       "type": "object"
     },
+    "PhotoPlace": {
+      "additionalProperties": false,
+      "properties": {
+        "gap": {
+          "minimum": 0,
+          "title": "Gap",
+          "type": "number"
+        },
+        "radius": {
+          "minimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "number"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "number"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "top",
+        "size",
+        "radius",
+        "gap"
+      ],
+      "title": "PhotoPlace",
+      "type": "object"
+    },
     "Placement": {
       "additionalProperties": false,
       "properties": {
@@ -8215,6 +8276,17 @@
           },
           "title": "Operations",
           "type": "array"
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalImageAsset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "projectId": {
           "minLength": 1,
@@ -15202,6 +15274,38 @@
         "size"
       ],
       "title": "TemplateRenderAsset",
+      "type": "object"
+    },
+    "TemplateRenderPhoto": {
+      "additionalProperties": false,
+      "description": "D187: the résumé's photo for the header; absent for a résumé without one, so its input stays as before.",
+      "properties": {
+        "bytesBase64": {
+          "maxLength": 5242880,
+          "minLength": 4,
+          "title": "Bytesbase64",
+          "type": "string"
+        },
+        "mimeType": {
+          "enum": [
+            "image/png",
+            "image/jpeg"
+          ],
+          "title": "Mimetype",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "mimeType",
+        "bytesBase64"
+      ],
+      "title": "TemplateRenderPhoto",
       "type": "object"
     },
     "TemplateRendererIdentity": {

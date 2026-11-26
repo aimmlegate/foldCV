@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "D187: the résumé's new photo (the cropped square, base64 JPEG or PNG), or null to remove it.",
+  "properties": {
+    "baseRevision": {
+      "minimum": 1,
+      "title": "Baserevision",
+      "type": "integer"
+    },
+    "clientMutationId": {
+      "minLength": 1,
+      "title": "Clientmutationid",
+      "type": "string"
+    },
+    "editorToken": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Editortoken",
+      "type": "string"
+    },
+    "image": {
+      "anyOf": [
+        {
+          "maxLength": 5242880,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Image"
+    }
+  },
+  "required": [
+    "editorToken",
+    "baseRevision",
+    "clientMutationId"
+  ],
+  "title": "PhotoRequestV1",
+  "type": "object"
+}

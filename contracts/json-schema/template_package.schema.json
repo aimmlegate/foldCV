@@ -917,6 +917,17 @@
           "title": "Overflow",
           "type": "string"
         },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhotoPlace"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "profession_top": {
           "minimum": 0,
           "title": "Profession Top",
@@ -1299,6 +1310,45 @@
         "ongoing_label"
       ],
       "title": "PeriodParameters",
+      "type": "object"
+    },
+    "PhotoPlace": {
+      "additionalProperties": false,
+      "properties": {
+        "gap": {
+          "minimum": 0,
+          "title": "Gap",
+          "type": "number"
+        },
+        "radius": {
+          "minimum": 0,
+          "title": "Radius",
+          "type": "number"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "number"
+        },
+        "top": {
+          "minimum": 0,
+          "title": "Top",
+          "type": "number"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "top",
+        "size",
+        "radius",
+        "gap"
+      ],
+      "title": "PhotoPlace",
       "type": "object"
     },
     "Placement": {

@@ -640,6 +640,12 @@ export type Outoforder = boolean;
 export type Overlaps = string[];
 export type Periods = string[];
 export type Offpage = string[];
+export type Radius = number;
+export type Shift = number;
+export type Size2 = number;
+export type Top = number;
+export type Url1 = string;
+export type X = number;
 export type Sortjobs = boolean;
 export type Alignment1 = ("left" | "center" | "right" | "justify") | null;
 export type Color1 = string;
@@ -649,7 +655,7 @@ export type Italic1 = string | null;
 export type Regular = string | null;
 export type Upright = string | null;
 export type Lineheight = number;
-export type Size2 = number;
+export type Size3 = number;
 export type Technologylines = string[][];
 export type Blockid1 = string;
 export type Jobid = string | null;
@@ -667,7 +673,7 @@ export type ReadingOrder = ("header" | "sidebar" | "main")[];
 export type Flow = "first_page_header" | "independent_column";
 export type Id15 = "header" | "sidebar" | "main";
 export type Width = number;
-export type X = number;
+export type X1 = number;
 export type Regions = Region[];
 export type Order = number;
 export type Region1 = "header" | "sidebar" | "main";
@@ -693,17 +699,22 @@ export type Text5 = string;
 export type Color2 = string;
 export type FollowHeader = true;
 export type Width1 = number;
-export type X1 = number;
+export type X11 = number;
 export type X2 = number;
 export type Y = number;
 export type Asset = string | null;
 export type Fit = "contain";
 export type Height = number;
-export type Top = number;
+export type Top1 = number;
 export type Width2 = number;
 export type X3 = number;
 export type NameTop = number;
 export type Overflow = "grow_header_and_move_body";
+export type Gap1 = number;
+export type Radius1 = number;
+export type Size4 = number;
+export type Top2 = number;
+export type X4 = number;
 export type ProfessionTop = number;
 export type BodyBottom = number;
 export type ContinuationBodyTop = number;
@@ -727,7 +738,7 @@ export type Alignment2 = ("left" | "center" | "right" | "justify") | null;
 export type Color3 = string;
 export type Font1 = string;
 export type LineHeight = number;
-export type Size3 = number;
+export type Size5 = number;
 export type FallbackStyle = string | null;
 export type Heading = "none" | "plain" | "band";
 export type HeadingStyle1 = string | null;
@@ -1523,7 +1534,7 @@ export type Mimetype1 = string;
 export type Path1 = string;
 export type Role3 = "font" | "logo" | "icon" | "catalog";
 export type Sha2561 = string;
-export type Size4 = number;
+export type Size6 = number;
 export type Assets = StoredAsset[];
 export type Dependencyorder = number;
 export type Id54 = string;
@@ -1665,7 +1676,7 @@ export type Id66 = string;
 export type Mimetype2 = "image/png" | "image/jpeg";
 export type Path3 = string;
 export type Sha2562 = string;
-export type Size5 = number;
+export type Size7 = number;
 export type Width4 = number;
 export type Assets2 = LocalImageAsset[];
 export type Createdat1 = string;
@@ -2029,15 +2040,18 @@ export type Attemptid5 = string;
 export type Id87 = string;
 export type Path4 = string;
 export type Sha2563 = string;
-export type Size6 = number;
+export type Size8 = number;
 export type Assets3 = TemplateRenderAsset[];
 export type Documenthash3 = string;
 export type Factshash3 = string;
 export type Packagehash7 = string;
+export type Bytesbase641 = string;
+export type Mimetype3 = "image/png" | "image/jpeg";
+export type Sha2564 = string;
 export type Presentationhash2 = string;
 export type Renderinputversion1 = 1;
 export type Id88 = string;
-export type Sha2564 = string;
+export type Sha2565 = string;
 export type Version7 = string;
 export type Schemaversion20 = 1;
 export type Exportinputs = TemplateExportCapture[];
@@ -2108,7 +2122,7 @@ export type Itemhandle8 = string | null;
 export type Reason4 = string | null;
 export type Importcoverage = SpanCoverage[];
 export type Operationid5 = string;
-export type Sha2565 = string;
+export type Sha2566 = string;
 export type Importhistory = ImportHistoryRef[];
 export type Importissues = ImportIssue[];
 export type Operations2 = RichOperation[];
@@ -2131,7 +2145,7 @@ export type Projectid11 = string;
 export type Projectrevision2 = number;
 export type Markdown = string;
 export type Revision47 = number;
-export type Sha2566 = string;
+export type Sha2567 = string;
 export type Schemaversion22 = 7;
 export type Actionid4 = string;
 export type Blockids4 = string[];
@@ -3162,8 +3176,8 @@ export type State13 = "queued" | "running" | "cancelling" | "completed" | "faile
 export type Filename = string;
 export type Format = "docx" | "foldcv";
 export type Id112 = string;
-export type Size7 = number;
-export type Url1 = string;
+export type Size9 = number;
+export type Url2 = string;
 /**
  * @maxItems 10
  */
@@ -3960,7 +3974,7 @@ export type Target3 = string;
  * @maxItems 100
  */
 export type Links1 = ExtractLink[];
-export type Mimetype3 = string;
+export type Mimetype4 = string;
 export type Originalname1 = string;
 export type Pagecount = number | null;
 export type Parser1 = string;
@@ -3986,6 +4000,10 @@ export type Kind116 = "start" | "resume" | "cancel";
 export type Lite1 = boolean;
 export type Operationid6 = string | null;
 export type Taskid6 = string | null;
+export type Baserevision4 = number;
+export type Clientmutationid5 = string;
+export type Editortoken8 = string;
+export type Image = string | null;
 export type Automaticanalysis = boolean;
 /**
  * @maxItems 2
@@ -4003,7 +4021,7 @@ export type Selectedimportmodel = string | null;
 export type Selectedmodel = string | null;
 export type Selectedrewritemodel = string | null;
 export type Theme = "light" | "dark" | "system";
-export type Editortoken8 = string;
+export type Editortoken9 = string;
 export type Schemaversion30 = 1;
 export type Elapsed = number;
 export type Error1 = string | null;
@@ -4646,14 +4664,14 @@ export type Tombstoned = boolean;
 export type Updatedat3 = string;
 export type Entries1 = RegistryEntry[];
 export type Schemaversion31 = 1;
-export type Baserevision4 = number;
-export type Editortoken9 = string;
+export type Baserevision5 = number;
+export type Editortoken10 = string;
 export type Title12 = string;
 export type Appliedclientmutationids = string[];
 export type Revision62 = number;
-export type Editortoken10 = string;
-export type Requestid = string;
 export type Editortoken11 = string;
+export type Requestid = string;
+export type Editortoken12 = string;
 export type Instruction2 = string;
 export type Requestid1 = string;
 /**
@@ -4684,7 +4702,7 @@ export type Markdown1 = string;
 export type Clarify = string;
 export type Shorten = string;
 export type Revision65 = number;
-export type Sha2567 = string;
+export type Sha2568 = string;
 export type Code8 =
   | "RULES_PRESETS_REQUIRED"
   | "RULES_STALE"
@@ -4702,19 +4720,19 @@ export type Model3 = string | null;
 export type Legacyimport1 = boolean;
 export type Importminutes1 = number;
 export type Projectmegabytes1 = number;
-export type Baserevision5 = number;
+export type Baserevision6 = number;
 export type Markdown2 = string;
 export type Clipboardcaptureid1 = string;
 export type Projectid16 = string;
 export type Schemaversion33 = 1;
 export type Selection1 = ClipboardRangeSelection | ClipboardBlocksSelection;
-export type Bytesbase641 = string;
+export type Bytesbase642 = string;
 export type Id117 = string;
-export type Mimetype4 = string;
+export type Mimetype5 = string;
 export type Path5 = string;
 export type Role8 = "font" | "logo" | "icon" | "catalog";
-export type Sha2568 = string;
-export type Size8 = number;
+export type Sha2569 = string;
+export type Size10 = number;
 export type Assets4 = CapturedAsset[];
 export type Blocks12 = CompiledBlock[];
 export type Compilerversion1 = string;
@@ -4798,6 +4816,7 @@ export interface FoldCVContracts {
   history_request_v1: HistoryRequestV1;
   history_state_v1: HistoryStateV1;
   import_command: ImportCommand;
+  photo_request_v1: PhotoRequestV1;
   preferences: Preferences;
   project_open_result_v1: ProjectOpenResultV1;
   propose_changes_v1: ProposeChangesV1;
@@ -5171,6 +5190,7 @@ export interface EditorPlanV1 {
   jobs?: Jobs;
   offPage?: Offpage;
   offPageFields?: Offpagefields;
+  photo?: EditorPhoto | null;
   sortJobs?: Sortjobs;
   styles: Styles;
   technologyLines?: Technologylines;
@@ -5255,6 +5275,18 @@ export interface EditorJobMove {
 export interface Offpagefields {
   [k: string]: string[];
 }
+/**
+ * D187: the résumé's photo on the sheet: its image, its place and corner radius in points, and how far the header
+ * lines move right.
+ */
+export interface EditorPhoto {
+  radius: Radius;
+  shift: Shift;
+  size: Size2;
+  top: Top;
+  url: Url1;
+  x: X;
+}
 export interface Styles {
   [k: string]: EditorStyle;
 }
@@ -5263,7 +5295,7 @@ export interface EditorStyle {
   color: Color1;
   faces: EditorFaces;
   lineHeight: Lineheight;
-  size: Size2;
+  size: Size3;
 }
 export interface EditorFaces {
   bold: Bold1;
@@ -5317,7 +5349,7 @@ export interface Region {
   flow: Flow;
   id: Id15;
   width: Width;
-  x: X;
+  x: X1;
 }
 export interface Placements {
   [k: string]: Placement;
@@ -5372,13 +5404,14 @@ export interface Header {
   logo: Logo | null;
   name_top: NameTop;
   overflow: Overflow;
+  photo?: PhotoPlace | null;
   profession_top: ProfessionTop;
 }
 export interface Divider {
   color: Color2;
   follow_header: FollowHeader;
   width: Width1;
-  x1: X1;
+  x1: X11;
   x2: X2;
   y: Y;
 }
@@ -5386,9 +5419,16 @@ export interface Logo {
   asset?: Asset;
   fit: Fit;
   height: Height;
-  top: Top;
+  top: Top1;
   width: Width2;
   x: X3;
+}
+export interface PhotoPlace {
+  gap: Gap1;
+  radius: Radius1;
+  size: Size4;
+  top: Top2;
+  x: X4;
 }
 export interface Page {
   body_bottom: BodyBottom;
@@ -5429,7 +5469,7 @@ export interface TextStyle {
   color: Color3;
   font: Font1;
   line_height: LineHeight;
-  size: Size3;
+  size: Size5;
 }
 export interface Views {
   [k: string]: View;
@@ -6558,7 +6598,7 @@ export interface StoredAsset {
   path: Path1;
   role: Role3;
   sha256: Sha2561;
-  size: Size4;
+  size: Size6;
 }
 export interface CompiledBlock {
   dependencyOrder: Dependencyorder;
@@ -6775,6 +6815,7 @@ export interface ProjectV6 {
   importHistory?: Importhistory;
   importIssues: Importissues;
   operations: Operations2;
+  photo?: LocalImageAsset | null;
   projectId: Projectid10;
   renders: Renders;
   revision: Revision46;
@@ -6796,7 +6837,7 @@ export interface LocalImageAsset {
   mimeType: Mimetype2;
   path: Path3;
   sha256: Sha2562;
-  size: Size5;
+  size: Size7;
   width: Width4;
 }
 export interface RichDocumentV2 {
@@ -7095,6 +7136,7 @@ export interface CapturedTemplateRenderInputV1 {
   facts: WorkingFactsV2;
   factsHash: Factshash3;
   packageHash: Packagehash7;
+  photo?: TemplateRenderPhoto | null;
   presentationHash: Presentationhash2;
   renderInputVersion: Renderinputversion1;
   renderer: TemplateRendererIdentity;
@@ -7104,11 +7146,19 @@ export interface TemplateRenderAsset {
   id: Id87;
   path: Path4;
   sha256: Sha2563;
-  size: Size6;
+  size: Size8;
+}
+/**
+ * D187: the résumé's photo for the header; absent for a résumé without one, so its input stays as before.
+ */
+export interface TemplateRenderPhoto {
+  bytesBase64: Bytesbase641;
+  mimeType: Mimetype3;
+  sha256: Sha2564;
 }
 export interface TemplateRendererIdentity {
   id: Id88;
-  sha256: Sha2564;
+  sha256: Sha2565;
   version: Version7;
 }
 /**
@@ -7158,7 +7208,7 @@ export interface SpanCoverage {
  */
 export interface ImportHistoryRef {
   operationId: Operationid5;
-  sha256: Sha2565;
+  sha256: Sha2566;
 }
 export interface RichRenderSnapshot {
   documentRevision: Documentrevision4;
@@ -7174,7 +7224,7 @@ export interface RichRenderSnapshot {
 export interface Rules3 {
   markdown: Markdown;
   revision: Revision47;
-  sha256: Sha2566;
+  sha256: Sha2567;
 }
 export interface TemplateSyncRecord {
   actionId: Actionid4;
@@ -7797,8 +7847,8 @@ export interface AssistantFileV1 {
   filename: Filename;
   format: Format;
   id: Id112;
-  size: Size7;
-  url: Url1;
+  size: Size9;
+  url: Url2;
 }
 export interface AssistantMessagesV1 {
   conversation: AssistantConversationV1;
@@ -8125,7 +8175,7 @@ export interface ExtractResult {
   byteSha256: Bytesha2561;
   gaps: Gaps;
   links: Links1;
-  mimeType: Mimetype3;
+  mimeType: Mimetype4;
   originalName: Originalname1;
   pageCount?: Pagecount;
   parser: Parser1;
@@ -8175,6 +8225,15 @@ export interface ImportCommand {
   operationId?: Operationid6;
   taskId?: Taskid6;
 }
+/**
+ * D187: the résumé's new photo (the cropped square, base64 JPEG or PNG), or null to remove it.
+ */
+export interface PhotoRequestV1 {
+  baseRevision: Baserevision4;
+  clientMutationId: Clientmutationid5;
+  editorToken: Editortoken8;
+  image?: Image;
+}
 export interface Preferences {
   automaticAnalysis: Automaticanalysis;
   enabledProviders?: Enabledproviders;
@@ -8190,7 +8249,7 @@ export interface Preferences {
   theme: Theme;
 }
 export interface ProjectOpenResultV1 {
-  editorToken: Editortoken8;
+  editorToken: Editortoken9;
   history: HistoryStateV1;
   response: TemplateProjectResponseV1;
   schemaVersion: Schemaversion30;
@@ -8243,8 +8302,8 @@ export interface RegistryEntry {
   updatedAt: Updatedat3;
 }
 export interface RenameRequestV1 {
-  baseRevision: Baserevision4;
-  editorToken: Editortoken9;
+  baseRevision: Baserevision5;
+  editorToken: Editortoken10;
   title: Title12;
 }
 /**
@@ -8259,11 +8318,11 @@ export interface Error2 {
   [k: string]: unknown;
 }
 export interface RewriteCancelRequestV1 {
-  editorToken: Editortoken10;
+  editorToken: Editortoken11;
   requestId: Requestid;
 }
 export interface RewritePreviewRequestV1 {
-  editorToken: Editortoken11;
+  editorToken: Editortoken12;
   instruction: Instruction2;
   range: AuthoredRange;
   requestId: Requestid1;
@@ -8284,7 +8343,7 @@ export interface RulesSettings {
   markdown: Markdown1;
   presets: RulePresets;
   revision: Revision65;
-  sha256: Sha2567;
+  sha256: Sha2568;
 }
 export interface RulePresets {
   clarify: Clarify;
@@ -8313,7 +8372,7 @@ export interface SaveLimitsPreference {
   projectMegabytes: Projectmegabytes1;
 }
 export interface SaveRulesRequest {
-  baseRevision: Baserevision5;
+  baseRevision: Baserevision6;
   markdown: Markdown2;
 }
 export interface TemplateClipboardCaptureV1 {
@@ -8342,13 +8401,13 @@ export interface TemplatePackage {
   schemaVersion: Schemaversion34;
 }
 export interface CapturedAsset {
-  bytesBase64: Bytesbase641;
+  bytesBase64: Bytesbase642;
   id: Id117;
-  mimeType: Mimetype4;
+  mimeType: Mimetype5;
   path: Path5;
   role: Role8;
-  sha256: Sha2568;
-  size: Size8;
+  sha256: Sha2569;
+  size: Size10;
 }
 export interface TemplateRenderRequestV1 {
   assets: Assets5;
@@ -8358,6 +8417,7 @@ export interface TemplateRenderRequestV1 {
   factsHash: Factshash4;
   package: TemplatePackage;
   packageHash: Packagehash9;
+  photo?: TemplateRenderPhoto | null;
   presentationHash: Presentationhash3;
   renderInputVersion: Renderinputversion2;
   renderer: TemplateRendererIdentity;
