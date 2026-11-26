@@ -120,3 +120,11 @@
 .image-pick { min-height: 180px; border: 1px dashed var(--line-strong); border-radius: 8px; background: var(--wash); color: var(--ink); }
 .image-zoom { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: var(--ui-small); }
 .image-zoom input { flex: 1; }
+/* D187: own icons above the template's in the Focus icon dialog. */
+.focus-own-icons { display: grid; gap: 8px; margin: 10px 0; }
+.focus-own-heading { display: flex; align-items: center; justify-content: space-between; }
+.focus-own-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.focus-own-name input { flex: 1; min-width: 160px; padding: 7px 9px; }
+.focus-own-icon { position: relative; display: grid; }
+.focus-own-icon > .icon { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; padding: 0; }
+.focus-own-confirm { display: flex; flex-wrap: wrap; gap: 4px; font-size: var(--ui-small); color: var(--muted); }

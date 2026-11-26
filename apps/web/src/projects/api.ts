@@ -112,7 +112,8 @@ function invalid(): never {
 /** A Focus row's icons besides the ones listed: the template's own choice and the one remembered for its name. */
 export type FocusIconRow = { automatic: { id: string; sha256: string } | null; remembered: string | null };
 /** The icons of a project's template for the facts panel's search, and each Focus row's own and remembered icon. */
-export type FocusIconChoices = { icons: FocusIcon[]; rows: ReadonlyMap<string, FocusIconRow> };
+/** `own`: the app's own icons (D187) and the copies this résumé keeps, shown above the template's. */
+export type FocusIconChoices = { icons: FocusIcon[]; rows: ReadonlyMap<string, FocusIconRow>; own: FocusIcon[] };
 
 const hash = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 function focusIcon(value: unknown): FocusIcon {
@@ -133,9 +134,23 @@ function focusIconRow(value: unknown): FocusIconRow {
 }
 export function parseFocusIconChoices(value: unknown): FocusIconChoices {
   const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
-  const { schemaVersion, icons, rows } = record;
-  if (schemaVersion !== 1 || !Array.isArray(icons) || typeof rows !== "object" || rows === null || Array.isArray(rows)) invalid();
-  return { icons: icons.map(focusIcon), rows: new Map(Object.entries(rows).map(([id, row]) => [id, focusIconRow(row)])) };
+  const { schemaVersion, icons, rows, own } = record;
+  if (schemaVersion !== 1 || !Array.isArray(icons) || typeof rows !== "object" || rows === null || Array.isArray(rows)
+    || own !== undefined && !Array.isArray(own)) invalid();
+  return { icons: icons.map(focusIcon), rows: new Map(Object.entries(rows).map(([id, row]) => [id, focusIconRow(row)])),
+    own: Array.isArray(own) ? own.map(focusIcon) : [] };
+}
+
+/** D187: a new own icon in the app's library (a cropped 256 px PNG in base64); its id for the row's choice. */
+export async function addOwnIcon(name: string, image: string, fetcher?: Fetcher): Promise<string> {
+  const reply = await v2Request<{ icon?: { id?: unknown } }>("/v2/icons", "POST", { name, image }, fetcher);
+  if (typeof reply.icon?.id !== "string") invalid();
+  return reply.icon.id;
+}
+
+/** Deletes an own icon from the library; résumés that use it keep their copy. */
+export async function deleteOwnIcon(id: string, fetcher?: Fetcher): Promise<void> {
+  await v2Request("/v2/icons/" + encodeURIComponent(id), "DELETE", undefined, fetcher);
 }
 
 /** GET the choices for the icon search (D122); their PNGs are served by hash like the document's icons. */
