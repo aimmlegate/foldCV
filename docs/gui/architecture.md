@@ -293,7 +293,7 @@ creates a V7 pre-draft with the default or the chosen template; an unknown templ
 parsed). A new template id is one URL path segment (letters, digits, `.`, `_`, `-`); the
 compiler refuses other ids, stored packages keep opening. The template routes are in `templates_routes.py`, the others
 in `app.py`.
-`PUT /v2/projects/{id}/photo` (D187) sets or removes the résumé's photo: a square JPEG or PNG the client cropped, at most
+`POST /v2/projects/{id}/photo` (D187) sets or removes the résumé's photo: a square JPEG or PNG the client cropped, at most
 800 px, checked again in Python (`image_check.py`: a real still image, no EXIF, XMP or text) and kept in the project's
 `images/` folder as `project.photo`, one history action. The header place comes from `style.header.photo` (x, top, size,
 radius, gap) or, for a template without it, from `templates/photo.py`'s default. `/v2/icons` (GET, POST, DELETE) is the

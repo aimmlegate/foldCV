@@ -100,7 +100,7 @@ def test_a_photo_is_one_history_action_kept_on_reopen_and_transfer_and_in_the_do
         editor = Editor(client, workspace.project_id)
         plain = export(client, editor, workspace.project_id)
         editor = Editor(client, workspace.project_id)
-        editor.adopt(editor.call('put', '/photo', body(editor, first, 'photo-add')))
+        editor.adopt(editor.call('post', '/photo', body(editor, first, 'photo-add')))
         assert editor.workspace().project.photo.width == 800 and editor.history['undo']['actionId'] == 'photo-add'
         plan = editor.response['presentation']['editor']['photo']
         assert plan['size'] == 61.33 and plan['shift'] > plan['size'] and plan['url'].endswith(editor.workspace().project.photo.sha256)
@@ -115,7 +115,7 @@ def test_a_photo_is_one_history_action_kept_on_reopen_and_transfer_and_in_the_do
         assert b'Photo' not in anonymous['word/header1.xml']
         editor = Editor(client, workspace.project_id)
         # Replace, Undo, Redo, remove: each one step through the project history; the files stay while history needs them.
-        editor.adopt(editor.call('put', '/photo', body(editor, second, 'photo-replace')))
+        editor.adopt(editor.call('post', '/photo', body(editor, second, 'photo-replace')))
         assert editor.workspace().project.photo.mime_type == 'image/png'
         editor.step('undo', 'undo-replace')
         assert editor.workspace().project.photo.sha256 == editor.workspace().project.photo.sha256 and editor.workspace().project.photo.width == 800
@@ -127,7 +127,7 @@ def test_a_photo_is_one_history_action_kept_on_reopen_and_transfer_and_in_the_do
         application.state.projects.repository.sweep_assets(workspace.project_id)
         editor.step('undo', 'undo-replace-again')
         assert client.get(editor.response['presentation']['editor']['photo']['url']).content == first
-        editor.adopt(editor.call('put', '/photo', body(editor, None, 'photo-remove')))
+        editor.adopt(editor.call('post', '/photo', body(editor, None, 'photo-remove')))
         assert editor.workspace().project.photo is None
         editor.step('undo', 'undo-remove')
         reopened = Editor(client, workspace.project_id)
@@ -139,7 +139,7 @@ def test_a_photo_is_one_history_action_kept_on_reopen_and_transfer_and_in_the_do
         assert transferred.project.photo.sha256 == reopened.workspace().project.photo.sha256
         assert images[transferred.project.photo.id] == first
         # A refused image changes nothing.
-        refused = reopened.refused('put', '/photo', body(reopened, drawn(800, exif=True), 'photo-exif'), 422)
+        refused = reopened.refused('post', '/photo', body(reopened, drawn(800, exif=True), 'photo-exif'), 422)
         assert refused['error']['code'] == 'IMAGE_METADATA'
 
 
@@ -149,7 +149,7 @@ def test_a_hidden_block_leaves_the_photo_as_it_is(tmp_path, imported):
     workspace, sources = imported
     with v2_app(tmp_path / 'app', [(workspace, sources)]) as (client, _application):
         editor = Editor(client, workspace.project_id)
-        editor.adopt(editor.call('put', '/photo', body(editor, drawn(800), 'photo-before-hide')))
+        editor.adopt(editor.call('post', '/photo', body(editor, drawn(800), 'photo-before-hide')))
         photo = editor.workspace().project.photo
         value = request(editor.workspace(), operation='hide', kind=None, values={'view': 'summary'}, identifier='hide-with-photo')
         editor.edit(value.model_dump(mode='json', by_alias=True))

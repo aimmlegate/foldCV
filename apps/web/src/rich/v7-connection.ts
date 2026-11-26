@@ -127,7 +127,7 @@ export class ProjectEditorConnection {
   /** Apply an assistant proposal with this page's token; an edit result becomes the shown state and undo history. */
   /** D187: the résumé's photo (the cropped square in base64) or null to remove it; one history action. */
   async setPhoto(image: string | null, clientMutationId: string): Promise<EditResultV1> {
-    const result = await this.editing(token => v2Request<EditResultV1>(this.path("/photo"), "PUT",
+    const result = await this.editing(token => v2Request<EditResultV1>(this.path("/photo"), "POST",
       { editorToken: token, baseRevision: this.response.workspace.projectRevision, clientMutationId, image }, this.fetcher), true);
     this.adopt(result);
     return result;

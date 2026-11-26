@@ -165,7 +165,7 @@ def mount_projects_v2(app, service):
     async def focus_icon_choices(project_id: str):
         return json_reply(await asyncio.to_thread(focus_icons.choices, service, project_id))
 
-    @app.put(PREFIX + '/{project_id}/photo')
+    @app.post(PREFIX + '/{project_id}/photo')
     async def photo(project_id: str, payload: PhotoRequestV1):
         from .photo import set_photo
         return model_reply(await asyncio.to_thread(set_photo, service, project_id, payload))
