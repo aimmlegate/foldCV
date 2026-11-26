@@ -15,6 +15,8 @@ def values(workspace):
     result.update({('builtin_scope', key): value for key, value in project.facts.builtin_manual_scopes.items()})
     result.update({('model_written', key): value for key, value in project.facts.model_written.items()})
     result.update({('tombstone', item.record_id): item.model_dump(mode='json', by_alias=True) for item in project.facts.tombstones})
+    # D185: the hidden store moves with the blocks it holds, so an Undo of Hide or Show restores both.
+    result.update({('hidden', entry.id): entry.model_dump(mode='json', by_alias=True) for entry in project.hidden_blocks})
     result.update({('coverage_anchor', address): item.model_dump(mode='json', by_alias=True)
         for address, item in zip(coverage_addresses(project), project.import_coverage, strict=True)})
     previous = None

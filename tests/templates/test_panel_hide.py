@@ -303,3 +303,23 @@ def test_the_original_marks_the_lines_of_a_hidden_job_and_block_red_until_show(t
     back = hide(hidden, 'education', view='education', operation='show').preview.workspace
     back = hide(back, job(workspace), operation='show').preview.workspace
     assert removals(back) == base
+
+
+def test_undo_and_redo_of_hide_and_show_go_through_the_project_history(tmp_path, imported):
+    """The app's Undo reads the project journal: the hidden store is one of its keys, so Undo of Hide puts the blocks back
+    and empties the store in one step, and Redo hides them again."""
+    workspace, sources = imported
+    editor = TemplateEditor(tmp_path, workspace, sources)
+    value = request(workspace, operation='hide', kind=None, values={'view': 'summary'}, identifier='hide-history')
+    value.operations[0].command.capture = value.capture.model_copy(deep=True)
+    editor.edit(value)
+    assert len(editor.current().project.hidden_blocks) == 1
+    undone = editor.undo('undo-hide', expected='hide-history').response.workspace
+    assert undone.project.hidden_blocks == [] and semantic(undone.project.document) == semantic(workspace.project.document)
+    redone = editor.redo('redo-hide', expected='hide-history').response.workspace
+    assert len(redone.project.hidden_blocks) == 1 and blocks(redone)['view:summary']['hidden']
+    shown = request(redone, operation='show', kind=None, values={'view': 'summary'}, identifier='show-history')
+    shown.operations[0].command.capture = shown.capture.model_copy(deep=True)
+    editor.edit(shown)
+    back = editor.undo('undo-show', expected='show-history').response.workspace
+    assert len(back.project.hidden_blocks) == 1 and blocks(back)['view:summary']['hidden']
