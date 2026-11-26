@@ -351,6 +351,11 @@ def create_app(*, origin: str, secret: str, temp_root: Path, dist: Path, cli_exe
     register_import_fold(project_repository)
     from packages.resume_core.repository.focus_icons import FocusIconStore
     projects = ProjectService(project_repository, icons=FocusIconStore(rules_store.root))
+    # D187: the library of own Focus icons beside the projects; every résumé on this computer sees it.
+    from packages.resume_core.repository.own_icons import OwnIconStore
+    from .icons_routes import mount_icon_routes
+    projects.own_icons = app.state.own_icons = OwnIconStore(rules_store.root)
+    mount_icon_routes(app, projects.own_icons)
     app.state.projects = projects
     intake = TemplateIntake(project_repository, temp_root=temp_root, worker_slot=worker_slot, cleanup_error=lifecycle_code,
         **({"clock": clock} if clock is not None else {}))

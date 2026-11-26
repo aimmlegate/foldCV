@@ -16,7 +16,7 @@ from .contracts import Id, Revision, Sha256, Source, Wire, _safe_path, _unique
 from .rich_document import FieldBinding, ImageBlock, NarrativeCitation, SectionBlock, SourceWitness, WorkingOwnership
 from .rich_workspace import (WorkspaceV6, RichPreDraft, LocalImageAsset, ImmutableFactEvidence,
                             RichOperation, RichRenderSnapshot, RichSyncRecord)
-from .template_mutations import HiddenBlocks, TemplateSyncRecord
+from .template_mutations import HiddenBlocks, OwnIcon, TemplateSyncRecord
 from .template_document import BoundLink, FieldOccurrence, RichDocumentV2
 from .template_facts import SourceSpan, WorkingFactsV2
 from .template_import import ExportAttempt, ImportIssue, ImportOperation
@@ -104,6 +104,8 @@ class ProjectV6(Wire):
     template_operations: list[ImportOperation] = Field(default_factory=list, exclude=True)
     exports: list[ExportAttempt]
     export_inputs: list[TemplateExportCapture] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D187: the résumé's own copies of library icons its Focus rows use.
+    own_icons: list[OwnIcon] = Field(default_factory=list, exclude_if=lambda value: not value)
     # D187: the résumé's photo, one square image in its images folder; none for a résumé without one.
     photo: LocalImageAsset | None = Field(default=None, exclude_if=lambda value: value is None)
     # D186: the short name the user confirmed for an anonymized export, with the full name it was confirmed for.

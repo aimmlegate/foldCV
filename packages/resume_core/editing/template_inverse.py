@@ -167,6 +167,12 @@ def inverse_template_mutation(before, after, *, origin_action_id, mutation_id, s
     for identifier, relation in new_relations.items():
         if identifier not in old_relations and relation.active:
             steps.append({'kind': 'remove_relation', 'relationId': identifier, 'beforeRevision': relation.revision})
+    # D187: own icon copies go back to what they were.
+    old_icons = {icon.id: icon for icon in before.project.own_icons}
+    new_icons = {icon.id: icon for icon in after.project.own_icons}
+    steps += [{'kind': 'put_own_icon', 'icon': icon.model_dump(mode='json', by_alias=True)}
+              for identifier, icon in old_icons.items() if identifier not in new_icons]
+    steps += [{'kind': 'remove_own_icon', 'iconId': identifier} for identifier in new_icons if identifier not in old_icons]
     # D185: the hidden store goes back to what it was.
     old_hidden = {entry.id: entry for entry in before.project.hidden_blocks}
     new_hidden = {entry.id: entry for entry in after.project.hidden_blocks}

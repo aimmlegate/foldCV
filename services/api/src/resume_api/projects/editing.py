@@ -49,6 +49,9 @@ def _edit_locked(service, project_id, request, session):
     panel = operation.command.operation if isinstance(operation, BuiltinPanel) else None
     # A row added from the facts panel takes the icon the user chose before for its name (D122).
     remembered = service.remembered_icons() if panel == 'add_to_focus' else None
+    # D187: an own icon comes from the app's library; the résumé keeps a copy of it.
+    icon = operation.command.values.get('icon', '') if panel == 'set_focus_icon' else ''
+    library = service.own_icons.get(icon) if icon.startswith('own-') and getattr(service, 'own_icons', None) else None
     # A card Facts puts back is built from the import's records, which only the history files hold (D104, D179).
     # A Show of a card or block deleted on the page builds it again from the same records (D185).
     operations = import_records(session.directory, session.workspace) if panel in {'restore', 'show'} else None
@@ -67,7 +70,7 @@ def _edit_locked(service, project_id, request, session):
                 after, created_ids = chained.workspace, chained.created_ids
             else:
                 prepared = prepare_edit(response, preparation, clipboard=clipboard, occupied=session.occupied_ids,
-                    remembered=remembered, operations=operations)
+                    remembered=remembered, operations=operations, library=library)
                 after, created_ids = prepared.preview.workspace if prepared.mutation is not None else None, prepared.created_ids
         except (ValueError, RichMutationFailure) as error:
             # A panel refusal keeps its code, so the panel can say why; other input is rejected as a whole.

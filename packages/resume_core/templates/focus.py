@@ -119,10 +119,11 @@ def remembered_catalog(remembered):
     return IconCatalog(dict(remembered), canonical)
 
 
-def remembered_icon(catalog, remembered, name):
-    """The icon remembered for a row name when this package has it; None keeps the package's own choice."""
+def remembered_icon(catalog, remembered, name, own=()):
+    """The icon remembered for a row name when this package has it, or the résumé keeps that own icon (D187); None
+    keeps the package's own choice."""
     found = remembered.find(name) if remembered is not None and name else None
-    return found if found is not None and found in catalog.files else None
+    return found if found is not None and (found in catalog.files or found in own) else None
 
 
 def name_keys(definition, view_key, node):
@@ -199,10 +200,19 @@ def _initial_png(font_bytes, letter):
     return output.getvalue()
 
 
-def row_icon(package, facts, row, catalog=None, chosen=None):
+def own_assets(icons):
+    """A résumé's own icon copies (D187) as assets by id, as the catalog gives its icons."""
+    import base64 as _base64
+    return {icon.id: CapturedAsset(id=icon.id, path=f'own-icons/{icon.id}.png', role='icon', mimeType='image/png',
+        sha256=icon.sha256, size=len(_base64.b64decode(icon.bytes_base64)), bytesBase64=icon.bytes_base64) for icon in icons}
+
+
+def row_icon(package, facts, row, catalog=None, chosen=None, own=None):
     """The icon a Focus row shows as (key, PNG asset): the one the user chose for it (D122), else the catalog's, else
     the template's placeholder; None shows text only. Editor and DOCX use this one decision."""
     catalog = icon_catalog(package) if catalog is None else catalog
+    if chosen is not None and own and chosen in own:
+        return chosen, own[chosen]
     if chosen is not None and chosen in catalog.files:
         return chosen, catalog.files[chosen]
     name = row_name(package, facts, row)

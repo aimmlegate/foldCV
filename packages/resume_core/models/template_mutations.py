@@ -258,6 +258,25 @@ class HiddenBlocks(Wire):
     anchors: list[HiddenAnchor] = Field(default_factory=list, max_length=5000, exclude_if=lambda value: not value)
 
 
+class OwnIcon(Wire):
+    """D187: a résumé's own copy of an icon from the app's library, so it shows and exports without the library."""
+    id: Id
+    name: str = Field(max_length=200)
+    sha256: Sha256
+    bytes_base64: str = Field(min_length=4, max_length=1_500_000)
+
+
+class PutOwnIcon(Wire):
+    kind: Literal['put_own_icon']
+    before_revision: None = None
+    icon: OwnIcon
+
+
+class RemoveOwnIcon(Wire):
+    kind: Literal['remove_own_icon']
+    icon_id: Id
+
+
 class PutHiddenBlocks(Wire):
     kind: Literal['put_hidden_blocks']
     before_revision: Revision | None
@@ -273,7 +292,7 @@ class RemoveHiddenBlocks(Wire):
 TemplateNonSyncStep = Annotated[TemplatePutBlock | RemoveBlock | MoveBlock | TemplateReplaceInlineRange |
     PutRecord | RemoveRecord | PutExtension | RemoveExtension | PutRelation | RemoveRelation |
     PutManualScope | SetBuiltinManualScope | SetModelWritten | SetIssueState | SetAuthoredAnchors | RestoreAuthoredBlockPatch |
-    SetManualScopeDisplays | PutHiddenBlocks | RemoveHiddenBlocks, Field(discriminator='kind')]
+    SetManualScopeDisplays | PutHiddenBlocks | RemoveHiddenBlocks | PutOwnIcon | RemoveOwnIcon, Field(discriminator='kind')]
 
 
 class TemplateOwnershipConflict(Wire):

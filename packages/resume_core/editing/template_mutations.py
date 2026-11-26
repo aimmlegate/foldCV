@@ -8,7 +8,7 @@ from ..models.template_facts import WorkingFactsV2
 from ..models.template_mutations import (PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope,
                                          SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors, SetModelWritten,
                                          RestoreAuthoredBlockPatch, SetManualScopeDisplays, PutTemplateSync,
-                                         RemoveTemplateSync, PutHiddenBlocks, RemoveHiddenBlocks)
+                                         RemoveTemplateSync, PutHiddenBlocks, RemoveHiddenBlocks, PutOwnIcon, RemoveOwnIcon)
 from .fact_mutations import apply_record_mutations
 from ..fact_records import delete_subject_in_place
 
@@ -16,8 +16,9 @@ from ..fact_records import delete_subject_in_place
 FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope,
     SetModelWritten)
 HIDDEN_STEPS = (PutHiddenBlocks, RemoveHiddenBlocks)
+ICON_STEPS = (PutOwnIcon, RemoveOwnIcon)
 DOMAIN_STEPS = (*FACT_STEPS, SetIssueState, SetAuthoredAnchors, SetManualScopeDisplays, PutTemplateSync, RemoveTemplateSync,
-    *HIDDEN_STEPS)
+    *HIDDEN_STEPS, *ICON_STEPS)
 
 
 def content(value):
@@ -351,3 +352,17 @@ def apply_hidden_steps(project, request):
         order = [entry.id for entry in project.hidden_blocks]
         project.hidden_blocks = [entries[identifier] for identifier in order if identifier in entries] + [
             entries[identifier] for identifier in entries if identifier not in order]
+
+
+def apply_icon_steps(project, request):
+    """A résumé's own icon copies (D187): one is put once and removed only by an Undo of the step that put it."""
+    icons = {icon.id: icon for icon in project.own_icons}
+    for step in request.steps:
+        if isinstance(step, PutOwnIcon):
+            if step.icon.id in icons:
+                raise ValueError('own icon already kept')
+            icons[step.icon.id] = step.icon.model_copy(deep=True)
+        elif isinstance(step, RemoveOwnIcon):
+            if icons.pop(step.icon_id, None) is None:
+                raise ValueError('own icon missing')
+    project.own_icons = list(icons.values())

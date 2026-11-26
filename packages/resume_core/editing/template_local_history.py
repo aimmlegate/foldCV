@@ -18,6 +18,7 @@ def values(workspace):
     # D187: the photo is one undoable value; its path keeps the image file while history can bring it back.
     if project.photo is not None:
         result[('photo', 'photo')] = project.photo.model_dump(mode='json', by_alias=True)
+    result.update({('own_icon', icon.id): icon.model_dump(mode='json', by_alias=True) for icon in project.own_icons})
     # D185: the hidden store moves with the blocks it holds, so an Undo of Hide or Show restores both.
     result.update({('hidden', entry.id): entry.model_dump(mode='json', by_alias=True) for entry in project.hidden_blocks})
     result.update({('coverage_anchor', address): item.model_dump(mode='json', by_alias=True)

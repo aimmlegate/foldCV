@@ -183,7 +183,8 @@ def _set_icon(candidate, command, technologies):
     if not sections:
         raise ValueError('FOCUS_SCOPE_INVALID')
     icon = command.values['icon'] or None
-    if icon is not None and icon not in catalog_for(candidate.template_package).files:
+    if icon is not None and icon not in catalog_for(candidate.template_package).files and icon not in {
+            value.id for value in candidate.own_icons}:
         raise ValueError('FOCUS_ICON_UNKNOWN')
     if all(section.props.icon == icon for section in sections):
         return False
@@ -224,7 +225,8 @@ def icon_choices(project, remembered=None):
             assets.append(automatic[1])
         rows[block.props.record_id] = {
             'automatic': {'id': automatic[0], 'sha256': automatic[1].sha256} if automatic is not None else None,
-            'remembered': remembered_icon(catalog, remembered, row_name(package, project.facts, row))}
+            'remembered': remembered_icon(catalog, remembered, row_name(package, project.facts, row),
+                {icon.id for icon in project.own_icons})}
     return {'schemaVersion': 1, 'icons': icons, 'rows': rows}, assets
 
 
@@ -311,7 +313,7 @@ def refresh_durations(workspace, candidate, facts, allocator):
                 section.children.remove(line)
 
 
-def prepare_focus(workspace, command, allocator, remembered=None):
+def prepare_focus(workspace, command, allocator, remembered=None, library=None):
     """(candidate project, steps) of one Focus row command, or None when it changes nothing. `remembered`: the icons
     the user chose before (`remembered_catalog`), which an added row takes."""
     project = workspace.project
@@ -321,6 +323,13 @@ def prepare_focus(workspace, command, allocator, remembered=None):
     if command.operation == 'add_to_focus':
         _add(workspace, candidate, command, allocator, technologies, remembered)
     elif command.operation == 'set_focus_icon':
+        icon = command.values['icon']
+        if icon.startswith('own-') and icon not in {value.id for value in project.own_icons}:
+            # D187: the résumé keeps its own copy of a library icon, so it shows without the library.
+            if library is None or library.id != icon:
+                raise ValueError('FOCUS_ICON_UNKNOWN')
+            candidate.own_icons.append(library)
+            steps.append({'kind': 'put_own_icon', 'icon': library.model_dump(mode='json', by_alias=True)})
         if not _set_icon(candidate, command, technologies):
             return None
     elif command.operation == 'remove_from_focus':

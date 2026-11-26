@@ -22,7 +22,8 @@ def capture_export(workspace, expected, renderer, *, retry_capture=None, id_fact
             presentationHash=snapshot.presentation_hash, package=project.template_package, packageHash=snapshot.package_hash,
             assets=[TemplateRenderAsset(id=asset.id, path=asset.path, sha256=asset.sha256, size=asset.size)
                 for asset in project.template_package.assets], renderer=renderer,
-            **({'photo': photo} if photo is not None else {}))
+            **({'photo': photo} if photo is not None else {}),
+            **({'ownIcons': project.own_icons} if project.own_icons else {}))
     else:
         if retry_capture.snapshot.project_id != workspace.project_id or retry_capture.request.renderer != renderer:
             raise TemplateImportFailure('IMPORT_EXPORT_SNAPSHOT_STALE')

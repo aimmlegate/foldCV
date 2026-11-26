@@ -92,7 +92,6 @@ def export(client, editor, project, **extra):
 
 
 def test_a_photo_is_one_history_action_kept_on_reopen_and_transfer_and_in_the_docx(tmp_path, imported):
-    from packages.resume_core.repository.archive_zip import write_zip
     from packages.resume_core.repository.template_archive import open_archive_v7
     from tests.projects.support import Editor, v2_app
     workspace, sources = imported

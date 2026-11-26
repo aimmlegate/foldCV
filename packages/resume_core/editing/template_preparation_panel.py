@@ -192,7 +192,8 @@ def _employment_change(workspace, command, allocator, action_id):
     return candidate, steps
 
 
-def prepare_panel_edit(response, request, *, occupied=None, remembered=None, operations=None):
+def prepare_panel_edit(response, request, *, occupied=None, remembered=None, operations=None, library=None):
+    """library: the app's own icon a Focus row takes (D187), which the résumé then keeps a copy of."""
     validate_preparation(response, request)
     workspace = response.workspace
     operation = request.operations[0]
@@ -214,7 +215,7 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None, ope
         kind = records.get(command.record_id) if command.record_id is not None else command.record_kind
         from .template_panel_groups import add_technology_group, move_to_group, remove_from_group
         if command.operation in FOCUS_OPERATIONS:
-            prepared = prepare_focus(workspace, command, allocator, remembered)
+            prepared = prepare_focus(workspace, command, allocator, remembered, library)
         elif command.operation in {'hide', 'show'}:
             from .template_panel_hide import hide, show
             prepared = hide(workspace.project, command, allocator) if command.operation == 'hide' else show(

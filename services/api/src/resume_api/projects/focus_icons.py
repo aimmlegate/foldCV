@@ -17,4 +17,17 @@ def choices(service, project_id):
     # Packed and generated icons are no assets of their own; the asset route serves their checked bytes by hash.
     for asset in assets:
         remember_asset(asset.sha256, asset.bytes_base64, asset.mime_type)
-    return value
+    # D187: the app's own icons, and the copies this résumé keeps, served by hash in the same way.
+    own, seen = [], set()
+    library = getattr(service, 'own_icons', None)
+    for entry in library.list() if library is not None else []:
+        icon = library.get(entry['id'])
+        if icon is not None:
+            remember_asset(icon.sha256, icon.bytes_base64, 'image/png')
+            own.append({'id': icon.id, 'names': [icon.name], 'sha256': icon.sha256})
+            seen.add(icon.id)
+    for icon in project.own_icons:
+        remember_asset(icon.sha256, icon.bytes_base64, 'image/png')
+        if icon.id not in seen:
+            own.append({'id': icon.id, 'names': [icon.name], 'sha256': icon.sha256, 'kept': True})
+    return {**value, 'own': own}

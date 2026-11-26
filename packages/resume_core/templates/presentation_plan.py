@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 from ..rendering.captured_styles import authored_spans
 from ..hashing import canonical, sha256
-from .focus import catalog_for, row_icon
+from .focus import catalog_for, own_assets, row_icon
 from .materialize_nodes import locale_text
 from ..models.template_package import remember_asset
 from .materialize_nodes import focus_row, node_of
@@ -159,7 +159,7 @@ def editor_plan(project):
             entry['style'] = keyed(ref.model_copy(update={'style_token': recipe.style.tables[row['table']].label_style}, deep=True))
         row = focus_row(block, recipe)
         if row:
-            icon = row_icon(package, project.facts, row, catalog_for(package), block.props.icon)
+            icon = row_icon(package, project.facts, row, catalog_for(package), block.props.icon, own_assets(project.own_icons))
             entry['focus'] = {'blocks': [child.id for child in row], 'icon': icon[0] if icon else None}
             if icon:
                 files[icon[0]] = icon[1]

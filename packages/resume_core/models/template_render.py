@@ -10,6 +10,7 @@ from .template_facts import WorkingFactsV2
 from ..hashing import canonical, digest, sha256
 from ..import_failure import TemplateImportFailure
 from .template_package import TemplatePackage
+from .template_mutations import OwnIcon
 from ..templates.store import verify_package
 
 
@@ -79,6 +80,8 @@ class CapturedTemplateRenderInputV1(Wire):
     assets: list[TemplateRenderAsset]
     renderer: TemplateRendererIdentity
     photo: TemplateRenderPhoto | None = Field(default=None, exclude_if=lambda value: value is None)
+    # D187: the résumé's own icon copies its Focus rows use; absent when there are none.
+    own_icons: list[OwnIcon] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class TemplateRenderRequestV1(CapturedTemplateRenderInputV1):
