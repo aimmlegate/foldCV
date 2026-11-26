@@ -98,7 +98,7 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
     assert {attempt.model.effort for attempt in result.attempts} == {result.capture.primary.effort}
     shown = views(workspace)
     assert order(workspace) == ['identity', 'focus', 'education', 'courses', 'location', 'languages', 'opensource', 'summary',
-        'projects', *(['other_projects'] if rewrite else []), 'career_highlights', 'programming', 'data_and_tools', 'infrastructure']
+        'projects', *(['other_projects'] if rewrite else []), 'programming', 'data_and_tools', 'infrastructure']
     # Partial records show what they state, without placeholders, stray separators or empty headings.
     assert shown['education'] == ['ОБРАЗОВАНИЕ', 'Example Institute'] and shown['languages'] == ['ЯЗЫКИ', 'English']
     assert shown['location'] == ['ЛОКАЦИЯ', 'Example City, Example Country, UTC+1']
@@ -130,10 +130,11 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
         # but for a label and case stays as the model wrote it («Product:», «Career:» below).
         assert shown['summary'][1] == 'Backend engineer focused on reliable queue systems.'
         assert 'Message queue platform for internal services.' in projects and 'Old Systems' in projects
-    # The career-wide highlight has no owner; both employment records and the old job's technology stay facts.
-    assert shown['career_highlights'] == ['КЛЮЧЕВЫЕ ДОСТИЖЕНИЯ', 'Mentored five engineers across teams']
-    highlight = next(record for record in workspace.project.facts.extensions if record.semantic_type == 'foldcv:career_highlights')
-    assert not highlight.relations and not any(relation.subject_id == highlight.id for relation in workspace.project.facts.relations)
+    # «Две колонки» 1.7.0 has no career highlights block (D184): no job takes the career line and no record holds it.
+    assert 'career_highlights' not in shown
+    assert not any(record.semantic_type == 'foldcv:career_highlights' for record in workspace.project.facts.extensions)
+    assert not any('Mentored five' in record.model_dump_json() for record in records(workspace, 'employment'))
+    # Both employment records and the old job's technology stay facts.
     assert sorted(record.employer.raw_text for record in records(workspace, 'employment')) == ['Example Labs', 'Old Systems']
     assert sorted(record.display.raw_text for record in records(workspace, 'technology') if record.job_id) == [
         'Docker', 'Perl', 'PostgreSQL', 'Python']
@@ -144,8 +145,9 @@ async def test_every_generic_block_imports_with_partial_records_and_one_rejected
         assert shown['programming'] == ['ЯП, ФРЕЙМВОРКИ, БИБЛИОТЕКИ', 'Python']
         assert shown['data_and_tools'] == ['СУБД, ИНСТРУМЕНТЫ', 'PostgreSQL, Perl']
     assert shown['infrastructure'] == ['ИНФРАСТРУКТУРА, ТАСК-МЕНЕДЖЕРЫ', 'Docker']
-    # Fourteen model blocks run with one review each; the rejected result adds one repair and its review.
-    assert spent_calls(result) == len(fixture.transport.calls) == 2 * 14 + 2
+    # Thirteen model blocks (D184: no career highlights) run with one review each; the rejected result adds one repair
+    # and its review.
+    assert spent_calls(result) == len(fixture.transport.calls) == 2 * 13 + 2
 
 
 @pytest.mark.asyncio

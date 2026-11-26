@@ -183,7 +183,11 @@ async def test_a_scripted_import_of_entries_from_the_map_publishes_the_document_
     _plain, baseline, before, _originals = await generic_import(tmp_path / 'base', name, concurrency=concurrency,
         rewrite=rewrite, table=table_)
     assert document(workspace) == document(before)
-    assert [issue.code for issue in result.issues] == [issue.code for issue in baseline.issues]
+    # D184: F10's career line has no block in «Две колонки» 1.7.0; only an import with a map names such a line.
+    unused = [issue.message for issue in result.issues if issue.code == 'IMPORT_SOURCE_UNUSED']
+    assert unused == (['Строки резюме не попали ни в один раздел: 1. «Career: Mentored five engineers across teams.».']
+                      if name == 'F10' else [])
+    assert [issue.code for issue in result.issues if issue.code != 'IMPORT_SOURCE_UNUSED'] == [issue.code for issue in baseline.issues]
 
 
 @pytest.mark.asyncio

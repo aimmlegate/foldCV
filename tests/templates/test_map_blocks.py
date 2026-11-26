@@ -119,7 +119,11 @@ async def test_a_scripted_import_with_a_map_publishes_the_document_it_publishes_
         rewrite=rewrite, table=table)
     assert result.state == baseline.state == 'published'
     assert document(workspace) == document(before)
-    assert [issue.code for issue in result.issues] == [issue.code for issue in baseline.issues]
+    # D184: F10's career line has no block in «Две колонки» 1.7.0; only an import with a map names such a line.
+    unused = [issue.message for issue in result.issues if issue.code == 'IMPORT_SOURCE_UNUSED']
+    assert unused == (['Строки резюме не попали ни в один раздел: 1. «Career: Mentored five engineers across teams.».']
+                      if name == 'F10' else [])
+    assert [issue.code for issue in result.issues if issue.code != 'IMPORT_SOURCE_UNUSED'] == [issue.code for issue in baseline.issues]
     # Fewer calls (empty blocks make none) and shorter requests, the map's included.
     assert len(mapped.transport.calls) < len(plain.transport.calls)
     assert sum(map(len, mapped.transport.prompts)) < sum(map(len, plain.transport.prompts))
