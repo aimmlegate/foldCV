@@ -186,3 +186,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D181 «Написать заново по резюме» for a list: the list replaced whole, two list operations
 - D182 Job order and date warnings in Facts
 - D183 The template assistant is removed
+- D184 «Две колонки» 1.7.0 has no common achievements block

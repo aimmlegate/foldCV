@@ -359,7 +359,7 @@ stall check). Nothing there is durable.
   text block's present text and the CV's lines less the lines the last import hid, and code checks the text against
   the lines it sent (`written_check`); a refused text gets one more call under the same request ID, so one Cancel
   stops either. A project with no hidden-line rows (an import before 1.1.0) gets no such action. Both previews write
-  nothing; Apply is one fact update action. A list block (`career_highlights`, F6b, D181) is written again whole: the
+  nothing; Apply is one fact update action. A list block (`career_highlights` of a template that has it, F6b, D181; «Две колонки» has none since 1.7.0, D184) is written again whole: the
   preview has the present items and the new ones (`shape: "items"`), each item checked alone, one call; its Apply
   adds items (authored operation `add_list_item`) and takes removed ones off the page with their records, one action.
 - Clipboard (`projects/clipboard.py`): captures stay in the session (20 at most), are
