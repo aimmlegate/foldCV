@@ -135,7 +135,10 @@ def job_warnings(project):
         for index, block in enumerate(items):
             cards.setdefault(block.props.record_id, []).append((index, len(items)))
     flagged = _flagged(project, lists)
-    ordered = [jobs[identifier] for identifier in order]
+    # D185: a job off the page (hidden, or deleted on the page) gets no overlap warning and gives none.
+    from .off_page import named_records
+    page = named_records(project.document)
+    ordered = [jobs[identifier] for identifier in order if identifier in page]
     result = {}
     for identifier in order:
         value = {}
@@ -145,7 +148,8 @@ def job_warnings(project):
             value['move'] = {'up': index > 0, 'down': index < size - 1}
         if identifier in flagged:
             value['outOfOrder'] = True
-        overlaps = list(dict.fromkeys(other.id for other, _period in _overlaps(jobs[identifier], ordered)))
+        overlaps = list(dict.fromkeys(other.id for other, _period in _overlaps(jobs[identifier], ordered))) \
+            if identifier in page else []
         if overlaps:
             value['overlaps'] = overlaps
         result[identifier] = value

@@ -38,8 +38,10 @@ def _card(document, record_id):
 
 def restorable(project):
     """The off-page records of the restorable kinds: their rows offer «Вернуть на страницу»."""
+    from .template_panel_hide import kept_records
     kinds = {record.id: record.kind for record in project.facts.records}
-    return {identifier for identifier in off_page(project) if kinds.get(identifier) in RESTORABLE}
+    # A record a hidden block or card holds comes back with its block's Show (D185).
+    return {identifier for identifier in off_page(project) - kept_records(project) if kinds.get(identifier) in RESTORABLE}
 
 
 def _owned(project, record_id):

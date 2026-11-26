@@ -167,6 +167,17 @@ def inverse_template_mutation(before, after, *, origin_action_id, mutation_id, s
     for identifier, relation in new_relations.items():
         if identifier not in old_relations and relation.active:
             steps.append({'kind': 'remove_relation', 'relationId': identifier, 'beforeRevision': relation.revision})
+    # D185: the hidden store goes back to what it was.
+    old_hidden = {entry.id: entry for entry in before.project.hidden_blocks}
+    new_hidden = {entry.id: entry for entry in after.project.hidden_blocks}
+    for identifier, entry in old_hidden.items():
+        existing = new_hidden.get(identifier)
+        if existing is None or content(entry) != content(existing):
+            steps.append({'kind': 'put_hidden_blocks', 'beforeRevision': existing.revision if existing else None,
+                'entry': entry.model_dump(mode='json', by_alias=True)})
+    for identifier, entry in new_hidden.items():
+        if identifier not in old_hidden:
+            steps.append({'kind': 'remove_hidden_blocks', 'entryId': identifier, 'beforeRevision': entry.revision})
     old_scopes = {scope.id: scope for scope in before.project.facts.manual_scopes}
     new_scopes = {scope.id: scope for scope in after.project.facts.manual_scopes}
     for identifier, scope in old_scopes.items():

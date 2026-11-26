@@ -96,6 +96,22 @@ class EditorJob(Wire):
     out_of_order: bool = Field(default=False, exclude_if=lambda value: not value)
     # The other jobs whose periods overlap this job's, in row order (D182, «Пересекается с …»).
     overlaps: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D185: the job's eye: its own card is on the page, it is off the page, or a hidden block holds its card. Absent for
+    # a job with no card of its own (a compact list's line).
+    eye: Literal['shown', 'hidden', 'locked'] | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+class EditorHideBlock(Wire):
+    """One template block with an eye in Facts (D185): where the eye stands and whether the block is hidden."""
+    # `view:` and the template block's id; the same id names the technology group of that view.
+    id: str
+    # The block's heading as the résumé writes it.
+    name: str
+    # The header of the Facts group of `kind` (a group that shows this one block), a technology group's title, the
+    # Focus part, or a row of «Другие блоки».
+    place: Literal['group', 'technology', 'focus', 'other']
+    kind: Literal['employment', 'education', 'language'] | None = Field(default=None, exclude_if=lambda value: value is None)
+    hidden: bool
 
 
 class EditorPlanV1(Wire):
@@ -128,6 +144,8 @@ class EditorPlanV1(Wire):
     job_order: list[Id] = Field(default_factory=list, exclude_if=lambda value: not value)
     # A job card stands out of date order, so «Расставить по дате» has something to do.
     sort_jobs: bool = Field(default=False, exclude_if=lambda value: not value)
+    # D185: the blocks with an eye, in template order; the page header is never one.
+    hide_blocks: list[EditorHideBlock] = Field(default_factory=list, exclude_if=lambda value: not value)
 
 
 class TemplatePresentationV1(Wire):

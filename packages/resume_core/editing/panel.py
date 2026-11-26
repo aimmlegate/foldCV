@@ -88,7 +88,7 @@ def panel_mutation(workspace, request):
     if project is None or (project.facts.revision, project.document.revision) != (request.facts_revision, request.document_revision):
         raise ValueError("STALE_PANEL_EDIT")
     # Skill groups (D136) and job cards in lists (D182) are a template document's; this document has none.
-    if request.operation in {"add_technology_group", "move_job", "sort_jobs"} or request.group_id is not None:
+    if request.operation in {"add_technology_group", "move_job", "sort_jobs", "hide", "show"} or request.group_id is not None:
         raise ValueError("PANEL_ACTION_UNSUPPORTED")
     records = {record.id: record for record in project.facts.records}
     if request.operation in {"move_technology", "move_focus"}:

@@ -27,7 +27,7 @@ class RichPanelRequest(Wire):
                     "jobId": {"type": "null"}, "periodId": {"type": "null"},
                     "values": {"required": ["icon"], "maxProperties": 1}}, "required": ["recordId"]}}},
     })
-    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon", "add_technology_group", "restore", "move_job", "sort_jobs"]
+    operation: Literal["add", "edit", "remove", "add_period", "remove_period", "clear_technologies", "add_to_focus", "remove_from_focus", "move_technology", "move_focus", "set_focus_icon", "add_technology_group", "restore", "move_job", "sort_jobs", "hide", "show"]
     record_id: Id | None = None
     record_kind: PanelKind | None = None
     job_id: Id | None = None
@@ -71,6 +71,11 @@ class RichPanelRequest(Wire):
         if self.operation == "move_job" and (self.record_id is None or self.record_kind not in {None, "employment"}
                 or self.job_id is not None or self.period_id is not None or set(self.values) != {"direction"}
                 or self.values["direction"] not in {"up", "down"}):
+            raise ValueError("PANEL_ACTION_UNSUPPORTED")
+        # D185: a job's card ({recordId}) or a whole template block ({values: {view}}) off the page or back on it.
+        if self.operation in {"hide", "show"} and (self.record_kind not in {None, "employment"} or self.job_id is not None
+                or self.period_id is not None or not set(self.values) <= {"view"}
+                or (self.record_id is None) == ("view" not in self.values)):
             raise ValueError("PANEL_ACTION_UNSUPPORTED")
         if self.operation == "sort_jobs" and (self.record_id is not None or self.record_kind not in {None, "employment"}
                 or self.job_id is not None or self.period_id is not None or self.values):

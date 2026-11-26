@@ -153,7 +153,11 @@ def _employment_change(workspace, command, allocator, action_id):
     if command.operation == 'remove':
         if command.values or command.period_id is not None:
             raise ValueError('employment deletion has unexpected fields')
-        return _delete_entity(workspace, original.id, original.revision, action_id)
+        candidate, steps = _delete_entity(workspace, original.id, original.revision, action_id)
+        # D185: a hidden card goes with its job.
+        steps += [{'kind': 'remove_hidden_blocks', 'entryId': entry.id, 'beforeRevision': entry.revision}
+                  for entry in workspace.project.hidden_blocks if entry.target.kind == 'record' and entry.target.id == original.id]
+        return candidate, steps
     if command.operation not in {'edit', 'remove_period'}:
         raise ValueError('employment panel creation requires its captured creation adapter')
     updated = original.model_copy(deep=True)
@@ -211,6 +215,10 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None, ope
         from .template_panel_groups import add_technology_group, move_to_group, remove_from_group
         if command.operation in FOCUS_OPERATIONS:
             prepared = prepare_focus(workspace, command, allocator, remembered)
+        elif command.operation in {'hide', 'show'}:
+            from .template_panel_hide import hide, show
+            prepared = hide(workspace.project, command, allocator) if command.operation == 'hide' else show(
+                workspace, command, allocator, operations)
         elif command.operation in {'move_job', 'sort_jobs'}:
             from .template_panel_jobs import move_job, sort_jobs
             prepared = move_job(workspace.project, command) if command.operation == 'move_job' else sort_jobs(workspace.project)
@@ -252,4 +260,5 @@ def prepare_panel_edit(response, request, *, occupied=None, remembered=None, ope
         refresh_durations(workspace, candidate, next_facts(response, request, steps), allocator)
     tree, replacements = changed_block_steps(workspace.project.document, candidate.document)
     steps += tree + [value.model_dump(by_alias=True) for value in anchor_steps(workspace.project, replacements)]
-    return finish_preparation(response, request, allocator, steps, candidate, kind='panel')
+    return finish_preparation(response, request, allocator, steps, candidate, kind='panel',
+        keep_issues=isinstance(operation, BuiltinPanel) and operation.command.operation in {'hide', 'show'})

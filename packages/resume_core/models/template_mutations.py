@@ -227,10 +227,53 @@ class HistoryCapture(Wire):
         return self
 
 
+class HiddenTarget(Wire):
+    """What a Facts eye hid (D185): a job's card, or every block of one template view."""
+    kind: Literal['record', 'view']
+    id: Id
+
+
+class HiddenGroup(Wire):
+    """Blocks that stood one after another in one parent; `before_ids` are the earlier siblings, nearest last, so Show
+    finds the place again when some of them are gone."""
+    parent_id: Id
+    before_ids: list[Id] = Field(max_length=1000)
+    blocks: list[TemplateBlock] = Field(min_length=1, max_length=1000)
+
+
+class HiddenAnchor(Wire):
+    """The block ids an import notice or coverage entry named before Hide took some of them off the page."""
+    kind: Literal['issue', 'coverage']
+    key: str = Field(min_length=1, max_length=200)
+    index: int | None = Field(default=None, ge=0, exclude_if=lambda value: value is None)
+    block_ids: list[Id] = Field(max_length=5000)
+
+
+class HiddenBlocks(Wire):
+    """Blocks a Facts eye took off the page, kept whole with their ids until Show puts them back (D185)."""
+    id: Id
+    revision: Revision
+    target: HiddenTarget
+    groups: list[HiddenGroup] = Field(min_length=1, max_length=200)
+    anchors: list[HiddenAnchor] = Field(default_factory=list, max_length=5000, exclude_if=lambda value: not value)
+
+
+class PutHiddenBlocks(Wire):
+    kind: Literal['put_hidden_blocks']
+    before_revision: Revision | None
+    entry: HiddenBlocks
+
+
+class RemoveHiddenBlocks(Wire):
+    kind: Literal['remove_hidden_blocks']
+    entry_id: Id
+    before_revision: Revision
+
+
 TemplateNonSyncStep = Annotated[TemplatePutBlock | RemoveBlock | MoveBlock | TemplateReplaceInlineRange |
     PutRecord | RemoveRecord | PutExtension | RemoveExtension | PutRelation | RemoveRelation |
     PutManualScope | SetBuiltinManualScope | SetModelWritten | SetIssueState | SetAuthoredAnchors | RestoreAuthoredBlockPatch |
-    SetManualScopeDisplays, Field(discriminator='kind')]
+    SetManualScopeDisplays | PutHiddenBlocks | RemoveHiddenBlocks, Field(discriminator='kind')]
 
 
 class TemplateOwnershipConflict(Wire):

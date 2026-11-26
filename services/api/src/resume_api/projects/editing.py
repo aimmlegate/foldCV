@@ -50,7 +50,8 @@ def _edit_locked(service, project_id, request, session):
     # A row added from the facts panel takes the icon the user chose before for its name (D122).
     remembered = service.remembered_icons() if panel == 'add_to_focus' else None
     # A card Facts puts back is built from the import's records, which only the history files hold (D104, D179).
-    operations = import_records(session.directory, session.workspace) if panel == 'restore' else None
+    # A Show of a card or block deleted on the page builds it again from the same records (D185).
+    operations = import_records(session.directory, session.workspace) if panel in {'restore', 'show'} else None
     states = []
 
     def build(committed):

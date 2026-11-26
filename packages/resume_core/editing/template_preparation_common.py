@@ -51,7 +51,8 @@ def next_facts(response, request, steps):
     return apply_fact_steps(workspace.project.facts, _mutation(workspace, request, steps, 'panel'))
 
 
-def finish_preparation(response, request, allocator, steps, candidate, *, kind='structure'):
+def finish_preparation(response, request, allocator, steps, candidate, *, kind='structure', keep_issues=False):
+    """keep_issues: the change moves content off or onto the page without changing it (D185), so no notice retires."""
     workspace = response.workspace
     def mutation(values):
         return _mutation(workspace, request, values, kind)
@@ -68,7 +69,7 @@ def finish_preparation(response, request, allocator, steps, candidate, *, kind='
     from ..template_anchors import apply_anchor_steps
     apply_anchor_steps(candidate, initial, workspace.project)
     affected, known = issue_impacts(workspace.project, candidate, initial)
-    for issue in workspace.project.import_issues:
+    for issue in [] if keep_issues else workspace.project.import_issues:
         targets = set(issue.target_ids) if issue.target_ids else set(issue.block_ids)
         if not targets & known:
             targets.update(issue.block_ids)

@@ -229,6 +229,8 @@ def apply_rich_mutation(workspace: WorkspaceV6, request, *, history_authorizatio
         try:
             apply_scope_displays(project, request, replay=replay_authorized)
             guard_retained_scope_ownership(workspace.project, project, request, replay=replay_authorized)
+            from .template_mutations import apply_hidden_steps
+            apply_hidden_steps(project, request)
         except ValueError:
             raise RichMutationFailure('STALE_MUTATION') from None
     result.project_revision += 1

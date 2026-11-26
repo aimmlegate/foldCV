@@ -246,7 +246,9 @@
         "add_technology_group",
         "restore",
         "move_job",
-        "sort_jobs"
+        "sort_jobs",
+        "hide",
+        "show"
       ],
       "title": "Operation",
       "type": "string"

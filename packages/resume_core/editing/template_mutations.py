@@ -8,14 +8,16 @@ from ..models.template_facts import WorkingFactsV2
 from ..models.template_mutations import (PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope,
                                          SetBuiltinManualScope, SetIssueState, SetAuthoredAnchors, SetModelWritten,
                                          RestoreAuthoredBlockPatch, SetManualScopeDisplays, PutTemplateSync,
-                                         RemoveTemplateSync)
+                                         RemoveTemplateSync, PutHiddenBlocks, RemoveHiddenBlocks)
 from .fact_mutations import apply_record_mutations
 from ..fact_records import delete_subject_in_place
 
 
 FACT_STEPS = (PutRecord, RemoveRecord, PutExtension, RemoveExtension, PutRelation, RemoveRelation, PutManualScope, SetBuiltinManualScope,
     SetModelWritten)
-DOMAIN_STEPS = (*FACT_STEPS, SetIssueState, SetAuthoredAnchors, SetManualScopeDisplays, PutTemplateSync, RemoveTemplateSync)
+HIDDEN_STEPS = (PutHiddenBlocks, RemoveHiddenBlocks)
+DOMAIN_STEPS = (*FACT_STEPS, SetIssueState, SetAuthoredAnchors, SetManualScopeDisplays, PutTemplateSync, RemoveTemplateSync,
+    *HIDDEN_STEPS)
 
 
 def content(value):
@@ -324,3 +326,28 @@ def apply_issue_steps(project, request, replay=False, *, before=None):
                 raise ValueError('issue retirement lacks a changed content or ownership scope')
         issue.lifecycle_id, issue.state = step.after_lifecycle_id, step.after_state
         issue.retired_by_action = step.action_id if step.after_state == 'retired' else None
+
+
+def apply_hidden_steps(project, request):
+    """The hidden store's steps (D185): an entry is put new or over its own revision, or removed at its revision. Run
+    after the tree steps, so an entry's blocks have left the page in the same mutation."""
+    entries = {entry.id: entry for entry in project.hidden_blocks}
+    touched = set()
+    for step in request.steps:
+        if not isinstance(step, HIDDEN_STEPS):
+            continue
+        identifier = step.entry.id if isinstance(step, PutHiddenBlocks) else step.entry_id
+        current = entries.get(identifier)
+        if identifier in touched or step.before_revision != (current.revision if current else None):
+            raise ValueError('stale hidden blocks')
+        touched.add(identifier)
+        if isinstance(step, RemoveHiddenBlocks):
+            del entries[identifier]
+        else:
+            entry = step.entry.model_copy(deep=True)
+            entry.revision = (current.revision if current else 0) + 1
+            entries[identifier] = entry
+    if touched:
+        order = [entry.id for entry in project.hidden_blocks]
+        project.hidden_blocks = [entries[identifier] for identifier in order if identifier in entries] + [
+            entries[identifier] for identifier in entries if identifier not in order]

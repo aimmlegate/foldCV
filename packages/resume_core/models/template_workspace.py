@@ -16,7 +16,7 @@ from .contracts import Id, Revision, Sha256, Source, Wire, _safe_path, _unique
 from .rich_document import FieldBinding, ImageBlock, NarrativeCitation, SectionBlock, SourceWitness, WorkingOwnership
 from .rich_workspace import (WorkspaceV6, RichPreDraft, LocalImageAsset, ImmutableFactEvidence,
                             RichOperation, RichRenderSnapshot, RichSyncRecord)
-from .template_mutations import TemplateSyncRecord
+from .template_mutations import HiddenBlocks, TemplateSyncRecord
 from .template_document import BoundLink, FieldOccurrence, RichDocumentV2
 from .template_facts import SourceSpan, WorkingFactsV2
 from .template_import import ExportAttempt, ImportIssue, ImportOperation
@@ -98,6 +98,8 @@ class ProjectV6(Wire):
     template_operations: list[ImportOperation] = Field(default_factory=list, exclude=True)
     exports: list[ExportAttempt]
     export_inputs: list[TemplateExportCapture] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D185: blocks a Facts eye took off the page, kept whole until Show; empty is left out, so older files keep their bytes.
+    hidden_blocks: list[HiddenBlocks] = Field(default_factory=list, exclude_if=lambda value: not value)
 
     @field_serializer('import_history', mode='wrap')
     def serialized_history(self, value, handler):
@@ -134,7 +136,7 @@ class ProjectV6(Wire):
         return self
 
     def _check_ids_and_history(self):
-        for name in ('evidence_records','assets','operations','renders','import_issues','template_operations','exports'):
+        for name in ('evidence_records','assets','operations','renders','import_issues','template_operations','exports','hidden_blocks'):
             _unique([item.id for item in getattr(self,name)],'project '+name)
         _unique([ref.operation_id for ref in self.import_history], 'project import history')
         if self.template_operations and self.import_history and (
@@ -144,6 +146,13 @@ class ProjectV6(Wire):
             # Loaded records name their own files, so a loaded copy equals the one read from them.
             self.import_history = history_refs(self.template_operations)
         _unique([(source.id, source.revision) for source in self.sources], 'source revision')
+        if self.hidden_blocks:
+            # A hidden block is off the page: its id stands nowhere in the document (D185).
+            hidden = [block.id for entry in self.hidden_blocks for group in entry.groups for top in group.blocks
+                for block in _subtree(top)]
+            _unique(hidden, 'hidden block')
+            if set(hidden) & {block.id for block in self.document.blocks()}:
+                raise ValueError('a hidden block is also on the page')
         for source in self.sources:
             _unique([(unit.id, unit.revision) for unit in source.units], 'source unit revision')
 
@@ -414,3 +423,9 @@ class ArchiveManifestV7(Wire):
         if sum(entry.role=='render' for entry in self.entries)>1: raise ValueError('one optional render allowed')
         if sum(entry.size for entry in self.entries)>ARCHIVE_EXPANDED_BYTES: raise ValueError('expanded archive exceeds limit')
         return self
+
+
+def _subtree(block):
+    yield block
+    for child in block.children:
+        yield from _subtree(child)

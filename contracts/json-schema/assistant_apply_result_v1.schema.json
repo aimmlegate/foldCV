@@ -2857,6 +2857,59 @@
       "title": "EditorFocusPanel",
       "type": "object"
     },
+    "EditorHideBlock": {
+      "additionalProperties": false,
+      "description": "One template block with an eye in Facts (D185): where the eye stands and whether the block is hidden.",
+      "properties": {
+        "hidden": {
+          "title": "Hidden",
+          "type": "boolean"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "employment",
+                "education",
+                "language"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "place": {
+          "enum": [
+            "group",
+            "technology",
+            "focus",
+            "other"
+          ],
+          "title": "Place",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "place",
+        "hidden"
+      ],
+      "title": "EditorHideBlock",
+      "type": "object"
+    },
     "EditorJob": {
       "additionalProperties": false,
       "description": "One job in the facts panel.",
@@ -2865,6 +2918,23 @@
           "default": false,
           "title": "Addperiod",
           "type": "boolean"
+        },
+        "eye": {
+          "anyOf": [
+            {
+              "enum": [
+                "shown",
+                "hidden",
+                "locked"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eye"
         },
         "move": {
           "anyOf": [
@@ -2998,6 +3068,13 @@
             "type": "string"
           },
           "title": "Fonts",
+          "type": "array"
+        },
+        "hideBlocks": {
+          "items": {
+            "$ref": "#/$defs/EditorHideBlock"
+          },
+          "title": "Hideblocks",
           "type": "array"
         },
         "iconFiles": {
@@ -5144,6 +5221,214 @@
         "level"
       ],
       "title": "HeadingProps",
+      "type": "object"
+    },
+    "HiddenAnchor": {
+      "additionalProperties": false,
+      "description": "The block ids an import notice or coverage entry named before Hide took some of them off the page.",
+      "properties": {
+        "blockIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 5000,
+          "title": "Blockids",
+          "type": "array"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "key": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "issue",
+            "coverage"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "blockIds"
+      ],
+      "title": "HiddenAnchor",
+      "type": "object"
+    },
+    "HiddenBlocks": {
+      "additionalProperties": false,
+      "description": "Blocks a Facts eye took off the page, kept whole with their ids until Show puts them back (D185).",
+      "properties": {
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/HiddenAnchor"
+          },
+          "maxItems": 5000,
+          "title": "Anchors",
+          "type": "array"
+        },
+        "groups": {
+          "items": {
+            "$ref": "#/$defs/HiddenGroup"
+          },
+          "maxItems": 200,
+          "minItems": 1,
+          "title": "Groups",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "target": {
+          "$ref": "#/$defs/HiddenTarget"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "target",
+        "groups"
+      ],
+      "title": "HiddenBlocks",
+      "type": "object"
+    },
+    "HiddenGroup": {
+      "additionalProperties": false,
+      "description": "Blocks that stood one after another in one parent; `before_ids` are the earlier siblings, nearest last, so Show\nfinds the place again when some of them are gone.",
+      "properties": {
+        "beforeIds": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 1000,
+          "title": "Beforeids",
+          "type": "array"
+        },
+        "blocks": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "bullet_list": "#/$defs/TemplateBulletBlock",
+                "check_list": "#/$defs/TemplateChecklistBlock",
+                "code": "#/$defs/TemplateCodeBlock",
+                "divider": "#/$defs/TemplateDividerBlock",
+                "heading": "#/$defs/TemplateHeadingBlock",
+                "image": "#/$defs/TemplateImageBlock",
+                "numbered_list": "#/$defs/TemplateNumberedBlock",
+                "paragraph": "#/$defs/TemplateParagraphBlock",
+                "quote": "#/$defs/TemplateQuoteBlock",
+                "section": "#/$defs/TemplateSectionBlock",
+                "table": "#/$defs/TemplateTableBlock",
+                "toggle_list": "#/$defs/TemplateToggleBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TemplateParagraphBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateHeadingBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateBulletBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateNumberedBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateChecklistBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateToggleBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateQuoteBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateCodeBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateDividerBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateTableBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateImageBlock"
+              },
+              {
+                "$ref": "#/$defs/TemplateSectionBlock"
+              }
+            ]
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Blocks",
+          "type": "array"
+        },
+        "parentId": {
+          "minLength": 1,
+          "title": "Parentid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parentId",
+        "beforeIds",
+        "blocks"
+      ],
+      "title": "HiddenGroup",
+      "type": "object"
+    },
+    "HiddenTarget": {
+      "additionalProperties": false,
+      "description": "What a Facts eye hid (D185): a job's card, or every block of one template view.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "record",
+            "view"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "HiddenTarget",
       "type": "object"
     },
     "HistoryActionV1": {
@@ -9361,6 +9646,13 @@
         "facts": {
           "$ref": "#/$defs/WorkingFactsV2"
         },
+        "hiddenBlocks": {
+          "items": {
+            "$ref": "#/$defs/HiddenBlocks"
+          },
+          "title": "Hiddenblocks",
+          "type": "array"
+        },
         "importCoverage": {
           "items": {
             "$ref": "#/$defs/SpanCoverage"
@@ -10028,6 +10320,38 @@
       "title": "PutExtension",
       "type": "object"
     },
+    "PutHiddenBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Beforerevision"
+        },
+        "entry": {
+          "$ref": "#/$defs/HiddenBlocks"
+        },
+        "kind": {
+          "const": "put_hidden_blocks",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "beforeRevision",
+        "entry"
+      ],
+      "title": "PutHiddenBlocks",
+      "type": "object"
+    },
     "PutManualScope": {
       "additionalProperties": false,
       "properties": {
@@ -10598,6 +10922,33 @@
         "beforeRevision"
       ],
       "title": "RemoveExtension",
+      "type": "object"
+    },
+    "RemoveHiddenBlocks": {
+      "additionalProperties": false,
+      "properties": {
+        "beforeRevision": {
+          "minimum": 1,
+          "title": "Beforerevision",
+          "type": "integer"
+        },
+        "entryId": {
+          "minLength": 1,
+          "title": "Entryid",
+          "type": "string"
+        },
+        "kind": {
+          "const": "remove_hidden_blocks",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "entryId",
+        "beforeRevision"
+      ],
+      "title": "RemoveHiddenBlocks",
       "type": "object"
     },
     "RemoveRecord": {
@@ -17143,11 +17494,13 @@
                 "move_block": "#/$defs/MoveBlock",
                 "put_block": "#/$defs/TemplatePutBlock",
                 "put_extension": "#/$defs/PutExtension",
+                "put_hidden_blocks": "#/$defs/PutHiddenBlocks",
                 "put_manual_scope": "#/$defs/PutManualScope",
                 "put_record": "#/$defs/PutRecord",
                 "put_relation": "#/$defs/PutRelation",
                 "remove_block": "#/$defs/RemoveBlock",
                 "remove_extension": "#/$defs/RemoveExtension",
+                "remove_hidden_blocks": "#/$defs/RemoveHiddenBlocks",
                 "remove_record": "#/$defs/RemoveRecord",
                 "remove_relation": "#/$defs/RemoveRelation",
                 "replace_inline_range": "#/$defs/TemplateReplaceInlineRange",
@@ -17211,6 +17564,12 @@
               },
               {
                 "$ref": "#/$defs/SetManualScopeDisplays"
+              },
+              {
+                "$ref": "#/$defs/PutHiddenBlocks"
+              },
+              {
+                "$ref": "#/$defs/RemoveHiddenBlocks"
               }
             ]
           },
