@@ -77,6 +77,12 @@ def validated_with_history(workspace):
     return type(workspace).model_validate(data)
 
 
+class AnonymizedName(Wire):
+    """The name an anonymized export showed last (D186); it stands until the candidate's name in the facts changes."""
+    name: str = Field(max_length=200)
+    full_name: str = Field(max_length=1000)
+
+
 class ProjectV6(Wire):
     schema_version: Literal[6]
     project_id: Id
@@ -98,6 +104,8 @@ class ProjectV6(Wire):
     template_operations: list[ImportOperation] = Field(default_factory=list, exclude=True)
     exports: list[ExportAttempt]
     export_inputs: list[TemplateExportCapture] = Field(default_factory=list, exclude_if=lambda value: not value)
+    # D186: the short name the user confirmed for an anonymized export, with the full name it was confirmed for.
+    anonymized_name: AnonymizedName | None = Field(default=None, exclude_if=lambda value: value is None)
     # D185: blocks a Facts eye took off the page, kept whole until Show; empty is left out, so older files keep their bytes.
     hidden_blocks: list[HiddenBlocks] = Field(default_factory=list, exclude_if=lambda value: not value)
 
