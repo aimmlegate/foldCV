@@ -58,8 +58,8 @@ export function removePrintCopy(): void {
 }
 
 /** The paged copy for the printer. Images decode before the measure, or they have no height, and again in the page copies. */
-export async function printCopy(paper: HTMLElement, page: PrintPage): Promise<HTMLElement> {
-  const { root, copy } = measured(paper, page);
+export async function printCopy(paper: HTMLElement, page: PrintPage, changes?: PageChanges): Promise<HTMLElement> {
+  const { root, copy } = measured(paper, page, changes);
   await loaded(root);
   paged(root, copy, page);
   await loaded(root);
@@ -78,7 +78,20 @@ export function printCopyNow(paper: HTMLElement, page: PrintPage): HTMLElement {
 
 /** A copy of the paper without editing, marks and buttons, laid out off screen. It loses the editor's class, so the editor's
  * queries skip it. */
-function measured(paper: HTMLElement, page: PrintPage): { root: HTMLElement; copy: HTMLElement } {
+/** D186: what Python's anonymized copy changes on the page, applied to the print copy only. */
+export type PageChanges = { removed: readonly string[]; texts: Readonly<Record<string, string>> };
+
+/** The anonymized export's changes on a copy: Python's removed blocks go and its changed blocks take its plain text. */
+export function applyPageChanges(copy: HTMLElement, changes: PageChanges): void {
+  const block = (id: string) => copy.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
+  for (const id of changes.removed) block(id)?.remove();
+  for (const [id, text] of Object.entries(changes.texts)) {
+    const content = block(id)?.querySelector<HTMLElement>(":scope > .bn-block > .bn-block-content .bn-inline-content");
+    if (content) content.textContent = text;
+  }
+}
+
+function measured(paper: HTMLElement, page: PrintPage, changes?: PageChanges): { root: HTMLElement; copy: HTMLElement } {
   removePrintCopy();
   const root = document.createElement("div"), rules = document.createElement("style"), copy = paper.cloneNode(true);
   if (!(copy instanceof HTMLElement)) throw new Error("Не удалось подготовить резюме к печати.");
@@ -90,6 +103,7 @@ function measured(paper: HTMLElement, page: PrintPage): { root: HTMLElement; cop
   for (const element of copy.querySelectorAll("[contenteditable]")) element.removeAttribute("contenteditable");
   for (const element of copy.querySelectorAll(".fcv-remark, .ProseMirror-selectednode, .selectedCell"))
     element.classList.remove("fcv-remark", "fcv-added", "ProseMirror-selectednode", "selectedCell");
+  if (changes) applyPageChanges(copy, changes);
   linkCopy(copy);
   root.append(rules, copy);
   document.body.append(root);

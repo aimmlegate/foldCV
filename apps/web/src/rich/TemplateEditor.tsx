@@ -47,12 +47,12 @@ import { groupAnchors } from "./outline";
 import { readRemarkMarks, saveRemarkMarks } from "../workbench/settings/interface";
 import { presentationMeta, templatePresentationPlugin, templateSheet, type TemplateSheet } from "./v7-presentation";
 import { TemplateEditorSession, type TemplateRewrite, type EditorMode } from "./v7-session";
-import { printCopy, printCopyNow, removePrintCopy } from "../workbench/files/print";
+import { printCopy, printCopyNow, removePrintCopy, type PageChanges } from "../workbench/files/print";
 
 export type TemplateEditorHandle = { background: boolean; flush: () => Promise<TemplateProjectResponseV1>;
   navigate: () => Promise<void>; resume: () => Promise<void>; refresh: () => Promise<void>; undo: () => void; redo: () => void;
   /** PDF export: the shown sheet through the system print window; the title names the saved file. */
-  print: (title: string) => Promise<void>;
+  print: (title: string, changes?: PageChanges) => Promise<void>;
   /** The assistant drawer's bridge: Apply through this page's token, the selection as run context, and a finding's place. */
   applyAssistant: (proposalId: string, allowEdits: boolean) => Promise<AssistantApplyResultV1>;
   captureSelection: () => AssistantSelection | null;
@@ -252,11 +252,12 @@ export function TemplateEditor({ initial, connection, onStatus, onShown, ref, po
     },
     navigate: () => session.navigateAway(), resume: () => session.resume(), refresh: () => session.refresh(),
     undo: () => void session.navigate("undo"), redo: () => void session.navigate("redo"),
-    print: async title => {
+    print: async (title, changes) => {
       await session.flush();
       const source = printSource(), doc = editor._tiptapEditor.state.doc;
       if (!source) throw new Error("Не удалось подготовить резюме к печати.");
-      await printCopy(source.paper, source.page);
+      // D186: an anonymized PDF changes only the print copy; the editor's page stays as it is.
+      await printCopy(source.paper, source.page, changes);
       printed.current = { doc, sheet: presented.current };
       // The print window names the PDF after the page title; it returns to the app's own after the print.
       document.title = title;

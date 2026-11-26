@@ -1,7 +1,7 @@
 import type { ListApply, RewordBlocks, RewordChange, RewordMode, RewordPreview } from "../workbench/editor/reword";
 /** What a «Принять» names: the cell of a word mark or a line of a block mark. */
 export type AcceptTarget = { cellId: string } | { blockId: string };
-import type { TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
+import type { AnonymizedPreviewV1, TemplateClipboardCaptureV1 } from "../contracts/generated/contracts";
 import type { TemplateEditPreparationV1 } from "../contracts/generated/contracts";
 import type { TemplateProjectResponseV1 } from "../contracts/generated/contracts";
 import type { TemplateRewritePreviewV1 } from "../contracts/generated/contracts";
@@ -196,14 +196,25 @@ export class ProjectEditorConnection {
     return response;
   }
 
-  async exportDocx(): Promise<{ blob: Blob; attemptId: string }> {
+  /** D186: what the anonymized export's dialog shows and the print copy changes; Python reads, nothing is written. */
+  async anonymizedPreview(name: string | null): Promise<AnonymizedPreviewV1> {
+    return v2Request<AnonymizedPreviewV1>(this.path("/anonymized"), "POST", name === null ? {} : { name }, this.fetcher);
+  }
+
+  /** The project remembers the name an anonymized PDF showed; no history action. */
+  async rememberAnonymizedName(name: string): Promise<void> {
+    await this.editing(token => v2Request(this.path("/anonymized/name"), "POST", { editorToken: token, name }, this.fetcher));
+  }
+
+  async exportDocx(anonymizedName?: string): Promise<{ blob: Blob; attemptId: string }> {
     const snapshot = this.response.snapshot;
     if (!snapshot) throw new ProjectApiFailure("INVALID_RESULT");
     const captured = structuredClone(snapshot);
     return this.editing(async token => {
       const response = await this.fetcher(this.path("/export"), { method: "POST", credentials: "same-origin", cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schemaVersion: 1, editorToken: token, snapshot: captured }) });
+        body: JSON.stringify({ schemaVersion: 1, editorToken: token, snapshot: captured,
+          ...(anonymizedName === undefined ? {} : { anonymizedName }) }) });
       if (!response.ok) throw await rejected(response);
       try {
         const artifact = await templateExportArtifact(response, captured);
