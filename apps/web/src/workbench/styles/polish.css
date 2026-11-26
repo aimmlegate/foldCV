@@ -88,3 +88,19 @@
 .fact-warning { display: flex; align-items: flex-start; gap: 5px; margin: 2px 0; color: var(--warn); font-size: var(--ui-small); }
 .fact-warning svg { flex: none; width: 13px; height: 13px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 2; }
 .fact-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+/* D185: the eye of a job or a résumé block; a hidden row is dimmed, with the crossed eye and «Скрыто». */
+.fact-eye svg { width: 13px; height: 13px; }
+.fact-row[data-hidden] .fact-eye, .fact-row[data-locked] .fact-eye, .fact-block-row .fact-eye { opacity: 1; }
+.fact-hidden-mark { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: var(--ui-small); }
+.fact-hidden-mark svg { width: 12px; height: 12px; }
+.fact-row[data-hidden] .fact-edit strong, .fact-row[data-hidden] .fact-edit > small:not(.fact-hidden-mark),
+.fact-row[data-locked] .fact-edit, .fact-group-frame[data-hidden] .fact-group > :not(summary),
+.technology-category[data-hidden] .technology-values, .focus-years[data-hidden] > :not(.technology-label),
+.fact-block-row[data-hidden] .fact-block-name strong { opacity: .55; }
+.fact-group-eye { position: absolute; top: 9px; right: 46px; display: inline-flex; align-items: center; gap: 6px; }
+.fact-group-eye .fact-eye { width: 26px; height: 26px; padding: 5px; }
+.fact-block-row { align-items: center; justify-content: space-between; }
+.fact-block-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.technology-category-heading .fact-hidden-mark, .technology-label .fact-hidden-mark { margin-left: 8px; }
+.technology-category-heading .fact-eye, .technology-label .fact-eye { margin-left: auto; }
+.technology-label { display: flex; align-items: center; }

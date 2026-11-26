@@ -17,6 +17,8 @@ import type { FocusIconChoices } from "../../projects/api";
 import { OperationStatus } from "../ui/OperationStatus";
 import type { DateWarning } from "../../projects/api";
 import { JobWarnings, overlapLine } from "./JobWarnings";
+import { HiddenMark, HideEye } from "./HideEye";
+import type { EditorHideBlock } from "../../contracts/generated/contracts";
 
 /** The records of a group as Facts lists them: jobs in the plan's order (D182), the others in record order. */
 export function groupRecords(records: readonly RecordValue[], kind: Kind, order: readonly string[] | undefined): RecordValue[] {
@@ -84,6 +86,13 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     const record = facts.records.find(value => value.id === recordId);
     if (record) setTarget({ kind: "technology", record });
   };
+  // D185: the blocks with an eye, by where it stands; Python's plan says each one's state.
+  const hideBlocks: readonly EditorHideBlock[] = plan.hideBlocks ?? [];
+  const groupBlock = (kind: Kind) => hideBlocks.find(block => block.place === "group" && block.kind === kind);
+  const otherBlocks = hideBlocks.filter(block => block.place === "other");
+  const toggleBlock = (block: EditorHideBlock) => void apply({ operation: block.hidden ? "show" : "hide",
+    values: { view: block.id.replace(/^view:/u, "") } }).catch(() => {});
+  const eyeOf = (block: EditorHideBlock | undefined) => block ? <HideEye name={block.name} hidden={block.hidden} disabled={busy} toggle={() => toggleBlock(block)} /> : null;
   async function apply(command: PanelCommand) {
     setError(null);
     try { await submit(command); }
@@ -105,29 +114,38 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
         <p>Сверьте с исходником и исправьте вручную.</p></details>}
     </div>}
     {groups.map(kind => {
-      const anchor = anchors?.get(kind);
-      return <div className="fact-group-frame" key={kind}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
+      const own = groupBlock(kind);
+      // A hidden block offers no jump to the page; its rows stay readable, dimmed.
+      const anchor = own?.hidden ? undefined : anchors?.get(kind);
+      return <div className="fact-group-frame" key={kind} data-hidden={own?.hidden || undefined}><details className="fact-group" data-group={kind} open={kind !== "claim"}>
       <summary>{labels[kind]}</summary>
-      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null} />
+      {kind === "technology" ? <><FocusYears entries={focusEntries} options={focusOptions} paused={busy} submit={apply} edit={editTechnology} pickIcon={focusIcons ? setIconRow : null}
+          eye={eyeOf(hideBlocks.find(block => block.place === "focus"))} hidden={hideBlocks.some(block => block.place === "focus" && block.hidden)} />
         {/* D136: the resume's skill groups; a template without them keeps one general list. */}
         {technologyTargets.some(target => target.jobId === null)
           ? <TechnologyGroups facts={facts} document={document} targets={technologyTargets.filter(target => target.jobId === null)}
-            creatable={plan.addTechnologyGroup === true} pending={pending} paused={busy} submit={apply} edit={editTechnology} excluded={focusOnly} />
+            creatable={plan.addTechnologyGroup === true} pending={pending} paused={busy} submit={apply} edit={editTechnology} excluded={focusOnly}
+            eyes={new Map(hideBlocks.filter(block => block.place === "technology").map(block => [block.id, { eye: eyeOf(block), hidden: block.hidden }]))} />
           : <TechnologySelect facts={facts} document={document} jobId={null} label="общий список" pending={pending} paused={busy} submit={apply} edit={editTechnology}
             focusRecordId={focusRequest?.recordId} targets={[]} lines={plan.technologyLines} excluded={focusOnly} />}</>
         : groupRecords(facts.records, kind, plan.jobOrder).map(record => {
           const job = plan.jobs?.[record.id];
           const [name, sub] = summary(record, job?.periods ?? []);
           // D179, sketch A1: a card the page does not show, with its way back.
-          const off = plan.offPage?.includes(record.id) === true;
-          return <div key={record.id}><div className="fact-row" data-fact-id={record.id} data-off-page={off || undefined}>
+          // D185: a job's eye says the same as «Не на странице», so its row shows the eye instead of that line.
+          const eye = job?.eye, hidden = eye === "hidden", locked = eye === "locked";
+          const off = plan.offPage?.includes(record.id) === true && !eye;
+          return <div key={record.id}><div className="fact-row" data-fact-id={record.id} data-off-page={off || undefined}
+            data-hidden={hidden || undefined} data-locked={locked || undefined}>
             <button className="fact-edit" disabled={busy} onClick={() => setTarget({ kind, record })}><strong>{name}</strong>
-              {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}</button>
+              {sub && <small>{sub}</small>}{needsCheck(record) && <small>Проверьте значение</small>}{hidden && <HiddenMark />}</button>
             {/* D182: one place up or down among the cards of the job's list; Python says which way can go. */}
-            {job?.move && <><button className="icon" aria-label={`Переместить выше: ${name}`} title="Выше" disabled={busy || !job.move.up}
+            {job?.move && <><button className="icon" aria-label={`Переместить выше: ${name}`} title="Выше" disabled={busy || locked || !job.move.up}
               onClick={() => void apply({ operation: "move_job", recordId: record.id, values: { direction: "up" } }).catch(() => {})}><Icon name="up" /></button>
-              <button className="icon" aria-label={`Переместить ниже: ${name}`} title="Ниже" disabled={busy || !job.move.down}
+              <button className="icon" aria-label={`Переместить ниже: ${name}`} title="Ниже" disabled={busy || locked || !job.move.down}
                 onClick={() => void apply({ operation: "move_job", recordId: record.id, values: { direction: "down" } }).catch(() => {})}><Icon name="down" /></button></>}
+            {eye && <HideEye name={name} hidden={hidden} disabled={busy || locked}
+              toggle={() => void apply({ operation: hidden ? "show" : "hide", recordId: record.id }).catch(() => {})} />}
             {panelSupport.remove.has(kind) && <button className="icon" aria-label={`Удалить: ${name}`} disabled={busy} onClick={() => setTarget({ kind, record, remove: true })}><Icon name="close" /></button>}
           </div>{job && <JobWarnings lines={[...(job.outOfOrder ? ["Стоит не по дате"] : []),
             ...(job.overlaps?.length ? [overlapLine(job.overlaps.map(id => jobName(facts.records, id)))] : [])]} />}
@@ -144,8 +162,16 @@ export function FactsPanel({ facts, document, focusEntries = [], focusOptions = 
     </details>
       {/* Beside the summary, not inside it: a click inside a summary also folds the group. */}
       {anchor && <button type="button" className="icon fact-group-jump" aria-label={`Показать в резюме: ${labels[kind]}`} title="Показать в резюме"
-        onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}</div>;
+        onClick={() => showBlock(anchor)}><Icon name="locate" /></button>}
+      {own && <span className="fact-group-eye">{own.hidden && <HiddenMark />}{eyeOf(own)}</span>}</div>;
     })}
+    {/* D185: the résumé's blocks with no Facts group of their own, one row each, named as the résumé names them. */}
+    {otherBlocks.length > 0 && <div className="fact-group-frame"><details className="fact-group" data-group="blocks" open>
+      <summary>Другие блоки</summary>
+      {otherBlocks.map(block => <div key={block.id} className="fact-row fact-block-row" data-block={block.id} data-hidden={block.hidden || undefined}>
+        <span className="fact-block-name"><strong>{block.name}</strong>{block.hidden && <HiddenMark />}</span>{eyeOf(block)}
+      </div>)}
+    </details></div>}
   </aside>{target && <FactDialog target={target} close={() => setTarget(null)} submit={apply}
       checkDates={target.kind === "employment" ? checkDates : null} jobName={id => jobName(facts.records, id)}
       offPage={target.record ? plan.offPageFields?.[target.record.id] : undefined}

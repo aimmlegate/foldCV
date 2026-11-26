@@ -12,7 +12,7 @@ export type TechnologyTarget = EditorTechnologyTarget;
  * can take another, the fields with no place in the document, the technologies that share a line, and whether a skill
  * group of one's own can be started (D136). */
 export type PanelPlan = Pick<EditorPlanV1, "jobs" | "unshownFields" | "offPage" | "offPageFields" | "technologyLines" | "addKinds" | "addTechnologyGroup"
-  | "jobOrder" | "sortJobs">;
+  | "jobOrder" | "sortJobs" | "hideBlocks">;
 
 /** What Python's V7 panel path saves (D113); the panel offers nothing else. Adding a technology also needs a target. */
 export const panelSupport: { remove: ReadonlySet<string> } = {
@@ -39,6 +39,13 @@ export function panelCommandsV7(command: PanelCommand, kinds: ReadonlyMap<string
       return null;
     return [command.recordId ? { operation: "add_technology_group", recordId: command.recordId, values: { title } }
       : { operation: "add_technology_group", recordKind: "technology", values: { title, display: display ?? "" } }];
+  }
+  if (command.operation === "hide" || command.operation === "show") {
+    // D185: a job's card by its record, or a whole résumé block by its template view.
+    const view = values?.["view"];
+    if (command.jobId || command.periodId) return null;
+    if (command.recordId) return kind === "employment" && !values ? [{ operation: command.operation, recordId: command.recordId }] : null;
+    return view && Object.keys(values ?? {}).length === 1 ? [{ operation: command.operation, values: { view } }] : null;
   }
   if (command.operation === "move_job") {
     // D182: Python decides where the card goes; the panel names the job and the way.

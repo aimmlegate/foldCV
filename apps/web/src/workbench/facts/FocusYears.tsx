@@ -5,6 +5,8 @@ import { Spinner } from "../ui/OperationStatus";
 import { Button } from "../ui/Button";
 import { useTechnologyDrag } from "./useTechnologyDrag";
 import { yearsValue } from "../../rich/v7-focus";
+import type { ReactNode } from "react";
+import { HiddenMark } from "./HideEye";
 
 /** One Focus row: the whole years its technology states, else that statement or the shown line for the placeholder;
  * the icon the document shows and whether the user chose it (D122). */
@@ -56,18 +58,21 @@ function YearsRow({ entry, paused, submit, edit, drag, pickIcon }: { entry: Entr
   </form>;
 }
 
-export function FocusYears({ entries, options, paused, submit, edit, pickIcon = null }: { entries: readonly Entry[]; options: readonly Entry[]; paused: boolean;
+export function FocusYears({ entries, options, paused, submit, edit, pickIcon = null, eye = null, hidden = false }: { entries: readonly Entry[]; options: readonly Entry[]; paused: boolean;
   submit: (command: PanelCommand) => Promise<void>;
   /** Opens the technology's own dialog: its name and any stated experience, such as 10 месяцев. */
   edit: (recordId: string) => void;
   /** Opens the icon search for a row; null when the template has no icons to choose from (D122). */
-  pickIcon?: ((recordId: string) => void) | null }) {
+  pickIcon?: ((recordId: string) => void) | null;
+  /** D185: the Focus block's eye, and whether the block is off the page. */
+  eye?: ReactNode; hidden?: boolean }) {
   const [selected, setSelected] = useState(""), [busy, setBusy] = useState(false);
   const running = useRef(false);
   const choice = options.some(option => option.recordId === selected) ? selected : options[0]?.recordId ?? "";
   const drag = useTechnologyDrag(entries.map(entry => entry.recordId), "move_focus", paused || busy, submit);
   // Nothing to list or add, as for a template without a Focus block: no Focus heading either.
-  if (!entries.length && !options.length) return null;
+  // A hidden Focus block shows no rows; its part stays for the eye that brings it back (D185).
+  if (!entries.length && !options.length && !eye) return null;
   async function add() {
     if (paused || running.current || !choice) return;
     running.current = true; setBusy(true);
@@ -75,8 +80,8 @@ export function FocusYears({ entries, options, paused, submit, edit, pickIcon = 
     catch { /* The facts panel shows the error. */ }
     finally { running.current = false; setBusy(false); }
   }
-  return <div className="focus-years" aria-label="Фокус">
-    <p className="technology-label">Фокус · лет опыта</p>
+  return <div className="focus-years" aria-label="Фокус" data-hidden={hidden || undefined}>
+    <p className="technology-label">Фокус · лет опыта{hidden && <HiddenMark />}{eye}</p>
     {entries.map(entry => <YearsRow key={entry.recordId} entry={entry} paused={paused} submit={submit} edit={edit} drag={drag} pickIcon={pickIcon} />)}
     {drag.dragging && entries.length > 1 && <div className="technology-drop-end" {...drag.target(null)}>В конец списка</div>}
     {options.length > 0 && <form className="focus-add" onSubmit={event => { event.preventDefault(); void add(); }}>

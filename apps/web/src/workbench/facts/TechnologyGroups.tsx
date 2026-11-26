@@ -1,4 +1,4 @@
-import { useId, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useId, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import type { WorkingFacts } from "../../contracts/generated/contracts";
 import { title as recordTitle } from "../../rich/fact-fields";
 import { technologyKey, technologyName } from "../../rich/panel-intents";
@@ -7,6 +7,7 @@ import type { PanelCommand, TechnologyTarget } from "../../rich/v7-panel";
 import { Icon } from "../ui/Icon";
 import { Spinner } from "../ui/OperationStatus";
 import { TechnologyAdd } from "./TechnologyAdd";
+import { HiddenMark } from "./HideEye";
 
 type Technology = Extract<WorkingFacts["records"][number], { kind: "technology" }>;
 type Category = { id: string; title: string; records: Technology[]; draft: boolean };
@@ -15,7 +16,7 @@ const dragType = "application/x-foldcv-technology-group";
 /** The skill groups of the resume, each with its technologies in the document's order (D136). A technology is added to a
  * group, moved within or between groups, or taken out of one; a group of one's own starts as a draft here and shows in the
  * resume with its first technology. General technologies the resume shows nowhere are listed last. */
-export function TechnologyGroups({ facts, document: resumeDocument, targets, creatable, pending, paused, submit, edit, excluded }: {
+export function TechnologyGroups({ facts, document: resumeDocument, targets, creatable, pending, paused, submit, edit, excluded, eyes }: {
   facts: WorkingFacts; document: OrderDocument;
   /** The plan's general targets: one per group, with its technologies. */
   targets: readonly TechnologyTarget[];
@@ -26,6 +27,8 @@ export function TechnologyGroups({ facts, document: resumeDocument, targets, cre
   edit: (recordId: string) => void;
   /** Records only Focus rows show; Focus manages them. */
   excluded?: ReadonlySet<string> | undefined;
+  /** D185: by group target, the eye of its résumé block and whether the block is off the page. */
+  eyes?: ReadonlyMap<string, { eye: ReactNode; hidden: boolean }>;
 }) {
   const scope = useId();
   const [drafts, setDrafts] = useState<string[]>([]), [naming, setNaming] = useState<string | null>(null);
@@ -111,8 +114,10 @@ export function TechnologyGroups({ facts, document: resumeDocument, targets, cre
       }}><Icon name="close" /></button>
   </li>;
   return <div className="technology-select technology-categories">
-    {categories.map(category => <section key={category.id} className="technology-category" aria-label={`Категория: ${category.title || "Без названия"}`}>
+    {categories.map(category => <section key={category.id} className="technology-category" aria-label={`Категория: ${category.title || "Без названия"}`}
+      data-hidden={eyes?.get(category.id)?.hidden || undefined}>
       <div className="technology-category-heading"><h4>{category.title || "Без названия"}</h4>
+        {eyes?.get(category.id)?.hidden && <HiddenMark />}{eyes?.get(category.id)?.eye}
         {category.draft && <button type="button" className="icon" aria-label={`Убрать категорию: ${category.title}`} disabled={paused}
           onClick={() => forget(category.title)}><Icon name="close" /></button>}</div>
       <ul className="technology-values" aria-label={`Технологии категории: ${category.title}`}>
