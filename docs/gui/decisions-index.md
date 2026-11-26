@@ -189,3 +189,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D184 «Две колонки» 1.7.0 has no common achievements block
 - D185 «Скрыть» in Facts: a job or a résumé block off the page and back
 - D186 Anonymized export: «DOCX обезличенный», «PDF обезличенный»
+- D187 A photo in the résumé, own Focus icons, one image dialog with crop and zoom
