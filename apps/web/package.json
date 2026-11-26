@@ -28,6 +28,7 @@
     "pdfjs-dist": "6.4.299",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-easy-crop": "6.2.5",
     "tailwindcss": "4.1.14",
     "yaml": "2.9.1"
   },
