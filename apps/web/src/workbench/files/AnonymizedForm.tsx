@@ -12,11 +12,14 @@ export function checkLine(quotes: readonly string[]): string {
 
 /** The anonymized export's form (D186): the short name to show, what is left out and the places to check. Python makes
  * every value; the form only edits the name. */
-export function AnonymizedForm({ load, name, change, busy }: {
+export function AnonymizedForm({ load, name, change, busy, initial = null }: {
   load: () => Promise<AnonymizedPreviewV1>; name: string | null; change: (value: string) => void; busy: boolean;
+  /** Python's answer when it is already known. */
+  initial?: AnonymizedPreviewV1 | null;
 }) {
-  const [shown, setShown] = useState<AnonymizedPreviewV1 | null>(null), [failure, setFailure] = useState<unknown>(null);
+  const [shown, setShown] = useState<AnonymizedPreviewV1 | null>(initial), [failure, setFailure] = useState<unknown>(null);
   useEffect(() => {
+    if (initial) return;
     let live = true;
     load().then(value => { if (!live) return; setShown(value); if (name === null) change(value.name); }, error => { if (live) setFailure(error); });
     return () => { live = false; };
