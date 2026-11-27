@@ -535,7 +535,9 @@ class CodexAgentRuntime:
         rows = subprocess.check_output(["/bin/ps", "-axo", "pid=,ppid=,command="], text=True, timeout=2)
         children = [row.strip().split(None, 2) for row in rows.splitlines()]
         owned = [parts for parts in children if len(parts) == 3 and int(parts[1]) == files.process.pid]
-        if (require_host and not owned) or any(parts[2] != str(host) for parts in owned):
+        # A newer CLI starts the host with arguments (0.169: `--listen grpc+stdio://`); the program is what counts.
+        if (require_host and not owned) or any(parts[2] != str(host) and not parts[2].startswith(str(host) + " ")
+                                               for parts in owned):
             raise AgentFailure("AGENT_RUNTIME_UNSUPPORTED")
         listeners = subprocess.run(["/usr/sbin/lsof", "-nP", "-a", "-p",
             ",".join([str(files.process.pid), *(parts[0] for parts in owned)]), "-iTCP", "-sTCP:LISTEN"],

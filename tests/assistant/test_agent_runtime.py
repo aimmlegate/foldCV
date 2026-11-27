@@ -7,6 +7,7 @@ import threading
 import pytest
 
 from packages.resume_core.repository.assistant_store import AgentFailure
+from resume_api.providers.codex import runtime as codex_runtime
 from resume_api.providers.codex.runtime import NativeSession, SERVER_REQUESTS, frame
 from resume_api.inference_admission import AdmissionBlocked, AdmissionCancelled, InferenceAdmission
 from tests.support.appserver import (JumpClock, complete_events, config_result, input_value, model_result, notification,
@@ -324,3 +325,27 @@ async def test_cleanup_failure_blocks_the_permit_before_another_waiter_can_enter
         with permit.hold(threading.Event()):
             pytest.fail("cleanup-blocked permit entered")
     assert "PRIVATE_CANARY" not in repr(result)
+
+
+@pytest.mark.skipif(codex_runtime.WINDOWS, reason="the POSIX process list")
+@pytest.mark.parametrize("command, accepted", [
+    ("/opt/cli runtime/bin/codex-code-mode-host", True),
+    ("/opt/cli runtime/bin/codex-code-mode-host --listen grpc+stdio://", True),
+    ("/opt/cli runtime/bin/codex-code-mode-host-other", False),
+    ("/bin/sh -c /opt/cli runtime/bin/codex-code-mode-host", False),
+    (None, False),
+])
+def test_the_child_of_the_app_server_is_the_host_program_with_any_arguments(monkeypatch, command, accepted):
+    from types import SimpleNamespace
+    rows = "  10     1 codex app-server\n" + (f"  11    10 {command}\n" if command else "")
+    monkeypatch.setattr(codex_runtime.subprocess, "check_output", lambda *args, **kwargs: rows)
+    monkeypatch.setattr(codex_runtime.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout=b""))
+    files = SimpleNamespace(process=SimpleNamespace(pid=10))
+    check = lambda: codex_runtime.CodexAgentRuntime.check_owned_host(files, host="/opt/cli runtime/bin/codex-code-mode-host")
+    if accepted:
+        assert check() == (11,)
+    else:
+        with pytest.raises(AgentFailure) as raised:
+            check()
+        assert raised.value.code == "AGENT_RUNTIME_UNSUPPORTED"

@@ -191,3 +191,4 @@ Number and title of each decision in the local log `docs/gui/automation/decision
 - D186 Anonymized export: «DOCX обезличенный», «PDF обезличенный»
 - D187 A photo in the résumé, own Focus icons, one image dialog with crop and zoom
 - D188 A period wrapped onto two lines is one line of the CV
+- D189 The Codex assistant accepts the code-mode host with arguments
